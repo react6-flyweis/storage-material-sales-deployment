@@ -5,19 +5,29 @@ import {
   Download,
   MessageSquare,
   Eye,
-  Edit,
   UserCheck,
   FileText,
   Redo,
   TrendingUp,
   Search,
+  Pen,
+  AlertCircle,
 } from "lucide-react";
 import ImportLeadsDialog from "@/components/leads/import-leads-dialog";
 import CreateQuotationDialog from "@/components/leads/create-quotation-dialog";
+import EscalateLeadDialog from "@/components/leads/escalate-lead-dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import StatCard from "@/components/ui/stat-card";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+} from "@/components/ui/table";
 import ChatDialog from "@/components/leads/chat-dialog";
 import MoveToOrdersDialog from "@/components/leads/move-to-orders-dialog";
 import SuccessDialog from "@/components/success-dialog";
@@ -337,176 +347,184 @@ export default function LeadsPage() {
         {/* Table */}
         <Card className="p-0">
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="px-4 py-3 text-left">
-                      <input
-                        type="checkbox"
-                        checked={
-                          selectedLeads.length === filteredLeads.length &&
-                          filteredLeads.length > 0
-                        }
-                        onChange={(e) => handleSelectAll(e.target.checked)}
-                        className="rounded border-gray-300"
-                      />
-                    </th>
-                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      PROJECT NAME
-                    </th>
-                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      PROGRESS
-                    </th>
-                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      STATUS
-                    </th>
-                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      PROJECT VALUE
-                    </th>
-                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      NEXT FOLLOW UP
-                    </th>
-                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      CHAT
-                    </th>
-                    <th className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      ACTIONS
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredLeads.length > 0 ? (
-                    filteredLeads.map((lead, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-3 py-2 sm:px-4 sm:py-4">
-                          <input
-                            type="checkbox"
-                            checked={selectedLeads.includes(lead.id)}
-                            onChange={(e) =>
-                              handleSelectLead(lead.id, e.target.checked)
-                            }
-                            className="rounded border-gray-300"
-                          />
-                        </td>
+            <Table>
+              <TableHeader className="bg-gray-50">
+                <TableRow>
+                  <TableHead className="px-4 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={
+                        selectedLeads.length === filteredLeads.length &&
+                        filteredLeads.length > 0
+                      }
+                      onChange={(e) => handleSelectAll(e.target.checked)}
+                      className="rounded border-gray-300"
+                    />
+                  </TableHead>
+                  <TableHead className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    PROJECT NAME
+                  </TableHead>
+                  <TableHead className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    PROGRESS
+                  </TableHead>
+                  <TableHead className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    STATUS
+                  </TableHead>
+                  <TableHead className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    PROJECT VALUE
+                  </TableHead>
+                  <TableHead className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    NEXT FOLLOW UP
+                  </TableHead>
+                  <TableHead className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    CHAT
+                  </TableHead>
+                  <TableHead className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    ACTIONS
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredLeads.length > 0 ? (
+                  filteredLeads.map((lead, index) => (
+                    <TableRow key={index}>
+                      <TableCell className="">
+                        <input
+                          type="checkbox"
+                          checked={selectedLeads.includes(lead.id)}
+                          onChange={(e) =>
+                            handleSelectLead(lead.id, e.target.checked)
+                          }
+                          className="rounded border-gray-300"
+                        />
+                      </TableCell>
 
-                        <td className="px-3 py-2 sm:px-6 sm:py-4">
-                          <div className="flex flex-col">
-                            <span className="font-semibold text-gray-900 uppercase">
-                              {lead.name}
-                            </span>
-                            <span className="text-sm text-gray-500">
-                              {lead.id.replace(/^ID-/, "Q-")}
-                            </span>
-                            <span className="text-sm text-gray-500">
-                              {lead.workshop} · {lead.category}
-                            </span>
-                            {lead.assignedTo && (
-                              <span className="text-sm text-gray-700 mt-1">
-                                Assigned to {lead.assignedToName}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-
-                        <td className="px-3 py-2 sm:px-6 sm:py-4">
-                          <div className="flex flex-col gap-1">
-                            {getProgressDots(lead.progress)}
-                            <a className="text-sm text-blue-600" href="#">
-                              {lead.progressStep}
-                            </a>
-                          </div>
-                        </td>
-
-                        <td className="px-3 py-2 sm:px-6 sm:py-4">
-                          <Badge
-                            className={`${getStatusBadgeColor(
-                              lead.statusColor,
-                            )} rounded-full px-4 py-1 text-sm`}
-                            variant="secondary"
-                          >
-                            {lead.status}
-                          </Badge>
-                        </td>
-
-                        <td className="px-3 py-2 sm:px-6 sm:py-4">
-                          <span className="font-medium text-gray-900">
-                            {lead.quoteValue}
+                      <TableCell className="">
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-gray-900 uppercase">
+                            {lead.name}
                           </span>
-                        </td>
+                          <span className="text-sm text-gray-500">
+                            {lead.id.replace(/^ID-/, "Q-")}
+                          </span>
+                          <span className="text-sm text-gray-500">
+                            {lead.workshop} · {lead.category}
+                          </span>
+                          {lead.assignedTo && (
+                            <span className="text-sm text-gray-700 mt-1">
+                              Assigned to {lead.assignedToName}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
 
-                        <td className="px-3 py-2 sm:px-6 sm:py-4 text-sm text-gray-600">
-                          {lead.nextFollowUp}
-                        </td>
+                      <TableCell className="">
+                        <div className="flex flex-col gap-1">
+                          {getProgressDots(lead.progress)}
+                          <a className="text-sm text-blue-600" href="#">
+                            {lead.progressStep}
+                          </a>
+                        </div>
+                      </TableCell>
 
-                        <td className="px-3 py-2 sm:px-6 sm:py-4">
-                          <ChatDialog
-                            lead={lead}
+                      <TableCell className="">
+                        <Badge
+                          className={`${getStatusBadgeColor(
+                            lead.statusColor,
+                          )} rounded-full px-4 py-1 text-sm`}
+                          variant="secondary"
+                        >
+                          {lead.status}
+                        </Badge>
+                      </TableCell>
+
+                      <TableCell className="">
+                        <span className="font-medium text-gray-900">
+                          {lead.quoteValue}
+                        </span>
+                      </TableCell>
+
+                      <TableCell className=" text-sm text-gray-600">
+                        {lead.nextFollowUp}
+                      </TableCell>
+
+                      <TableCell className="">
+                        <ChatDialog
+                          lead={lead}
+                          trigger={
+                            <button className="flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-600">
+                              <MessageSquare className="h-4 w-4" />
+                              <span className="text-sm">Chat</span>
+                              {lead.chatCount > 0 && (
+                                <span className="ml-2 inline-flex items-center justify-center h-5 w-5 rounded-full bg-red-500 text-white text-xs">
+                                  {lead.chatCount}
+                                </span>
+                              )}
+                            </button>
+                          }
+                        />
+                      </TableCell>
+
+                      <TableCell className="">
+                        <div className="flex items-center gap-1">
+                          <Link to={`/leads/${lead.id}`}>
+                            <Button variant="ghost" size="icon">
+                              <Eye className=" text-purple-600 stroke-2" />
+                            </Button>
+                          </Link>
+
+                          <CreateQuotationDialog
+                            leadData={{ name: lead.name, id: lead.id }}
                             trigger={
-                              <button className="flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-600">
-                                <MessageSquare className="h-4 w-4" />
-                                <span className="text-sm">Chat</span>
-                                {lead.chatCount > 0 && (
-                                  <span className="ml-2 inline-flex items-center justify-center h-5 w-5 rounded-full bg-red-500 text-white text-xs">
-                                    {lead.chatCount}
-                                  </span>
-                                )}
-                              </button>
+                              <Button variant="ghost" size="icon">
+                                <Pen className=" text-green-600" />
+                              </Button>
                             }
                           />
-                        </td>
 
-                        <td className="px-3 py-2 sm:px-6 sm:py-4">
-                          <div className="flex items-center gap-3">
-                            <Link to={`/leads/${lead.id}`}>
-                              <button className="p-2 h-8 w-8 rounded-full hover:bg-gray-100">
-                                <Eye className="h-4 w-4 text-gray-600" />
-                              </button>
-                            </Link>
+                          <Button variant="ghost" size="icon">
+                            <FileText className=" text-red-800" />
+                          </Button>
 
-                            <CreateQuotationDialog
-                              leadData={{ name: lead.name, id: lead.id }}
-                              trigger={
-                                <button className="p-2 h-8 w-8 rounded-full hover:bg-gray-100">
-                                  <Edit className="h-4 w-4 text-gray-600" />
-                                </button>
-                              }
-                            />
+                          <MoveToOrdersDialog
+                            trigger={
+                              <Button variant="ghost" size="icon">
+                                <Redo className=" text-red-500" />
+                              </Button>
+                            }
+                          />
 
-                            <button className="p-2 h-8 w-8 rounded-full hover:bg-gray-100">
-                              <FileText className="h-4 w-4 text-gray-600" />
-                            </button>
-
-                            <MoveToOrdersDialog
-                              trigger={
-                                <button className="p-2 h-8 w-8 rounded-full hover:bg-gray-100">
-                                  <Redo className="h-4 w-4 text-red-500" />
-                                </button>
-                              }
-                            />
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td
-                        colSpan={8}
-                        className="px-6 py-12 text-center text-gray-500"
-                      >
-                        <div className="flex flex-col items-center">
-                          <Search className="h-12 w-12 text-gray-300 mb-3" />
-                          <p className="text-lg font-medium">No leads found</p>
-                          <p className="text-sm">
-                            Try adjusting your search or filters
-                          </p>
+                          <EscalateLeadDialog
+                            leadId={lead.id}
+                            leadName={lead.name}
+                            trigger={
+                              <Button variant="ghost" size="icon">
+                                <AlertCircle className=" text-gray-500" />
+                              </Button>
+                            }
+                          />
                         </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={8}
+                      className="px-6 py-12 text-center text-gray-500"
+                    >
+                      <div className="flex flex-col items-center">
+                        <Search className="h-12 w-12 text-gray-300 mb-3" />
+                        <p className="text-lg font-medium">No leads found</p>
+                        <p className="text-sm">
+                          Try adjusting your search or filters
+                        </p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
       </div>
