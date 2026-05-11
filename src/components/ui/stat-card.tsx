@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router";
 
 type StatCardProps = {
-  title: string;
+  title: string | React.ReactNode;
   value: React.ReactNode;
   icon?: React.ReactNode;
   color?: string;
@@ -26,7 +26,7 @@ export default function StatCard({
       className={cn(
         "sm:p-5 px-3 py-2 rounded-md text-white border-none cursor-pointer",
         className,
-        color
+        color,
       )}
       onClick={() => navigateTo && navigation(navigateTo)}
     >

@@ -128,7 +128,7 @@ export default function ProjectInvoicesPage() {
             value={stat.value}
             color={stat.bg}
             icon={<stat.icon className={`h-5 w-5 ${stat.iconColor}`} />}
-            valueClassName="text-3xl font-semibold"
+            // valueClassName="text-3xl font-semibold"
           />
         ))}
       </div>

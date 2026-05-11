@@ -67,9 +67,7 @@ export default function ProjectDetailsPage() {
   const [selectedStepId, setSelectedStepId] = useState(7);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
-  const [successDialogTitle, setSuccessDialogTitle] = useState(
-    "Status Updated Successfully",
-  );
+  const [successDialogTitle] = useState("Status Updated Successfully");
 
   const handleSaveNote = (data: AddNotesFormValues) => {
     setNotes((current) => [data, ...current]);

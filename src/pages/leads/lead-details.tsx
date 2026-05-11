@@ -65,7 +65,7 @@ export default function LeadDetails() {
             </TabsList>
 
             <TabsContent value="basic-info" className="mt-6">
-              <BasicDetails lead={lead} />
+              <BasicDetails />
             </TabsContent>
             {/* <TabsContent value="rfq" className="mt-6">
               <RFQTab />

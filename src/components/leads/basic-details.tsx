@@ -24,19 +24,19 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-type Lead = {
-  id: string;
-  name: string;
-  workshop?: string;
-  category?: string;
-  assignedToName?: string | null;
-  assignmentStatus?: string;
-  progress?: number;
-  status?: string;
-  statusColor?: string;
-  quoteValue?: string;
-  chatCount?: number;
-};
+// type Lead = {
+//   id: string;
+//   name: string;
+//   workshop?: string;
+//   category?: string;
+//   assignedToName?: string | null;
+//   assignmentStatus?: string;
+//   progress?: number;
+//   status?: string;
+//   statusColor?: string;
+//   quoteValue?: string;
+//   chatCount?: number;
+// };
 
 const lifecycleSteps = [
   { id: 1, label: "Released\nto plant", date: "24-10-10" },
@@ -60,7 +60,7 @@ const lifecycleSteps = [
   { id: 14, label: "Delivered" },
 ];
 
-export default function BasicDetails({ lead }: { lead: Lead }) {
+export default function BasicDetails() {
   const [notes, setNotes] = useState<AddNotesFormValues[]>([
     {
       title: "Steel Investment",
