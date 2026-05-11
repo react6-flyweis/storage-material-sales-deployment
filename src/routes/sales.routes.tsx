@@ -15,6 +15,29 @@ const EscalatedQueries = lazy(() => import("@/pages/escalated-queries"));
 
 const Dashboard = lazy(() => import("@/pages/dashboard"));
 
+// customers section
+const Customers = lazy(() => import("@/pages/customers/customers"));
+const CustomerInfo = lazy(
+  () => import("@/pages/customers/customer-detail/customer-info"),
+);
+
+const ProjectDetails = lazy(
+  () => import("@/pages/customers/customer-detail/project-details"),
+);
+const ProjectInvoices = lazy(
+  () => import("@/pages/customers/customer-detail/project-invoices"),
+);
+const ProjectPayments = lazy(
+  () => import("@/pages/customers/customer-detail/project-payments"),
+);
+const ProjectQuotation = lazy(
+  () => import("@/pages/customers/customer-detail/project-quotation"),
+);
+const AddNewProjectPage = lazy(
+  () => import("@/pages/customers/customer-detail/add-new-project"),
+);
+const ContractDetail = lazy(() => import("@/pages/customers/contract-detail"));
+
 // leads section
 const Leads = lazy(() => import("@/pages/leads/leads"));
 const AddNewLead = lazy(() => import("@/pages/leads/add-new-lead"));
@@ -68,6 +91,28 @@ export const salesRoutes: RouteObject[] = [
     element: <AdminLayout />,
     children: [
       { path: "dashboard", element: <Dashboard /> },
+
+      // customers routes
+      {
+        path: "customers",
+        children: [
+          { index: true, element: <Customers /> },
+          // /customers/meetings routes
+          // /customers/:id routes
+          {
+            path: ":id",
+            children: [
+              { index: true, element: <CustomerInfo /> },
+              { path: "contracts/:id", element: <ContractDetail /> },
+              { path: "project-details", element: <ProjectDetails /> },
+              { path: "project-invoices", element: <ProjectInvoices /> },
+              { path: "project-quotation", element: <ProjectQuotation /> },
+              { path: "project-payments", element: <ProjectPayments /> },
+            ],
+          },
+          { path: ":id/projects/new", element: <AddNewProjectPage /> },
+        ],
+      },
 
       // leads routes
       {
