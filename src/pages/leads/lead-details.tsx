@@ -1,28 +1,27 @@
-import { useState } from "react";
 import { useNavigate } from "react-router";
 import { ArrowLeft } from "lucide-react";
 import BasicDetails from "@/components/leads/basic-details";
-import RFQTab from "@/components/leads/rfq-tab";
+// import RFQTab from "@/components/leads/rfq-tab";
 import QuotationCard from "@/components/leads/quotation-card";
 import ChatCard from "@/components/leads/chat-card";
 import TimelineCard from "@/components/leads/timeline-card";
 import FollowUpsCard from "@/components/leads/follow-ups-card";
 import PaymentsCard from "@/components/leads/payments-card";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const TABS = [
-  "Basic info",
-  "RFQ",
-  "Quotation",
-  "Open Chat",
-  "Timeline",
-  "Follow Ups",
-  "Payments",
-];
+  { value: "basic-info", label: "Basic info" },
+  // { value: "rfq", label: "RFQ" },
+  { value: "quotation", label: "Quotation" },
+  { value: "open-chat", label: "Open Chat" },
+  { value: "timeline", label: "Timeline" },
+  { value: "follow-ups", label: "Follow Ups" },
+  { value: "payments", label: "Payments" },
+] as const;
 
 export default function LeadDetails() {
   const navigate = useNavigate();
-  const [active, setActive] = useState<string>(TABS[0]);
 
   const lead = {
     id: "LD-2025-001",
@@ -56,44 +55,38 @@ export default function LeadDetails() {
         </div>
 
         <div className="mt-6">
-          <nav>
-            <ul className="flex items-end overflow-x-auto gap-8 text-sm text-gray-600">
-              {TABS.map((tab) => {
-                const isActive = tab === active;
-                return (
-                  <li
-                    key={tab}
-                    onClick={() => {
-                      setActive(tab);
-                    }}
-                    className={`cursor-pointer pb-3 ${
-                      isActive ? "text-blue-600 font-medium" : ""
-                    }`}
-                  >
-                    <div className="relative">
-                      {tab}
-                      {isActive && (
-                        <span className="absolute left-0 -bottom-1 h-1 w-full bg-blue-500 rounded" />
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </nav>
-        </div>
-      </div>
+          <Tabs defaultValue={TABS[0].value} className="w-full">
+            <TabsList variant="line" className="w-full justify-start ">
+              {TABS.map((tab) => (
+                <TabsTrigger key={tab.value} value={tab.value} className="">
+                  {tab.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
 
-      {/* active tab */}
-      <div className="mt-6">
-        {active === "Basic info" && <BasicDetails lead={lead} />}
-        {active === "RFQ" && <RFQTab />}
-        {active === "Quotation" && <QuotationCard />}
-        {active === "Open Chat" && <ChatCard lead={lead} />}
-        {active === "Timeline" && <TimelineCard lead={lead} />}
-        {active === "Follow Ups" && <FollowUpsCard />}
-        {active === "Payments" && <PaymentsCard />}
-        {/* TODO: render other tabs here when implemented */}
+            <TabsContent value="basic-info" className="mt-6">
+              <BasicDetails lead={lead} />
+            </TabsContent>
+            {/* <TabsContent value="rfq" className="mt-6">
+              <RFQTab />
+            </TabsContent> */}
+            <TabsContent value="quotation" className="mt-6">
+              <QuotationCard />
+            </TabsContent>
+            <TabsContent value="open-chat" className="mt-6">
+              <ChatCard lead={lead} />
+            </TabsContent>
+            <TabsContent value="timeline" className="mt-6">
+              <TimelineCard lead={lead} />
+            </TabsContent>
+            <TabsContent value="follow-ups" className="mt-6">
+              <FollowUpsCard />
+            </TabsContent>
+            <TabsContent value="payments" className="mt-6">
+              <PaymentsCard />
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
     </div>
   );
