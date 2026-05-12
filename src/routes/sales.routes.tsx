@@ -14,9 +14,22 @@ const EditProfile = lazy(() => import("@/pages/edit-profile"));
 const EscalatedQueries = lazy(() => import("@/pages/escalated-queries"));
 
 const Dashboard = lazy(() => import("@/pages/dashboard"));
+const Deliveries = lazy(() => import("@/pages/deliveries/deliveries"));
+const DeliveryDetails = lazy(
+  () => import("@/pages/deliveries/delivery-details"),
+);
+const CustomerDeliverySchedule = lazy(
+  () => import("@/pages/deliveries/customer-delivery-schedule"),
+);
+const AwardedFreightRequests = lazy(
+  () => import("@/pages/deliveries/awarded-freight"),
+);
 
 // customers section
 const Customers = lazy(() => import("@/pages/customers/customers"));
+const RequestDeliveryChange = lazy(
+  () => import("@/pages/customers/request-delivery-change"),
+);
 const CustomerInfo = lazy(
   () => import("@/pages/customers/customer-detail/customer-info"),
 );
@@ -35,6 +48,9 @@ const ProjectQuotation = lazy(
 );
 const AddNewProjectPage = lazy(
   () => import("@/pages/customers/customer-detail/add-new-project"),
+);
+const CustomerCommunication = lazy(
+  () => import("@/pages/customers/customer-communication"),
 );
 const ContractDetail = lazy(() => import("@/pages/customers/contract-detail"));
 
@@ -97,6 +113,10 @@ export const salesRoutes: RouteObject[] = [
         path: "customers",
         children: [
           { index: true, element: <Customers /> },
+          {
+            path: "request-delivery-change",
+            element: <RequestDeliveryChange />,
+          },
           // /customers/meetings routes
           // /customers/:id routes
           {
@@ -219,6 +239,30 @@ export const salesRoutes: RouteObject[] = [
           { path: ":id", element: <InvoiceForm /> },
           { path: "sales-growth", element: <SalesGrowth /> },
         ],
+      },
+
+      //  customer delivery
+      {
+        path: "deliveries",
+        children: [
+          { index: true, element: <CustomerDeliverySchedule /> },
+          {
+            path: "projects",
+            children: [
+              { index: true, element: <Deliveries /> },
+
+              { path: ":id", element: <DeliveryDetails /> },
+            ],
+          },
+        ],
+      },
+      {
+        path: "awarded-freight",
+        element: <AwardedFreightRequests />,
+      },
+      {
+        path: "customer-communication",
+        element: <CustomerCommunication />,
       },
 
       { path: "*", element: <NotFound /> },
