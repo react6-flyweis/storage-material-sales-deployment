@@ -24,6 +24,7 @@ const CustomerDeliverySchedule = lazy(
 const AwardedFreightRequests = lazy(
   () => import("@/pages/deliveries/awarded-freight"),
 );
+const SalesPage = lazy(() => import("@/pages/sales/sales"));
 
 // customers section
 const Customers = lazy(() => import("@/pages/customers/customers"));
@@ -263,6 +264,10 @@ export const salesRoutes: RouteObject[] = [
       {
         path: "customer-communication",
         element: <CustomerCommunication />,
+      },
+      {
+        path: "sales",
+        element: <SalesPage />,
       },
 
       { path: "*", element: <NotFound /> },
