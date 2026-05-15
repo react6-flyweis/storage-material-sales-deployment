@@ -27,102 +27,15 @@ import { Badge } from "@/components/ui/badge";
 import FilterTabs, { type Period } from "@/components/FilterTabs";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router";
+import { useCustomerStatsQuery } from "@/lib/metrics";
+import { useSalesCustomersQuery } from "@/modules/customers/customers.hooks";
 
 // import totalCustomersIcon from "@/assets/icons/customers/total-customers.svg";
 // import activeCustomersIcon from "@/assets/icons/customers/active-customers.svg";
 // import totalProjectsIcon from "@/assets/icons/customers/total-projects.svg";
 // import projectsInExecutionIcon from "@/assets/icons/customers/projects-execution.svg";
 
-const customers = [
-  {
-    id: "1",
-    customerId: "ID-2025-1047",
-    customerName: "John Doe",
-    phone: "+39 02 8945 2231",
-    email: "luca.moretti@eurobuild.it",
-    inquiryFor: "Garage",
-    status: "Inactive",
-    createdAt: new Date(),
-    isReturning: false,
-  },
-  {
-    id: "2",
-    customerId: "ID-2025-1047",
-    customerName: "John Doe",
-    phone: "+39 02 8945 2231",
-    email: "luca.moretti@eurobuild.it",
-    inquiryFor: "Garage",
-    status: "Active",
-    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-    isReturning: true,
-  },
-  {
-    id: "3",
-    customerId: "ID-2025-1047",
-    customerName: "John Doe",
-    phone: "+39 02 8945 2231",
-    email: "luca.moretti@eurobuild.it",
-    inquiryFor: "Garage",
-    status: "Active",
-    createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-    isReturning: true,
-  },
-  {
-    id: "4",
-    customerId: "ID-2025-1047",
-    customerName: "John Doe",
-    phone: "+39 02 8945 2231",
-    email: "luca.moretti@eurobuild.it",
-    inquiryFor: "Garage",
-    status: "Inactive",
-    createdAt: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000),
-    isReturning: false,
-  },
-  {
-    id: "5",
-    customerId: "ID-2025-1047",
-    customerName: "John Doe",
-    phone: "+39 02 8945 2231",
-    email: "luca.moretti@eurobuild.it",
-    inquiryFor: "Garage",
-    status: "Active",
-    createdAt: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000),
-    isReturning: true,
-  },
-  {
-    id: "6",
-    customerId: "ID-2025-1047",
-    customerName: "John Doe",
-    phone: "+39 02 8945 2231",
-    email: "luca.moretti@eurobuild.it",
-    inquiryFor: "Garage",
-    status: "Active",
-    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-    isReturning: true,
-  },
-  {
-    id: "7",
-    customerId: "ID-2025-1047",
-    customerName: "John Doe",
-    phone: "+39 02 8945 2231",
-    email: "luca.moretti@eurobuild.it",
-    inquiryFor: "Garage",
-    status: "Inactive",
-    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-    isReturning: false,
-  },
-  {
-    id: "8",
-    customerId: "ID-2025-1047",
-    customerName: "John Doe",
-    phone: "+39 02 8945 2231",
-    email: "luca.moretti@eurobuild.it",
-    inquiryFor: "Garage",
-    status: "Active",
-    createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
-    isReturning: true,
-  },
-];
+// Customers will be loaded from the sales API via `useSalesCustomersQuery`
 
 function getStatusClasses(status: string) {
   switch (status.toLowerCase()) {
@@ -139,6 +52,8 @@ export default function CustomersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [period, setPeriod] = useState<Period>("month");
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
 
   // Helper to check if a date matches the selected period
   const isInPeriod = useCallback(
@@ -168,25 +83,56 @@ export default function CustomersPage() {
     [period],
   );
 
+  // Load customers from sales API and map to UI shape
+  const { data: salesData, isLoading: customersLoading } =
+    useSalesCustomersQuery(page, limit);
+
+  const customers = useMemo(() => {
+    const apiCustomers = salesData?.data.customers ?? [];
+
+    return apiCustomers.map((c) => ({
+      id: c._id,
+      customerId: c.customerId,
+      customerName:
+        `${c.firstName ?? ""} ${c.lastName ?? ""}`.trim() || c.customerId,
+      phone: c.phone
+        ? `${c.phone.countryCode ?? ""} ${c.phone.number ?? ""}`.trim()
+        : "",
+      email: c.email ?? "",
+      inquiryFor: c.inquiryFor ?? "",
+      status: c.isActive ? "Active" : "Inactive",
+      createdAt: c.createdAt ? new Date(c.createdAt) : new Date(),
+      isReturning: (c as any).isReturning ?? false,
+    }));
+  }, [salesData]);
+
   // Calculate period-filtered stats
   const periodFilteredCustomers = useMemo(() => {
     return customers.filter((c) => isInPeriod(c.createdAt));
-  }, [isInPeriod]);
+  }, [customers, isInPeriod]);
+  const { data: customerStats, isLoading: statsLoading } =
+    useCustomerStatsQuery(period);
 
   const stats = useMemo(() => {
-    const total = periodFilteredCustomers.length;
-    const active = periodFilteredCustomers.filter(
-      (c) => c.status.toLowerCase() === "active",
-    ).length;
-    const newCustomers = periodFilteredCustomers.filter(
-      (c) => c.isReturning === false,
-    ).length;
-    const returning = periodFilteredCustomers.filter(
-      (c) => c.isReturning === true,
-    ).length;
+    if (statsLoading) {
+      return { total: 0, active: 0, newCustomers: 0, returning: 0 };
+    }
 
-    return { total, active, newCustomers, returning };
-  }, [periodFilteredCustomers]);
+    return {
+      total: customerStats?.total ?? periodFilteredCustomers.length,
+      active:
+        customerStats?.active ??
+        periodFilteredCustomers.filter(
+          (c) => c.status.toLowerCase() === "active",
+        ).length,
+      newCustomers:
+        customerStats?.newThisMonth ??
+        periodFilteredCustomers.filter((c) => c.isReturning === false).length,
+      returning:
+        customerStats?.returning ??
+        periodFilteredCustomers.filter((c) => c.isReturning === true).length,
+    };
+  }, [customerStats, periodFilteredCustomers, statsLoading]);
 
   const filteredCustomers = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -284,6 +230,7 @@ export default function CustomersPage() {
                 value={value}
                 color={iconBgClassName}
                 icon={<Icon className={cn("h-6 w-6", iconColor)} />}
+                loading={statsLoading}
               />
             ),
           )}
@@ -330,35 +277,77 @@ export default function CustomersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredCustomers.map((customer, index) => (
-                <TableRow key={`${customer.id}-${index}`} className="border-0">
-                  <TableCell className="">{customer.customerId}</TableCell>
-                  <TableCell className="">{customer.customerName}</TableCell>
-                  <TableCell className="">{customer.phone}</TableCell>
-                  <TableCell className="">{customer.email}</TableCell>
-                  <TableCell className="">{customer.inquiryFor}</TableCell>
-                  <TableCell className="">
-                    <Badge
-                      // variant="outline"
-                      className={cn("", getStatusClasses(customer.status))}
-                    >
-                      {customer.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="">
-                    <Link to={`/customers/${customer.id}`}>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`View ${customer.customerName}`}
-                      >
-                        <Eye className="text-purple-500" />
-                      </Button>
-                    </Link>
+              {customersLoading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <TableRow
+                    key={`loading-${i}`}
+                    className="border-0 animate-pulse"
+                  >
+                    <TableCell>
+                      <div className="h-4 w-24 rounded bg-slate-200" />
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-4 w-40 rounded bg-slate-200" />
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-4 w-32 rounded bg-slate-200" />
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-4 w-48 rounded bg-slate-200" />
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-4 w-28 rounded bg-slate-200" />
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-4 w-20 rounded bg-slate-200" />
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-4 w-10 rounded bg-slate-200" />
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : filteredCustomers.length === 0 ? (
+                <TableRow className="border-0">
+                  <TableCell
+                    colSpan={7}
+                    className="text-center py-6 text-gray-500"
+                  >
+                    No customers found.
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                filteredCustomers.map((customer, index) => (
+                  <TableRow
+                    key={`${customer.id}-${index}`}
+                    className="border-0"
+                  >
+                    <TableCell className="">{customer.customerId}</TableCell>
+                    <TableCell className="">{customer.customerName}</TableCell>
+                    <TableCell className="">{customer.phone}</TableCell>
+                    <TableCell className="">{customer.email}</TableCell>
+                    <TableCell className="">{customer.inquiryFor}</TableCell>
+                    <TableCell className="">
+                      <Badge
+                        className={cn("", getStatusClasses(customer.status))}
+                      >
+                        {customer.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="">
+                      <Link to={`/customers/${customer.id}`}>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`View ${customer.customerName}`}
+                        >
+                          <Eye className="text-purple-500" />
+                        </Button>
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </div>
