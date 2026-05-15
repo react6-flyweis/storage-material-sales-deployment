@@ -52,8 +52,8 @@ export default function CustomersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [period, setPeriod] = useState<Period>("month");
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(20);
+  const [page] = useState(1);
+  const [limit] = useState(20);
 
   // Helper to check if a date matches the selected period
   const isInPeriod = useCallback(
