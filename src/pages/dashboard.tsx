@@ -9,29 +9,13 @@ import LeadsIcon from "@/assets/icons/dashboard/leads.svg";
 import ConfirmedIcon from "@/assets/icons/dashboard/confirmed.svg";
 import ValueIcon from "@/assets/icons/dashboard/value.svg";
 import RevenueIcon from "@/assets/icons/dashboard/revenue.svg";
-import { useEffect, useState } from "react";
-import { getDashboardMetrics, type DashboardMetrics } from "@/lib/metrics";
+import { useState } from "react";
+import { useDashboardMetricsQuery } from "@/lib/metrics";
 
 export default function Dashboard() {
   const [period, setPeriod] = useState<Period>("quarter");
-  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    let mounted = true;
-    setLoading(true);
-    getDashboardMetrics(period)
-      .then((m) => {
-        if (mounted) setMetrics(m);
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [period]);
+  const { data: metrics, isPending } = useDashboardMetricsQuery(period);
+  const loading = isPending && !metrics;
 
   return (
     <div className="">
@@ -52,43 +36,47 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             title="Total Leads"
-            value={loading ? "..." : metrics ? metrics.totalLeads : "-"}
+            value={metrics?.totalLeads ?? 0}
             icon={<img src={LeadsIcon} alt="leads" className="size-7" />}
             color="bg-blue-500"
             navigateTo="/leads"
+            loading={loading}
           />
 
           <StatCard
             title="Leads Closed"
-            value={loading ? "..." : metrics ? metrics.leadsClosed : "-"}
+            value={metrics?.leadsClosed ?? 0}
             icon={
               <img src={ConfirmedIcon} alt="confirmed" className="size-7" />
             }
             color="bg-green-500"
             navigateTo="/leads"
+            loading={loading}
           />
 
           <StatCard
             title="Follow-ups Pending"
-            value={loading ? "..." : metrics ? metrics.followUpsPending : "-"}
+            value={metrics?.followUpPending ?? 0}
             icon={<img src={ValueIcon} alt="value" className="size-7" />}
             color="bg-yellow-500"
             navigateTo="/leads/follow-up"
+            loading={loading}
           />
 
           <StatCard
             title="AI Escalations"
-            value={loading ? "..." : metrics ? metrics.aiEscalations : "-"}
+            value={metrics?.escalationsPending ?? 0}
             icon={<img src={RevenueIcon} alt="revenue" className="size-7" />}
             color="bg-red-500"
             navigateTo="/leads/escalated-queries"
+            loading={loading}
           />
         </div>
 
         {/* Chart Row 1 */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
-            <SalesFunnel />
+            <SalesFunnel period={period} />
           </div>
           <AiSupportSummary />
         </div>
