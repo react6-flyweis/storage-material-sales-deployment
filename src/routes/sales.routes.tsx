@@ -2,6 +2,7 @@ import type { RouteObject } from "react-router";
 import { lazy } from "react";
 import { NotFound } from "@/pages/not-found";
 import { AdminLayout } from "@/components/admin-layout";
+import { ProtectedRoute, PublicOnlyRoute } from "@/modules/auth/auth.guards";
 
 const SignIn = lazy(() => import("@/pages/sign-in"));
 const Notifications = lazy(() => import("@/pages/notifications"));
@@ -100,177 +101,187 @@ const InvoicePreviewPage = lazy(
 
 export const salesRoutes: RouteObject[] = [
   {
-    path: "/",
-    element: <SignIn />,
+    element: <PublicOnlyRoute />,
+    children: [
+      {
+        path: "/sign-in",
+        element: <SignIn />,
+      },
+    ],
   },
   {
-    path: "/",
-    element: <AdminLayout />,
+    element: <ProtectedRoute />,
     children: [
-      { path: "dashboard", element: <Dashboard /> },
-
-      // customers routes
       {
-        path: "customers",
+        path: "/",
+        element: <AdminLayout />,
         children: [
-          { index: true, element: <Customers /> },
+          { path: "dashboard", element: <Dashboard /> },
+
+          // customers routes
           {
-            path: "request-delivery-change",
-            element: <RequestDeliveryChange />,
-          },
-          // /customers/meetings routes
-          // /customers/:id routes
-          {
-            path: ":id",
+            path: "customers",
             children: [
-              { index: true, element: <CustomerInfo /> },
-              { path: "contracts/:id", element: <ContractDetail /> },
-              { path: "project-details", element: <ProjectDetails /> },
-              { path: "project-invoices", element: <ProjectInvoices /> },
-              { path: "project-quotation", element: <ProjectQuotation /> },
-              { path: "project-payments", element: <ProjectPayments /> },
+              { index: true, element: <Customers /> },
+              {
+                path: "request-delivery-change",
+                element: <RequestDeliveryChange />,
+              },
+              // /customers/meetings routes
+              // /customers/:id routes
+              {
+                path: ":id",
+                children: [
+                  { index: true, element: <CustomerInfo /> },
+                  { path: "contracts/:id", element: <ContractDetail /> },
+                  { path: "project-details", element: <ProjectDetails /> },
+                  { path: "project-invoices", element: <ProjectInvoices /> },
+                  { path: "project-quotation", element: <ProjectQuotation /> },
+                  { path: "project-payments", element: <ProjectPayments /> },
+                ],
+              },
+              { path: ":id/projects/new", element: <AddNewProjectPage /> },
             ],
           },
-          { path: ":id/projects/new", element: <AddNewProjectPage /> },
-        ],
-      },
 
-      // leads routes
-      {
-        path: "leads",
-        children: [
-          { index: true, element: <Leads /> },
-          { path: "add", element: <AddNewLead /> },
-          { path: "ai-marketing", element: <AIMarketing /> },
-          { path: "payment-follow-up", element: <PaymentFollowUp /> },
-          { path: "escalated-queries", element: <EscalatedQueries /> },
-
-          // /leads/follow-up routes
+          // leads routes
           {
-            path: "follow-up",
+            path: "leads",
             children: [
-              { index: true, element: <FollowUp /> },
+              { index: true, element: <Leads /> },
+              { path: "add", element: <AddNewLead /> },
+              { path: "ai-marketing", element: <AIMarketing /> },
+              { path: "payment-follow-up", element: <PaymentFollowUp /> },
+              { path: "escalated-queries", element: <EscalatedQueries /> },
+
+              // /leads/follow-up routes
               {
-                path: "communication-timeline",
-                element: <LeadCommunicationTimelinePage />,
-              },
-              {
-                path: "script-generator",
-                element: <AiScriptGeneratorPage />,
-              },
-              {
-                path: "scoring",
-                element: <LeadScoring />,
-              },
-              {
-                path: "kpis",
-                element: <FollowUpKpis />,
-              },
-              {
-                path: "smart-reminders",
+                path: "follow-up",
                 children: [
-                  { index: true, element: <SmartReminders /> },
+                  { index: true, element: <FollowUp /> },
                   {
-                    path: ":id",
-                    element: <SmartReminderDetail />,
+                    path: "communication-timeline",
+                    element: <LeadCommunicationTimelinePage />,
+                  },
+                  {
+                    path: "script-generator",
+                    element: <AiScriptGeneratorPage />,
+                  },
+                  {
+                    path: "scoring",
+                    element: <LeadScoring />,
+                  },
+                  {
+                    path: "kpis",
+                    element: <FollowUpKpis />,
+                  },
+                  {
+                    path: "smart-reminders",
+                    children: [
+                      { index: true, element: <SmartReminders /> },
+                      {
+                        path: ":id",
+                        element: <SmartReminderDetail />,
+                      },
+                    ],
+                  },
+                ],
+              },
+
+              // /leads/:leadId routes
+              {
+                path: ":leadId",
+                children: [
+                  { index: true, element: <LeadDetails /> },
+                  { path: "timeline", element: <SingleLeadTimelinePage /> },
+                  {
+                    path: "emails",
+                    element: <SingleLeadEmailsPage />,
+                  },
+                  {
+                    path: "chats",
+                    element: <SingleLeadChatsPage />,
+                  },
+                  {
+                    path: "notes",
+                    element: <SingleLeadNotesPage />,
+                  },
+                  {
+                    path: "calls",
+                    element: <SingleLeadCallsPage />,
                   },
                 ],
               },
             ],
           },
 
-          // /leads/:leadId routes
+          // global routes
+          { path: "notifications", element: <Notifications /> },
           {
-            path: ":leadId",
+            path: "communication",
+            element: <Communication />,
+          },
+          {
+            path: "analytics",
+            element: <Analytics />,
+          },
+
+          {
+            path: "settings",
+            element: <Settings />,
+          },
+          {
+            path: "profile",
             children: [
-              { index: true, element: <LeadDetails /> },
-              { path: "timeline", element: <SingleLeadTimelinePage /> },
+              { index: true, element: <Profile /> },
+              { path: "edit", element: <EditProfile /> },
+            ],
+          },
+
+          // invoice routes
+          {
+            path: "invoice",
+            children: [
+              { index: true, element: <InvoiceForm /> },
+              { path: "list", element: <InvoiceList /> },
+              { path: "preview", element: <InvoicePreviewPage /> },
+              { path: "new", element: <InvoiceForm /> },
+              { path: ":id", element: <InvoiceForm /> },
+              { path: "sales-growth", element: <SalesGrowth /> },
+            ],
+          },
+
+          //  customer delivery
+          {
+            path: "deliveries",
+            children: [
+              { index: true, element: <CustomerDeliverySchedule /> },
               {
-                path: "emails",
-                element: <SingleLeadEmailsPage />,
-              },
-              {
-                path: "chats",
-                element: <SingleLeadChatsPage />,
-              },
-              {
-                path: "notes",
-                element: <SingleLeadNotesPage />,
-              },
-              {
-                path: "calls",
-                element: <SingleLeadCallsPage />,
+                path: "projects",
+                children: [
+                  { index: true, element: <Deliveries /> },
+
+                  { path: ":id", element: <DeliveryDetails /> },
+                ],
               },
             ],
           },
-        ],
-      },
-
-      // global routes
-      { path: "notifications", element: <Notifications /> },
-      {
-        path: "communication",
-        element: <Communication />,
-      },
-      {
-        path: "analytics",
-        element: <Analytics />,
-      },
-
-      {
-        path: "settings",
-        element: <Settings />,
-      },
-      {
-        path: "profile",
-        children: [
-          { index: true, element: <Profile /> },
-          { path: "edit", element: <EditProfile /> },
-        ],
-      },
-
-      // invoice routes
-      {
-        path: "invoice",
-        children: [
-          { index: true, element: <InvoiceForm /> },
-          { path: "list", element: <InvoiceList /> },
-          { path: "preview", element: <InvoicePreviewPage /> },
-          { path: "new", element: <InvoiceForm /> },
-          { path: ":id", element: <InvoiceForm /> },
-          { path: "sales-growth", element: <SalesGrowth /> },
-        ],
-      },
-
-      //  customer delivery
-      {
-        path: "deliveries",
-        children: [
-          { index: true, element: <CustomerDeliverySchedule /> },
           {
-            path: "projects",
-            children: [
-              { index: true, element: <Deliveries /> },
-
-              { path: ":id", element: <DeliveryDetails /> },
-            ],
+            path: "awarded-freight",
+            element: <AwardedFreightRequests />,
           },
+          {
+            path: "customer-communication",
+            element: <CustomerCommunication />,
+          },
+          {
+            path: "sales",
+            element: <SalesPage />,
+          },
+
+          { path: "*", element: <NotFound /> },
         ],
       },
-      {
-        path: "awarded-freight",
-        element: <AwardedFreightRequests />,
-      },
-      {
-        path: "customer-communication",
-        element: <CustomerCommunication />,
-      },
-      {
-        path: "sales",
-        element: <SalesPage />,
-      },
-
-      { path: "*", element: <NotFound /> },
     ],
   },
   { path: "*", element: <NotFound /> },
