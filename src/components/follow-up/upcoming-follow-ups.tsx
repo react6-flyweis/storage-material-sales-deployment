@@ -12,11 +12,12 @@ import {
   Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useUpcomingFollowUpsQuery } from "@/modules/followups/followups.hooks";
 
 type ViewMode = "schedule" | "calendar" | "list";
 
 interface FollowUp {
-  id: number;
+  id: string;
   date: string;
   customer: string;
   type: string;
@@ -24,50 +25,58 @@ interface FollowUp {
   company?: string;
   status?: "overdue" | "upcoming" | "normal";
 }
-const mockFollowUps: FollowUp[] = [
-  {
-    id: 1,
-    date: "10",
-    customer: "Sarah Johnson",
-    type: "Call",
-    time: "10:00 AM",
-    company: "Tech Solutions Inc",
-    status: "overdue",
-  },
-  {
-    id: 2,
-    date: "16",
-    customer: "Michael Chen",
-    type: "Email",
-    time: "2:00 PM",
-    company: "StartupXYZ",
-    status: "upcoming",
-  },
-  {
-    id: 3,
-    date: "18",
-    customer: "Emily Davis",
-    type: "Meeting",
-    time: "4:30 PM",
-    company: "Enterprise Corp",
-    status: "normal",
-  },
-];
 
 export default function UpcomingFollowUps() {
   const [viewMode, setViewMode] = useState<ViewMode>("calendar");
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const { data: apiFollowUps = [], isLoading } = useUpcomingFollowUpsQuery();
 
   const daysInMonth = Array.from({ length: 31 }, (_, i) => i + 1);
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-  const getFollowUpForDay = (day: number) => {
-    return mockFollowUps.filter((f) => parseInt(f.date) === day);
+  const apiToFollowUp = (f: any, index: number): FollowUp => {
+    const dateObj = new Date(f.followUpDate);
+    const day = String(dateObj.getDate());
+    const time = dateObj.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    const customer =
+      f.customerId?.firstName || f.leadId?.customerId?.firstName || "Unknown";
+    const type =
+      f.modeOfContact === "call"
+        ? "Call"
+        : f.modeOfContact === "email"
+          ? "Email"
+          : "Meeting";
+    const company =
+      f.leadId?.jobId || f.leadId?.projectName || f.assignedTo?.name || "";
+    const status = (() => {
+      if (f.status === "completed") return "normal";
+      const now = new Date();
+      const d = new Date(f.followUpDate);
+      return d < now ? "overdue" : "upcoming";
+    })();
+
+    return {
+      id: f._id || String(index),
+      date: day,
+      customer,
+      type,
+      time,
+      company,
+      status,
+    };
   };
 
+  const mappedFollowUps = apiFollowUps.map(apiToFollowUp);
+
+  const getFollowUpForDay = (day: number) =>
+    mappedFollowUps.filter((f) => parseInt(f.date) === day);
+
   const filteredFollowUps = selectedDay
-    ? mockFollowUps.filter((f) => parseInt(f.date) === selectedDay)
-    : mockFollowUps;
+    ? mappedFollowUps.filter((f) => parseInt(f.date) === selectedDay)
+    : mappedFollowUps;
 
   return (
     <Card className="p-6">
@@ -124,6 +133,12 @@ export default function UpcomingFollowUps() {
         Quick view of scheduled activities
       </p>
 
+      {isLoading && (
+        <div className="p-4 text-center text-sm text-gray-500">
+          Loading follow-ups...
+        </div>
+      )}
+
       {viewMode === "calendar" && (
         <div className="space-y-4">
           {/* Day names */}
@@ -143,8 +158,9 @@ export default function UpcomingFollowUps() {
             {daysInMonth.map((day) => {
               const followUps = getFollowUpForDay(day);
               const hasFollowUp = followUps.length > 0;
-              const isOverdue = hasFollowUp && day < 23; // Mock overdue logic
-              const isToday = day === 23;
+              const isOverdue =
+                hasFollowUp && followUps.some((f) => f.status === "overdue");
+              const isToday = day === new Date().getDate();
 
               return (
                 <div
