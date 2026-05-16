@@ -116,6 +116,7 @@ export const salesRoutes: RouteObject[] = [
         path: "/",
         element: <AdminLayout />,
         children: [
+          { index: true, element: <Dashboard /> },
           { path: "dashboard", element: <Dashboard /> },
 
           // customers routes
