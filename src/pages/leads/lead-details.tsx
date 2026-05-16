@@ -1,7 +1,6 @@
-import { useNavigate } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import { ArrowLeft } from "lucide-react";
 import BasicDetails from "@/components/leads/basic-details";
-// import RFQTab from "@/components/leads/rfq-tab";
 import QuotationCard from "@/components/leads/quotation-card";
 import ChatCard from "@/components/leads/chat-card";
 import TimelineCard from "@/components/leads/timeline-card";
@@ -9,10 +8,12 @@ import FollowUpsCard from "@/components/leads/follow-ups-card";
 import PaymentsCard from "@/components/leads/payments-card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useLeadDetailQuery } from "@/modules/leads/leads.hooks";
+import { getLeadProgress } from "@/modules/leads/leads.utils";
+import type { LeadDetailData } from "@/modules/leads/leads.api";
 
 const TABS = [
   { value: "basic-info", label: "Basic info" },
-  // { value: "rfq", label: "RFQ" },
   { value: "quotation", label: "Quotation" },
   { value: "open-chat", label: "Open Chat" },
   { value: "timeline", label: "Timeline" },
@@ -20,22 +21,47 @@ const TABS = [
   { value: "payments", label: "Payments" },
 ] as const;
 
+const defaultLead = {
+  id: "—",
+  name: "—",
+  workshop: "",
+  category: "",
+  assignedToName: "",
+  assignmentStatus: "",
+  progress: 0,
+  status: "",
+  statusColor: "orange",
+  quoteValue: "",
+  chatCount: 0,
+};
+
+function mapDetailToLead(detail: LeadDetailData) {
+  const latestQuotation =
+    detail.quotations.find((q) => q.isLatest) ?? detail.quotations[0];
+
+  return {
+    id: detail.lead._id,
+    name: detail.customer.firstName || detail.customer.customerId || "Lead",
+    workshop:
+      latestQuotation?.buildingType || detail.lead.buildingType || "",
+    category: latestQuotation?.location || detail.lead.location || "",
+    assignedToName: "",
+    assignmentStatus: detail.lead.assignedSales ? "Assigned" : "",
+    progress: getLeadProgress(detail.lead.lifecycleStatus),
+    status: detail.lead.lifecycleStatus,
+    statusColor: "orange",
+    quoteValue: String(detail.lead.quoteValue),
+    chatCount: detail.recentMessages.length,
+  };
+}
+
 export default function LeadDetails() {
   const navigate = useNavigate();
+  const { leadId } = useParams<{ leadId: string }>();
+  const { data: response } = useLeadDetailQuery(leadId);
 
-  const lead = {
-    id: "LD-2025-001",
-    name: "John Doe",
-    workshop: "Residential Building",
-    category: "Lahore",
-    assignedToName: "Aamir",
-    assignmentStatus: "Assigned",
-    progress: 3,
-    status: "Negotiation",
-    statusColor: "orange",
-    quoteValue: "PKR 120,000",
-    chatCount: 2,
-  } as const;
+  const detail = response?.success ? response.data : undefined;
+  const lead = detail ? mapDetailToLead(detail) : { ...defaultLead, id: leadId ?? "—" };
 
   return (
     <div className="p-5">
@@ -67,9 +93,6 @@ export default function LeadDetails() {
             <TabsContent value="basic-info" className="mt-6">
               <BasicDetails />
             </TabsContent>
-            {/* <TabsContent value="rfq" className="mt-6">
-              <RFQTab />
-            </TabsContent> */}
             <TabsContent value="quotation" className="mt-6">
               <QuotationCard />
             </TabsContent>
@@ -80,10 +103,13 @@ export default function LeadDetails() {
               <TimelineCard lead={lead} />
             </TabsContent>
             <TabsContent value="follow-ups" className="mt-6">
-              <FollowUpsCard />
+              <FollowUpsCard auditLog={detail?.auditLog} />
             </TabsContent>
             <TabsContent value="payments" className="mt-6">
-              <PaymentsCard />
+              <PaymentsCard
+                leadId={detail?.lead._id}
+                paymentsData={detail?.payments}
+              />
             </TabsContent>
           </Tabs>
         </div>
