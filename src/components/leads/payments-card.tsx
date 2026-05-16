@@ -1,6 +1,8 @@
 import { Card } from "../ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import type { LeadDetailPayments } from "@/modules/leads/leads.api";
+import { formatLeadCurrency, formatLeadDate } from "@/modules/leads/leads.utils";
 
 type Payment = {
   invoice: string;
@@ -9,7 +11,12 @@ type Payment = {
   status: "Pending" | "Confirmed" | "Failed";
 };
 
-const payments: Payment[] = [
+type Props = {
+  leadId?: string;
+  paymentsData?: LeadDetailPayments;
+};
+
+const defaultPayments: Payment[] = [
   {
     invoice: "INV 2024-001",
     date: "27-01-2025",
@@ -36,16 +43,36 @@ const payments: Payment[] = [
   },
 ];
 
-export default function PaymentsCard() {
-  const total = "$15,000";
-  const paid = "$0";
-  const outstanding = "$15,000";
+function mapPayments(data: LeadDetailPayments): Payment[] {
+  return data.invoices.map((invoice) => ({
+    invoice: invoice.invoiceNumber,
+    date: formatLeadDate(invoice.date ?? invoice.createdAt),
+    amount: formatLeadCurrency(invoice.totalAmount),
+    status: invoice.paidAt ? "Confirmed" : "Pending",
+  }));
+}
+
+export default function PaymentsCard({ leadId, paymentsData }: Props) {
+  const payments =
+    paymentsData && paymentsData.invoices.length > 0
+      ? mapPayments(paymentsData)
+      : defaultPayments;
+  const total = paymentsData
+    ? formatLeadCurrency(paymentsData.totalPaid + paymentsData.totalPending)
+    : "$15,000";
+  const paid = paymentsData
+    ? formatLeadCurrency(paymentsData.totalPaid)
+    : "$0";
+  const outstanding = paymentsData
+    ? formatLeadCurrency(paymentsData.totalPending)
+    : "$15,000";
 
   return (
     <Card className=" p-6">
       <div>
         <div className="text-sm text-gray-500">
-          Lead ID-<span className="font-semibold">LD-2025-001</span>
+          Lead ID-
+          <span className="font-semibold">{leadId ?? "LD-2025-001"}</span>
         </div>
       </div>
       <div className="p-4 rounded bg-blue-50">
