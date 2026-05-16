@@ -64,7 +64,7 @@ export default function ChatCard({ lead }: Props) {
       <div className="px-6 pt-6 pb-4 border-b">
         <div className="mb-4">
           <div className="text-sm text-gray-500">
-            Lead ID-<span className="font-semibold">LD-2025-001</span>
+            Lead ID-<span className="font-semibold">{lead.id}</span>
           </div>
         </div>
         <div className="flex items-center gap-3">
