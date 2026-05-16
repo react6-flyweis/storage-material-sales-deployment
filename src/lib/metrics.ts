@@ -11,6 +11,13 @@ export type DashboardMetrics = {
   aiEscalations: number;
 };
 
+export type LeadsStats = {
+  totalLeads: number;
+  leadsClosed: number;
+  followUpPending: number;
+  escalationsPending: number;
+};
+
 export type ConversionFunnelMetrics = {
   newLeads: number;
   contacted: number;
@@ -27,6 +34,12 @@ type DashboardStatsResponse = {
     followUpPending: number;
     escalationsPending: number;
   };
+};
+
+type LeadsStatsResponse = {
+  success: boolean;
+  message: string;
+  data: LeadsStats;
 };
 
 type ConversionFunnelResponse = {
@@ -85,6 +98,14 @@ export async function getDashboardMetrics(
   };
 }
 
+export async function getLeadsStats(): Promise<LeadsStats> {
+  const response = await apiClient.get<LeadsStatsResponse>(
+    "/api/sales/leads/stats",
+  );
+
+  return response.data.data;
+}
+
 export async function getConversionFunnelMetrics(
   period: Period,
 ): Promise<ConversionFunnelMetrics> {
@@ -106,6 +127,45 @@ export function useDashboardMetricsQuery(period: Period) {
   return useQuery({
     queryKey: ["sales", "dashboard", "stats", period],
     queryFn: () => getDashboardMetrics(period),
+    staleTime: 60 * 1000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useLeadsStatsQuery() {
+  return useQuery({
+    queryKey: ["sales", "leads", "stats"],
+    queryFn: getLeadsStats,
+    staleTime: 60 * 1000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export type FollowUpStats = {
+  total: number;
+  upcoming: number;
+  completed: number;
+  overdue: number;
+};
+
+type FollowUpStatsResponse = {
+  success: boolean;
+  message: string;
+  data: FollowUpStats;
+};
+
+export async function getFollowUpStats(): Promise<FollowUpStats> {
+  const response = await apiClient.get<FollowUpStatsResponse>(
+    "/api/sales/followups/stats",
+  );
+
+  return response.data.data;
+}
+
+export function useFollowUpStatsQuery() {
+  return useQuery({
+    queryKey: ["sales", "followups", "stats"],
+    queryFn: getFollowUpStats,
     staleTime: 60 * 1000,
     placeholderData: keepPreviousData,
   });
