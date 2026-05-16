@@ -1,0 +1,140 @@
+export const formatLeadCurrency = (value = 0, currency = "USD") =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(value);
+
+export const formatLeadDate = (value?: string | null) => {
+  if (!value) return "-";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+};
+
+export const formatLeadDateTime = (value?: string | null) => {
+  if (!value) return "-";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+};
+
+export const formatLifecycleStatus = (value: string) =>
+  value
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+
+export const getLeadProgress = (status: string) => {
+  const normalized = status.toLowerCase();
+
+  if (normalized.includes("delivered")) return 7;
+  if (normalized.includes("payment") || normalized.includes("paid")) return 6;
+  if (normalized.includes("closed")) return 5;
+  if (normalized.includes("negotiation")) return 4;
+  if (normalized.includes("proposal")) return 3;
+  if (normalized.includes("quotation")) return 3;
+  if (normalized.includes("requirements")) return 2;
+
+  return 1;
+};
+
+export const formatPhone = (phone?: {
+  number?: string;
+  countryCode?: string;
+}) => {
+  if (!phone?.number) return "-";
+  return `${phone.countryCode ?? ""} ${phone.number}`.trim();
+};
+
+export const formatAuditAction = (
+  action: string,
+  metadata: Record<string, unknown> = {},
+) => {
+  switch (action) {
+    case "lead.created":
+      return "Lead created";
+    case "lead.assigned.manual":
+      return `Assigned to ${String(metadata.employeeName ?? "sales rep")}`;
+    case "quotation.created":
+      return `Quotation created (${formatLeadCurrency(Number(metadata.basePrice ?? 0))})`;
+    case "quotation.sent":
+      return `Quotation sent to ${String(metadata.sentTo ?? "customer")}`;
+    case "quotation.edited":
+      return "Quotation updated";
+    case "invoice.created":
+      return `Invoice ${String(metadata.invoiceNumber ?? "")} created`;
+    case "invoice.sent":
+      return `Invoice ${String(metadata.invoiceNumber ?? "")} sent`;
+    case "invoice.paid":
+      return `Invoice ${String(metadata.invoiceNumber ?? "")} paid`;
+    case "payment.item_paid":
+      return `Payment received: ${String(metadata.paymentName ?? "item")}`;
+    case "lead.escalated":
+      return "Lead escalated";
+    case "escalation.resolved":
+      return `Escalation resolved (${String(metadata.employeeName ?? "assigned")})`;
+    default:
+      return action.replace(/\./g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+};
+
+export const getAuditTypeLabel = (type: string) =>
+  formatLifecycleStatus(type);
+
+export const getAuditPerformedBy = (
+  entry: {
+    performedBy?: string | null;
+    metadata?: Record<string, unknown>;
+  },
+) => {
+  const metadata = entry.metadata ?? {};
+
+  if (metadata.employeeName) return String(metadata.employeeName);
+  if (metadata.paidByName) return String(metadata.paidByName);
+  if (entry.performedBy) return "Staff";
+
+  return "System";
+};
+
+export const splitLeadDateTime = (value?: string | null) => {
+  if (!value) return { date: "-", time: "" };
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return { date: "-", time: "" };
+
+  return {
+    date: formatLeadDate(value),
+    time: date.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    }),
+  };
+};
+
+export const getAssignedEmployeeName = (
+  auditLog: Array<{ action: string; metadata?: Record<string, unknown> }>,
+) => {
+  const assignment = [...auditLog]
+    .reverse()
+    .find((entry) => entry.action === "lead.assigned.manual");
+
+  if (assignment?.metadata?.employeeName) {
+    return String(assignment.metadata.employeeName);
+  }
+
+  return null;
+};
