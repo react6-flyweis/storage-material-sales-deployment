@@ -1,5 +1,6 @@
 import { useState } from "react";
 import StatCard from "@/components/ui/stat-card";
+import { useFollowUpStatsQuery } from "@/lib/metrics";
 import { Button } from "@/components/ui/button";
 import {
   CalendarIcon,
@@ -9,7 +10,6 @@ import {
   Plus,
 } from "lucide-react";
 import UpcomingFollowUps from "@/components/follow-up/upcoming-follow-ups";
-import SmartReminders from "@/components/follow-up/smart-reminders";
 import AddFollowUpDialog from "@/components/follow-up/add-follow-up-dialog";
 import LeadCommunicationTimeline from "@/components/leads/lead-communication-timeline";
 import AiScriptGenerator from "@/components/follow-up/ai-script-generator";
@@ -18,6 +18,8 @@ import FollowUpKpis from "@/components/follow-up/follow-up-kpis";
 
 export default function FollowUpPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const { data: stats, isPending } = useFollowUpStatsQuery();
+  const loading = isPending && !stats;
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-5">
@@ -44,42 +46,42 @@ export default function FollowUpPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Follow-ups"
-          value="8"
+          value={stats?.total ?? 0}
           icon={<CalendarIcon className="w-6 h-6 text-blue-600" />}
           color="bg-blue-600"
+          loading={loading}
         />
         <StatCard
           title="Upcoming"
-          value="4"
+          value={stats?.upcoming ?? 0}
           icon={<Clock className="w-6 h-6 text-green-600" />}
           color="bg-green-600"
+          loading={loading}
         />
         <StatCard
           title="Completed"
-          value="2"
+          value={stats?.completed ?? 0}
           icon={<CheckCircle2 className="w-6 h-6 text-green-600" />}
           color="bg-green-600"
+          loading={loading}
         />
         <StatCard
           title="Overdue"
-          value="2"
+          value={stats?.overdue ?? 0}
           icon={<AlertCircle className="w-6 h-6 text-red-600" />}
           color="bg-red-600"
+          loading={loading}
         />
       </div>
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <UpcomingFollowUps />
-        <SmartReminders />
-      </div>
+        {/* <SmartReminders /> */}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <LeadCommunicationTimeline />
         <AiScriptGenerator />
-      </div>
+        <LeadCommunicationTimeline />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <LeadScoring />
         <FollowUpKpis />
       </div>
