@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import SuccessDialog from "@/components/success-dialog";
+import { useEscalateLeadMutation } from "@/modules/leads/leads.hooks";
+import { getApiErrorMessage } from "@/lib/api-error";
 
 interface EscalateLeadDialogProps {
   trigger?: React.ReactNode;
@@ -19,24 +21,34 @@ interface EscalateLeadDialogProps {
 
 export default function EscalateLeadDialog({
   trigger,
-  //   leadId,
-  //   leadName,
+  leadId,
 }: EscalateLeadDialogProps) {
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const escalateLeadMutation = useEscalateLeadMutation();
 
   const handleEscalate = async () => {
+    if (!leadId || !note.trim() || escalateLeadMutation.isPending) {
+      return;
+    }
+
+    setErrorMessage(null);
+
     try {
-      setIsLoading(true);
-      // Placeholder for actual API call
-      await new Promise((res) => setTimeout(res, 600));
+      await escalateLeadMutation.mutateAsync({
+        leadId,
+        note: note.trim(),
+      });
+
       setOpen(false);
       setNote("");
       setShowSuccess(true);
-    } finally {
-      setIsLoading(false);
+    } catch (error) {
+      setErrorMessage(
+        getApiErrorMessage(error, "Unable to escalate lead. Please try again."),
+      );
     }
   };
 
@@ -60,22 +72,27 @@ export default function EscalateLeadDialog({
               className="min-h-[150px] resize-none"
             />
           </div>
+          {errorMessage && (
+            <p className="text-sm text-destructive">{errorMessage}</p>
+          )}
         </div>
 
         <DialogFooter className="flex gap-3 justify-end p-4 pt-0">
           <Button
             variant="secondary"
             onClick={() => setOpen(false)}
-            disabled={isLoading}
+            disabled={escalateLeadMutation.isPending}
           >
             Cancel
           </Button>
           <Button
             className="bg-blue-600 hover:bg-blue-700"
             onClick={handleEscalate}
-            disabled={isLoading || !note.trim()}
+            disabled={
+              escalateLeadMutation.isPending || !note.trim() || !leadId
+            }
           >
-            {isLoading ? "Escalating..." : "Escalate"}
+            {escalateLeadMutation.isPending ? "Escalating..." : "Escalate"}
           </Button>
         </DialogFooter>
       </DialogContent>
