@@ -50,6 +50,32 @@ export default function ProfileCard({
       });
   };
 
+  if (isLoading) {
+    return (
+      <Card className="p-4">
+        <CardContent className="flex flex-col md:flex-row gap-8 md:gap-24 items-start px-0 pb-0 animate-pulse">
+          <div className="flex gap-6 items-start">
+            <div className="h-20 w-20 rounded-full bg-slate-200 shrink-0" />
+            <div className="space-y-3">
+              <div className="h-7 w-48 rounded bg-slate-200" />
+              <div className="h-6 w-24 rounded-full bg-slate-200" />
+              <div className="h-4 w-28 rounded bg-slate-200" />
+              <div className="h-4 w-36 rounded bg-slate-200" />
+            </div>
+          </div>
+          <div className="flex flex-col gap-3 flex-1 mt-4 md:mt-0 w-full">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div key={index} className="flex items-center gap-8">
+                <div className="h-4 w-24 rounded bg-slate-200" />
+                <div className="h-4 w-56 rounded bg-slate-200" />
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="p-4">
       <CardContent className="flex flex-col md:flex-row gap-8 md:gap-24 items-start px-0 pb-0">
@@ -68,9 +94,7 @@ export default function ProfileCard({
           {/* Customer Details */}
           <div className="space-y-2">
             <div className="flex items-center gap-4">
-              <h2 className="text-xl font-bold text-gray-900">
-                {isLoading ? "Loading..." : profile.name}
-              </h2>
+              <h2 className="text-xl font-bold text-gray-900">{profile.name}</h2>
               <div className="flex items-center gap-2 bg-green-100/80 text-green-600 px-3 py-1 rounded-full text-sm font-medium">
                 <div className="h-2.5 w-2.5 bg-green-500 rounded-full"></div>
                 {profile.status}
