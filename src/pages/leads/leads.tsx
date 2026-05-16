@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import {
   UserPlus,
@@ -16,6 +16,7 @@ import {
 import ImportLeadsDialog from "@/components/leads/import-leads-dialog";
 import CreateQuotationDialog from "@/components/leads/create-quotation-dialog";
 import EscalateLeadDialog from "@/components/leads/escalate-lead-dialog";
+import Pagination from "@/components/Pagination";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -39,123 +40,185 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import FilterTabs, { type Period } from "@/components/FilterTabs";
-import { getDashboardMetrics, type DashboardMetrics } from "@/lib/metrics";
+import { useLeadsQuery } from "@/modules/leads/leads.hooks";
+import { exportLeadsProvider } from "@/modules/leads/leads.api";
+import { useLeadsStatsQuery } from "@/lib/metrics";
 
-// Mock data - replace with actual API calls
-const initialLeads = [
-  {
-    id: "ID-2025-1047",
-    name: "PROJECT 1",
-    workshop: "Workshop",
-    category: "Texas",
+type LeadRow = {
+  id: string;
+  name: string;
+  workshop: string;
+  category: string;
+  assignedTo: string | null;
+  assignedToName: string;
+  progress: number;
+  progressStep: string;
+  status: string;
+  statusClassName: string;
+  quoteValue: string;
+  quoteValueNumber: number;
+  chatCount: number;
+  nextFollowUp: string;
+  searchText: string;
+  rawStatus: string;
+};
+
+const PAGE_SIZE = 20;
+
+const createCsvFilename = () => {
+  const date = new Date().toISOString().slice(0, 10);
+
+  return `leads-export-${date}.csv`;
+};
+
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(value);
+
+const formatFollowUpDate = (value?: string | null) => {
+  if (!value) return "-";
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+  }).format(new Date(value));
+};
+
+const formatLifecycleStatus = (value: string) =>
+  value
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+
+const getStatusBadgeClassName = (status: string) => {
+  const normalized = status.toLowerCase();
+
+  if (normalized.includes("proposal")) {
+    return "bg-purple-100 text-purple-700";
+  }
+
+  if (normalized.includes("quotation")) {
+    return "bg-orange-100 text-orange-700";
+  }
+
+  if (normalized.includes("negotiation")) {
+    return "bg-blue-100 text-blue-700";
+  }
+
+  if (normalized.includes("closed")) {
+    return "bg-green-100 text-green-700";
+  }
+
+  return "bg-gray-100 text-gray-700";
+};
+
+const getLeadProgress = (status: string) => {
+  const normalized = status.toLowerCase();
+
+  if (normalized.includes("closed")) return 7;
+  if (normalized.includes("proposal")) return 4;
+  if (normalized.includes("quotation")) return 3;
+  if (normalized.includes("negotiation")) return 5;
+
+  return 2;
+};
+
+const mapLeadToRow = (lead: {
+  _id: string;
+  projectName: string;
+  customerId: { firstName: string; email: string };
+  lifecycleStatus: string;
+  quoteValue: number;
+  buildingType: string;
+  location: string;
+  nextFollowUp: { followUpDate: string } | null;
+}): LeadRow => {
+  const status = formatLifecycleStatus(lead.lifecycleStatus);
+  const progress = getLeadProgress(lead.lifecycleStatus);
+
+  return {
+    id: lead._id,
+    name: lead.projectName || lead.customerId.firstName || "Untitled Lead",
+    workshop: lead.buildingType || "-",
+    category: lead.location || "-",
     assignedTo: null,
     assignedToName: "",
-    assignmentStatus: "Assign",
-    progress: 3,
-    progressStep: "Step 4/7",
-    status: "Proposal sent",
-    statusColor: "purple",
-    quoteValue: "$12,500",
-    chatCount: 2,
-    nextFollowUp: "25-01-2025",
-  },
-  {
-    id: "ID-2025-1048",
-    name: "PROJECT 2",
-    workshop: "Workshop",
-    category: "Texas",
-    assignedTo: "Sarah Lee",
-    assignedToName: "Sarah Lee",
-    assignmentStatus: "1 person assigned",
-    progress: 3,
-    progressStep: "Step 4/7",
-    status: "Quotation Sent",
-    statusColor: "orange",
-    quoteValue: "$12,500",
-    chatCount: 4,
-    nextFollowUp: "25-01-2025",
-  },
-  {
-    id: "ID-2025-1049",
-    name: "PROJECT 3",
-    workshop: "Workshop",
-    category: "Texas",
-    assignedTo: "Sarah Lee",
-    assignedToName: "Sarah Lee",
-    assignmentStatus: "1 person assigned",
-    progress: 3,
-    progressStep: "Step 4/7",
-    status: "Proposal sent",
-    statusColor: "purple",
-    quoteValue: "$12,500",
-    chatCount: 2,
-    nextFollowUp: "25-01-2025",
-  },
-  {
-    id: "ID-2025-1050",
-    name: "PROJECT 4",
-    workshop: "Workshop",
-    category: "Texas",
-    assignedTo: "Sarah Lee",
-    assignedToName: "Sarah Lee",
-    assignmentStatus: "1 person assigned",
-    progress: 3,
-    progressStep: "Step 4/7",
-    status: "Proposal sent",
-    statusColor: "purple",
-    quoteValue: "$12,500",
-    chatCount: 2,
-    nextFollowUp: "25-01-2025",
-  },
-];
+    progress,
+    progressStep: `Step ${Math.min(progress + 1, 7)}/7`,
+    status,
+    statusClassName: getStatusBadgeClassName(lead.lifecycleStatus),
+    quoteValue: formatCurrency(lead.quoteValue),
+    quoteValueNumber: lead.quoteValue,
+    chatCount: 0,
+    nextFollowUp: formatFollowUpDate(lead.nextFollowUp?.followUpDate),
+    searchText: [
+      lead._id,
+      lead.projectName,
+      lead.customerId.firstName,
+      lead.customerId.email,
+      lead.lifecycleStatus,
+      lead.buildingType,
+      lead.location,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase(),
+    rawStatus: lead.lifecycleStatus,
+  };
+};
 
 export default function LeadsPage() {
-  const [period, setPeriod] = useState<Period>("quarter");
-  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    let mounted = true;
-    setLoading(true);
-    getDashboardMetrics(period)
-      .then((m) => {
-        if (mounted) setMetrics(m);
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [period]);
   const [buildingType, setBuildingType] = useState("all");
   const [projectValue, setProjectValue] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [leads] = useState(initialLeads);
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [exporting, setExporting] = useState(false);
   const [showExportSuccess, setShowExportSuccess] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(PAGE_SIZE);
+  const { data: metrics, isPending } = useLeadsStatsQuery();
+  const loading = isPending && !metrics;
+  const { data: leadsResponse, isPending: leadsLoading } = useLeadsQuery(
+    currentPage,
+    rowsPerPage,
+  );
+
+  const leadsData = leadsResponse?.data.leads;
+  const leads = useMemo(() => leadsData ?? [], [leadsData]);
+  const totalItems = leadsResponse?.data.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalItems / rowsPerPage));
+  const leadRows = useMemo(() => leads.map(mapLeadToRow), [leads]);
+
+  useEffect(() => {
+    setSelectedLeads([]);
+  }, [
+    currentPage,
+    rowsPerPage,
+    buildingType,
+    projectValue,
+    statusFilter,
+    searchQuery,
+  ]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   // Filter leads based on all criteria
   const filteredLeads = useMemo(() => {
-    return leads.filter((lead) => {
-      // Search filter
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        const matchesSearch =
-          lead.name.toLowerCase().includes(query) ||
-          lead.id.toLowerCase().includes(query) ||
-          lead.workshop.toLowerCase().includes(query) ||
-          lead.category.toLowerCase().includes(query) ||
-          (lead.assignedToName &&
-            lead.assignedToName.toLowerCase().includes(query));
-        if (!matchesSearch) return false;
+    const normalizedSearch = searchQuery.trim().toLowerCase();
+
+    return leadRows.filter((lead) => {
+      if (normalizedSearch && !lead.searchText.includes(normalizedSearch)) {
+        return false;
       }
 
-      // Building type filter
       if (buildingType !== "all") {
         const typeMatch = lead.workshop
           .toLowerCase()
@@ -163,9 +226,19 @@ export default function LeadsPage() {
         if (!typeMatch) return false;
       }
 
-      // Status filter
+      if (projectValue !== "all") {
+        const matchesValue =
+          (projectValue === "small" && lead.quoteValueNumber < 50000) ||
+          (projectValue === "medium" &&
+            lead.quoteValueNumber >= 50000 &&
+            lead.quoteValueNumber <= 200000) ||
+          (projectValue === "large" && lead.quoteValueNumber > 200000);
+
+        if (!matchesValue) return false;
+      }
+
       if (statusFilter !== "all") {
-        const statusMatch = lead.status
+        const statusMatch = lead.rawStatus
           .toLowerCase()
           .includes(statusFilter.toLowerCase());
         if (!statusMatch) return false;
@@ -173,7 +246,7 @@ export default function LeadsPage() {
 
       return true;
     });
-  }, [leads, searchQuery, buildingType, statusFilter]);
+  }, [leadRows, searchQuery, buildingType, projectValue, statusFilter]);
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -206,21 +279,20 @@ export default function LeadsPage() {
     );
   };
 
-  const getStatusBadgeColor = (color: string) => {
-    const colors: Record<string, string> = {
-      purple: "bg-purple-100 text-purple-700",
-      orange: "bg-orange-100 text-orange-700",
-      green: "bg-green-100 text-green-700",
-      blue: "bg-blue-100 text-blue-700",
-    };
-    return colors[color] || "bg-gray-100 text-gray-700";
-  };
-
   const handleExport = async () => {
     try {
       setExporting(true);
-      // Placeholder for actual export logic (API call / file generation)
-      await new Promise((res) => setTimeout(res, 600));
+
+      const csv = await exportLeadsProvider(currentPage, rowsPerPage);
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = createCsvFilename();
+      link.click();
+      URL.revokeObjectURL(url);
+
       setShowExportSuccess(true);
     } finally {
       setExporting(false);
@@ -229,7 +301,6 @@ export default function LeadsPage() {
 
   return (
     <>
-      <FilterTabs onPeriodChange={setPeriod} initialPeriod={period} />
       <div className="p-4 sm:p-6 space-y-6">
         {/* Header */}
         <div>
@@ -243,27 +314,31 @@ export default function LeadsPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             title="Leads in Pipeline"
-            value={loading ? "..." : metrics ? metrics.totalLeads : "-"}
+            value={metrics?.totalLeads ?? 0}
             color="bg-blue-600"
             icon={<UserPlus className="h-5 w-5 text-blue-600" />}
+            loading={loading}
           />
           <StatCard
             title="Leads Closed"
-            value={loading ? "..." : metrics ? metrics.leadsClosed : "-"}
+            value={metrics?.leadsClosed ?? 0}
             color="bg-green-500"
             icon={<UserCheck className="h-5 w-5 text-green-500" />}
+            loading={loading}
           />
           <StatCard
             title="Follow-ups Pending"
-            value={loading ? "..." : metrics ? metrics.followUpsPending : "-"}
+            value={metrics?.followUpPending ?? 0}
             color="bg-yellow-500"
             icon={<FileText className="h-5 w-5 text-yellow-500" />}
+            loading={loading}
           />
           <StatCard
             title="AI Escalations"
-            value={loading ? "..." : metrics ? metrics.aiEscalations : "-"}
+            value={metrics?.escalationsPending ?? 0}
             color="bg-orange-400"
             icon={<TrendingUp className="h-5 w-5 text-orange-400" />}
+            loading={loading}
           />
         </div>
 
@@ -385,9 +460,18 @@ export default function LeadsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredLeads.length > 0 ? (
-                  filteredLeads.map((lead, index) => (
-                    <TableRow key={index}>
+                {leadsLoading ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={8}
+                      className="px-6 py-12 text-center text-gray-500"
+                    >
+                      Loading leads...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredLeads.length > 0 ? (
+                  filteredLeads.map((lead) => (
+                    <TableRow key={lead.id}>
                       <TableCell className="">
                         <input
                           type="checkbox"
@@ -405,7 +489,7 @@ export default function LeadsPage() {
                             {lead.name}
                           </span>
                           <span className="text-sm text-gray-500">
-                            {lead.id.replace(/^ID-/, "Q-")}
+                            {lead.id}
                           </span>
                           <span className="text-sm text-gray-500">
                             {lead.workshop} · {lead.category}
@@ -429,9 +513,7 @@ export default function LeadsPage() {
 
                       <TableCell className="">
                         <Badge
-                          className={`${getStatusBadgeColor(
-                            lead.statusColor,
-                          )} rounded-full px-4 py-1 text-sm`}
+                          className={`${lead.statusClassName} rounded-full px-4 py-1 text-sm`}
                           variant="secondary"
                         >
                           {lead.status}
@@ -525,6 +607,16 @@ export default function LeadsPage() {
                 )}
               </TableBody>
             </Table>
+            <Pagination
+              totalItems={totalItems}
+              currentPage={currentPage}
+              rowsPerPage={rowsPerPage}
+              onPageChange={setCurrentPage}
+              onRowsPerPageChange={(rows) => {
+                setRowsPerPage(rows);
+                setCurrentPage(1);
+              }}
+            />
           </CardContent>
         </Card>
       </div>
