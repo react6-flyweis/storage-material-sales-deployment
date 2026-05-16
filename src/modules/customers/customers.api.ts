@@ -158,3 +158,62 @@ export async function getSalesCustomersProvider(page = 1, limit = 20) {
 
   return response.data;
 }
+
+export type SalesCustomerFinancials = {
+  totalPaid?: number;
+  pendingPayment?: number;
+  totalInvoices?: number;
+  revenueGenerated?: number;
+};
+
+export type GetSalesCustomerDetailData = {
+  customer: SalesCustomer;
+  financials: SalesCustomerFinancials;
+};
+
+export type GetSalesCustomerDetailResponse = {
+  success: boolean;
+  message: string;
+  data: GetSalesCustomerDetailData;
+};
+
+export async function getSalesCustomerDetailProvider(customerId: string) {
+  const response = await apiClient.get<GetSalesCustomerDetailResponse>(
+    `/api/sales/customers/${customerId}`,
+  );
+
+  return response.data;
+}
+
+export type SalesCustomerProject = {
+  _id: string;
+  projectName?: string;
+  lifecycleStatus?: string;
+  quoteValue?: number;
+  budget?: number | null;
+  createdAt?: string;
+};
+
+export type GetSalesCustomerProjectsData = {
+  projects: SalesCustomerProject[];
+  total: number;
+};
+
+export type GetSalesCustomerProjectsResponse = {
+  success: boolean;
+  message: string;
+  data: GetSalesCustomerProjectsData;
+};
+
+export async function getSalesCustomerProjectsProvider(
+  customerId: string,
+  page = 1,
+  limit = 20,
+) {
+  const response = await apiClient.get<GetSalesCustomerProjectsResponse>(
+    `/api/sales/customers/${customerId}/projects`,
+    { params: { page, limit } },
+  );
+
+  return response.data;
+}
