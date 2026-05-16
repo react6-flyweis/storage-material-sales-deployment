@@ -25,8 +25,17 @@ import {
   TableRow,
   TableCell,
 } from "@/components/ui/table";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Pagination from "@/components/Pagination";
+import {
+  useSalesCustomerDetailQuery,
+  useSalesCustomerProjectsQuery,
+} from "@/modules/customers/customers.hooks";
+import {
+  formatLeadDate,
+  formatLifecycleStatus,
+  getLeadProgress,
+} from "@/modules/leads/leads.utils";
 
 function formatCurrency(value = 0) {
   return new Intl.NumberFormat("en-US", {
@@ -50,55 +59,69 @@ function formatJoinedDate(value?: string) {
 }
 
 type ProjectRow = {
+  id: string;
   name: string;
   building: string;
   startDate: string;
   stage: string;
   progress: string;
-  status: "Work in Progress" | "Active" | "Completed" | "Canceled";
+  status: string;
+  statusClassName: string;
 };
 
-const projectRows: ProjectRow[] = [
-  {
-    name: "ABC Warehouse",
-    building: "2",
-    startDate: "22 Feb 2025",
-    stage: "Shipment",
-    progress: "75%",
-    status: "Work in Progress",
-  },
-  {
-    name: "Tech Park Dev",
-    building: "1",
-    startDate: "07 Feb 2025",
-    stage: "Engineering",
-    progress: "30%",
-    status: "Active",
-  },
-  {
-    name: "Downtown Plaza",
-    building: "3",
-    startDate: "30 Jan 2025",
-    stage: "Completed",
-    progress: "100%",
-    status: "Completed",
-  },
-  {
-    name: "Riverside Complex",
-    building: "1",
-    startDate: "17 Jan 2025",
-    stage: "Canceled",
-    progress: "0%",
-    status: "Canceled",
-  },
-];
+function getProjectStatusBadgeClassName(status: string) {
+  const normalized = status.toLowerCase();
 
-const statusStyles: Record<ProjectRow["status"], string> = {
-  "Work in Progress": "bg-[#FEF3C7] text-[#D97706]",
-  Active: "bg-[#DCFCE7] text-[#16A34A]",
-  Completed: "bg-[#DCFCE7] text-[#166534]",
-  Canceled: "bg-[#FEE2E2] text-[#C2410C]",
-};
+  if (normalized.includes("proposal")) {
+    return "bg-purple-100 text-purple-700";
+  }
+
+  if (normalized.includes("quotation")) {
+    return "bg-orange-100 text-orange-700";
+  }
+
+  if (normalized.includes("negotiation")) {
+    return "bg-blue-100 text-blue-700";
+  }
+
+  if (normalized.includes("closed") || normalized.includes("completed")) {
+    return "bg-green-100 text-green-700";
+  }
+
+  if (normalized.includes("cancel")) {
+    return "bg-red-100 text-red-700";
+  }
+
+  return "bg-slate-100 text-slate-700";
+}
+
+function mapProjectToRow(project: {
+  _id: string;
+  projectName?: string;
+  lifecycleStatus?: string;
+  createdAt?: string;
+}): ProjectRow {
+  const lifecycleStatus = project.lifecycleStatus ?? "";
+  const status = lifecycleStatus
+    ? formatLifecycleStatus(lifecycleStatus)
+    : "-";
+  const progressStep = lifecycleStatus
+    ? Math.min(getLeadProgress(lifecycleStatus) + 1, 7)
+    : null;
+
+  return {
+    id: project._id,
+    name: project.projectName?.trim() || "-",
+    building: "-",
+    startDate: formatLeadDate(project.createdAt),
+    stage: status,
+    progress: progressStep ? `Step ${progressStep}/7` : "-",
+    status,
+    statusClassName: lifecycleStatus
+      ? getProjectStatusBadgeClassName(lifecycleStatus)
+      : "bg-slate-100 text-slate-700",
+  };
+}
 
 export default function CustomerDetailLayout() {
   const navigate = useNavigate();
@@ -109,6 +132,23 @@ export default function CustomerDetailLayout() {
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
+  const {
+    data: customerDetailResponse,
+    isLoading,
+    isError,
+  } = useSalesCustomerDetailQuery(id);
+
+  const {
+    data: projectsResponse,
+    isLoading: projectsLoading,
+    isError: projectsError,
+  } = useSalesCustomerProjectsQuery(id, currentPage, rowsPerPage);
+
+  const projectRows = useMemo(() => {
+    const apiProjects = projectsResponse?.data.projects ?? [];
+    return apiProjects.map(mapProjectToRow);
+  }, [projectsResponse]);
+
   const filteredProjects = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
 
@@ -117,71 +157,30 @@ export default function CustomerDetailLayout() {
     }
 
     return projectRows.filter((row) => {
-      return [
-        row.name,
-        row.building,
-        row.startDate,
-        row.stage,
-        row.progress,
-        row.status,
-      ]
+      return [row.name, row.building, row.startDate, row.stage, row.progress, row.status]
         .join(" ")
         .toLowerCase()
         .includes(query);
     });
+  }, [projectRows, searchTerm]);
+
+  const projectsTotal = projectsResponse?.data.total ?? 0;
+
+  useEffect(() => {
+    setCurrentPage(1);
   }, [searchTerm]);
 
-  // const totalPages = Math.max(
-  //   1,
-  //   Math.ceil(filteredProjects.length / rowsPerPage),
-  // );
+  useEffect(() => {
+    if (projectsTotal === 0) return;
 
-  // useEffect(() => {
-  //   if (currentPage > totalPages) {
-  //     setCurrentPage(totalPages);
-  //   }
-  // }, [currentPage, totalPages]);
-
-  const currentProjects = useMemo(() => {
-    const start = (currentPage - 1) * rowsPerPage;
-    return filteredProjects.slice(start, start + rowsPerPage);
-  }, [filteredProjects, currentPage, rowsPerPage]);
-
-  const isLoading = false;
-  const isError = false;
-
-  const customerDetailResponse = {
-    data: {
-      totalPaid: 125000,
-      totalPending: 50000,
-      totalInvoices: 5,
-      customer: {
-        _id: id,
-        customerId: "12345",
-        firstName: "John",
-        lastName: "Doe",
-        email: "john.doe@example.com",
-        phone: {
-          countryCode: "+1",
-          number: "555-123-4567",
-        },
-        isActive: true,
-        createdAt: "2024-01-15T10:30:00Z",
-      },
-      projects: [
-        {
-          name: "ABC Warehouse",
-          buildingType: "Warehouse",
-          startDate: "2025-02-22",
-          stage: "Shipment",
-          progress: "75%",
-          status: "Work in Progress",
-        },
-      ],
-    },
-  };
+    const totalPages = Math.max(1, Math.ceil(projectsTotal / rowsPerPage));
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, projectsTotal, rowsPerPage]);
 
   const customerData = customerDetailResponse?.data.customer;
+  const financials = customerDetailResponse?.data.financials;
 
   const customerName =
     `${customerData?.firstName ?? ""} ${customerData?.lastName ?? ""}`.trim() ||
@@ -201,8 +200,7 @@ export default function CustomerDetailLayout() {
     customerName,
     email: customerData?.email ?? "-",
     phone,
-    inquiryFor:
-      customerDetailResponse?.data.projects?.[0]?.buildingType?.trim() || "-",
+    inquiryFor: customerData?.source?.trim() || customerData?.inquiryFor?.trim() || "-",
     status: customerData?.isActive ? "Active" : "Inactive",
     joined: joinedDate,
     address: "-",
@@ -221,25 +219,25 @@ export default function CustomerDetailLayout() {
   const statCards = [
     {
       title: "Total Paid",
-      value: formatCurrency(customerDetailResponse?.data.totalPaid ?? 0),
+      value: formatCurrency(financials?.totalPaid ?? 0),
       color: "bg-[#1D51A4]",
       icon: <DollarSign className="h-5 w-5 text-[#1D51A4]" />,
     },
     {
       title: "Pending Payment",
-      value: formatCurrency(customerDetailResponse?.data.totalPending ?? 0),
+      value: formatCurrency(financials?.pendingPayment ?? 0),
       color: "bg-[#FD8D5B]",
       icon: <Clock3 className="h-5 w-5 text-[#FD8D5B]" />,
     },
     {
       title: "Total Invoices",
-      value: String(customerDetailResponse?.data.totalInvoices ?? 0),
+      value: String(financials?.totalInvoices ?? 0),
       color: "bg-[#EAB308]",
       icon: <FileText className="h-5 w-5 text-[#EAB308]" />,
     },
     {
       title: "Revenue Generated",
-      value: formatCurrency(customerDetailResponse?.data.totalPaid ?? 0),
+      value: formatCurrency(financials?.revenueGenerated ?? 0),
       color: "bg-[#A855F7]",
       icon: <DollarSign className="h-5 w-5 text-[#A855F7]" />,
     },
@@ -253,8 +251,7 @@ export default function CustomerDetailLayout() {
           <Button
             variant="default"
             onClick={() => navigate(-1)}
-            className="px
-            -4"
+            className="px-4"
           >
             <ArrowLeft className="h-4 w-4 mr-1" />
             Back
@@ -290,6 +287,7 @@ export default function CustomerDetailLayout() {
             value={value}
             color={color}
             icon={icon}
+            loading={isLoading}
           />
         ))}
       </div>
@@ -356,73 +354,97 @@ export default function CustomerDetailLayout() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {currentProjects.map((project) => (
-                <TableRow
-                  key={`${project.name}-${project.startDate}`}
-                  className="text-[13px] text-slate-700"
-                >
-                  <TableCell className="px-3 py-4">
-                    <input
-                      type="checkbox"
-                      aria-label={`Select ${project.name}`}
-                      className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                    />
-                  </TableCell>
-                  <TableCell className="px-4 py-4 font-medium text-slate-700">
-                    {project.name}
-                  </TableCell>
-                  <TableCell className="px-4 py-4 text-slate-700">
-                    {project.building}
-                  </TableCell>
-                  <TableCell className="px-4 py-4 text-slate-700">
-                    {project.startDate}
-                  </TableCell>
-                  <TableCell className="px-4 py-4 text-slate-700">
-                    {project.stage}
-                  </TableCell>
-                  <TableCell className="px-4 py-4 text-slate-700">
-                    {project.progress}
-                  </TableCell>
-                  <TableCell className="px-4 py-4">
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium ${statusStyles[project.status]}`}
-                    >
-                      <span
-                        className={`h-2 w-2 rounded-full ${
-                          project.status === "Work in Progress"
-                            ? "bg-[#F59E0B]"
-                            : project.status === "Active"
-                              ? "bg-[#16A34A]"
-                              : project.status === "Completed"
-                                ? "bg-[#166534]"
-                                : "bg-[#DC2626]"
-                        }`}
-                      />
-                      {project.status}
-                    </span>
-                  </TableCell>
-                  <TableCell className="px-4 py-4">
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() =>
-                        navigate(`/customers/${id}/project-details`)
-                      }
-                      aria-label={`View ${project.name}`}
-                      className=""
-                    >
-                      view
-                    </Button>
+              {projectsLoading ? (
+                Array.from({ length: 5 }).map((_, index) => (
+                  <TableRow
+                    key={`project-loading-${index}`}
+                    className="border-0 animate-pulse"
+                  >
+                    {Array.from({ length: 8 }).map((__, cellIndex) => (
+                      <TableCell key={cellIndex} className="px-4 py-4">
+                        <div className="h-4 w-full max-w-28 rounded bg-slate-200" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : projectsError ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={8}
+                    className="px-4 py-6 text-center text-sm text-red-600"
+                  >
+                    Failed to load projects. Please refresh and try again.
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : filteredProjects.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={8}
+                    className="px-4 py-6 text-center text-sm text-slate-500"
+                  >
+                    No projects found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredProjects.map((project) => (
+                  <TableRow
+                    key={project.id}
+                    className="text-[13px] text-slate-700"
+                  >
+                    <TableCell className="px-3 py-4">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${project.name}`}
+                        className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      />
+                    </TableCell>
+                    <TableCell className="px-4 py-4 font-medium text-slate-700">
+                      {project.name}
+                    </TableCell>
+                    <TableCell className="px-4 py-4 text-slate-700">
+                      {project.building}
+                    </TableCell>
+                    <TableCell className="px-4 py-4 text-slate-700">
+                      {project.startDate}
+                    </TableCell>
+                    <TableCell className="px-4 py-4 text-slate-700">
+                      {project.stage}
+                    </TableCell>
+                    <TableCell className="px-4 py-4 text-slate-700">
+                      {project.progress}
+                    </TableCell>
+                    <TableCell className="px-4 py-4">
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium ${project.statusClassName}`}
+                      >
+                        <span className="h-2 w-2 rounded-full bg-current opacity-70" />
+                        {project.status}
+                      </span>
+                    </TableCell>
+                    <TableCell className="px-4 py-4">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() =>
+                          navigate(`/customers/${id}/project-details`, {
+                            state: { projectId: project.id },
+                          })
+                        }
+                        aria-label={`View ${project.name}`}
+                      >
+                        view
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
       <div className="bg-white rounded">
         <Pagination
-          totalItems={filteredProjects.length}
+          totalItems={searchTerm.trim() ? filteredProjects.length : projectsTotal}
           currentPage={currentPage}
           rowsPerPage={rowsPerPage}
           onPageChange={setCurrentPage}
