@@ -16,6 +16,14 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { useMemo, useState } from "react";
+import type { LeadDetailAuditEntry } from "@/modules/leads/leads.api";
+import {
+  formatAuditAction,
+  getAuditPerformedBy,
+  getAuditTypeLabel,
+  splitLeadDateTime,
+} from "@/modules/leads/leads.utils";
 
 type FollowUp = {
   id: number;
@@ -84,7 +92,48 @@ const meetings: Meeting[] = [
   },
 ];
 
-export default function FollowUpsCard() {
+const getTypeBadgeClassName = (type: string) => {
+  switch (type.toLowerCase()) {
+    case "quotation":
+      return "bg-orange-500";
+    case "invoice":
+      return "bg-purple-600";
+    case "escalation":
+      return "bg-red-600";
+    default:
+      return "bg-blue-600";
+  }
+};
+
+type Props = {
+  auditLog?: LeadDetailAuditEntry[];
+};
+
+export default function FollowUpsCard({ auditLog = [] }: Props) {
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const activityEntries = useMemo(() => {
+    const entries = [...auditLog].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+
+    const normalizedSearch = searchQuery.trim().toLowerCase();
+    if (!normalizedSearch) return entries;
+
+    return entries.filter((entry) => {
+      const haystack = [
+        formatAuditAction(entry.action, entry.metadata),
+        getAuditTypeLabel(entry.type),
+        getAuditPerformedBy(entry),
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(normalizedSearch);
+    });
+  }, [auditLog, searchQuery]);
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -188,6 +237,8 @@ export default function FollowUpsCard() {
               <input
                 placeholder="Search by Lead, Client or Project"
                 className="h-9 w-80 rounded-md border px-3 text-sm placeholder-gray-400"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
             <Button variant="ghost">Export</Button>
@@ -209,47 +260,72 @@ export default function FollowUpsCard() {
                 </tr>
               </thead>
               <tbody>
-                {Array.from({ length: 10 }).map((_, i) => (
-                  <tr key={i} className="border-b">
-                    <td className="px-6 py-4 align-top">
-                      <div className="text-sm font-medium">May 19,2025</div>
-                      <div className="text-xs text-gray-400 mt-1">10:30 AM</div>
-                    </td>
+                {activityEntries.length > 0 ? (
+                  activityEntries.map((entry) => {
+                    const { date, time } = splitLeadDateTime(entry.createdAt);
+                    const performedBy = getAuditPerformedBy(entry);
 
-                    <td className="px-6 py-4 align-top">
-                      <span className="inline-flex items-center rounded-full bg-blue-600 px-3 py-1 text-xs font-medium text-white">
-                        Email
-                      </span>
-                    </td>
+                    return (
+                      <tr key={entry._id} className="border-b">
+                        <td className="px-6 py-4 align-top">
+                          <div className="text-sm font-medium">{date}</div>
+                          {time && (
+                            <div className="text-xs text-gray-400 mt-1">
+                              {time}
+                            </div>
+                          )}
+                        </td>
 
-                    <td className="px-6 py-4 align-top">
-                      <div className="text-sm">John Smith</div>
-                      <div className="text-xs text-gray-400">Sales</div>
-                    </td>
+                        <td className="px-6 py-4 align-top">
+                          <span
+                            className={cn(
+                              "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium text-white capitalize",
+                              getTypeBadgeClassName(entry.type),
+                            )}
+                          >
+                            {getAuditTypeLabel(entry.type)}
+                          </span>
+                        </td>
 
-                    <td className="px-6 py-4 align-top">
-                      <span className="inline-flex items-center rounded-full bg-green-600 px-3 py-1 text-xs font-medium text-white">
-                        Completed
-                      </span>
-                    </td>
+                        <td className="px-6 py-4 align-top">
+                          <div className="text-sm">{performedBy}</div>
+                          <div className="text-xs text-gray-400">Sales</div>
+                        </td>
 
-                    <td className="px-6 py-4 align-top">
-                      <span className="text-sm text-amber-500">Neutral</span>
-                    </td>
+                        <td className="px-6 py-4 align-top">
+                          <span className="inline-flex items-center rounded-full bg-green-600 px-3 py-1 text-xs font-medium text-white">
+                            Completed
+                          </span>
+                        </td>
 
-                    <td className="px-6 py-4 align-top">
-                      <div className="text-sm">May 19,2025</div>
-                      <div className="text-xs text-gray-400 mt-1">10:30 AM</div>
-                    </td>
+                        <td className="px-6 py-4 align-top">
+                          <span className="text-sm text-amber-500">
+                            {formatAuditAction(entry.action, entry.metadata)}
+                          </span>
+                        </td>
 
-                    <td className="px-6 py-4 align-top">
-                      <Button variant="outline" className="h-8 px-3">
-                        {" "}
-                        View
-                      </Button>
+                        <td className="px-6 py-4 align-top">
+                          <div className="text-sm">—</div>
+                        </td>
+
+                        <td className="px-6 py-4 align-top">
+                          <Button variant="outline" className="h-8 px-3">
+                            View
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      className="px-6 py-12 text-center text-sm text-gray-500"
+                    >
+                      No activity recorded yet.
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
@@ -262,7 +338,7 @@ export default function FollowUpsCard() {
                 <option>25</option>
                 <option>50</option>
               </select>
-              <div className="text-sm text-gray-600">Results</div>
+              <div className="text-sm text-gray-600">{activityEntries.length} Results</div>
             </div>
 
             <div className="flex items-center gap-2">
