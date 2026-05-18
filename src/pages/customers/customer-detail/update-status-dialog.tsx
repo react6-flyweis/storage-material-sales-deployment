@@ -20,38 +20,40 @@ import {
 type LifecycleStep = {
   id: number;
   label: string;
+  value: string;
 };
 
 type UpdateStatusDialogProps = {
   open: boolean;
-  currentStepId: number;
+  currentStatus: string;
   steps: LifecycleStep[];
   onOpenChange: (open: boolean) => void;
-  onSave: (stepId: number) => void;
+  onSave: (status: string) => void | Promise<void>;
 };
 
 const formatLabel = (label: string) => label.replace(/\n/g, " ");
 
 export default function UpdateStatusDialog({
   open,
-  currentStepId,
+  currentStatus,
   steps,
   onOpenChange,
   onSave,
 }: UpdateStatusDialogProps) {
-  const [draftStepId, setDraftStepId] = useState(currentStepId);
+  const [draftStatus, setDraftStatus] = useState(currentStatus);
 
   useEffect(() => {
     if (open) {
-      setDraftStepId(currentStepId);
+      setDraftStatus(currentStatus);
     }
-  }, [open, currentStepId]);
+  }, [open, currentStatus]);
 
-  const currentStep = steps.find((step) => step.id === currentStepId);
+  const currentStep = steps.find((step) => step.value === currentStatus);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    onSave(draftStepId);
+
+    await Promise.resolve(onSave(draftStatus));
     onOpenChange(false);
   };
 
@@ -69,19 +71,19 @@ export default function UpdateStatusDialog({
             <div className="space-y-2">
               <Label htmlFor="status-step">Select Current Status</Label>
               <Select
-                value={draftStepId.toString()}
-                onValueChange={(value) => setDraftStepId(Number(value))}
+                value={draftStatus}
+                onValueChange={(value) => setDraftStatus(value)}
               >
                 <SelectTrigger id="status-step" className="w-full">
                   <SelectValue
                     placeholder={formatLabel(
-                      currentStep?.label ?? "Production Planning",
+                      currentStep?.label ?? "Initial contact",
                     )}
                   />
                 </SelectTrigger>
                 <SelectContent>
                   {steps.map((step) => (
-                    <SelectItem key={step.id} value={step.id.toString()}>
+                    <SelectItem key={step.id} value={step.value}>
                       {formatLabel(step.label)}
                     </SelectItem>
                   ))}
