@@ -72,6 +72,22 @@ type ProjectRow = {
 function getProjectStatusBadgeClassName(status: string) {
   const normalized = status.toLowerCase();
 
+  if (normalized.includes("sent_to_admin")) {
+    return "bg-slate-100 text-slate-700";
+  }
+
+  if (normalized.includes("converted_to_po")) {
+    return "bg-violet-100 text-violet-700";
+  }
+
+  if (normalized.includes("payment")) {
+    return "bg-emerald-100 text-emerald-700";
+  }
+
+  if (normalized.includes("deal_closed") || normalized.includes("completed")) {
+    return "bg-green-100 text-green-700";
+  }
+
   if (normalized.includes("proposal")) {
     return "bg-purple-100 text-purple-700";
   }
@@ -82,10 +98,6 @@ function getProjectStatusBadgeClassName(status: string) {
 
   if (normalized.includes("negotiation")) {
     return "bg-blue-100 text-blue-700";
-  }
-
-  if (normalized.includes("closed") || normalized.includes("completed")) {
-    return "bg-green-100 text-green-700";
   }
 
   if (normalized.includes("cancel")) {
@@ -102,11 +114,9 @@ function mapProjectToRow(project: {
   createdAt?: string;
 }): ProjectRow {
   const lifecycleStatus = project.lifecycleStatus ?? "";
-  const status = lifecycleStatus
-    ? formatLifecycleStatus(lifecycleStatus)
-    : "-";
+  const status = lifecycleStatus ? formatLifecycleStatus(lifecycleStatus) : "-";
   const progressStep = lifecycleStatus
-    ? Math.min(getLeadProgress(lifecycleStatus) + 1, 7)
+    ? Math.min(getLeadProgress(lifecycleStatus), 8)
     : null;
 
   return {
@@ -115,7 +125,7 @@ function mapProjectToRow(project: {
     building: "-",
     startDate: formatLeadDate(project.createdAt),
     stage: status,
-    progress: progressStep ? `Step ${progressStep}/7` : "-",
+    progress: progressStep ? `Step ${progressStep}/8` : "-",
     status,
     statusClassName: lifecycleStatus
       ? getProjectStatusBadgeClassName(lifecycleStatus)
@@ -157,7 +167,14 @@ export default function CustomerDetailLayout() {
     }
 
     return projectRows.filter((row) => {
-      return [row.name, row.building, row.startDate, row.stage, row.progress, row.status]
+      return [
+        row.name,
+        row.building,
+        row.startDate,
+        row.stage,
+        row.progress,
+        row.status,
+      ]
         .join(" ")
         .toLowerCase()
         .includes(query);
@@ -200,7 +217,8 @@ export default function CustomerDetailLayout() {
     customerName,
     email: customerData?.email ?? "-",
     phone,
-    inquiryFor: customerData?.source?.trim() || customerData?.inquiryFor?.trim() || "-",
+    inquiryFor:
+      customerData?.source?.trim() || customerData?.inquiryFor?.trim() || "-",
     status: customerData?.isActive ? "Active" : "Inactive",
     joined: joinedDate,
     address: "-",
@@ -444,7 +462,9 @@ export default function CustomerDetailLayout() {
       </Card>
       <div className="bg-white rounded">
         <Pagination
-          totalItems={searchTerm.trim() ? filteredProjects.length : projectsTotal}
+          totalItems={
+            searchTerm.trim() ? filteredProjects.length : projectsTotal
+          }
           currentPage={currentPage}
           rowsPerPage={rowsPerPage}
           onPageChange={setCurrentPage}
