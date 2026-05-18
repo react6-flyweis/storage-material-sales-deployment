@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Paperclip, Send } from "lucide-react";
+import type { LeadDetailMessage } from "@/modules/leads/leads.api";
 
 type Lead = {
   id: string;
@@ -12,12 +13,7 @@ type Lead = {
 
 type Props = {
   lead: Lead;
-  recentMessages?: Array<{
-    _id: string;
-    senderType: string;
-    content: string;
-    createdAt: string;
-  }>;
+  recentMessages?: LeadDetailMessage[];
 };
 
 export default function ChatCard({ lead, recentMessages }: Props) {
@@ -54,13 +50,16 @@ export default function ChatCard({ lead, recentMessages }: Props) {
   useEffect(() => {
     if (recentMessages && recentMessages.length > 0) {
       const mapped = recentMessages.map((m) => ({
-        id: m._id,
-        from: m.senderType === "customer" ? "lead" : "lead",
-        text: m.content,
-        time: new Date(m.createdAt).toLocaleTimeString("en-US", {
+        id: m._id ?? `${m.createdAt ?? Date.now()}`,
+        from: m.sender === "customer" ? "lead" : "you",
+        text: m.content ?? m.text ?? "",
+        time: new Date(m.createdAt ?? Date.now()).toLocaleTimeString(
+          "en-US",
+          {
           hour: "numeric",
           minute: "2-digit",
-        }),
+          },
+        ),
       }));
       setMessages(mapped);
     }
