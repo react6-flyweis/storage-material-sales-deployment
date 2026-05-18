@@ -96,6 +96,22 @@ const formatLifecycleStatus = (value: string) =>
 const getStatusBadgeClassName = (status: string) => {
   const normalized = status.toLowerCase();
 
+  if (normalized.includes("sent_to_admin")) {
+    return "bg-slate-100 text-slate-700";
+  }
+
+  if (normalized.includes("converted_to_po")) {
+    return "bg-violet-100 text-violet-700";
+  }
+
+  if (normalized.includes("payment")) {
+    return "bg-emerald-100 text-emerald-700";
+  }
+
+  if (normalized.includes("deal_closed")) {
+    return "bg-green-100 text-green-700";
+  }
+
   if (normalized.includes("proposal")) {
     return "bg-purple-100 text-purple-700";
   }
@@ -106,10 +122,6 @@ const getStatusBadgeClassName = (status: string) => {
 
   if (normalized.includes("negotiation")) {
     return "bg-blue-100 text-blue-700";
-  }
-
-  if (normalized.includes("closed")) {
-    return "bg-green-100 text-green-700";
   }
 
   return "bg-gray-100 text-gray-700";
@@ -147,7 +159,7 @@ const mapLeadToRow = (lead: {
     assignedTo: null,
     assignedToName: "",
     progress,
-    progressStep: `Step ${Math.min(progress + 1, 7)}/7`,
+    progressStep: `Step ${Math.min(progress, 8)}/8`,
     status,
     statusClassName: getStatusBadgeClassName(lead.lifecycleStatus),
     quoteValue: formatCurrency(lead.quoteValue),
@@ -569,6 +581,7 @@ export default function LeadsPage() {
                           </Button>
 
                           <MoveToOrdersDialog
+                            leadId={lead.id}
                             trigger={
                               <Button variant="ghost" size="icon">
                                 <Redo className=" text-red-500" />
