@@ -1,5 +1,7 @@
 import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -16,6 +18,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { useScoredLeadsQuery } from "@/modules/leads/leads.hooks";
+import {
+  formatLifecycleStatus,
+  getLeadProgress,
+} from "@/modules/leads/leads.utils";
 
 interface LeadScore {
   id: string;
@@ -23,63 +30,102 @@ interface LeadScore {
   leadId: string;
   location: string;
   progress: number;
-  status: "Proposal sent" | "Quotation Sent";
+  status: string;
   quoteValue: number;
   score: "Hot" | "Warm" | "Cold";
   lastActivity: string;
   lastActivityDate?: string; // ISO date string for filtering
 }
 
-const initialLeads: LeadScore[] = [
-  {
-    id: "1",
-    name: "John Doe",
-    leadId: "O-2025-1047",
-    location: "Workshop - Texas",
-    progress: 4,
-    status: "Proposal sent",
-    quoteValue: 12500,
-    score: "Hot",
-    lastActivity: "2 Days Ago",
-    lastActivityDate: "2026-01-11",
-  },
-  {
-    id: "2",
-    name: "John Doe",
-    leadId: "O-2025-1047",
-    location: "Workshop - Texas",
-    progress: 3,
-    status: "Quotation Sent",
-    quoteValue: 12500,
-    score: "Warm",
-    lastActivity: "2 Days Ago",
-    lastActivityDate: "2026-01-11",
-  },
-  {
-    id: "3",
-    name: "John Doe",
-    leadId: "O-2025-1047",
-    location: "Workshop - Texas",
-    progress: 3,
-    status: "Proposal sent",
-    quoteValue: 12500,
-    score: "Cold",
-    lastActivity: "2 Days Ago",
-    lastActivityDate: "2026-01-09",
-  },
-  {
-    id: "4",
-    name: "John Doe",
-    leadId: "O-2025-1047",
-    location: "Workshop - Texas",
-    progress: 3,
-    status: "Proposal sent",
-    quoteValue: 12500,
-    score: "Hot",
-    lastActivity: "2 Days Ago",
-    lastActivityDate: "2025-12-20",
-  },
-];
+interface LeadFilters {
+  status: string;
+  client: string;
+  dateFrom: string;
+  dateTo: string;
+}
+
+function filterLeadScores(
+  leads: LeadScore[],
+  overrides: Record<string, LeadScore["score"]>,
+  filters: LeadFilters,
+) {
+  const normalizedClient = filters.client.trim().toLowerCase();
+
+  return leads
+    .map((lead) => ({
+      ...lead,
+      score: overrides[lead.id] ?? lead.score,
+    }))
+    .filter((lead) => {
+      if (filters.status !== "all" && lead.status !== filters.status) {
+        return false;
+      }
+
+      if (
+        normalizedClient &&
+        !(
+          lead.name.toLowerCase().includes(normalizedClient) ||
+          lead.leadId.toLowerCase().includes(normalizedClient) ||
+          lead.location.toLowerCase().includes(normalizedClient)
+        )
+      ) {
+        return false;
+      }
+
+      if (filters.dateFrom && lead.lastActivityDate) {
+        const from = new Date(filters.dateFrom);
+        const activityDate = new Date(lead.lastActivityDate);
+
+        if (activityDate < from) {
+          return false;
+        }
+      }
+
+      if (filters.dateTo && lead.lastActivityDate) {
+        const to = new Date(filters.dateTo);
+        const activityDate = new Date(lead.lastActivityDate);
+
+        if (activityDate > to) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+}
+
+function LeadScoringSkeleton() {
+  return (
+    <div className="px-6 py-8 space-y-3 animate-pulse">
+      {Array.from({ length: 5 }).map((_, index) => (
+        <div
+          key={index}
+          className="grid grid-cols-6 gap-4 rounded-lg border border-slate-100 p-4"
+        >
+          <div className="h-4 rounded bg-slate-200 col-span-1" />
+          <div className="h-4 rounded bg-slate-200 col-span-1" />
+          <div className="h-4 rounded bg-slate-200 col-span-1" />
+          <div className="h-4 rounded bg-slate-200 col-span-1" />
+          <div className="h-8 rounded-full bg-slate-200 col-span-1 w-20" />
+          <div className="h-4 rounded bg-slate-200 col-span-1" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LeadScoringEmptyState() {
+  return (
+    <div className="px-6 py-10 text-center space-y-3">
+      <p className="text-lg font-medium">No scored leads found</p>
+      <p className="text-sm text-slate-600">
+        Try adjusting filters or refresh.
+      </p>
+    </div>
+  );
+}
+
+// initial sample removed — data comes from API
 
 export default function LeadScoring() {
   const [dateFrom, setDateFrom] = useState("");
@@ -87,13 +133,56 @@ export default function LeadScoring() {
   const [status, setStatus] = useState("all");
   const [client, setClient] = useState("");
 
-  const [leads, setLeads] = useState<LeadScore[]>(initialLeads);
+  const [overrides, setOverrides] = useState<
+    Record<string, LeadScore["score"]>
+  >({});
 
   const updateLeadScore = (id: string, newScore: LeadScore["score"]) => {
-    setLeads((prev) =>
-      prev.map((l) => (l.id === id ? { ...l, score: newScore } : l)),
-    );
+    setOverrides((s) => ({ ...s, [id]: newScore }));
   };
+
+  // fetch scored leads from API
+  const {
+    data: scoredResp,
+    isLoading,
+    isError,
+    refetch,
+  } = useScoredLeadsQuery(1, 20);
+
+  const apiLeads: LeadScore[] = (scoredResp?.data?.leads || []).map((l) => {
+    const scoreNum = l.leadScoring?.score ?? 0;
+
+    const scoreLabel: LeadScore["score"] =
+      scoreNum >= 70 ? "Hot" : scoreNum >= 40 ? "Warm" : "Cold";
+
+    const lifecycle = l.lifecycleStatus || "";
+    const statusLabel = formatLifecycleStatus(lifecycle || "initial_contact");
+    const progress = getLeadProgress(lifecycle || "initial_contact");
+
+    return {
+      id: l._id,
+      name: l.customerId?.firstName || "",
+      leadId: l._id,
+      location: l.projectName || "",
+      progress,
+      status: statusLabel as LeadScore["status"],
+      quoteValue: l.quoteValue || 0,
+      score: scoreLabel,
+      lastActivity: `${scoreNum} pts`,
+      lastActivityDate: undefined,
+    };
+  });
+
+  const filteredLeads = useMemo(
+    () =>
+      filterLeadScores(apiLeads, overrides, {
+        status,
+        client,
+        dateFrom,
+        dateTo,
+      }),
+    [apiLeads, overrides, status, client, dateFrom, dateTo],
+  );
 
   const getScoreBadgeClass = (score: string) => {
     switch (score) {
@@ -120,13 +209,15 @@ export default function LeadScoring() {
   };
 
   const renderProgressDots = (progress: number) => {
+    const normalizedProgress = Math.max(0, Math.min(4, progress));
+
     return (
       <div className="flex gap-1">
         {[...Array(4)].map((_, i) => (
           <div
             key={i}
             className={`w-2 h-2 rounded-full ${
-              i < progress ? "bg-green-500" : "bg-gray-300"
+              i < normalizedProgress ? "bg-green-500" : "bg-gray-300"
             }`}
           />
         ))}
@@ -138,7 +229,12 @@ export default function LeadScoring() {
     <div className="">
       {/* Header */}
       <div className="bg-teal-400  px-6 py-4 text-white">
-        <h1 className="text-xl font-semibold">Lead Scoring</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-semibold">Lead Scoring</h1>
+          {isLoading ? (
+            <Loader2 className="h-5 w-5 animate-spin text-white" />
+          ) : null}
+        </div>
       </div>
 
       <div className="p-6 space-y-6">
@@ -205,62 +301,45 @@ export default function LeadScoring() {
 
         {/* Table */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
-          <Table>
-            <TableHeader className="bg-gray-50">
-              <TableRow>
-                <TableHead className="font-semibold text-gray-600 uppercase text-xs">
-                  Lead Info
-                </TableHead>
-                <TableHead className="font-semibold text-gray-600 uppercase text-xs">
-                  Progress
-                </TableHead>
-                <TableHead className="font-semibold text-gray-600 uppercase text-xs">
-                  Status
-                </TableHead>
-                <TableHead className="font-semibold text-gray-600 uppercase text-xs">
-                  Quote Value
-                </TableHead>
-                <TableHead className="font-semibold text-gray-600 uppercase text-xs">
-                  Score
-                </TableHead>
-                <TableHead className="font-semibold text-gray-600 uppercase text-xs">
-                  Last Activity
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {useMemo(() => {
-                const filteredLeads = leads.filter((l) => {
-                  // Status filter
-                  if (status !== "all" && l.status !== status) return false;
-
-                  // Client search: match name, leadId or location
-                  if (
-                    client &&
-                    !(
-                      l.name.toLowerCase().includes(client.toLowerCase()) ||
-                      l.leadId.toLowerCase().includes(client.toLowerCase()) ||
-                      l.location.toLowerCase().includes(client.toLowerCase())
-                    )
-                  )
-                    return false;
-
-                  // Date filters (use lastActivityDate if available)
-                  if (dateFrom && l.lastActivityDate) {
-                    const from = new Date(dateFrom);
-                    const act = new Date(l.lastActivityDate);
-                    if (act < from) return false;
-                  }
-                  if (dateTo && l.lastActivityDate) {
-                    const to = new Date(dateTo);
-                    const act = new Date(l.lastActivityDate);
-                    if (act > to) return false;
-                  }
-
-                  return true;
-                });
-
-                return filteredLeads.map((lead) => (
+          {isError ? (
+            <div className="px-6 py-10 text-center space-y-3">
+              <p className="text-sm text-slate-600">
+                Unable to load scored leads.
+              </p>
+              <Button variant="outline" onClick={() => refetch()}>
+                Try again
+              </Button>
+            </div>
+          ) : isLoading ? (
+            <LeadScoringSkeleton />
+          ) : filteredLeads.length === 0 ? (
+            <LeadScoringEmptyState />
+          ) : (
+            <Table>
+              <TableHeader className="bg-gray-50">
+                <TableRow>
+                  <TableHead className="font-semibold text-gray-600 uppercase text-xs">
+                    Lead Info
+                  </TableHead>
+                  <TableHead className="font-semibold text-gray-600 uppercase text-xs">
+                    Progress
+                  </TableHead>
+                  <TableHead className="font-semibold text-gray-600 uppercase text-xs">
+                    Status
+                  </TableHead>
+                  <TableHead className="font-semibold text-gray-600 uppercase text-xs">
+                    Quote Value
+                  </TableHead>
+                  <TableHead className="font-semibold text-gray-600 uppercase text-xs">
+                    Score
+                  </TableHead>
+                  <TableHead className="font-semibold text-gray-600 uppercase text-xs">
+                    Last Activity
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredLeads.map((lead) => (
                   <TableRow key={lead.id} className="hover:bg-gray-50">
                     <TableCell>
                       <div>
@@ -316,10 +395,10 @@ export default function LeadScoring() {
                       {lead.lastActivity}
                     </TableCell>
                   </TableRow>
-                ));
-              }, [leads, status, client, dateFrom, dateTo])}
-            </TableBody>
-          </Table>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </div>
       </div>
     </div>
