@@ -69,7 +69,7 @@ export default function EscalateLeadDialog({
               placeholder="while creating escalation just a small note is required."
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              className="min-h-[150px] resize-none"
+              className="min-h-37.5 resize-none"
             />
           </div>
           {errorMessage && (

@@ -76,7 +76,7 @@ export default function Profile() {
       <Card className="mb-6 bg-white p-4">
         <div className="flex items-start gap-6">
           {/* Avatar */}
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-2xl font-semibold">
+          <div className="w-20 h-20 rounded-full bg-linear-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-2xl font-semibold">
             {userData.name
               .split(" ")
               .map((n) => n[0])

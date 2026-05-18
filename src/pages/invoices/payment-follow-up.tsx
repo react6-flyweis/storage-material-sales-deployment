@@ -9,13 +9,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import NotifyToAccountsDialog from "@/components/notify-to-accounts-dialog";
 import CustomerDetailsDialog from "@/components/customers/customer-details-dialog";
 import {
@@ -201,38 +195,24 @@ export default function PaymentFollowUp() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
+      <Card className="p-0">
+        {/* <CardHeader >
           <CardTitle>Payment Follow-Up</CardTitle>
           <CardDescription>
             Recent payments and pending follow-ups
           </CardDescription>
-        </CardHeader>
-        <CardContent>
+        </CardHeader> */}
+        <CardContent className="p-0">
           <Table>
             <TableHeader>
               <tr className="bg-gray-50">
-                <TableHead className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Client Name
-                </TableHead>
-                <TableHead className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Invoice
-                </TableHead>
-                <TableHead className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Amount
-                </TableHead>
-                <TableHead className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Payment Date
-                </TableHead>
-                <TableHead className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Next Follow Up
-                </TableHead>
-                <TableHead className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Status
-                </TableHead>
-                <TableHead className="px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Actions
-                </TableHead>
+                <TableHead className="">Client Name</TableHead>
+                <TableHead className="">Invoice</TableHead>
+                <TableHead className="">Amount</TableHead>
+                <TableHead className="">Payment Date</TableHead>
+                <TableHead className="">Next Follow Up</TableHead>
+                <TableHead className="">Status</TableHead>
+                <TableHead className="">Actions</TableHead>
               </tr>
             </TableHeader>
             <TableBody className="divide-y divide-gray-200">
@@ -242,7 +222,7 @@ export default function PaymentFollowUp() {
                     key={item.id}
                     className="hover:bg-gray-50 transition-colors"
                   >
-                    <TableCell className="px-6 py-4">
+                    <TableCell className="">
                       <div className="flex flex-col">
                         <div className="font-medium text-gray-900">
                           {item.clientName}
@@ -255,12 +235,12 @@ export default function PaymentFollowUp() {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="px-6 py-4">
+                    <TableCell className="">
                       <span className="text-sm font-medium text-blue-600">
                         {item.invoice}
                       </span>
                     </TableCell>
-                    <TableCell className="px-6 py-4">
+                    <TableCell className="">
                       <div className="flex flex-col">
                         <div className="text-sm font-semibold text-gray-900">
                           {formatCurrency(item.amount)}
@@ -270,20 +250,20 @@ export default function PaymentFollowUp() {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="px-6 py-4">
+                    <TableCell className="">
                       <span className="text-sm text-gray-700">
                         {item.paymentDate || "------"}
                       </span>
                     </TableCell>
-                    <TableCell className="px-6 py-4">
+                    <TableCell className="">
                       <span className="text-sm text-gray-700">
                         {item.nextFollowUp}
                       </span>
                     </TableCell>
-                    <TableCell className="px-6 py-4">
+                    <TableCell className="">
                       {getStatusBadge(item.status)}
                     </TableCell>
-                    <TableCell className="px-6 py-4">
+                    <TableCell className="">
                       <div className="flex items-center gap-2">
                         <CustomerDetailsDialog
                           trigger={
@@ -314,8 +294,8 @@ export default function PaymentFollowUp() {
                                   item.status === "confirmed"
                                     ? "Confirmed"
                                     : item.status === "notified"
-                                    ? "Notified"
-                                    : "Pending",
+                                      ? "Notified"
+                                      : "Pending",
                               },
                             ],
                           }}
@@ -339,7 +319,7 @@ export default function PaymentFollowUp() {
                                   "Notify date:",
                                   date,
                                   "for",
-                                  item.id
+                                  item.id,
                                 );
                               }}
                             />
