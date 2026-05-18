@@ -42,8 +42,7 @@ function mapDetailToLead(detail: LeadDetailData) {
   return {
     id: detail.lead._id,
     name: detail.customer.firstName || detail.customer.customerId || "Lead",
-    workshop:
-      latestQuotation?.buildingType || detail.lead.buildingType || "",
+    workshop: latestQuotation?.buildingType || detail.lead.buildingType || "",
     category: latestQuotation?.location || detail.lead.location || "",
     assignedToName: "",
     assignmentStatus: detail.lead.assignedSales ? "Assigned" : "",
@@ -55,13 +54,78 @@ function mapDetailToLead(detail: LeadDetailData) {
   };
 }
 
+function LeadDetailsSkeleton() {
+  return (
+    <div className="p-5">
+      <div className="animate-pulse space-y-6">
+        <div className="flex items-start gap-4">
+          <div className="h-10 w-24 rounded-lg bg-slate-200" />
+
+          <div className="space-y-3 pt-1">
+            <div className="h-7 w-44 rounded-lg bg-slate-200" />
+            <div className="h-4 w-72 rounded bg-slate-200" />
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="h-10 w-full rounded-xl bg-slate-200" />
+
+          <div className="rounded-xl border border-slate-100 bg-white p-6 space-y-6">
+            <div className="flex items-start gap-4">
+              <div className="h-12 w-12 rounded-xl bg-slate-200" />
+              <div className="space-y-3">
+                <div className="h-5 w-56 rounded bg-slate-200" />
+                <div className="h-4 w-24 rounded bg-slate-200" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="flex items-center gap-3">
+                  <div className="h-5 w-5 rounded-full bg-slate-200" />
+                  <div className="space-y-2">
+                    <div className="h-3 w-24 rounded bg-slate-200" />
+                    <div className="h-4 w-28 rounded bg-slate-200" />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="rounded-xl bg-slate-50 p-4 space-y-3"
+                >
+                  <div className="h-4 w-36 rounded bg-slate-200" />
+                  <div className="space-y-2">
+                    <div className="h-4 w-40 rounded bg-slate-200" />
+                    <div className="h-3 w-32 rounded bg-slate-200" />
+                    <div className="h-3 w-24 rounded bg-slate-200" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function LeadDetails() {
   const navigate = useNavigate();
   const { leadId } = useParams<{ leadId: string }>();
-  const { data: response } = useLeadDetailQuery(leadId);
+  const { data: response, isLoading } = useLeadDetailQuery(leadId);
 
   const detail = response?.success ? response.data : undefined;
-  const lead = detail ? mapDetailToLead(detail) : { ...defaultLead, id: leadId ?? "—" };
+  const lead = detail
+    ? mapDetailToLead(detail)
+    : { ...defaultLead, id: leadId ?? "—" };
+
+  if (isLoading) {
+    return <LeadDetailsSkeleton />;
+  }
 
   return (
     <div className="p-5">
@@ -91,19 +155,22 @@ export default function LeadDetails() {
             </TabsList>
 
             <TabsContent value="basic-info" className="mt-6">
-              <BasicDetails />
+              <BasicDetails lead={detail} />
             </TabsContent>
             <TabsContent value="quotation" className="mt-6">
               <QuotationCard />
             </TabsContent>
             <TabsContent value="open-chat" className="mt-6">
-              <ChatCard lead={lead} />
+              <ChatCard lead={lead} recentMessages={detail?.recentMessages} />
             </TabsContent>
             <TabsContent value="timeline" className="mt-6">
               <TimelineCard lead={lead} />
             </TabsContent>
             <TabsContent value="follow-ups" className="mt-6">
-              <FollowUpsCard auditLog={detail?.auditLog} />
+              <FollowUpsCard
+                auditLog={detail?.auditLog}
+                followUps={detail?.followUps}
+              />
             </TabsContent>
             <TabsContent value="payments" className="mt-6">
               <PaymentsCard
