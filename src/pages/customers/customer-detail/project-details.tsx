@@ -21,35 +21,17 @@ import SuccessDialog from "@/components/success-dialog";
 import UpdateStatusDialog from "./update-status-dialog";
 import { AddNotesDialog, type AddNotesFormValues } from "./add-notes-dialog";
 import { useNavigate, useParams } from "react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import {
+  LEAD_LIFECYCLE_STEPS,
+  getLeadLifecycleStepId,
+} from "@/modules/leads/lifecycle-statuses";
 
 const quickActionButtons = [
   { label: "View Quotation", path: "project-quotation" },
   { label: "View Agreement", path: "contracts/1" },
   { label: "View Invoices", path: "project-invoices" },
   { label: "View Payments", path: "project-payments" },
-];
-
-const lifecycleSteps = [
-  { id: 1, label: "Released\nto plant", date: "24-10-10" },
-  { id: 2, label: "Drawings\nReceived", date: "24-10-10" },
-  { id: 3, label: "BOM\nReceived", date: "24-10-10" },
-  { id: 4, label: "BOM\nReview", date: "24-10-10" },
-  { id: 5, label: "Material\nCheck", date: "24-10-10" },
-  { id: 6, label: "Material\nRequest", date: "24-10-10" },
-  {
-    id: 7,
-    label: "Production\nPlanning",
-    labelSub: "Current\nStep",
-    current: true,
-  },
-  { id: 8, label: "Fabrication\nStarted" },
-  { id: 9, label: "Quality\nInspection" },
-  { id: 10, label: "Packing\nBundling" },
-  { id: 11, label: "Shipper\nPrepared" },
-  { id: 12, label: "Ready For\nDelivery" },
-  { id: 13, label: "Dispatched" },
-  { id: 14, label: "Delivered" },
 ];
 
 export default function ProjectDetailsPage() {
@@ -64,10 +46,23 @@ export default function ProjectDetailsPage() {
         "Reliable for long-distance steel transport.\nPreferred carrier for Texas routes.\nFast response time during bidding.",
     },
   ]);
-  const [selectedStepId, setSelectedStepId] = useState(7);
+  const [selectedStatus, setSelectedStatus] = useState("initial_contact");
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
   const [successDialogTitle] = useState("Status Updated Successfully");
+
+  const selectedStepId = useMemo(
+    () => getLeadLifecycleStepId(selectedStatus),
+    [selectedStatus],
+  );
+  const totalLifecycleSteps = LEAD_LIFECYCLE_STEPS.length;
+  const progressWidth =
+    totalLifecycleSteps > 1
+      ? ((selectedStepId - 1) / (totalLifecycleSteps - 1)) * 100
+      : 0;
+  const currentLifecycleLabel =
+    LEAD_LIFECYCLE_STEPS[selectedStepId - 1]?.label.replace(/\n/g, " ") ??
+    "Initial contact";
 
   const handleSaveNote = (data: AddNotesFormValues) => {
     setNotes((current) => [data, ...current]);
@@ -114,7 +109,7 @@ export default function ProjectDetailsPage() {
       <Card className="">
         <CardHeader className="border-b  flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-[8px] bg-[#EEF2FC]">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#EEF2FC]">
               <Building2 className="h-6 w-6 text-[#1D51A4]" />
             </div>
             <div>
@@ -187,7 +182,7 @@ export default function ProjectDetailsPage() {
               <h3 className="text-[14px] font-semibold text-slate-800">
                 Contact Information
               </h3>
-              <div className="bg-[#F8FAFC] rounded-[8px] p-4 flex gap-4">
+              <div className="bg-[#F8FAFC] rounded-xl p-4 flex gap-4">
                 <div className="flex-1 space-y-2">
                   <p className="text-[14px] font-medium text-slate-800 mb-1">
                     John Doe
@@ -230,7 +225,7 @@ export default function ProjectDetailsPage() {
               <h3 className="text-[14px] font-semibold text-slate-800">
                 Assignment
               </h3>
-              <div className="bg-[#F8FAFC] rounded-[8px] p-4 flex items-start gap-4">
+              <div className="bg-[#F8FAFC] rounded-xl p-4 flex items-start gap-4">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#DCFCE7] text-[#16A34A] shrink-0">
                   <User className="h-5 w-5" />
                 </div>
@@ -249,7 +244,7 @@ export default function ProjectDetailsPage() {
               <h3 className="text-[14px] font-semibold text-slate-800">
                 Signed Contract/Agreement
               </h3>
-              <div className="bg-[#F8FAFC] rounded-[8px] p-4 flex items-start gap-4">
+              <div className="bg-[#F8FAFC] rounded-xl p-4 flex items-start gap-4">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#DCFCE7] text-[#16A34A] shrink-0">
                   <FileText className="h-5 w-5" />
                 </div>
@@ -274,12 +269,15 @@ export default function ProjectDetailsPage() {
         </CardHeader>
 
         <CardContent>
-          <div className="relative min-w-[900px] mb-8">
-            <div className="absolute top-[11px] left-3 right-3 h-[2px] bg-[#E2E8F0] -z-10"></div>
-            <div className="absolute top-[11px] left-3 w-[45%] h-[2px] bg-[#1D51A4] -z-10"></div>
+          <div className="relative min-w-225 mb-8">
+            <div className="absolute top-2.75 left-3 right-3 h-0.5 bg-[#E2E8F0] -z-10"></div>
+            <div
+              className="absolute top-2.75 left-3 h-0.5 bg-[#1D51A4] -z-10"
+              style={{ width: `${progressWidth}%` }}
+            ></div>
 
             <div className="flex justify-between">
-              {lifecycleSteps.map((step) => {
+              {LEAD_LIFECYCLE_STEPS.map((step) => {
                 const isCompleted = step.id < selectedStepId;
                 const isCurrent = step.id === selectedStepId;
 
@@ -289,7 +287,7 @@ export default function ProjectDetailsPage() {
                     className="flex flex-col items-center group relative w-16"
                   >
                     <div
-                      className={`flex h-[24px] w-[24px] items-center justify-center rounded-full text-[12px] font-semibold mb-2 z-10 transition-colors
+                      className={`flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-semibold mb-2 z-10 transition-colors
                       ${
                         isCompleted
                           ? "bg-[#16A34A] text-white border-2 border-white"
@@ -306,16 +304,6 @@ export default function ProjectDetailsPage() {
                       >
                         {step.label}
                       </p>
-                      {step.labelSub && (
-                        <p className="text-[10px] text-slate-400 whitespace-pre-line mt-1">
-                          {step.labelSub}
-                        </p>
-                      )}
-                      {step.date && (
-                        <p className="text-[10px] text-slate-400 mt-1">
-                          {step.date}
-                        </p>
-                      )}
                     </div>
                   </div>
                 );
@@ -323,14 +311,15 @@ export default function ProjectDetailsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-[#F8FAFC] rounded-[8px] p-5 mb-5 border border-slate-100">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-[#F8FAFC] rounded-xl p-5 mb-5 border border-slate-100">
             <div>
               <p className="text-[14px] font-semibold text-slate-800 mb-1">
-                Production Planning (Step 7 of 14)
+                {currentLifecycleLabel} (Step {selectedStepId} of{" "}
+                {totalLifecycleSteps})
               </p>
               <p className="text-[12px] text-slate-500 leading-relaxed">
-                Plan Production Schedule, assign resources and determine
-                fabrication priority for this project
+                Move this project through the lifecycle states tracked by the
+                backend.
               </p>
             </div>
 
@@ -370,7 +359,7 @@ export default function ProjectDetailsPage() {
               </div>
               <div>
                 <p className="text-[12px] text-slate-500 mb-0.5">Priority</p>
-                <p className="text-[13px] font-medium text-[#D97706] inline-flex items-center px-2 py-0.5 rounded-[4px] bg-[#FEF3C7]">
+                <p className="text-[13px] font-medium text-[#D97706] inline-flex items-center px-2 py-0.5 rounded-lg bg-[#FEF3C7]">
                   Medium
                 </p>
               </div>
@@ -400,11 +389,11 @@ export default function ProjectDetailsPage() {
 
           <UpdateStatusDialog
             open={statusDialogOpen}
-            currentStepId={selectedStepId}
-            steps={lifecycleSteps}
+            currentStatus={selectedStatus}
+            steps={LEAD_LIFECYCLE_STEPS}
             onOpenChange={setStatusDialogOpen}
-            onSave={(stepId) => {
-              setSelectedStepId(stepId);
+            onSave={async (status) => {
+              setSelectedStatus(status);
               setSuccessDialogOpen(true);
             }}
           />
@@ -419,7 +408,7 @@ export default function ProjectDetailsPage() {
 
       {/* Grid: Status, Activity, Notes */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="rounded-[12px] border border-[#E5E7EB] bg-white shadow-sm p-6 flex flex-col items-center justify-center text-center">
+        <Card className="rounded-2xl border border-[#E5E7EB] bg-white shadow-sm p-6 flex flex-col items-center justify-center text-center">
           <div className="w-full flex justify-start mb-4">
             <h3 className="text-[16px] font-bold text-slate-800">
               Project Status
@@ -449,16 +438,20 @@ export default function ProjectDetailsPage() {
                 strokeWidth="10"
                 fill="transparent"
                 strokeDasharray="251.2"
-                strokeDashoffset="125.6" /* 50% */
+                strokeDashoffset={
+                  251.2 - (251.2 * selectedStepId) / totalLifecycleSteps
+                }
                 className="text-[#1D51A4]"
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <span className="text-[12px] text-slate-500">Step</span>
               <span className="text-[28px] font-bold text-slate-800 leading-none">
-                7
+                {selectedStepId}
               </span>
-              <span className="text-[11px] text-slate-500">of 14</span>
+              <span className="text-[11px] text-slate-500">
+                of {totalLifecycleSteps}
+              </span>
             </div>
           </div>
 
@@ -466,7 +459,7 @@ export default function ProjectDetailsPage() {
             <div>
               <p className="text-[12px] text-slate-500">Current step</p>
               <p className="text-[14px] font-medium text-[#1D51A4]">
-                Production Planning
+                {currentLifecycleLabel}
               </p>
             </div>
             <div>
@@ -482,7 +475,7 @@ export default function ProjectDetailsPage() {
               <p className="text-[13px] font-semibold text-slate-800 mb-1">
                 Estimate Completion
               </p>
-              <p className="text-[13px] text-slate-500">2024-10-10</p>
+              <p className="text-[13px] text-slate-500">—</p>
             </div>
           </div>
         </Card>
@@ -491,8 +484,8 @@ export default function ProjectDetailsPage() {
           <h3 className="text-[16px] font-bold text-slate-800 mb-6">
             Recent Activity
           </h3>
-          <div className="relative pl-6 space-y-6">
-            <div className="absolute left-[9px] top-2 bottom-2 w-[1px] bg-slate-200"></div>
+            <div className="relative pl-6 space-y-6">
+            <div className="absolute left-2.25 top-2 bottom-2 w-px bg-slate-200"></div>
 
             <div className="relative">
               <div className="absolute -left-6 top-1 h-3.5 w-3.5 rounded-full bg-white border-[3px] border-[#8B5CF6]"></div>
@@ -546,7 +539,7 @@ export default function ProjectDetailsPage() {
           </div>
         </Card>
 
-        <Card className="rounded-[12px] border border-[#E5E7EB] bg-white shadow-sm p-6 overflow-y-auto max-h-[400px]">
+        <Card className="rounded-2xl border border-[#E5E7EB] bg-white shadow-sm p-6 overflow-y-auto max-h-100">
           <h3 className="text-[16px] font-bold text-slate-800 mb-4">Notes</h3>
           <div className="space-y-4 text-[13px] text-slate-600">
             {notes.map((note, index) => (
@@ -562,7 +555,7 @@ export default function ProjectDetailsPage() {
       </div>
 
       {/* Project Photos */}
-      <Card className="rounded-[12px] border border-[#E5E7EB] bg-white shadow-sm p-6">
+      <Card className="rounded-2xl border border-[#E5E7EB] bg-white shadow-sm p-6">
         <h3 className="text-[16px] font-bold text-slate-800 mb-6">
           Project Photos (Latest)
         </h3>
@@ -570,7 +563,7 @@ export default function ProjectDetailsPage() {
           {[1, 2, 3, 4, 5].map((i) => (
             <div
               key={i}
-              className="aspect-video bg-slate-100 rounded-[8px] overflow-hidden border border-slate-200"
+              className="aspect-video bg-slate-100 rounded-xl overflow-hidden border border-slate-200"
             >
               <img
                 src={`https://placehold.co/400x300/E2E8F0/A1A1AA?text=Photo+${i}`}
