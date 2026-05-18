@@ -115,13 +115,25 @@ const navigationGroups: NavigationGroup[] = [
         ],
       },
       { path: "/leads/ai-marketing", label: "AI Support" },
-      { path: "/leads/escalated-queries", label: "Escalated Queries" },
+      // { path: "/leads/escalated-queries", label: "Escalated Queries" },
       // escalated queries
-
       // payment follow-up
       {
         path: "/leads/payment-follow-up",
         label: "Payment Follow-Up",
+      },
+      {
+        path: "/leads/escalated",
+        label: "Escalated Leads",
+      },
+      {
+        path: "/leads/purchase-orders",
+        label: "All Purchase Orders",
+      },
+      // new quotation list
+      {
+        path: "/leads/quotation-list",
+        label: "Quote List",
       },
     ],
   },
@@ -246,7 +258,10 @@ export function Sidebar({
   // Determine active group based on current path
   const activeGroup =
     navigationGroups.find((group) => {
-      if (group.link === currentPath) {
+      if (
+        currentPath === group.link ||
+        currentPath.startsWith(`${group.link}/`)
+      ) {
         return true;
       }
       return group.items.some((item) => {
@@ -442,9 +457,9 @@ export function Sidebar({
               <div className="flex items-center gap-3">
                 <div>
                   <h2 className="text-lg font-bold text-gray-800">
-                    Admin Panel
+                    Sales User
                   </h2>
-                  <p className="text-xs text-gray-500">admin@steelpro.com</p>
+                  <p className="text-xs text-gray-500">sales@steelpro.com</p>
                 </div>
               </div>
               <Button
