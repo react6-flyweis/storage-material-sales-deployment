@@ -36,6 +36,15 @@ type FollowUp = {
   icon: "camera" | "mail" | "phone" | "doc";
 };
 
+type Meeting = {
+  id: string | number;
+  time: string;
+  title: string;
+  company?: string;
+  duration: string;
+  action: "call" | "email";
+};
+
 function mapLeadFollowUpsToDisplay(items?: LeadDetailFollowUp[]): FollowUp[] {
   if (!items || items.length === 0) return [];
 
@@ -48,7 +57,7 @@ function mapLeadFollowUpsToDisplay(items?: LeadDetailFollowUp[]): FollowUp[] {
   }));
 }
 
-const meetings = [];
+const meetings: Meeting[] = [];
 
 const getTypeBadgeClassName = (type: string) => {
   switch (type.toLowerCase()) {
