@@ -22,55 +22,98 @@ import {
   User,
   FileText,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import type { LeadDetailData } from "@/modules/leads/leads.api";
+import {
+  formatLeadCurrency,
+  formatLeadDate,
+  formatLifecycleStatus,
+  formatPhone,
+  getAssignedEmployeeName,
+} from "@/modules/leads/leads.utils";
+import { useUpdateLeadLifecycleMutation } from "@/modules/leads/leads.hooks";
+import {
+  LEAD_LIFECYCLE_STEPS,
+  getLeadLifecycleBadgeClassName,
+  getLeadLifecycleBadgeDotClassName,
+  getLeadLifecycleStepId,
+  getLeadLifecycleStatusLabel,
+} from "@/modules/leads/lifecycle-statuses";
 
-// type Lead = {
-//   id: string;
-//   name: string;
-//   workshop?: string;
-//   category?: string;
-//   assignedToName?: string | null;
-//   assignmentStatus?: string;
-//   progress?: number;
-//   status?: string;
-//   statusColor?: string;
-//   quoteValue?: string;
-//   chatCount?: number;
-// };
+type BasicDetailsProps = {
+  lead?: LeadDetailData;
+};
 
-const lifecycleSteps = [
-  { id: 1, label: "Released\nto plant", date: "24-10-10" },
-  { id: 2, label: "Drawings\nReceived", date: "24-10-10" },
-  { id: 3, label: "BOM\nReceived", date: "24-10-10" },
-  { id: 4, label: "BOM\nReview", date: "24-10-10" },
-  { id: 5, label: "Material\nCheck", date: "24-10-10" },
-  { id: 6, label: "Material\nRequest", date: "24-10-10" },
-  {
-    id: 7,
-    label: "Production\nPlanning",
-    labelSub: "Current\nStep",
-    current: true,
-  },
-  { id: 8, label: "Fabrication\nStarted" },
-  { id: 9, label: "Quality\nInspection" },
-  { id: 10, label: "Packing\nBundling" },
-  { id: 11, label: "Shipper\nPrepared" },
-  { id: 12, label: "Ready For\nDelivery" },
-  { id: 13, label: "Dispatched" },
-  { id: 14, label: "Delivered" },
-];
-
-export default function BasicDetails() {
-  const [notes, setNotes] = useState<AddNotesFormValues[]>([
-    {
-      title: "Steel Investment",
-      notes:
-        "Reliable for long-distance steel transport.\nPreferred carrier for Texas routes.\nFast response time during bidding.",
-    },
-  ]);
-  const [selectedStepId, setSelectedStepId] = useState(7);
+export default function BasicDetails({ lead }: BasicDetailsProps) {
+  const [notes, setNotes] = useState<AddNotesFormValues[]>([]);
+  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
+  const updateLifecycleStatusMutation = useUpdateLeadLifecycleMutation();
+
+  const leadData = lead?.lead;
+  const customer = lead?.customer;
+  const latestQuotation =
+    lead?.quotations.find((quotation) => quotation.isLatest) ??
+    lead?.quotations[0];
+
+  const projectTitle =
+    leadData?.buildingType?.trim() ||
+    customer?.firstName?.trim() ||
+    "Lead Details";
+  const projectReference = leadData?.customerId || leadData?._id || "—";
+  const statusLabel = leadData?.lifecycleStatus
+    ? formatLifecycleStatus(leadData.lifecycleStatus)
+    : "—";
+  const statusClassName = getLeadLifecycleBadgeClassName(
+    leadData?.lifecycleStatus,
+  );
+  const statusDotClassName = getLeadLifecycleBadgeDotClassName(
+    leadData?.lifecycleStatus,
+  );
+  const buildingType =
+    latestQuotation?.buildingType || leadData?.buildingType || "—";
+  const quoteValue = formatLeadCurrency(
+    leadData?.quoteValue ?? latestQuotation?.basePrice ?? 0,
+    latestQuotation?.currency ?? "USD",
+  );
+  const createdOn = formatLeadDate(leadData?.createdAt);
+  const location = latestQuotation?.location || leadData?.location || "—";
+  const contactName =
+    customer?.firstName?.trim() || customer?.customerId || "Customer";
+  const contactPhone = formatPhone(customer?.phone);
+  const contactEmail = customer?.email || "—";
+  const contactAddress = leadData?.location || "—";
+  const assignedToName =
+    getAssignedEmployeeName(lead?.auditLog ?? []) ||
+    (leadData?.assignedSales ? "Assigned sales rep" : "Unassigned");
+  const assignmentSummary = leadData?.assignedSales
+    ? "Sales rep assigned to this lead"
+    : "No sales rep assigned yet";
+  const signedAgreementSummary = leadData?.documents?.length
+    ? `${leadData.documents.length} document${leadData.documents.length === 1 ? "" : "s"} attached`
+    : "No signed agreement uploaded";
+  const signedAgreementDate = leadData?.updatedAt
+    ? `Last updated: ${formatLeadDate(leadData.updatedAt)}`
+    : "No update available";
+
+  const activeStatus =
+    selectedStatus ?? leadData?.lifecycleStatus ?? "initial_contact";
+  const selectedStepId = useMemo(
+    () => getLeadLifecycleStepId(activeStatus),
+    [activeStatus],
+  );
+  const totalLifecycleSteps = LEAD_LIFECYCLE_STEPS.length;
+  const progressWidth =
+    totalLifecycleSteps > 1
+      ? ((selectedStepId - 1) / (totalLifecycleSteps - 1)) * 100
+      : 0;
+  const currentLifecycleStep =
+    LEAD_LIFECYCLE_STEPS.find((step) => step.value === activeStatus) ??
+    LEAD_LIFECYCLE_STEPS[0];
+  const currentLifecycleLabel = currentLifecycleStep
+    ? getLeadLifecycleStatusLabel(currentLifecycleStep.value)
+    : "—";
 
   const handleSaveNote = (data: AddNotesFormValues) => {
     setNotes((current) => [data, ...current]);
@@ -78,6 +121,20 @@ export default function BasicDetails() {
 
   const handleOpenStatusDialog = () => {
     setStatusDialogOpen(true);
+  };
+
+  const handleSaveStatus = async (status: string) => {
+    if (!leadData?._id) {
+      return;
+    }
+
+    await updateLifecycleStatusMutation.mutateAsync({
+      leadId: leadData._id,
+      lifecycleStatus: status,
+    });
+
+    setSelectedStatus(status);
+    setSuccessDialogOpen(true);
   };
   return (
     <div className="space-y-6">
@@ -91,14 +148,20 @@ export default function BasicDetails() {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-[16px] font-semibold text-slate-800">
-                  Project 1- ABC Warehouse
+                  {projectTitle}
                 </h2>
-                <span className="inline-flex items-center rounded-full bg-[#DCFCE7] px-2 py-0.5 text-[12px] font-medium text-[#16A34A]">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A] mr-1.5"></span>
-                  In Progress
+                <span
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[12px] font-medium ${statusClassName}`}
+                >
+                  <span
+                    className={`mr-1.5 h-1.5 w-1.5 rounded-full ${statusDotClassName}`}
+                  ></span>
+                  {statusLabel}
                 </span>
               </div>
-              <p className="text-[13px] text-slate-500 mt-1">Q-2025-1047</p>
+              <p className="text-[13px] text-slate-500 mt-1">
+                {projectReference}
+              </p>
             </div>
           </div>
         </CardHeader>
@@ -112,7 +175,7 @@ export default function BasicDetails() {
               <div>
                 <p className="text-[12px] text-slate-500">Building Type</p>
                 <p className="text-[14px] font-medium text-slate-800">
-                  Workshop
+                  {buildingType}
                 </p>
               </div>
             </div>
@@ -123,7 +186,7 @@ export default function BasicDetails() {
               <div>
                 <p className="text-[12px] text-slate-500">Quote Value</p>
                 <p className="text-[14px] font-medium text-slate-800">
-                  $12,500
+                  {quoteValue}
                 </p>
               </div>
             </div>
@@ -134,7 +197,7 @@ export default function BasicDetails() {
               <div>
                 <p className="text-[12px] text-slate-500">Created On</p>
                 <p className="text-[14px] font-medium text-slate-800">
-                  2024-10-10
+                  {createdOn}
                 </p>
               </div>
             </div>
@@ -145,7 +208,7 @@ export default function BasicDetails() {
               <div>
                 <p className="text-[12px] text-slate-500">Location</p>
                 <p className="text-[14px] font-medium text-slate-800">
-                  1878 Bayonne Ave, Manchester, NNJ, 088765
+                  {location}
                 </p>
               </div>
             </div>
@@ -158,17 +221,17 @@ export default function BasicDetails() {
               <h3 className="text-[14px] font-semibold text-slate-800">
                 Contact Information
               </h3>
-              <div className="bg-[#F8FAFC] rounded-[8px] p-4 flex gap-4">
+              <div className="bg-[#F8FAFC] rounded-xl p-4 flex gap-4">
                 <div className="flex-1 space-y-2">
                   <p className="text-[14px] font-medium text-slate-800 mb-1">
-                    John Doe
+                    {contactName}
                   </p>
                   <div className="flex items-start gap-2">
                     <Phone className="h-4 w-4 text-slate-400 shrink-0 mt-0.5" />
                     <div className="flex text-[13px]">
                       <span className="text-slate-500 w-16">Phone</span>
                       <span className="font-medium text-slate-800">
-                        (163) 2459 315
+                        {contactPhone}
                       </span>
                     </div>
                   </div>
@@ -177,10 +240,14 @@ export default function BasicDetails() {
                     <div className="flex text-[13px]">
                       <span className="text-slate-500 w-16">Email</span>
                       <a
-                        href="mailto:darlee@example.com"
+                        href={
+                          contactEmail === "—"
+                            ? undefined
+                            : `mailto:${contactEmail}`
+                        }
                         className="font-medium text-[#1D51A4] hover:underline"
                       >
-                        darlee@example.com
+                        {contactEmail}
                       </a>
                     </div>
                   </div>
@@ -189,7 +256,7 @@ export default function BasicDetails() {
                     <div className="flex flex-col text-[13px]">
                       <span className="text-slate-500 w-16">Address</span>
                       <span className="font-medium text-slate-800">
-                        1861 Bayonne Ave,
+                        {contactAddress}
                       </span>
                     </div>
                   </div>
@@ -201,16 +268,16 @@ export default function BasicDetails() {
               <h3 className="text-[14px] font-semibold text-slate-800">
                 Assignment
               </h3>
-              <div className="bg-[#F8FAFC] rounded-[8px] p-4 flex items-start gap-4">
+              <div className="bg-[#F8FAFC] rounded-xl p-4 flex items-start gap-4">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#DCFCE7] text-[#16A34A] shrink-0">
                   <User className="h-5 w-5" />
                 </div>
                 <div>
                   <p className="text-[14px] font-medium text-slate-800">
-                    Assigned to: Sarah Lee
+                    Assigned to: {assignedToName}
                   </p>
                   <p className="text-[13px] text-slate-500 mt-1">
-                    1 person working on this lead
+                    {assignmentSummary}
                   </p>
                 </div>
               </div>
@@ -220,7 +287,7 @@ export default function BasicDetails() {
               <h3 className="text-[14px] font-semibold text-slate-800">
                 Signed Contract/Agreement
               </h3>
-              <div className="bg-[#F8FAFC] rounded-[8px] p-4 flex items-start gap-4">
+              <div className="bg-[#F8FAFC] rounded-xl p-4 flex items-start gap-4">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#DCFCE7] text-[#16A34A] shrink-0">
                   <FileText className="h-5 w-5" />
                 </div>
@@ -229,7 +296,10 @@ export default function BasicDetails() {
                     Signed contract/Agreement
                   </p>
                   <p className="text-[13px] text-slate-500 mt-1">
-                    Signed on: 12 April 2025
+                    {signedAgreementSummary}
+                  </p>
+                  <p className="text-[13px] text-slate-500 mt-1">
+                    {signedAgreementDate}
                   </p>
                 </div>
               </div>
@@ -245,12 +315,15 @@ export default function BasicDetails() {
         </CardHeader>
 
         <CardContent>
-          <div className="relative min-w-[900px] mb-8">
-            <div className="absolute top-[11px] left-3 right-3 h-[2px] bg-[#E2E8F0] -z-10"></div>
-            <div className="absolute top-[11px] left-3 w-[45%] h-[2px] bg-[#1D51A4] -z-10"></div>
+          <div className="relative min-w-225 mb-8">
+            <div className="absolute top-3.5 mx-5 bg-[#1D51A4] left-3 right-3 h-0.5  "></div>
+            <div
+              className="absolute top-2.75 left-3 h-0.5 bg-[#1D51A4] -z-10"
+              style={{ width: `${progressWidth}%` }}
+            ></div>
 
             <div className="flex justify-between">
-              {lifecycleSteps.map((step) => {
+              {LEAD_LIFECYCLE_STEPS.map((step) => {
                 const isCompleted = step.id < selectedStepId;
                 const isCurrent = step.id === selectedStepId;
 
@@ -260,7 +333,7 @@ export default function BasicDetails() {
                     className="flex flex-col items-center group relative w-16"
                   >
                     <div
-                      className={`flex h-[24px] w-[24px] items-center justify-center rounded-full text-[12px] font-semibold mb-2 z-10 transition-colors
+                      className={`flex size-8 items-center justify-center rounded-full  font-semibold mb-2 z-10 transition-colors
                       ${
                         isCompleted
                           ? "bg-[#16A34A] text-white border-2 border-white"
@@ -294,14 +367,15 @@ export default function BasicDetails() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-[#F8FAFC] rounded-[8px] p-5 mb-5 border border-slate-100">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-[#F8FAFC] rounded-xl p-5 mb-5 border border-slate-100">
             <div>
               <p className="text-[14px] font-semibold text-slate-800 mb-1">
-                Production Planning (Step 7 of 14)
+                {currentLifecycleLabel} (Step {selectedStepId} of{" "}
+                {totalLifecycleSteps})
               </p>
               <p className="text-[12px] text-slate-500 leading-relaxed">
-                Plan Production Schedule, assign resources and determine
-                fabrication priority for this project
+                Move this lead through the sales lifecycle and keep the current
+                stage aligned with the backend status.
               </p>
             </div>
 
@@ -341,7 +415,7 @@ export default function BasicDetails() {
               </div>
               <div>
                 <p className="text-[12px] text-slate-500 mb-0.5">Priority</p>
-                <p className="text-[13px] font-medium text-[#D97706] inline-flex items-center px-2 py-0.5 rounded-[4px] bg-[#FEF3C7]">
+                <p className="text-[13px] font-medium text-[#D97706] inline-flex items-center px-2 py-0.5 rounded-lg bg-[#FEF3C7]">
                   Medium
                 </p>
               </div>
@@ -363,6 +437,9 @@ export default function BasicDetails() {
               variant="default"
               className="bg-[#1D51A4] hover:bg-[#1D51A4]/90 text-white rounded-[6px]"
               onClick={handleOpenStatusDialog}
+              disabled={
+                updateLifecycleStatusMutation.isPending || !leadData?._id
+              }
             >
               Update Step Status
             </Button>
@@ -371,13 +448,10 @@ export default function BasicDetails() {
 
           <UpdateStatusDialog
             open={statusDialogOpen}
-            currentStepId={selectedStepId}
-            steps={lifecycleSteps}
+            currentStatus={activeStatus}
+            steps={LEAD_LIFECYCLE_STEPS}
             onOpenChange={setStatusDialogOpen}
-            onSave={(stepId) => {
-              setSelectedStepId(stepId);
-              setSuccessDialogOpen(true);
-            }}
+            onSave={handleSaveStatus}
           />
 
           <SuccessDialog
@@ -420,16 +494,20 @@ export default function BasicDetails() {
                 strokeWidth="10"
                 fill="transparent"
                 strokeDasharray="251.2"
-                strokeDashoffset="125.6" /* 50% */
+                strokeDashoffset={
+                  251.2 - (251.2 * selectedStepId) / totalLifecycleSteps
+                }
                 className="text-[#1D51A4]"
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <span className="text-[12px] text-slate-500">Step</span>
               <span className="text-[28px] font-bold text-slate-800 leading-none">
-                7
+                {selectedStepId}
               </span>
-              <span className="text-[11px] text-slate-500">of 14</span>
+              <span className="text-[11px] text-slate-500">
+                of {totalLifecycleSteps}
+              </span>
             </div>
           </div>
 
@@ -437,7 +515,7 @@ export default function BasicDetails() {
             <div>
               <p className="text-[12px] text-slate-500">Current step</p>
               <p className="text-[14px] font-medium text-[#1D51A4]">
-                Production Planning
+                {currentLifecycleLabel}
               </p>
             </div>
             <div>
@@ -453,7 +531,7 @@ export default function BasicDetails() {
               <p className="text-[13px] font-semibold text-slate-800 mb-1">
                 Estimate Completion
               </p>
-              <p className="text-[13px] text-slate-500">2024-10-10</p>
+              <p className="text-[13px] text-slate-500">—</p>
             </div>
           </div>
         </Card>
@@ -463,71 +541,56 @@ export default function BasicDetails() {
             Recent Activity
           </h3>
           <div className="relative pl-6 space-y-6">
-            <div className="absolute left-[9px] top-2 bottom-2 w-[1px] bg-slate-200"></div>
+            <div className="absolute left-2.25 top-2 bottom-2 w-px bg-slate-200"></div>
 
-            <div className="relative">
-              <div className="absolute -left-6 top-1 h-3.5 w-3.5 rounded-full bg-white border-[3px] border-[#8B5CF6]"></div>
-              <p className="text-[13px] font-medium text-slate-800">
-                Step updated: material request completed
-              </p>
-              <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-1">
-                <Calendar className="h-3 w-3" /> 19 Jan 2025
-              </p>
-            </div>
-
-            <div className="relative">
-              <div className="absolute -left-6 top-1 h-3.5 w-3.5 rounded-full bg-white border-[3px] border-[#8B5CF6]"></div>
-              <p className="text-[13px] font-medium text-slate-800">
-                Additional material request #AMR-001 Created
-              </p>
-              <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-1">
-                <Calendar className="h-3 w-3" /> 18 Jan 2025
-              </p>
-            </div>
-
-            <div className="relative">
-              <div className="absolute -left-6 top-1 h-3.5 w-3.5 rounded-full bg-white border-[3px] border-[#8B5CF6]"></div>
-              <p className="text-[13px] font-medium text-slate-800">
-                Material Check Completed
-              </p>
-              <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-1">
-                <Calendar className="h-3 w-3" /> 18 Jan 2025
-              </p>
-            </div>
-
-            <div className="relative">
-              <div className="absolute -left-6 top-1 h-3.5 w-3.5 rounded-full bg-white border-[3px] border-[#8B5CF6]"></div>
-              <p className="text-[13px] font-medium text-slate-800">
-                BOM Review completed
-              </p>
-              <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-1">
-                <Calendar className="h-3 w-3" /> 17 Jan 2025
-              </p>
-            </div>
-
-            <div className="relative">
-              <div className="absolute -left-6 top-1 h-3.5 w-3.5 rounded-full bg-white border-[3px] border-[#8B5CF6]"></div>
-              <p className="text-[13px] font-medium text-slate-800">
-                2 unread messages
-              </p>
-              <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-1">
-                <Calendar className="h-3 w-3" /> 17 Jan 2025
-              </p>
-            </div>
+            {lead?.activityLog && lead.activityLog.length > 0 ? (
+              lead.activityLog.map((entry: any, index: number) => (
+                <div key={entry.id ?? index} className="relative">
+                  <div className="absolute -left-6 top-1 h-3.5 w-3.5 rounded-full bg-white border-[3px] border-[#8B5CF6]"></div>
+                  <p className="text-[13px] font-medium text-slate-800">
+                    {entry.title ?? entry.message ?? String(entry)}
+                  </p>
+                  <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-1">
+                    <Calendar className="h-3 w-3" />{" "}
+                    {entry.timestamp ?? entry.date ?? entry.createdAt ?? ""}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-slate-500">
+                <Calendar className="mx-auto h-6 w-6 text-slate-400" />
+                <p className="font-medium mt-2">No recent activity</p>
+                <p className="text-sm mt-1">
+                  Activity will appear here when available.
+                </p>
+              </div>
+            )}
           </div>
         </Card>
 
         <Card className="p-6 gap-0">
           <h3 className="text-[16px] font-bold text-slate-800 mb-4">Notes</h3>
           <div className="space-y-4 text-[13px] text-slate-600">
-            {notes.map((note, index) => (
-              <div key={index} className="space-y-2">
-                <p className="text-[14px] font-medium text-slate-800">
-                  {note.title}
+            {notes.length > 0 ? (
+              notes.map((note, index) => (
+                <div key={index} className="space-y-2">
+                  <p className="text-[14px] font-medium text-slate-800">
+                    {note.title}
+                  </p>
+                  <p className="whitespace-pre-line">{note.notes}</p>
+                </div>
+              ))
+            ) : (
+              <div className="py-6 text-center text-slate-500">
+                <p className="font-medium text-slate-800 mb-1">No notes yet</p>
+                <p className="text-sm">
+                  Add notes to keep track of communications.
                 </p>
-                <p className="whitespace-pre-line">{note.notes}</p>
+                <div className="mt-3 flex justify-center">
+                  <AddNotesDialog onSave={handleSaveNote} />
+                </div>
               </div>
-            ))}
+            )}
           </div>
         </Card>
       </div>
