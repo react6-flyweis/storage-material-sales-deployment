@@ -19,6 +19,62 @@ interface CommunicationItem {
   timestamp: string;
   status: string;
 }
+const communicationItems: CommunicationItem[] = [
+  {
+    id: "1",
+    clientName: "Sarah Johnson",
+    message:
+      "Hi Sarah, Following up on our discussion about the implementation timeline...",
+    contactPerson: "John Smith",
+    timestamp: "2024-01-15 at 3:45 PM",
+    status: "completed",
+  },
+  {
+    id: "2",
+    clientName: "Sarah Johnson",
+    message:
+      "Hi Sarah, Following up on our discussion about the implementation timeline...",
+    contactPerson: "John Smith",
+    timestamp: "2024-01-15 at 3:45 PM",
+    status: "completed",
+  },
+  {
+    id: "3",
+    clientName: "Sarah Johnson",
+    message:
+      "Hi Sarah, Following up on our discussion about the implementation timeline...",
+    contactPerson: "John Smith",
+    timestamp: "2024-01-16 at 3:45 PM",
+    status: "completed",
+  },
+  {
+    id: "4",
+    clientName: "Sarah Johnson",
+    message:
+      "Hi Sarah, Following up on our discussion about the implementation timeline...",
+    contactPerson: "John Smith",
+    timestamp: "2024-01-15 at 3:45 PM",
+    status: "completed",
+  },
+  {
+    id: "5",
+    clientName: "Sarah Johnson",
+    message:
+      "Hi Sarah, Following up on our discussion about the implementation timeline...",
+    contactPerson: "John Smith",
+    timestamp: "2024-01-15 at 3:45 PM",
+    status: "completed",
+  },
+  {
+    id: "6",
+    clientName: "Sarah Johnson",
+    message:
+      "Hi Sarah, Following up on our discussion about the implementation timeline...",
+    contactPerson: "John Smith",
+    timestamp: "2024-01-15 at 3:45 PM",
+    status: "completed",
+  },
+];
 
 export default function LeadCommunicationTimeline() {
   const navigate = useNavigate();
@@ -26,63 +82,6 @@ export default function LeadCommunicationTimeline() {
   const [dateTo, setDateTo] = useState("");
   const [status, setStatus] = useState("completed");
   const [searchClient, setSearchClient] = useState("");
-
-  const communicationItems: CommunicationItem[] = [
-    {
-      id: "1",
-      clientName: "Sarah Johnson",
-      message:
-        "Hi Sarah, Following up on our discussion about the implementation timeline...",
-      contactPerson: "John Smith",
-      timestamp: "2024-01-15 at 3:45 PM",
-      status: "completed",
-    },
-    {
-      id: "2",
-      clientName: "Sarah Johnson",
-      message:
-        "Hi Sarah, Following up on our discussion about the implementation timeline...",
-      contactPerson: "John Smith",
-      timestamp: "2024-01-15 at 3:45 PM",
-      status: "completed",
-    },
-    {
-      id: "3",
-      clientName: "Sarah Johnson",
-      message:
-        "Hi Sarah, Following up on our discussion about the implementation timeline...",
-      contactPerson: "John Smith",
-      timestamp: "2024-01-16 at 3:45 PM",
-      status: "completed",
-    },
-    {
-      id: "4",
-      clientName: "Sarah Johnson",
-      message:
-        "Hi Sarah, Following up on our discussion about the implementation timeline...",
-      contactPerson: "John Smith",
-      timestamp: "2024-01-15 at 3:45 PM",
-      status: "completed",
-    },
-    {
-      id: "5",
-      clientName: "Sarah Johnson",
-      message:
-        "Hi Sarah, Following up on our discussion about the implementation timeline...",
-      contactPerson: "John Smith",
-      timestamp: "2024-01-15 at 3:45 PM",
-      status: "completed",
-    },
-    {
-      id: "6",
-      clientName: "Sarah Johnson",
-      message:
-        "Hi Sarah, Following up on our discussion about the implementation timeline...",
-      contactPerson: "John Smith",
-      timestamp: "2024-01-15 at 3:45 PM",
-      status: "completed",
-    },
-  ];
 
   // Helpers: parse input dd-mm-yyyy -> Date, and parse item timestamp
   const parseInputDate = (s: string) => {
@@ -139,7 +138,7 @@ export default function LeadCommunicationTimeline() {
 
       return true;
     });
-  }, [communicationItems, status, dateFrom, dateTo, searchClient]);
+  }, [status, dateFrom, dateTo, searchClient]);
 
   return (
     <div className="w-full">
@@ -234,7 +233,7 @@ export default function LeadCommunicationTimeline() {
 
                   {/* Message with Icon */}
                   <div className="flex items-start gap-2 mb-3">
-                    <Mail className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                    <Mail className="h-4 w-4 text-gray-500 mt-0.5 shrink-0" />
                     <p className="text-sm text-gray-600 line-clamp-2">
                       {item.message}
                     </p>
