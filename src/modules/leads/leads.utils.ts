@@ -33,7 +33,19 @@ export const formatLeadDateTime = (value?: string | null) => {
   }).format(date);
 };
 
+const lifecycleStatusLabels: Record<string, string> = {
+  initial_contact: "Initial contact",
+  requirements_gathered: "Requirements gathered",
+  proposal_sent: "Proposal sent",
+  negotiation: "Negotiation",
+  deal_closed: "Deal closed",
+  payment_done: "Payment done",
+  converted_to_po: "Converted to PO",
+  sent_to_admin: "Sent to admin",
+};
+
 export const formatLifecycleStatus = (value: string) =>
+  lifecycleStatusLabels[value] ??
   value
     .replace(/_/g, " ")
     .replace(/\b\w/g, (character) => character.toUpperCase());
@@ -41,13 +53,16 @@ export const formatLifecycleStatus = (value: string) =>
 export const getLeadProgress = (status: string) => {
   const normalized = status.toLowerCase();
 
-  if (normalized.includes("delivered")) return 7;
-  if (normalized.includes("payment") || normalized.includes("paid")) return 6;
+  if (normalized.includes("sent_to_admin")) return 8;
+  if (normalized.includes("converted_to_po")) return 7;
+  if (normalized.includes("payment")) return 6;
   if (normalized.includes("closed")) return 5;
   if (normalized.includes("negotiation")) return 4;
-  if (normalized.includes("proposal")) return 3;
-  if (normalized.includes("quotation")) return 3;
+  if (normalized.includes("proposal") || normalized.includes("quotation")) {
+    return 3;
+  }
   if (normalized.includes("requirements")) return 2;
+  if (normalized.includes("initial_contact")) return 1;
 
   return 1;
 };
@@ -88,19 +103,18 @@ export const formatAuditAction = (
     case "escalation.resolved":
       return `Escalation resolved (${String(metadata.employeeName ?? "assigned")})`;
     default:
-      return action.replace(/\./g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      return action
+        .replace(/\./g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase());
   }
 };
 
-export const getAuditTypeLabel = (type: string) =>
-  formatLifecycleStatus(type);
+export const getAuditTypeLabel = (type: string) => formatLifecycleStatus(type);
 
-export const getAuditPerformedBy = (
-  entry: {
-    performedBy?: string | null;
-    metadata?: Record<string, unknown>;
-  },
-) => {
+export const getAuditPerformedBy = (entry: {
+  performedBy?: string | null;
+  metadata?: Record<string, unknown>;
+}) => {
   const metadata = entry.metadata ?? {};
 
   if (metadata.employeeName) return String(metadata.employeeName);
