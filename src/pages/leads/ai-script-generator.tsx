@@ -19,29 +19,31 @@ interface Message {
   timestamp: Date;
 }
 
+interface ApiMessage {
+  _id?: string;
+  content?: string;
+  role?: string;
+  timestamp?: string | number;
+}
+
+import { useAiScriptSessionsQuery } from "@/modules/leads/leads.hooks";
+
 export default function AiScriptGeneratorPage() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      text: "Hello John! I'd be happy to help you with that. Can you tell me more about the intended use and any specific requirements?",
-      sender: "ai",
-      timestamp: new Date(),
-    },
-    {
-      id: "2",
-      text: "It will be used for automotive repair. I need overhead doors and good ventilation.",
-      sender: "user",
-      timestamp: new Date(),
-    },
-    {
-      id: "3",
-      text: "I just wanted to follow up regarding the quotation we shared for your warehouse project last week.\n\nHave you had a chance to go through the details?\n\nWe've customized the structure based on your initial design inputs — and I'd be happy to walk you through the material specifications or pricing options if you have any questions.\n\nAlso, our design team has a slot available this week if you'd like to discuss potential modifications before finalizing.\n\nWould you prefer a quick call tomorrow morning or later in the afternoon?",
-      sender: "ai",
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
+
+  const { data: aiData, isLoading: isAiLoading } = useAiScriptSessionsQuery();
+
+  const apiSessions = aiData?.data?.sessions ?? [];
+  const mappedApiMessages: Message[] | null = apiSessions.length
+    ? apiSessions[0].messages.map((m: ApiMessage) => ({
+        id: m._id ?? String(m.timestamp ?? ""),
+        text: m.content ?? "",
+        sender: m.role === "user" ? "user" : "ai",
+        timestamp: m.timestamp ? new Date(m.timestamp) : new Date(0),
+      }))
+    : null;
 
   const handleSendMessage = () => {
     if (inputMessage.trim()) {
@@ -196,29 +198,65 @@ export default function AiScriptGeneratorPage() {
           </div>
 
           {/* Messages Container */}
-          <div className="p-6 space-y-4 min-h-[500px] max-h-[500px] overflow-y-auto">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={cn(
-                  "flex",
-                  message.sender === "user" ? "justify-start" : "justify-end",
-                )}
-              >
+          <div className="p-6 space-y-4 min-h-125 max-h-125 overflow-y-auto">
+            {isAiLoading ? (
+              <div className="space-y-3">
+                {[...Array(6)].map((_, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      "max-w-[60%] rounded-lg px-4 py-3 animate-pulse bg-gray-200",
+                    )}
+                  />
+                ))}
+              </div>
+            ) : mappedApiMessages ? (
+              mappedApiMessages.map((message) => (
                 <div
+                  key={message.id}
                   className={cn(
-                    "max-w-[80%] rounded-lg px-4 py-3",
-                    message.sender === "user"
-                      ? "bg-gray-200 text-gray-900"
-                      : "bg-blue-600 text-white",
+                    "flex",
+                    message.sender === "user" ? "justify-start" : "justify-end",
                   )}
                 >
-                  <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                    {message.text}
-                  </p>
+                  <div
+                    className={cn(
+                      "max-w-[80%] rounded-lg px-4 py-3",
+                      message.sender === "user"
+                        ? "bg-gray-200 text-gray-900"
+                        : "bg-blue-600 text-white",
+                    )}
+                  >
+                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                      {message.text}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={cn(
+                    "flex",
+                    message.sender === "user" ? "justify-start" : "justify-end",
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "max-w-[80%] rounded-lg px-4 py-3",
+                      message.sender === "user"
+                        ? "bg-gray-200 text-gray-900"
+                        : "bg-blue-600 text-white",
+                    )}
+                  >
+                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                      {message.text}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
 
           {/* Input Area */}
