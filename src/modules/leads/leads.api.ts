@@ -42,6 +42,34 @@ export type LeadsListResponse = {
   };
 };
 
+export type ScoredLeadItem = {
+  _id: string;
+  projectName?: string;
+  customerId: {
+    _id: string;
+    firstName: string;
+  };
+  lifecycleStatus: string;
+  quoteValue: number;
+  leadScoring: {
+    score: number;
+    projectSize: { points: number; reason: string };
+    budgetSignals: { points: number; reason: string };
+    timeline: { points: number; reason: string };
+    decisionMaker: { points: number; reason: string };
+    projectClarity: { points: number; reason: string };
+  };
+};
+
+export type ScoredLeadsResponse = {
+  success: boolean;
+  message: string;
+  data: {
+    leads: ScoredLeadItem[];
+    total: number;
+  };
+};
+
 export type ImportLeadsResponse = {
   success: boolean;
   message: string;
@@ -63,6 +91,50 @@ export async function getLeadsProvider(page: number, limit: number) {
 export async function importLeadsProvider(payload: ImportLeadsPayload) {
   const response = await apiClient.post<ImportLeadsResponse>(
     "/api/sales/leads/import",
+    payload,
+  );
+
+  return response.data;
+}
+
+export async function getScoredLeadsProvider(page: number, limit: number) {
+  const response = await apiClient.get<ScoredLeadsResponse>(
+    "/api/sales/leads/scored",
+    {
+      params: { page, limit },
+    },
+  );
+
+  return response.data;
+}
+
+export type CreateLeadPayload = {
+  firstName: string;
+  lastName?: string;
+  emailAddress?: string;
+  phoneNumber?: string;
+  countryCode?: string;
+  companyName?: string;
+  projectType?: string;
+  city?: string;
+  roofStyle?: string;
+  width?: number;
+  length?: number;
+  height?: number;
+  estimatedValue?: number;
+  leadStatus?: string;
+  notes?: string;
+};
+
+export type CreateLeadResponse = {
+  success: boolean;
+  message: string;
+  data?: unknown;
+};
+
+export async function createLeadProvider(payload: CreateLeadPayload) {
+  const response = await apiClient.post<CreateLeadResponse>(
+    "/api/sales/leads",
     payload,
   );
 
@@ -102,14 +174,34 @@ export type LeadDetailLead = {
   isHandedToSales?: boolean;
   isRaisedToPO?: boolean;
   poStatus?: string | null;
+  aiQuoteData?: unknown;
   aiContextSummary?: string;
+  aiContextSummaryUpdatedAt?: string;
+  assigningHistory?: Array<{
+    employeeId: string;
+    assignedAt: string;
+    method?: string;
+    assignedBy?: string | null;
+  }>;
+  projectName?: string;
+  sqft?: string | number | null;
+  width?: number | null;
+  length?: number | null;
+  height?: number | null;
+  numberOfBuildings?: number;
+  isTerminated?: boolean;
+  terminationReason?: string;
+  terminatedAt?: string | null;
   leadScoring?: {
     score: number;
     requirements?: string;
+    lastScoredAt?: string;
+    scoreBreakdown?: Record<string, { points: number; reason: string }>;
   };
   documents?: unknown[];
   createdAt: string;
   updatedAt: string;
+  jobId?: string;
 };
 
 export type LeadDetailQuotation = {
@@ -191,6 +283,39 @@ export type LeadDetailMessage = {
   createdAt?: string;
 };
 
+export type AiScriptMessage = {
+  role: string;
+  content: string;
+  timestamp: string;
+  _id?: string;
+};
+
+export type AiScriptSession = {
+  _id: string;
+  salesEmployeeId?: string;
+  leadId?: { _id: string; projectName?: string } | string;
+  messages: AiScriptMessage[];
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+type AiScriptResponse = {
+  success: boolean;
+  message: string;
+  data: {
+    sessions: AiScriptSession[];
+  };
+};
+
+export async function getAiScriptSessionsProvider(): Promise<AiScriptResponse> {
+  const response = await apiClient.get<AiScriptResponse>(
+    "/api/sales/followups/ai-script",
+  );
+
+  return response.data;
+}
+
 export type LeadDetailData = {
   lead: LeadDetailLead;
   customer: LeadDetailCustomer;
@@ -238,6 +363,52 @@ export async function escalateLeadProvider(
 ) {
   const response = await apiClient.post<EscalateLeadResponse>(
     `/api/sales/leads/${leadId}/escalate`,
+    payload,
+  );
+
+  return response.data;
+}
+
+export type MoveLeadToOrdersPayload = {
+  poNumber: string;
+  invoiceId: string;
+  quotationId: string;
+};
+
+export type MoveLeadToOrdersResponse = {
+  success: boolean;
+  message: string;
+  data?: unknown;
+};
+
+export async function moveLeadToOrdersProvider(
+  leadId: string,
+  payload: MoveLeadToOrdersPayload,
+) {
+  const response = await apiClient.post<MoveLeadToOrdersResponse>(
+    `/api/sales/leads/${leadId}/po-order`,
+    payload,
+  );
+
+  return response.data;
+}
+
+export type UpdateLeadLifecyclePayload = {
+  lifecycleStatus: string;
+};
+
+export type UpdateLeadLifecycleResponse = {
+  success: boolean;
+  message: string;
+  data?: unknown;
+};
+
+export async function updateLeadLifecycleProvider(
+  leadId: string,
+  payload: UpdateLeadLifecyclePayload,
+) {
+  const response = await apiClient.patch<UpdateLeadLifecycleResponse>(
+    `/api/sales/leads/${leadId}/lifecycle`,
     payload,
   );
 
