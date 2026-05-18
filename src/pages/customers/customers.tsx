@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { CheckIcon, Eye, Search, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import AddCustomerDialog from "@/components/customers/add-customer-dialog";
+// import AddCustomerDialog from "@/components/customers/add-customer-dialog";
 import StatCard from "@/components/ui/stat-card";
 import {
   InputGroup,
@@ -206,18 +206,21 @@ export default function CustomersPage() {
             </p>
           </div>
           <div className="flex gap-3">
-            <AddCustomerDialog
+            {/* <AddCustomerDialog
               onAdd={() => {}}
-              // onAdd={(c) => {
-              //   const newCustomer = c ?? generateRandomCustomer();
-              //   setCustomers((prev) => [newCustomer, ...prev]);
-              // }}
+              onAdd={(c) => {
+                const newCustomer = c ?? generateRandomCustomer();
+                setCustomers((prev) => [newCustomer, ...prev]);
+              }}
               trigger={
                 <Button size="lg" className="">
                   Add New Customer
                 </Button>
               }
-            />
+            /> */}
+            <Button size="lg" className="">
+              Add New Customer
+            </Button>
           </div>
         </div>
 
