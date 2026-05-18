@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { ArrowLeft, Minus, Plus } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router";
 import SuccessDialog from "@/components/success-dialog";
+import Counter from "@/components/counter-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,10 +14,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useCreateLeadMutation } from "@/modules/leads/leads.hooks";
 
 export default function AddNewLead() {
   const navigate = useNavigate();
   const [showSuccess, setShowSuccess] = useState(false);
+  const createLeadMutation = useCreateLeadMutation();
+  const [submitting, setSubmitting] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -42,7 +46,7 @@ export default function AddNewLead() {
   });
 
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -52,22 +56,37 @@ export default function AddNewLead() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleNumberChange = (field: string, delta: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: Math.max(
-        0,
-        (prev[field as keyof typeof prev] as number) + delta
-      ),
-    }));
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement API call to save the lead
-    console.log("Form submitted:", formData);
-    // Show success dialog
-    setShowSuccess(true);
+    const payload = {
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      emailAddress: formData.email,
+      phoneNumber: formData.phone,
+      companyName: formData.companyName,
+      projectType: formData.buildingType || undefined,
+      roofStyle: formData.roofStyle || undefined,
+      width: formData.width || undefined,
+      length: formData.length || undefined,
+      height: formData.height || undefined,
+      estimatedValue: formData.estimatedValue
+        ? parseInt(String(formData.estimatedValue))
+        : undefined,
+      leadStatus: formData.leadStatus,
+      notes: formData.notes,
+    };
+
+    setSubmitting(true);
+    createLeadMutation.mutate(payload, {
+      onSuccess: () => {
+        setShowSuccess(true);
+        setSubmitting(false);
+      },
+      onError: (err) => {
+        console.error("Create lead failed:", err);
+        setSubmitting(false);
+      },
+    });
   };
 
   const handleCancel = () => {
@@ -206,16 +225,18 @@ export default function AddNewLead() {
                 }
                 required
               >
-                <SelectTrigger id="leadSource">
+                <SelectTrigger id="leadSource" className="w-full">
                   <SelectValue placeholder="Select lead source" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="website">Website</SelectItem>
-                  <SelectItem value="referral">Referral</SelectItem>
                   <SelectItem value="social-media">Social Media</SelectItem>
-                  <SelectItem value="cold-call">Cold Call</SelectItem>
                   <SelectItem value="email-campaign">Email Campaign</SelectItem>
+                  <SelectItem value="referral">Referral</SelectItem>
+                  <SelectItem value="cold-call">Cold Call</SelectItem>
                   <SelectItem value="trade-show">Trade Show</SelectItem>
+                  <SelectItem value="linkedin">LinkedIn</SelectItem>
+                  <SelectItem value="google-ads">Google Ads</SelectItem>
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
@@ -228,14 +249,14 @@ export default function AddNewLead() {
                   handleSelectChange("leadStatus", value)
                 }
               >
-                <SelectTrigger id="leadStatus">
+                <SelectTrigger id="leadStatus" className="w-full">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="New">New</SelectItem>
                   <SelectItem value="Contacted">Contacted</SelectItem>
                   <SelectItem value="Qualified">Qualified</SelectItem>
-                  <SelectItem value="Proposal Sent">Proposal Sent</SelectItem>
+                  <SelectItem value="Proposal">Proposal</SelectItem>
                   <SelectItem value="Negotiation">Negotiation</SelectItem>
                 </SelectContent>
               </Select>
@@ -257,14 +278,13 @@ export default function AddNewLead() {
                 value={formData.priority}
                 onValueChange={(value) => handleSelectChange("priority", value)}
               >
-                <SelectTrigger id="priority">
+                <SelectTrigger id="priority" className="w-full">
                   <SelectValue placeholder="Select priority" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Low">Low</SelectItem>
-                  <SelectItem value="Medium">Medium</SelectItem>
-                  <SelectItem value="High">High</SelectItem>
-                  <SelectItem value="Urgent">Urgent</SelectItem>
+                  <SelectItem value="Low">Low Priority</SelectItem>
+                  <SelectItem value="Medium">Medium Priority</SelectItem>
+                  <SelectItem value="High">High Priority</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -289,117 +309,39 @@ export default function AddNewLead() {
             {/* Dimensions */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="width">Width (ft/m)</Label>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9 shrink-0"
-                    onClick={() => handleNumberChange("width", -1)}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <Input
-                    id="width"
-                    name="width"
-                    type="number"
-                    value={formData.width}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        width: Math.max(0, parseInt(e.target.value) || 0),
-                      }))
-                    }
-                    className="text-center"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9 shrink-0"
-                    onClick={() => handleNumberChange("width", 1)}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
+                <Counter
+                  id="width"
+                  label="Width (ft/m)"
+                  value={formData.width}
+                  onChange={(v) =>
+                    setFormData((prev) => ({ ...prev, width: Math.max(0, v) }))
+                  }
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="length">Length (ft/m)</Label>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9 shrink-0"
-                    onClick={() => handleNumberChange("length", -1)}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <Input
-                    id="length"
-                    name="length"
-                    type="number"
-                    value={formData.length}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        length: Math.max(0, parseInt(e.target.value) || 0),
-                      }))
-                    }
-                    className="text-center"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9 shrink-0"
-                    onClick={() => handleNumberChange("length", 1)}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
+                <Counter
+                  id="length"
+                  label="Length (ft/m)"
+                  value={formData.length}
+                  onChange={(v) =>
+                    setFormData((prev) => ({ ...prev, length: Math.max(0, v) }))
+                  }
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="height">Height (ft/m)</Label>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9 shrink-0"
-                    onClick={() => handleNumberChange("height", -1)}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <Input
-                    id="height"
-                    name="height"
-                    type="number"
-                    value={formData.height}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        height: Math.max(0, parseInt(e.target.value) || 0),
-                      }))
-                    }
-                    className="text-center"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9 shrink-0"
-                    onClick={() => handleNumberChange("height", 1)}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
+                <Counter
+                  id="height"
+                  label="Height (ft/m)"
+                  value={formData.height}
+                  onChange={(v) =>
+                    setFormData((prev) => ({ ...prev, height: Math.max(0, v) }))
+                  }
+                />
               </div>
             </div>
 
             {/* Roof Style and Building Type */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="roofStyle">Roof Style</Label>
                 <Select
@@ -408,16 +350,12 @@ export default function AddNewLead() {
                     handleSelectChange("roofStyle", value)
                   }
                 >
-                  <SelectTrigger id="roofStyle">
+                  <SelectTrigger id="roofStyle" className="w-full">
                     <SelectValue placeholder="Select Roof Style" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="gable">Gable</SelectItem>
-                    <SelectItem value="hip">Hip</SelectItem>
-                    <SelectItem value="flat">Flat</SelectItem>
-                    <SelectItem value="mansard">Mansard</SelectItem>
-                    <SelectItem value="gambrel">Gambrel</SelectItem>
-                    <SelectItem value="shed">Shed</SelectItem>
+                    <SelectItem value="arch">Arch</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -429,15 +367,11 @@ export default function AddNewLead() {
                     handleSelectChange("buildingType", value)
                   }
                 >
-                  <SelectTrigger id="buildingType">
+                  <SelectTrigger id="buildingType" className="w-full">
                     <SelectValue placeholder="Select Building Type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="residential">Residential</SelectItem>
-                    <SelectItem value="commercial">Commercial</SelectItem>
-                    <SelectItem value="industrial">Industrial</SelectItem>
-                    <SelectItem value="agricultural">Agricultural</SelectItem>
-                    <SelectItem value="warehouse">Warehouse</SelectItem>
+                    <SelectItem value="garage">Garage</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -446,112 +380,40 @@ export default function AddNewLead() {
             {/* Additional Specs */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="doors">Doors</Label>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9 shrink-0"
-                    onClick={() => handleNumberChange("doors", -1)}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <Input
-                    id="doors"
-                    name="doors"
-                    type="number"
-                    value={formData.doors}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        doors: Math.max(0, parseInt(e.target.value) || 0),
-                      }))
-                    }
-                    className="text-center"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9 shrink-0"
-                    onClick={() => handleNumberChange("doors", 1)}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
+                <Counter
+                  id="doors"
+                  label="Doors"
+                  value={formData.doors}
+                  onChange={(v) =>
+                    setFormData((prev) => ({ ...prev, doors: Math.max(0, v) }))
+                  }
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="windows">Windows</Label>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9 shrink-0"
-                    onClick={() => handleNumberChange("windows", -1)}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <Input
-                    id="windows"
-                    name="windows"
-                    type="number"
-                    value={formData.windows}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        windows: Math.max(0, parseInt(e.target.value) || 0),
-                      }))
-                    }
-                    className="text-center"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9 shrink-0"
-                    onClick={() => handleNumberChange("windows", 1)}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
+                <Counter
+                  id="windows"
+                  label="Windows"
+                  value={formData.windows}
+                  onChange={(v) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      windows: Math.max(0, v),
+                    }))
+                  }
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="insulation">Insulation</Label>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9 shrink-0"
-                    onClick={() => handleNumberChange("insulation", -1)}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <Input
-                    id="insulation"
-                    name="insulation"
-                    type="number"
-                    value={formData.insulation}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        insulation: Math.max(0, parseInt(e.target.value) || 0),
-                      }))
-                    }
-                    className="text-center"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9 shrink-0"
-                    onClick={() => handleNumberChange("insulation", 1)}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
+                <Counter
+                  id="insulation"
+                  label="Insulation"
+                  value={formData.insulation}
+                  onChange={(v) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      insulation: Math.max(0, v),
+                    }))
+                  }
+                />
               </div>
             </div>
           </div>
@@ -562,8 +424,12 @@ export default function AddNewLead() {
           <Button type="button" variant="outline" onClick={handleCancel}>
             Cancel
           </Button>
-          <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-            Save Lead
+          <Button
+            type="submit"
+            className="bg-blue-600 hover:bg-blue-700"
+            disabled={submitting}
+          >
+            {submitting ? "Saving..." : "Save Lead"}
           </Button>
         </div>
       </form>
