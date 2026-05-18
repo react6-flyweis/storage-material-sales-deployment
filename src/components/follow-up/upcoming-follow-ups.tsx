@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUpcomingFollowUpsQuery } from "@/modules/followups/followups.hooks";
+import type { UpcomingFollowUpItem } from "@/modules/followups/followups.api";
 
 type ViewMode = "schedule" | "calendar" | "list";
 
@@ -29,28 +30,27 @@ interface FollowUp {
 export default function UpcomingFollowUps() {
   const [viewMode, setViewMode] = useState<ViewMode>("calendar");
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  const { data: apiFollowUps = [], isLoading } = useUpcomingFollowUpsQuery();
+  const { data: response, isLoading } = useUpcomingFollowUpsQuery();
+  const apiFollowUps = response?.success ? response.data.followups : [];
 
   const daysInMonth = Array.from({ length: 31 }, (_, i) => i + 1);
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-  const apiToFollowUp = (f: any, index: number): FollowUp => {
+  const apiToFollowUp = (f: UpcomingFollowUpItem, index: number): FollowUp => {
     const dateObj = new Date(f.followUpDate);
     const day = String(dateObj.getDate());
     const time = dateObj.toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
     });
-    const customer =
-      f.customerId?.firstName || f.leadId?.customerId?.firstName || "Unknown";
+    const customer = f.customerId?.firstName || "Unknown";
     const type =
       f.modeOfContact === "call"
         ? "Call"
         : f.modeOfContact === "email"
           ? "Email"
           : "Meeting";
-    const company =
-      f.leadId?.jobId || f.leadId?.projectName || f.assignedTo?.name || "";
+    const company = f.leadId?.jobId || f.leadId?.projectName || "";
     const status = (() => {
       if (f.status === "completed") return "normal";
       const now = new Date();

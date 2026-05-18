@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   getUpcomingFollowUps,
-  type UpcomingFollowUpItem,
+  type UpcomingFollowUpsResponse,
 } from "./followups.api";
 
 export function useUpcomingFollowUpsQuery() {
-  return useQuery<UpcomingFollowUpItem[]>({
+  return useQuery<UpcomingFollowUpsResponse>({
     queryKey: ["sales", "followups", "upcoming"],
     queryFn: getUpcomingFollowUps,
     staleTime: 60 * 1000,
