@@ -12,7 +12,7 @@ const Settings = lazy(() => import("@/pages/settings"));
 const Profile = lazy(() => import("@/pages/profile"));
 const EditProfile = lazy(() => import("@/pages/edit-profile"));
 
-const EscalatedQueries = lazy(() => import("@/pages/escalated-queries"));
+// const EscalatedQueries = lazy(() => import("@/pages/escalated-queries"));
 
 const Dashboard = lazy(() => import("@/pages/dashboard"));
 const Deliveries = lazy(() => import("@/pages/deliveries/deliveries"));
@@ -87,6 +87,15 @@ const AiScriptGeneratorPage = lazy(
 const LeadScoring = lazy(() => import("@/pages/leads/lead-scoring"));
 const FollowUpKpis = lazy(() => import("@/pages/leads/follow-up-kpis"));
 const AIMarketing = lazy(() => import("@/pages/leads/ai-marketing"));
+const EscalatedLeads = lazy(() => import("@/pages/leads/escalated-leads"));
+const AllPurchaseOrders = lazy(
+  () => import("@/pages/leads/all-purchase-orders"),
+);
+const PurchaseOrderDetails = lazy(
+  () => import("@/pages/leads/purchase-order-details"),
+);
+const QuotationList = lazy(() => import("@/pages/leads/quotation-list"));
+const QuotationDetails = lazy(() => import("@/pages/leads/quotation-details"));
 
 // Invoice section
 const InvoiceForm = lazy(() => import("@/pages/invoices/invoice-form"));
@@ -152,8 +161,21 @@ export const salesRoutes: RouteObject[] = [
               { index: true, element: <Leads /> },
               { path: "add", element: <AddNewLead /> },
               { path: "ai-marketing", element: <AIMarketing /> },
+
+              {
+                path: "purchase-orders",
+                children: [
+                  { index: true, element: <AllPurchaseOrders /> },
+                  { path: ":poId", element: <PurchaseOrderDetails /> },
+                ],
+              },
+              { path: "quotation-list", element: <QuotationList /> },
+              { path: "quotation-details", element: <QuotationDetails /> },
+              { path: "quotation-details/:id", element: <QuotationDetails /> },
+
               { path: "payment-follow-up", element: <PaymentFollowUp /> },
-              { path: "escalated-queries", element: <EscalatedQueries /> },
+              { path: "escalated", element: <EscalatedLeads /> },
+              // { path: "escalated-queries", element: <EscalatedQueries /> },
 
               // /leads/follow-up routes
               {
