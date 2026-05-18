@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { ArrowLeft, Minus, Plus } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useNavigate, useParams } from "react-router";
 import SuccessDialog from "@/components/success-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import Counter from "@/components/counter-input";
 import {
   Select,
   SelectContent,
@@ -49,15 +50,7 @@ export default function AddNewProjectPage() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleNumberChange = (
-    field: "width" | "length" | "height" | "doors" | "windows" | "insulation",
-    delta: number,
-  ) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: Math.max(0, prev[field] + delta),
-    }));
-  };
+  // Numeric fields are handled by the reusable `Counter` component below.
 
   const handleCancel = () => {
     navigate(`/customers/${customerId}`);
@@ -226,109 +219,32 @@ export default function AddNewProjectPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="width">Width (ft/m)</Label>
-              <div className="relative">
-                <Input
-                  id="width"
-                  type="number"
-                  value={formData.width}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      width: Math.max(0, Number(e.target.value) || 0),
-                    }))
-                  }
-                  className="text-center"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-xs"
-                  className="absolute left-2 top-1/2 -translate-y-1/2"
-                  onClick={() => handleNumberChange("width", -1)}
-                >
-                  <Minus className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-xs"
-                  className="absolute right-2 top-1/2 -translate-y-1/2"
-                  onClick={() => handleNumberChange("width", 1)}
-                >
-                  <Plus className="h-3.5 w-3.5 text-blue-600" />
-                </Button>
-              </div>
+              <Counter
+                id="width"
+                label="Width (ft/m)"
+                value={formData.width}
+                onChange={(v) => setFormData((prev) => ({ ...prev, width: v }))}
+              />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="length">Length (ft/m)</Label>
-              <div className="relative">
-                <Input
-                  id="length"
-                  type="number"
-                  value={formData.length}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      length: Math.max(0, Number(e.target.value) || 0),
-                    }))
-                  }
-                  className="text-center"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-xs"
-                  className="absolute left-2 top-1/2 -translate-y-1/2"
-                  onClick={() => handleNumberChange("length", -1)}
-                >
-                  <Minus className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-xs"
-                  className="absolute right-2 top-1/2 -translate-y-1/2"
-                  onClick={() => handleNumberChange("length", 1)}
-                >
-                  <Plus className="h-3.5 w-3.5 text-blue-600" />
-                </Button>
-              </div>
+              <Counter
+                id="length"
+                label="Length (ft/m)"
+                value={formData.length}
+                onChange={(v) =>
+                  setFormData((prev) => ({ ...prev, length: v }))
+                }
+              />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="height">Height (ft/m)</Label>
-              <div className="relative">
-                <Input
-                  id="height"
-                  type="number"
-                  value={formData.height}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      height: Math.max(0, Number(e.target.value) || 0),
-                    }))
-                  }
-                  className="text-center"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-xs"
-                  className="absolute left-2 top-1/2 -translate-y-1/2"
-                  onClick={() => handleNumberChange("height", -1)}
-                >
-                  <Minus className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-xs"
-                  className="absolute right-2 top-1/2 -translate-y-1/2"
-                  onClick={() => handleNumberChange("height", 1)}
-                >
-                  <Plus className="h-3.5 w-3.5 text-blue-600" />
-                </Button>
-              </div>
+              <Counter
+                id="height"
+                label="Height (ft/m)"
+                value={formData.height}
+                onChange={(v) =>
+                  setFormData((prev) => ({ ...prev, height: v }))
+                }
+              />
             </div>
           </div>
 
@@ -374,109 +290,32 @@ export default function AddNewProjectPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="doors">Doors</Label>
-              <div className="relative">
-                <Input
-                  id="doors"
-                  type="number"
-                  value={formData.doors}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      doors: Math.max(0, Number(e.target.value) || 0),
-                    }))
-                  }
-                  className="text-center"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-xs"
-                  className="absolute left-2 top-1/2 -translate-y-1/2"
-                  onClick={() => handleNumberChange("doors", -1)}
-                >
-                  <Minus className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-xs"
-                  className="absolute right-2 top-1/2 -translate-y-1/2"
-                  onClick={() => handleNumberChange("doors", 1)}
-                >
-                  <Plus className="h-3.5 w-3.5 text-blue-600" />
-                </Button>
-              </div>
+              <Counter
+                id="doors"
+                label="Doors"
+                value={formData.doors}
+                onChange={(v) => setFormData((prev) => ({ ...prev, doors: v }))}
+              />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="windows">Windows</Label>
-              <div className="relative">
-                <Input
-                  id="windows"
-                  type="number"
-                  value={formData.windows}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      windows: Math.max(0, Number(e.target.value) || 0),
-                    }))
-                  }
-                  className="text-center"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-xs"
-                  className="absolute left-2 top-1/2 -translate-y-1/2"
-                  onClick={() => handleNumberChange("windows", -1)}
-                >
-                  <Minus className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-xs"
-                  className="absolute right-2 top-1/2 -translate-y-1/2"
-                  onClick={() => handleNumberChange("windows", 1)}
-                >
-                  <Plus className="h-3.5 w-3.5 text-blue-600" />
-                </Button>
-              </div>
+              <Counter
+                id="windows"
+                label="Windows"
+                value={formData.windows}
+                onChange={(v) =>
+                  setFormData((prev) => ({ ...prev, windows: v }))
+                }
+              />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="insulation">Insulation</Label>
-              <div className="relative">
-                <Input
-                  id="insulation"
-                  type="number"
-                  value={formData.insulation}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      insulation: Math.max(0, Number(e.target.value) || 0),
-                    }))
-                  }
-                  className="text-center"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-xs"
-                  className="absolute left-2 top-1/2 -translate-y-1/2"
-                  onClick={() => handleNumberChange("insulation", -1)}
-                >
-                  <Minus className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-xs"
-                  className="absolute right-2 top-1/2 -translate-y-1/2"
-                  onClick={() => handleNumberChange("insulation", 1)}
-                >
-                  <Plus className="h-3.5 w-3.5 text-blue-600" />
-                </Button>
-              </div>
+              <Counter
+                id="insulation"
+                label="Insulation"
+                value={formData.insulation}
+                onChange={(v) =>
+                  setFormData((prev) => ({ ...prev, insulation: v }))
+                }
+              />
             </div>
           </div>
         </section>
