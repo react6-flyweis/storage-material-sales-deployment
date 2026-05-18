@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -12,11 +12,17 @@ type Lead = {
 
 type Props = {
   lead: Lead;
+  recentMessages?: Array<{
+    _id: string;
+    senderType: string;
+    content: string;
+    createdAt: string;
+  }>;
 };
 
-export default function ChatCard({ lead }: Props) {
+export default function ChatCard({ lead, recentMessages }: Props) {
   const [messages, setMessages] = useState<
-    Array<{ id: number; from: string; text: string; time: string }>
+    Array<{ id: string | number; from: string; text: string; time: string }>
   >([
     {
       id: 1,
@@ -44,6 +50,21 @@ export default function ChatCard({ lead }: Props) {
     },
   ]);
   const [input, setInput] = useState("");
+
+  useEffect(() => {
+    if (recentMessages && recentMessages.length > 0) {
+      const mapped = recentMessages.map((m) => ({
+        id: m._id,
+        from: m.senderType === "customer" ? "lead" : "lead",
+        text: m.content,
+        time: new Date(m.createdAt).toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+        }),
+      }));
+      setMessages(mapped);
+    }
+  }, [recentMessages]);
 
   const sendMessage = () => {
     if (!input.trim()) return;
@@ -100,7 +121,7 @@ export default function ChatCard({ lead }: Props) {
               }`}
             >
               {m.from === "lead" && (
-                <Avatar className="h-8 w-8 bg-gray-100 flex-shrink-0">
+                <Avatar className="h-8 w-8 bg-gray-100 shrink-0">
                   <AvatarFallback className="text-xs text-gray-600">
                     {lead.name
                       .split(" ")
