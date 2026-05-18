@@ -6,58 +6,53 @@ import {
 } from "@tanstack/react-query";
 import { apiClient } from "@/modules/auth/auth.api";
 import {
+  getAiScriptSessionsProvider,
   escalateLeadProvider,
   getLeadDetailProvider,
+  getScoredLeadsProvider,
   getLeadsProvider,
   importLeadsProvider,
+  createLeadProvider,
+  moveLeadToOrdersProvider,
+  updateLeadLifecycleProvider,
   type ImportLeadsPayload,
 } from "./leads.api";
 
 type EscalationStatus = "pending" | "assigned" | "resolved";
 
-type EscalationCustomer = {
+type EscalatedLeadResponse = {
   _id: string;
-  customerId?: string;
-  firstName?: string;
-};
-
-type EscalationEmployee = {
-  _id?: string;
-  name?: string;
-};
-
-type EscalationLead = {
-  _id: string;
-  customerId?: EscalationCustomer | string | null;
-  buildingType?: string;
-  location?: string;
-  assignedSales?: string | EscalationEmployee | null;
+  projectName?: string;
   lifecycleStatus?: string;
-};
-
-type EscalationItem = {
-  _id: string;
-  leadId?: EscalationLead | null;
-  customerId?: EscalationCustomer | null;
-  raisedBy?: EscalationEmployee | null;
-  note?: string;
-  status?: EscalationStatus;
-  resolvedAssignedTo?: EscalationEmployee | null;
-  resolvedAt?: string | null;
-  createdAt: string;
+  quoteValue?: number;
+  customerId: {
+    _id: string;
+    firstName: string;
+    email: string;
+  };
+  escalation: {
+    _id: string;
+    note: string;
+    status: EscalationStatus;
+    createdAt: string;
+  };
 };
 
 type EscalationsResponse = {
   success: boolean;
   message: string;
   data: {
-    escalations: EscalationItem[];
+    leads: EscalatedLeadResponse[];
+    total: number;
   };
 };
 
 async function getEscalationsProvider(): Promise<EscalationsResponse> {
   const response = await apiClient.get<EscalationsResponse>(
-    "/api/sales/escalations",
+    "/api/sales/leads/escalated",
+    {
+      params: { status: "pending", page: 1, limit: 100 },
+    },
   );
 
   return response.data;
@@ -80,11 +75,27 @@ export function useLeadsQuery(page: number, limit: number) {
   });
 }
 
-export function useLeadDetailQuery(leadId: string | undefined) {
+export function useLeadDetailQuery(leadId: string | undefined, enabled = true) {
   return useQuery({
     queryKey: ["sales", "leads", "detail", leadId],
     queryFn: () => getLeadDetailProvider(leadId!),
-    enabled: Boolean(leadId),
+    enabled: Boolean(leadId) && enabled,
+    staleTime: 30 * 1000,
+  });
+}
+
+export function useScoredLeadsQuery(page: number, limit: number) {
+  return useQuery({
+    queryKey: ["sales", "leads", "scored", page, limit],
+    queryFn: () => getScoredLeadsProvider(page, limit),
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useAiScriptSessionsQuery() {
+  return useQuery({
+    queryKey: ["sales", "followups", "ai-script"],
+    queryFn: () => getAiScriptSessionsProvider(),
     staleTime: 30 * 1000,
   });
 }
@@ -121,7 +132,84 @@ export function useEscalateLeadMutation() {
       }
 
       void queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
-      void queryClient.invalidateQueries({ queryKey: ["sales", "escalations"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["sales", "escalations"],
+      });
+    },
+  });
+}
+
+export function useCreateLeadMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: Parameters<typeof createLeadProvider>[0]) =>
+      createLeadProvider(payload),
+    onSuccess: (response) => {
+      if (!response.success) {
+        return;
+      }
+
+      void queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
+    },
+  });
+}
+
+type MoveLeadToOrdersVariables = {
+  leadId: string;
+  poNumber: string;
+  invoiceId: string;
+  quotationId: string;
+};
+
+export function useMoveLeadToOrdersMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      leadId,
+      poNumber,
+      invoiceId,
+      quotationId,
+    }: MoveLeadToOrdersVariables) =>
+      moveLeadToOrdersProvider(leadId, {
+        poNumber,
+        invoiceId,
+        quotationId,
+      }),
+    onSuccess: (response, variables) => {
+      if (!response.success) {
+        return;
+      }
+
+      void queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["sales", "leads", "detail", variables.leadId],
+      });
+    },
+  });
+}
+
+type UpdateLeadLifecycleVariables = {
+  leadId: string;
+  lifecycleStatus: string;
+};
+
+export function useUpdateLeadLifecycleMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ leadId, lifecycleStatus }: UpdateLeadLifecycleVariables) =>
+      updateLeadLifecycleProvider(leadId, { lifecycleStatus }),
+    onSuccess: (response, variables) => {
+      if (!response.success) {
+        return;
+      }
+
+      void queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["sales", "leads", "detail", variables.leadId],
+      });
     },
   });
 }
