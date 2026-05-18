@@ -7,6 +7,10 @@ import {
 } from "../ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type {
+  LeadDetailAuditEntry,
+  LeadDetailFollowUp,
+} from "@/modules/leads/leads.api";
 import {
   Phone,
   Mail,
@@ -17,7 +21,6 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { LeadDetailAuditEntry } from "@/modules/leads/leads.api";
 import {
   formatAuditAction,
   getAuditPerformedBy,
@@ -26,71 +29,26 @@ import {
 } from "@/modules/leads/leads.utils";
 
 type FollowUp = {
-  id: number;
+  id: string | number;
   name: string;
   note: string;
   timeAgo: string;
   icon: "camera" | "mail" | "phone" | "doc";
 };
 
-type Meeting = {
-  id: number;
-  time: string;
-  title: string;
-  company?: string;
-  duration?: string;
-  action: "call" | "email";
-};
+function mapLeadFollowUpsToDisplay(items?: LeadDetailFollowUp[]): FollowUp[] {
+  if (!items || items.length === 0) return [];
 
-const followUps: FollowUp[] = [
-  {
-    id: 1,
-    name: "Sarah Johnson",
-    note: "Discussed pricing options and implementation timeline",
-    timeAgo: "2 hours ago",
-    icon: "camera",
-  },
-  {
-    id: 2,
-    name: "Michael Chen",
-    note: "Sent product demo video and case studies",
-    timeAgo: "4 hours ago",
+  return items.map((f) => ({
+    id: f._id,
+    name: f.type ?? f.priority ?? "Follow Up",
+    note: f.notes ?? "",
+    timeAgo: f.followUpDate ?? f.createdAt ?? "",
     icon: "mail",
-  },
-  {
-    id: 3,
-    name: "Emily Davis",
-    note: "30-min discovery call completed - high interest level",
-    timeAgo: "6 hours ago",
-    icon: "phone",
-  },
-  {
-    id: 4,
-    name: "Robert Wilson",
-    note: "Lead requested technical specifications document",
-    timeAgo: "1 day ago",
-    icon: "doc",
-  },
-];
+  }));
+}
 
-const meetings: Meeting[] = [
-  {
-    id: 1,
-    time: "09:00",
-    title: "Follow up with Alice Johnson",
-    company: "Tech Solutions Inc",
-    duration: "30 min",
-    action: "call",
-  },
-  {
-    id: 2,
-    time: "14:30",
-    title: "Send Proposal to marketing Pro",
-    company: "Marketing Pro",
-    duration: "15 min",
-    action: "email",
-  },
-];
+const meetings = [];
 
 const getTypeBadgeClassName = (type: string) => {
   switch (type.toLowerCase()) {
@@ -107,9 +65,13 @@ const getTypeBadgeClassName = (type: string) => {
 
 type Props = {
   auditLog?: LeadDetailAuditEntry[];
+  followUps?: LeadDetailFollowUp[];
 };
 
-export default function FollowUpsCard({ auditLog = [] }: Props) {
+export default function FollowUpsCard({
+  auditLog = [],
+  followUps: followUpsProp = [],
+}: Props) {
   const [searchQuery, setSearchQuery] = useState("");
 
   const activityEntries = useMemo(() => {
@@ -153,26 +115,39 @@ export default function FollowUpsCard({ auditLog = [] }: Props) {
           </CardHeader>
 
           <CardContent className="space-y-3">
-            {followUps.map((f) => (
-              <div
-                key={f.id}
-                className="flex items-center gap-4 bg-gray-100 p-4 rounded-md"
-              >
-                <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center text-sm text-gray-700">
-                  {f.icon === "camera" && <Calendar className="h-4 w-4" />}
-                  {f.icon === "mail" && <Mail className="h-4 w-4" />}
-                  {f.icon === "phone" && <Phone className="h-4 w-4" />}
-                  {f.icon === "doc" && <Clock className="h-4 w-4" />}
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium text-sm text-gray-900">
-                    {f.name}
+            {(() => {
+              const displayedFollowUps =
+                mapLeadFollowUpsToDisplay(followUpsProp);
+
+              if (displayedFollowUps.length === 0) {
+                return (
+                  <div className="px-4 py-6 text-sm text-gray-500">
+                    No follow-ups recorded.
                   </div>
-                  <div className="text-xs text-gray-500">{f.note}</div>
+                );
+              }
+
+              return displayedFollowUps.map((f) => (
+                <div
+                  key={f.id}
+                  className="flex items-center gap-4 bg-gray-100 p-4 rounded-md"
+                >
+                  <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center text-sm text-gray-700">
+                    {f.icon === "camera" && <Calendar className="h-4 w-4" />}
+                    {f.icon === "mail" && <Mail className="h-4 w-4" />}
+                    {f.icon === "phone" && <Phone className="h-4 w-4" />}
+                    {f.icon === "doc" && <Clock className="h-4 w-4" />}
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium text-sm text-gray-900">
+                      {f.name}
+                    </div>
+                    <div className="text-xs text-gray-500">{f.note}</div>
+                  </div>
+                  <div className="text-xs text-gray-400">{f.timeAgo}</div>
                 </div>
-                <div className="text-xs text-gray-400">{f.timeAgo}</div>
-              </div>
-            ))}
+              ));
+            })()}
           </CardContent>
         </Card>
 
@@ -338,7 +313,9 @@ export default function FollowUpsCard({ auditLog = [] }: Props) {
                 <option>25</option>
                 <option>50</option>
               </select>
-              <div className="text-sm text-gray-600">{activityEntries.length} Results</div>
+              <div className="text-sm text-gray-600">
+                {activityEntries.length} Results
+              </div>
             </div>
 
             <div className="flex items-center gap-2">
