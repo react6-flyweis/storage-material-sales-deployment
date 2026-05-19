@@ -16,6 +16,7 @@ import {
   type LucideIcon,
   ArrowRight,
 } from "lucide-react";
+import { useCommunicationTimelineQuery } from "@/modules/followups/followups.hooks";
 import { Link } from "react-router";
 
 type TimelineItem = {
@@ -29,44 +30,47 @@ type TimelineItem = {
 };
 
 export default function LeadCommunicationTimeline() {
-  const items: TimelineItem[] = [
-    {
-      id: 1,
-      name: "Sarah Johnson",
-      note: "Discussed pricing options and implementation timeline",
-      time: "2 hours ago",
-      type: "note",
-      icon: MessageCircle,
-      bg: "bg-purple-50 text-purple-600",
-    },
-    {
-      id: 2,
-      name: "Michael Chen",
-      note: "Sent product demo video and case studies",
-      time: "4 hours ago",
-      type: "email",
-      icon: Mail,
-      bg: "bg-sky-50 text-sky-600",
-    },
-    {
-      id: 3,
-      name: "Emily Davis",
-      note: "30-min discovery call completed - high interest level",
-      time: "6 hours ago",
-      type: "call",
-      icon: Phone,
-      bg: "bg-emerald-50 text-emerald-600",
-    },
-    {
-      id: 4,
-      name: "Robert Wilson",
-      note: "Lead requested technical specifications document",
-      time: "1 day ago",
-      type: "doc",
-      icon: FileText,
-      bg: "bg-gray-50 text-gray-600",
-    },
-  ];
+  const { data, isLoading, isError, refetch } = useCommunicationTimelineQuery(
+    1,
+    4,
+  );
+
+  const items: TimelineItem[] = (data?.data.entries ?? []).map((e, i) => {
+    const activity = (e.metadata?.activityType || "note").toLowerCase();
+
+    const icon =
+      activity === "email"
+        ? Mail
+        : activity === "call"
+          ? Phone
+          : activity === "doc"
+            ? FileText
+            : MessageCircle;
+
+    const bg =
+      activity === "email"
+        ? "bg-sky-50 text-sky-600"
+        : activity === "call"
+          ? "bg-emerald-50 text-emerald-600"
+          : activity === "doc"
+            ? "bg-gray-50 text-gray-600"
+            : "bg-purple-50 text-purple-600";
+
+    const name =
+      e.customerId?.firstName?.trim() || e.performedBy?.name || "Unknown";
+    const note = e.metadata?.notes?.trim() || "No notes provided";
+    const time = new Date(e.createdAt).toLocaleString();
+
+    return {
+      id: i,
+      name,
+      note,
+      time,
+      type: activity as TimelineItem["type"],
+      icon,
+      bg,
+    } as TimelineItem;
+  });
 
   return (
     <Card>
@@ -91,39 +95,75 @@ export default function LeadCommunicationTimeline() {
       </CardHeader>
 
       <CardContent className="space-y-3">
-        {items.map((it) => {
-          const Icon = it.icon;
-          return (
+        {isError ? (
+          <div className="px-4 py-6 text-center">
+            <p className="text-sm text-red-700">Failed to load timeline.</p>
+            <div className="mt-3">
+              <Button variant="outline" onClick={() => refetch()}>
+                Retry
+              </Button>
+            </div>
+          </div>
+        ) : isLoading && items.length === 0 ? (
+          Array.from({ length: 3 }).map((_, idx) => (
             <div
-              key={it.id}
+              key={`skeleton-${idx}`}
               className="flex items-start justify-between bg-muted rounded-md p-4"
             >
               <div className="flex items-start space-x-3">
-                <Avatar className={`h-9 w-9 ${it.bg}`}>
-                  <AvatarFallback className="text-sm">
-                    <Icon className="h-4 w-4" />
-                  </AvatarFallback>
-                </Avatar>
+                <div className="h-9 w-9 rounded-full bg-slate-100 animate-pulse" />
 
-                <div>
-                  <div className="font-medium text-foreground">{it.name}</div>
-                  <div className="text-sm text-muted-foreground">{it.note}</div>
+                <div className="flex-1">
+                  <div className="h-4 w-40 rounded bg-slate-100 animate-pulse mb-2" />
+                  <div className="h-3 w-full rounded bg-slate-100 animate-pulse" />
                 </div>
               </div>
 
               <div className="text-sm text-muted-foreground">
-                <div className="text-right">{it.time}</div>
+                <div className="h-3 w-20 rounded bg-slate-100 animate-pulse" />
                 <div className="text-xs mt-1">
-                  <span
-                    className={`inline-block px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-700`}
-                  >
-                    {it.type}
-                  </span>
+                  <div className="h-3 w-12 rounded bg-slate-100 animate-pulse mt-2" />
                 </div>
               </div>
             </div>
-          );
-        })}
+          ))
+        ) : (
+          items.map((it) => {
+            const Icon = it.icon;
+            return (
+              <div
+                key={it.id}
+                className="flex items-start justify-between bg-muted rounded-md p-4"
+              >
+                <div className="flex items-start space-x-3">
+                  <Avatar className={`h-9 w-9 ${it.bg}`}>
+                    <AvatarFallback className="text-sm">
+                      <Icon className="h-4 w-4" />
+                    </AvatarFallback>
+                  </Avatar>
+
+                  <div>
+                    <div className="font-medium text-foreground">{it.name}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {it.note}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-sm text-muted-foreground">
+                  <div className="text-right">{it.time}</div>
+                  <div className="text-xs mt-1">
+                    <span
+                      className={`inline-block px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-700`}
+                    >
+                      {it.type}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
       </CardContent>
 
       <CardFooter className="justify-center">
