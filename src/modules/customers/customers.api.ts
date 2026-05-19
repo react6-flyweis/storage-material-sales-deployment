@@ -217,3 +217,30 @@ export async function getSalesCustomerProjectsProvider(
 
   return response.data;
 }
+
+export type CreateSalesCustomerProjectPayload = {
+  projectName: string;
+  buildingType: string;
+  location: string;
+  roofStyle: string;
+  width: number;
+  length: number;
+};
+
+export type CreateSalesCustomerProjectResponse = {
+  success: boolean;
+  message: string;
+  data?: unknown;
+};
+
+export async function createSalesCustomerProjectProvider(
+  customerId: string,
+  payload: CreateSalesCustomerProjectPayload,
+) {
+  const response = await apiClient.post<CreateSalesCustomerProjectResponse>(
+    `/api/sales/customers/${customerId}/projects`,
+    payload,
+  );
+
+  return response.data;
+}

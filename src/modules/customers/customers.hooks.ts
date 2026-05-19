@@ -1,10 +1,17 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import {
+  createSalesCustomerProjectProvider,
   getAdminCustomerDetailProvider,
   getAdminCustomersProvider,
   getSalesCustomerDetailProvider,
   getSalesCustomerProjectsProvider,
   getSalesCustomersProvider,
+  type CreateSalesCustomerProjectPayload,
 } from "./customers.api";
 
 export function useCustomersQuery(page = 1, limit = 20) {
@@ -54,5 +61,23 @@ export function useSalesCustomerProjectsQuery(
     staleTime: 60 * 1000,
     enabled: Boolean(customerId) && customerId !== "unknown",
     placeholderData: keepPreviousData,
+  });
+}
+
+export function useCreateSalesCustomerProjectMutation(customerId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: CreateSalesCustomerProjectPayload) =>
+      createSalesCustomerProjectProvider(customerId, payload),
+    onSuccess: (response) => {
+      if (!response.success) {
+        return;
+      }
+
+      void queryClient.invalidateQueries({
+        queryKey: ["customers", "sales-projects", customerId],
+      });
+    },
   });
 }
