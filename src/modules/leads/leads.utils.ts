@@ -33,6 +33,9 @@ export const formatLeadDateTime = (value?: string | null) => {
   }).format(date);
 };
 
+// Total number of progress steps for a lead lifecycle
+export const LEAD_TOTAL_STEPS = 8;
+
 const lifecycleStatusLabels: Record<string, string> = {
   initial_contact: "Initial contact",
   requirements_gathered: "Requirements gathered",
@@ -43,6 +46,8 @@ const lifecycleStatusLabels: Record<string, string> = {
   converted_to_po: "Converted to PO",
   sent_to_admin: "Sent to admin",
 };
+
+export const LEAD_LIFECYCLE_STEPS = Object.values(lifecycleStatusLabels);
 
 export const formatLifecycleStatus = (value: string) =>
   lifecycleStatusLabels[value] ??
@@ -65,6 +70,40 @@ export const getLeadProgress = (status: string) => {
   if (normalized.includes("initial_contact")) return 1;
 
   return 1;
+};
+
+export const getStatusBadgeClassName = (status: string) => {
+  const normalized = status.toLowerCase();
+
+  if (normalized.includes("sent_to_admin")) {
+    return "bg-slate-100 text-slate-700";
+  }
+
+  if (normalized.includes("converted_to_po")) {
+    return "bg-violet-100 text-violet-700";
+  }
+
+  if (normalized.includes("payment")) {
+    return "bg-emerald-100 text-emerald-700";
+  }
+
+  if (normalized.includes("deal_closed") || normalized.includes("closed")) {
+    return "bg-green-100 text-green-700";
+  }
+
+  if (normalized.includes("proposal")) {
+    return "bg-purple-100 text-purple-700";
+  }
+
+  if (normalized.includes("quotation")) {
+    return "bg-orange-100 text-orange-700";
+  }
+
+  if (normalized.includes("negotiation")) {
+    return "bg-blue-100 text-blue-700";
+  }
+
+  return "bg-gray-100 text-gray-700";
 };
 
 export const formatPhone = (phone?: {
