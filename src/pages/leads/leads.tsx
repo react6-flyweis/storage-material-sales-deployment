@@ -568,6 +568,7 @@ export default function LeadsPage() {
 
                           <CreateQuotationDialog
                             leadData={{ name: lead.name, id: lead.id }}
+                            mode="edit"
                             trigger={
                               <Button variant="ghost" size="icon">
                                 <Pen className=" text-green-600" />
@@ -575,9 +576,15 @@ export default function LeadsPage() {
                             }
                           />
 
-                          <Button variant="ghost" size="icon">
-                            <FileText className=" text-red-800" />
-                          </Button>
+                          <CreateQuotationDialog
+                            leadData={{ name: lead.name, id: lead.id }}
+                            mode="create"
+                            trigger={
+                              <Button variant="ghost" size="icon">
+                                <FileText className=" text-red-800" />
+                              </Button>
+                            }
+                          />
 
                           <MoveToOrdersDialog
                             leadId={lead.id}
