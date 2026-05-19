@@ -247,6 +247,23 @@ export type LeadDetailAuditEntry = {
   createdAt: string;
 };
 
+export type LeadDetailActivityEntry = {
+  _id: string;
+  type?: string;
+  action?: string;
+  leadId?: string;
+  customerId?: string;
+  performedBy?: string | null;
+  metadata?: {
+    activityType?: string;
+    notes?: string;
+    outcome?: string;
+    [key: string]: unknown;
+  };
+  createdAt: string;
+  __v?: number;
+};
+
 export type LeadDetailFollowUp = {
   _id: string;
   followUpDate?: string;
@@ -325,7 +342,7 @@ export type LeadDetailData = {
   };
   quotations: LeadDetailQuotation[];
   auditLog: LeadDetailAuditEntry[];
-  activityLog: unknown[];
+  activityLog: LeadDetailActivityEntry[];
   followUps: LeadDetailFollowUp[];
   payments: LeadDetailPayments;
   buildings: unknown[];
@@ -407,7 +424,7 @@ export async function updateLeadLifecycleProvider(
   leadId: string,
   payload: UpdateLeadLifecyclePayload,
 ) {
-  const response = await apiClient.patch<UpdateLeadLifecycleResponse>(
+  const response = await apiClient.put<UpdateLeadLifecycleResponse>(
     `/api/sales/leads/${leadId}/lifecycle`,
     payload,
   );
