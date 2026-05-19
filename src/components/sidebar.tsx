@@ -122,6 +122,11 @@ const navigationGroups: NavigationGroup[] = [
         path: "/leads/payment-follow-up",
         label: "Payment Follow-Up",
       },
+      // new quotation list
+      {
+        path: "/leads/quotation-list",
+        label: "Quote List",
+      },
       {
         path: "/leads/escalated",
         label: "Escalated Leads",
@@ -129,11 +134,6 @@ const navigationGroups: NavigationGroup[] = [
       {
         path: "/leads/purchase-orders",
         label: "All Purchase Orders",
-      },
-      // new quotation list
-      {
-        path: "/leads/quotation-list",
-        label: "Quote List",
       },
     ],
   },

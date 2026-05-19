@@ -32,7 +32,6 @@ import {
 import ChatDialog from "@/components/leads/chat-dialog";
 import MoveToOrdersDialog from "@/components/leads/move-to-orders-dialog";
 import SuccessDialog from "@/components/success-dialog";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -186,7 +185,7 @@ export default function LeadsPage() {
   const [buildingType, setBuildingType] = useState("all");
   const [projectValue, setProjectValue] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery] = useState("");
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [exporting, setExporting] = useState(false);
   const [showExportSuccess, setShowExportSuccess] = useState(false);
@@ -359,7 +358,7 @@ export default function LeadsPage() {
           <div className="flex flex-wrap gap-3">
             <Link to="/leads/add" className="inline-block">
               <Button className="bg-blue-600 hover:bg-blue-700">
-                <UserPlus className="h-4 w-4 mr-2" />
+                <UserPlus className="" />
                 Add Lead
               </Button>
             </Link>
@@ -375,7 +374,7 @@ export default function LeadsPage() {
               {exporting ? "Exporting..." : "Export Data"}
             </Button>
           </div>
-
+          {/* 
           <div className="relative w-full lg:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
@@ -384,51 +383,51 @@ export default function LeadsPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 bg-white"
             />
+          </div> */}
+
+          <div className="flex flex-wrap gap-3 ">
+            <Select value={buildingType} onValueChange={setBuildingType}>
+              <SelectTrigger className="w-full sm:w-40 bg-white">
+                <SelectValue placeholder="Building types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="garages">Garages</SelectItem>
+                <SelectItem value="workshops">Workshops</SelectItem>
+                <SelectItem value="commercial">Commercial</SelectItem>
+                <SelectItem value="sales-storage">Sales Storage</SelectItem>
+                <SelectItem value="arch-buildings">Arch Buildings</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={projectValue} onValueChange={setProjectValue}>
+              <SelectTrigger className="w-full sm:w-40 bg-white">
+                <SelectValue placeholder="Project value" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="small">
+                  Small projects (&lt;$50,000)
+                </SelectItem>
+                <SelectItem value="medium">
+                  Medium ($50,000 - $200,000)
+                </SelectItem>
+                <SelectItem value="large">Large (&gt;$200,000)</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full sm:w-40 bg-white">
+                <SelectValue placeholder="All Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="proposal">Proposal sent</SelectItem>
+                <SelectItem value="quotation">Quotation Sent</SelectItem>
+                <SelectItem value="closed">Closed</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        </div>
-
-        <div className="flex flex-wrap gap-3 w-full lg:w-auto">
-          <Select value={buildingType} onValueChange={setBuildingType}>
-            <SelectTrigger className="w-full sm:w-40 bg-white">
-              <SelectValue placeholder="Building types" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="garages">Garages</SelectItem>
-              <SelectItem value="workshops">Workshops</SelectItem>
-              <SelectItem value="commercial">Commercial</SelectItem>
-              <SelectItem value="sales-storage">Sales Storage</SelectItem>
-              <SelectItem value="arch-buildings">Arch Buildings</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={projectValue} onValueChange={setProjectValue}>
-            <SelectTrigger className="w-full sm:w-40 bg-white">
-              <SelectValue placeholder="Project value" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="small">
-                Small projects (&lt;$50,000)
-              </SelectItem>
-              <SelectItem value="medium">
-                Medium ($50,000 - $200,000)
-              </SelectItem>
-              <SelectItem value="large">Large (&gt;$200,000)</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-40 bg-white">
-              <SelectValue placeholder="All Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="proposal">Proposal sent</SelectItem>
-              <SelectItem value="quotation">Quotation Sent</SelectItem>
-              <SelectItem value="closed">Closed</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
 
         {/* Table */}
