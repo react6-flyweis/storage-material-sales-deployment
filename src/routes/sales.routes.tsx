@@ -48,6 +48,9 @@ const ProjectPayments = lazy(
 const ProjectQuotation = lazy(
   () => import("@/pages/customers/customer-detail/project-quotation"),
 );
+const QuotationPreview = lazy(
+  () => import("@/pages/customers/customer-detail/quotation-preview"),
+);
 const AddNewProjectPage = lazy(
   () => import("@/pages/customers/customer-detail/add-new-project"),
 );
@@ -161,6 +164,11 @@ export const salesRoutes: RouteObject[] = [
               { index: true, element: <Leads /> },
               { path: "add", element: <AddNewLead /> },
               { path: "ai-marketing", element: <AIMarketing /> },
+
+              {
+                path: "quotation-preview",
+                element: <QuotationPreview />,
+              },
 
               {
                 path: "purchase-orders",
