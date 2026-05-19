@@ -126,9 +126,9 @@ export default function QuotationListPage() {
 
       return {
         id: quotation._id,
-        quoteNumber: quotation.quoteNumber || quotation._id,
+        quoteNumber: quotation.quoteNumber || "N/A",
         customer: quotation.customerId?.firstName?.trim() || "Unknown customer",
-        project: quotation.leadId?.projectName?.trim() || "—",
+        project: quotation.leadId?.projectName?.trim() || "N/A",
         status,
         value: formatMoney(quotation.finalPrice),
         dateSent: formatDate(quotation.sentAt ?? quotation.createdAt),
