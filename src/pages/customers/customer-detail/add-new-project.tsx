@@ -1,11 +1,17 @@
 import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate, useParams } from "react-router";
+import { Controller, useForm } from "react-hook-form";
 import SuccessDialog from "@/components/success-dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import Counter from "@/components/counter-input";
+import { Button } from "@/components/ui/button";
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -13,52 +19,70 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useCreateSalesCustomerProjectMutation } from "@/modules/customers/customers.hooks";
+
+type AddNewProjectFormValues = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  city: string;
+  landmark: string;
+  fullAddress: string;
+  state: string;
+  companyName: string;
+  jobTitle: string;
+  buildingType: string;
+  roofStyle: string;
+  width: number;
+  length: number;
+  height: number;
+  doors: number;
+  windows: number;
+  insulation: number;
+};
+
+const requiredFieldMessage = "This field is required";
 
 export default function AddNewProjectPage() {
   const navigate = useNavigate();
   const params = useParams();
   const customerId = params.id ?? "unknown";
   const [showSuccess, setShowSuccess] = useState(false);
+  const createProjectMutation =
+    useCreateSalesCustomerProjectMutation(customerId);
 
-  const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-    city: "",
-    landmark: "",
-    fullAddress: "",
-    state: "",
-    companyName: "",
-    jobTitle: "",
-    width: 0,
-    length: 0,
-    height: 0,
-    roofStyle: "",
-    buildingType: "",
-    doors: 0,
-    windows: 0,
-    insulation: 0,
+  const {
+    register,
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<AddNewProjectFormValues>({
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      email: "",
+      phone: "",
+      city: "",
+      landmark: "",
+      fullAddress: "",
+      state: "",
+      companyName: "",
+      jobTitle: "",
+      buildingType: "",
+      roofStyle: "",
+      width: 0,
+      length: 0,
+      height: 0,
+      doors: 0,
+      windows: 0,
+      insulation: 0,
+    },
   });
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSelectChange = (name: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  // Numeric fields are handled by the reusable `Counter` component below.
 
   const handleCancel = () => {
     navigate(`/customers/${customerId}`);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setShowSuccess(true);
   };
 
   const handleSuccessClose = () => {
@@ -66,14 +90,37 @@ export default function AddNewProjectPage() {
     navigate(`/customers/${customerId}`);
   };
 
+  const onSubmit = async (values: AddNewProjectFormValues) => {
+    const projectName =
+      values.companyName.trim() ||
+      `${values.firstName} ${values.lastName}`.trim() ||
+      values.jobTitle.trim() ||
+      values.city.trim();
+
+    const location = values.city.trim() || values.fullAddress.trim();
+
+    await createProjectMutation.mutateAsync({
+      projectName,
+      buildingType: values.buildingType,
+      location,
+      roofStyle: values.roofStyle,
+      width: values.width,
+      length: values.length,
+    });
+    setShowSuccess(true);
+    reset();
+  };
+
+  const isLoading = isSubmitting || createProjectMutation.isPending;
+
   return (
-    <div className="p-4 sm:p-6 space-y-6 min-h-screen">
-      <div className="space-y-2 flex gap-2">
+    <div className="min-h-screen space-y-6 p-4 sm:p-6">
+      <div className="flex gap-2 space-y-2">
         <Button onClick={() => navigate(-1)} className="px-4">
-          <ArrowLeft className="h-4 w-4 mr-1" />
+          <ArrowLeft className="mr-1 h-4 w-4" />
           Back
         </Button>
-        <div className="">
+        <div>
           <h1 className="text-3xl font-semibold text-slate-900">
             Add New Project
           </h1>
@@ -84,241 +131,291 @@ export default function AddNewProjectPage() {
       </div>
 
       <form
-        onSubmit={handleSubmit}
-        className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6 space-y-7"
+        onSubmit={handleSubmit(onSubmit)}
+        className="space-y-7 rounded-lg border border-slate-200 bg-white p-5 sm:p-6"
       >
-        <section className="space-y-4">
-          <h2 className="text-base font-semibold text-slate-900">
-            Personal Information (Auto-fill)
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="firstName">First Name *</Label>
-              <Input
-                id="firstName"
-                name="firstName"
-                placeholder="Enter First Name"
-                value={formData.firstName}
-                onChange={handleInputChange}
-              />
+        <FieldGroup>
+          <section className="space-y-4">
+            <h2 className="text-base font-semibold text-slate-900">
+              Personal Information (Auto-fill)
+            </h2>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Field>
+                <FieldLabel htmlFor="firstName">First Name</FieldLabel>
+                <Input
+                  id="firstName"
+                  placeholder="Enter First Name"
+                  {...register("firstName")}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="lastName">Last Name</FieldLabel>
+                <Input
+                  id="lastName"
+                  placeholder="Enter Last Name"
+                  {...register("lastName")}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="email">Email Address</FieldLabel>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="Enter Email Address"
+                  {...register("email")}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="phone">Phone Number</FieldLabel>
+                <Input
+                  id="phone"
+                  placeholder="Enter Phone Number"
+                  {...register("phone")}
+                />
+              </Field>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Last Name *</Label>
-              <Input
-                id="lastName"
-                name="lastName"
-                placeholder="Enter Last Name"
-                value={formData.lastName}
-                onChange={handleInputChange}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email Address *</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="Enter Email Address"
-                value={formData.email}
-                onChange={handleInputChange}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number *</Label>
-              <Input
-                id="phone"
-                name="phone"
-                placeholder="Enter Phone Number"
-                value={formData.phone}
-                onChange={handleInputChange}
-              />
-            </div>
-          </div>
-        </section>
+          </section>
 
-        <section className="space-y-4">
-          <h2 className="text-base font-semibold text-slate-900">
-            Site Location/Address
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="city">City *</Label>
-              <Input
-                id="city"
-                name="city"
-                placeholder="Enter City"
-                value={formData.city}
-                onChange={handleInputChange}
-              />
+          <section className="space-y-4">
+            <h2 className="text-base font-semibold text-slate-900">
+              Site Location/Address
+            </h2>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Field data-invalid={Boolean(errors.city)}>
+                <FieldLabel htmlFor="city">City *</FieldLabel>
+                <Input
+                  id="city"
+                  placeholder="Enter City"
+                  aria-invalid={Boolean(errors.city)}
+                  {...register("city", {
+                    required: requiredFieldMessage,
+                  })}
+                />
+                {errors.city && <FieldError errors={[errors.city]} />}
+              </Field>
+              <Field data-invalid={Boolean(errors.landmark)}>
+                <FieldLabel htmlFor="landmark">Landmark *</FieldLabel>
+                <Input
+                  id="landmark"
+                  placeholder="Near this -----"
+                  aria-invalid={Boolean(errors.landmark)}
+                  {...register("landmark", {
+                    required: requiredFieldMessage,
+                  })}
+                />
+                {errors.landmark && <FieldError errors={[errors.landmark]} />}
+              </Field>
+              <Field data-invalid={Boolean(errors.fullAddress)}>
+                <FieldLabel htmlFor="fullAddress">Full Address *</FieldLabel>
+                <Input
+                  id="fullAddress"
+                  placeholder="Enter Full Address"
+                  aria-invalid={Boolean(errors.fullAddress)}
+                  {...register("fullAddress", {
+                    required: requiredFieldMessage,
+                  })}
+                />
+                {errors.fullAddress && (
+                  <FieldError errors={[errors.fullAddress]} />
+                )}
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="state">State</FieldLabel>
+                <Input
+                  id="state"
+                  placeholder="Enter State"
+                  {...register("state")}
+                />
+              </Field>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="landmark">Landmark *</Label>
-              <Input
-                id="landmark"
-                name="landmark"
-                placeholder="Near this -----"
-                value={formData.landmark}
-                onChange={handleInputChange}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="fullAddress">Full Address *</Label>
-              <Input
-                id="fullAddress"
-                name="fullAddress"
-                placeholder="Enter Full Address"
-                value={formData.fullAddress}
-                onChange={handleInputChange}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="state">State*</Label>
-              <Input
-                id="state"
-                name="state"
-                placeholder="Enter State"
-                value={formData.state}
-                onChange={handleInputChange}
-              />
-            </div>
-          </div>
-        </section>
+          </section>
 
-        <section className="space-y-4">
-          <h2 className="text-base font-semibold text-slate-900">
-            Company Information (Auto-fill)
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="companyName">Company Name *</Label>
-              <Input
-                id="companyName"
-                name="companyName"
-                placeholder="Enter company name"
-                value={formData.companyName}
-                onChange={handleInputChange}
-              />
+          <section className="space-y-4">
+            <h2 className="text-base font-semibold text-slate-900">
+              Company Information (Auto-fill)
+            </h2>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Field>
+                <FieldLabel htmlFor="companyName">Company Name</FieldLabel>
+                <Input
+                  id="companyName"
+                  placeholder="Enter company name"
+                  {...register("companyName")}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="jobTitle">Job title</FieldLabel>
+                <Input
+                  id="jobTitle"
+                  placeholder="Enter job title"
+                  {...register("jobTitle")}
+                />
+              </Field>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="jobTitle">Job title *</Label>
-              <Input
-                id="jobTitle"
-                name="jobTitle"
-                placeholder="Enter job title"
-                value={formData.jobTitle}
-                onChange={handleInputChange}
-              />
-            </div>
-          </div>
-        </section>
+          </section>
 
-        <section className="space-y-4">
-          <h2 className="text-base font-semibold text-slate-900">
-            Project Specification
-          </h2>
+          <section className="space-y-4">
+            <h2 className="text-base font-semibold text-slate-900">
+              Project Specification
+            </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Counter
-                id="width"
-                label="Width (ft/m)"
-                value={formData.width}
-                onChange={(v) => setFormData((prev) => ({ ...prev, width: v }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Counter
-                id="length"
-                label="Length (ft/m)"
-                value={formData.length}
-                onChange={(v) =>
-                  setFormData((prev) => ({ ...prev, length: v }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Counter
-                id="height"
-                label="Height (ft/m)"
-                value={formData.height}
-                onChange={(v) =>
-                  setFormData((prev) => ({ ...prev, height: v }))
-                }
-              />
-            </div>
-          </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <Field data-invalid={Boolean(errors.width)}>
+                <Controller
+                  control={control}
+                  name="width"
+                  rules={{ required: requiredFieldMessage, min: 1 }}
+                  render={({ field }) => (
+                    <Counter
+                      id="width"
+                      label="Width (ft/m) *"
+                      value={field.value}
+                      onChange={field.onChange}
+                    />
+                  )}
+                />
+                {errors.width && <FieldError errors={[errors.width]} />}
+              </Field>
 
-          <div className="grid grid-cols-1 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="roofStyle">Roof Style</Label>
-              <Select
-                value={formData.roofStyle}
-                onValueChange={(value) =>
-                  handleSelectChange("roofStyle", value)
-                }
-              >
-                <SelectTrigger id="roofStyle" className="w-full">
-                  <SelectValue placeholder="Select Roof Style" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="gable">Gable Roof</SelectItem>
-                  <SelectItem value="flat">Flat Roof</SelectItem>
-                  <SelectItem value="shed">Shed Roof</SelectItem>
-                </SelectContent>
-              </Select>
+              <Field data-invalid={Boolean(errors.length)}>
+                <Controller
+                  control={control}
+                  name="length"
+                  rules={{ required: requiredFieldMessage, min: 1 }}
+                  render={({ field }) => (
+                    <Counter
+                      id="length"
+                      label="Length (ft/m) *"
+                      value={field.value}
+                      onChange={field.onChange}
+                    />
+                  )}
+                />
+                {errors.length && <FieldError errors={[errors.length]} />}
+              </Field>
+
+              <Field>
+                <Controller
+                  control={control}
+                  name="height"
+                  render={({ field }) => (
+                    <Counter
+                      id="height"
+                      label="Height (ft/m)"
+                      value={field.value}
+                      onChange={field.onChange}
+                    />
+                  )}
+                />
+              </Field>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="buildingType">Building Type</Label>
-              <Select
-                value={formData.buildingType}
-                onValueChange={(value) =>
-                  handleSelectChange("buildingType", value)
-                }
-              >
-                <SelectTrigger id="buildingType" className="w-full">
-                  <SelectValue placeholder="Select Building Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="warehouse">Warehouse</SelectItem>
-                  <SelectItem value="industrial">Industrial Shed</SelectItem>
-                  <SelectItem value="commercial">Commercial Unit</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+            <div className="grid grid-cols-1 gap-4 ">
+              <Field data-invalid={Boolean(errors.buildingType)}>
+                <FieldLabel htmlFor="buildingType">Building Type *</FieldLabel>
+                <Controller
+                  control={control}
+                  name="buildingType"
+                  rules={{ required: requiredFieldMessage }}
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger
+                        id="buildingType"
+                        className="w-full"
+                        aria-invalid={Boolean(errors.buildingType)}
+                      >
+                        <SelectValue placeholder="Select Building Type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Warehouse">Warehouse</SelectItem>
+                        <SelectItem value="Industrial Shed">
+                          Industrial Shed
+                        </SelectItem>
+                        <SelectItem value="Commercial Unit">
+                          Commercial Unit
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.buildingType && (
+                  <FieldError errors={[errors.buildingType]} />
+                )}
+              </Field>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Counter
-                id="doors"
-                label="Doors"
-                value={formData.doors}
-                onChange={(v) => setFormData((prev) => ({ ...prev, doors: v }))}
-              />
+              <Field data-invalid={Boolean(errors.roofStyle)}>
+                <FieldLabel htmlFor="roofStyle">Roof Style *</FieldLabel>
+                <Controller
+                  control={control}
+                  name="roofStyle"
+                  rules={{ required: requiredFieldMessage }}
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger
+                        id="roofStyle"
+                        className="w-full"
+                        aria-invalid={Boolean(errors.roofStyle)}
+                      >
+                        <SelectValue placeholder="Select Roof Style" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Gable">Gable Roof</SelectItem>
+                        <SelectItem value="Flat">Flat Roof</SelectItem>
+                        <SelectItem value="Shed">Shed Roof</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.roofStyle && <FieldError errors={[errors.roofStyle]} />}
+              </Field>
             </div>
-            <div className="space-y-2">
-              <Counter
-                id="windows"
-                label="Windows"
-                value={formData.windows}
-                onChange={(v) =>
-                  setFormData((prev) => ({ ...prev, windows: v }))
-                }
-              />
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <Field>
+                <Controller
+                  control={control}
+                  name="doors"
+                  render={({ field }) => (
+                    <Counter
+                      id="doors"
+                      label="Doors"
+                      value={field.value}
+                      onChange={field.onChange}
+                    />
+                  )}
+                />
+              </Field>
+              <Field>
+                <Controller
+                  control={control}
+                  name="windows"
+                  render={({ field }) => (
+                    <Counter
+                      id="windows"
+                      label="Windows"
+                      value={field.value}
+                      onChange={field.onChange}
+                    />
+                  )}
+                />
+              </Field>
+              <Field>
+                <Controller
+                  control={control}
+                  name="insulation"
+                  render={({ field }) => (
+                    <Counter
+                      id="insulation"
+                      label="Insulation"
+                      value={field.value}
+                      onChange={field.onChange}
+                    />
+                  )}
+                />
+              </Field>
             </div>
-            <div className="space-y-2">
-              <Counter
-                id="insulation"
-                label="Insulation"
-                value={formData.insulation}
-                onChange={(v) =>
-                  setFormData((prev) => ({ ...prev, insulation: v }))
-                }
-              />
-            </div>
-          </div>
-        </section>
+          </section>
+        </FieldGroup>
 
         <div className="flex items-center justify-end gap-3 pt-2">
           <Button
@@ -332,8 +429,9 @@ export default function AddNewProjectPage() {
           <Button
             type="submit"
             className="min-w-28 bg-[#2864DC] hover:bg-[#1D4FB8]"
+            disabled={isLoading}
           >
-            Add Project
+            {isLoading ? "Saving..." : "Add Project"}
           </Button>
         </div>
       </form>
