@@ -544,18 +544,42 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
             <div className="absolute left-2.25 top-2 bottom-2 w-px bg-slate-200"></div>
 
             {lead?.activityLog && lead.activityLog.length > 0 ? (
-              lead.activityLog.map((entry: any, index: number) => (
-                <div key={entry.id ?? index} className="relative">
-                  <div className="absolute -left-6 top-1 h-3.5 w-3.5 rounded-full bg-white border-[3px] border-[#8B5CF6]"></div>
-                  <p className="text-[13px] font-medium text-slate-800">
-                    {entry.title ?? entry.message ?? String(entry)}
-                  </p>
-                  <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-1">
-                    <Calendar className="h-3 w-3" />{" "}
-                    {entry.timestamp ?? entry.date ?? entry.createdAt ?? ""}
-                  </p>
-                </div>
-              ))
+              lead.activityLog.map((entry: any, index: number) => {
+                const id = entry._id ?? entry.id ?? index;
+                const title =
+                  entry?.metadata?.activityType ||
+                  entry.action ||
+                  entry.type ||
+                  entry.title ||
+                  entry.message ||
+                  String(entry);
+                const message = entry?.metadata?.notes ?? entry.message ?? "";
+                const outcome = entry?.metadata?.outcome
+                  ? ` — ${entry.metadata.outcome}`
+                  : "";
+                const timestamp =
+                  entry.createdAt ?? entry.timestamp ?? entry.date ?? "";
+
+                return (
+                  <div key={id} className="relative">
+                    <div className="absolute -left-6 top-1 h-3.5 w-3.5 rounded-full bg-white border-[3px] border-[#8B5CF6]"></div>
+                    <p className="text-[13px] font-medium text-slate-800">
+                      {title}
+                    </p>
+                    <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-1">
+                      <Calendar className="h-3 w-3" /> {timestamp}
+                    </p>
+                    {message && (
+                      <p className="text-[13px] text-slate-600 mt-2 whitespace-pre-line">
+                        {message}
+                        <span className="text-[12px] text-slate-500">
+                          {outcome}
+                        </span>
+                      </p>
+                    )}
+                  </div>
+                );
+              })
             ) : (
               <div className="text-center py-8 text-slate-500">
                 <Calendar className="mx-auto h-6 w-6 text-slate-400" />
