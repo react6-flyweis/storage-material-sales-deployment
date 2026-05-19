@@ -177,38 +177,40 @@ export default function AddNewLead() {
           </div>
         </div>
 
-        {/* Company Information */}
-        <div className="">
-          <h2 className="text-lg font-semibold mb-4">Company Information</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="companyName">
-                Company Name <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="companyName"
-                name="companyName"
-                placeholder="Enter company name"
-                value={formData.companyName}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="jobTitle">
-                Job title <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="jobTitle"
-                name="jobTitle"
-                placeholder="Enter job title"
-                value={formData.jobTitle}
-                onChange={handleInputChange}
-                required
-              />
+        {/* Company Information - commented out */}
+        {false && (
+          <div className="">
+            <h2 className="text-lg font-semibold mb-4">Company Information</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="companyName">
+                  Company Name <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="companyName"
+                  name="companyName"
+                  placeholder="Enter company name"
+                  value={formData.companyName}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="jobTitle">
+                  Job title <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="jobTitle"
+                  name="jobTitle"
+                  placeholder="Enter job title"
+                  value={formData.jobTitle}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Lead Details */}
         <div className="">
