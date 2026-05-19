@@ -560,11 +560,11 @@ export function Sidebar({
                                         isActiveExact,
                                       "bg-white shadow": !isActiveExact,
                                       // islast
-                                      "mb-6":
-                                        subItem ===
-                                        item.subItems?.[
-                                          item.subItems.length - 1
-                                        ],
+                                      // "mb-6":
+                                      //   subItem ===
+                                      //   item.subItems?.[
+                                      //     item.subItems.length - 1
+                                      //   ],
                                     },
                                   )
                                 }
