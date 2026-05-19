@@ -32,6 +32,7 @@ import {
 import ChatDialog from "@/components/leads/chat-dialog";
 import MoveToOrdersDialog from "@/components/leads/move-to-orders-dialog";
 import SuccessDialog from "@/components/success-dialog";
+import ProgressDots from "@/components/ui/progress-dots";
 import {
   Select,
   SelectContent,
@@ -40,18 +41,26 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useLeadsQuery } from "@/modules/leads/leads.hooks";
-import { exportLeadsProvider } from "@/modules/leads/leads.api";
+import {
+  exportLeadsProvider,
+  type LeadListItem,
+} from "@/modules/leads/leads.api";
 import { useLeadsStatsQuery } from "@/lib/metrics";
+import {
+  formatLifecycleStatus,
+  getLeadProgress,
+  getStatusBadgeClassName,
+} from "@/modules/leads/leads.utils";
 
 type LeadRow = {
   id: string;
+  customerId: string;
   name: string;
   workshop: string;
   category: string;
   assignedTo: string | null;
   assignedToName: string;
   progress: number;
-  progressStep: string;
   status: string;
   statusClassName: string;
   quoteValue: string;
@@ -87,78 +96,19 @@ const formatFollowUpDate = (value?: string | null) => {
   }).format(new Date(value));
 };
 
-const formatLifecycleStatus = (value: string) =>
-  value
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (character) => character.toUpperCase());
-
-const getStatusBadgeClassName = (status: string) => {
-  const normalized = status.toLowerCase();
-
-  if (normalized.includes("sent_to_admin")) {
-    return "bg-slate-100 text-slate-700";
-  }
-
-  if (normalized.includes("converted_to_po")) {
-    return "bg-violet-100 text-violet-700";
-  }
-
-  if (normalized.includes("payment")) {
-    return "bg-emerald-100 text-emerald-700";
-  }
-
-  if (normalized.includes("deal_closed")) {
-    return "bg-green-100 text-green-700";
-  }
-
-  if (normalized.includes("proposal")) {
-    return "bg-purple-100 text-purple-700";
-  }
-
-  if (normalized.includes("quotation")) {
-    return "bg-orange-100 text-orange-700";
-  }
-
-  if (normalized.includes("negotiation")) {
-    return "bg-blue-100 text-blue-700";
-  }
-
-  return "bg-gray-100 text-gray-700";
-};
-
-const getLeadProgress = (status: string) => {
-  const normalized = status.toLowerCase();
-
-  if (normalized.includes("closed")) return 7;
-  if (normalized.includes("proposal")) return 4;
-  if (normalized.includes("quotation")) return 3;
-  if (normalized.includes("negotiation")) return 5;
-
-  return 2;
-};
-
-const mapLeadToRow = (lead: {
-  _id: string;
-  projectName: string;
-  customerId: { firstName: string; email: string };
-  lifecycleStatus: string;
-  quoteValue: number;
-  buildingType: string;
-  location: string;
-  nextFollowUp: { followUpDate: string } | null;
-}): LeadRow => {
+const mapLeadToRow = (lead: LeadListItem): LeadRow => {
   const status = formatLifecycleStatus(lead.lifecycleStatus);
   const progress = getLeadProgress(lead.lifecycleStatus);
 
   return {
     id: lead._id,
-    name: lead.projectName || lead.customerId.firstName || "Untitled Lead",
+    customerId: lead.customerId._id,
+    name: lead.projectName || "Untitled Lead",
     workshop: lead.buildingType || "-",
     category: lead.location || "-",
     assignedTo: null,
     assignedToName: "",
     progress,
-    progressStep: `Step ${Math.min(progress, 8)}/8`,
     status,
     statusClassName: getStatusBadgeClassName(lead.lifecycleStatus),
     quoteValue: formatCurrency(lead.quoteValue),
@@ -168,8 +118,8 @@ const mapLeadToRow = (lead: {
     searchText: [
       lead._id,
       lead.projectName,
-      lead.customerId.firstName,
-      lead.customerId.email,
+      lead.customerId?.firstName,
+      lead.customerId?.email,
       lead.lifecycleStatus,
       lead.buildingType,
       lead.location,
@@ -273,21 +223,6 @@ export default function LeadsPage() {
     } else {
       setSelectedLeads(selectedLeads.filter((leadId) => leadId !== id));
     }
-  };
-
-  const getProgressDots = (progress: number) => {
-    return (
-      <div className="flex items-center gap-1">
-        {[...Array(7)].map((_, i) => (
-          <div
-            key={i}
-            className={`w-2 h-2 rounded-full ${
-              i < progress ? "bg-green-500" : "bg-gray-300"
-            }`}
-          />
-        ))}
-      </div>
-    );
   };
 
   const handleExport = async () => {
@@ -514,12 +449,7 @@ export default function LeadsPage() {
                       </TableCell>
 
                       <TableCell className="">
-                        <div className="flex flex-col gap-1">
-                          {getProgressDots(lead.progress)}
-                          <a className="text-sm text-blue-600" href="#">
-                            {lead.progressStep}
-                          </a>
-                        </div>
+                        <ProgressDots rawStatus={lead.rawStatus} />
                       </TableCell>
 
                       <TableCell className="">
@@ -567,7 +497,11 @@ export default function LeadsPage() {
                           </Link>
 
                           <CreateQuotationDialog
-                            leadData={{ name: lead.name, id: lead.id }}
+                            leadData={{
+                              name: lead.name,
+                              id: lead.id,
+                              customerId: lead.customerId,
+                            }}
                             mode="edit"
                             trigger={
                               <Button variant="ghost" size="icon">
@@ -577,7 +511,11 @@ export default function LeadsPage() {
                           />
 
                           <CreateQuotationDialog
-                            leadData={{ name: lead.name, id: lead.id }}
+                            leadData={{
+                              name: lead.name,
+                              id: lead.id,
+                              customerId: lead.customerId,
+                            }}
                             mode="create"
                             trigger={
                               <Button variant="ghost" size="icon">
