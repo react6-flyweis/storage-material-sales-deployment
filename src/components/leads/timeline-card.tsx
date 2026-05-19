@@ -1,21 +1,18 @@
 import { CheckCircle } from "lucide-react";
 import { Card } from "../ui/card";
+import {
+  LEAD_LIFECYCLE_STEPS,
+  getLeadProgress,
+} from "../../modules/leads/leads.utils";
 
 type Lead = {
   id: string;
   name: string;
   progress?: number;
+  status?: string;
 };
 
-const progressSteps = [
-  "Initial Contact",
-  "Requirements Gathered",
-  "Proposal Sent",
-  "Negotiation",
-  "Deal Closed",
-  "Payment Done",
-  "Delivered",
-];
+const progressSteps = LEAD_LIFECYCLE_STEPS;
 
 export default function TimelineCard({ lead }: { lead: Lead }) {
   return (
@@ -31,8 +28,11 @@ export default function TimelineCard({ lead }: { lead: Lead }) {
         <div className="space-y-3">
           {progressSteps.map((step, i) => {
             const idx = i + 1;
-            const completed = idx <= (lead.progress ?? 0);
-            const isCurrent = idx === (lead.progress ?? 0) + 1;
+            const progress =
+              lead.progress ?? getLeadProgress(lead.status ?? "");
+            const completed = idx <= progress;
+            const isCurrent =
+              idx === progress + 1 && progress < progressSteps.length;
             return (
               <div key={step} className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -41,8 +41,8 @@ export default function TimelineCard({ lead }: { lead: Lead }) {
                       completed
                         ? "bg-green-600 text-white"
                         : isCurrent
-                        ? "bg-blue-100 text-blue-700"
-                        : "bg-gray-200 text-gray-600"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-gray-200 text-gray-600"
                     }`}
                   >
                     {completed ? (
@@ -57,8 +57,8 @@ export default function TimelineCard({ lead }: { lead: Lead }) {
                         completed
                           ? "text-green-800"
                           : isCurrent
-                          ? "text-blue-700 font-semibold"
-                          : "text-gray-700"
+                            ? "text-blue-700 font-semibold"
+                            : "text-gray-700"
                       }`}
                     >
                       {step}
@@ -76,7 +76,16 @@ export default function TimelineCard({ lead }: { lead: Lead }) {
           })}
         </div>
         <div className="mt-2 pt-2 text-xs text-gray-500 border-t">
-          Progress: Step {(lead.progress ?? 0) + 1} of {progressSteps.length}
+          {(() => {
+            const progress =
+              lead.progress ?? getLeadProgress(lead.status ?? "");
+            const completedCount = Math.max(0, progress);
+            const currentIndex =
+              completedCount >= progressSteps.length
+                ? progressSteps.length
+                : completedCount + 1;
+            return `Progress: Step ${currentIndex} of ${progressSteps.length}`;
+          })()}
         </div>
       </div>
     </Card>
