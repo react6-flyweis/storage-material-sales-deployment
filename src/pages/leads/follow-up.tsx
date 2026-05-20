@@ -18,8 +18,24 @@ import FollowUpKpis from "@/components/follow-up/follow-up-kpis";
 
 export default function FollowUpPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [initialFollowUpDate, setInitialFollowUpDate] = useState<string | null>(
+    null,
+  );
   const { data: stats, isPending } = useFollowUpStatsQuery();
   const loading = isPending && !stats;
+
+  const openAddFollowUpDialog = (date: string | null = null) => {
+    setInitialFollowUpDate(date);
+    setIsAddDialogOpen(true);
+  };
+
+  const handleAddDialogOpenChange = (open: boolean) => {
+    setIsAddDialogOpen(open);
+
+    if (!open) {
+      setInitialFollowUpDate(null);
+    }
+  };
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-5">
@@ -34,7 +50,7 @@ export default function FollowUpPage() {
           </p>
         </div>
         <Button
-          onClick={() => setIsAddDialogOpen(true)}
+          onClick={() => openAddFollowUpDialog()}
           className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto mt-3 sm:mt-0"
         >
           <Plus className="w-4 h-4 mr-2" />
@@ -76,7 +92,7 @@ export default function FollowUpPage() {
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <UpcomingFollowUps />
+        <UpcomingFollowUps onScheduleFollowUp={openAddFollowUpDialog} />
         {/* <SmartReminders /> */}
 
         <AiScriptGenerator />
@@ -89,7 +105,8 @@ export default function FollowUpPage() {
       {/* Add Follow-up Dialog */}
       <AddFollowUpDialog
         open={isAddDialogOpen}
-        onOpenChange={setIsAddDialogOpen}
+        onOpenChange={handleAddDialogOpenChange}
+        initialDate={initialFollowUpDate}
       />
     </div>
   );
