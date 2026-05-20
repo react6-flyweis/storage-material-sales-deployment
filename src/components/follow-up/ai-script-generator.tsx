@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,37 +18,92 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { Link } from "react-router";
-import { useAiScriptSessionsQuery } from "@/modules/leads/leads.hooks";
+import { type Socket } from "socket.io-client";
+import { createAdminSocket } from "@/lib/socket";
+import { useAuthStore } from "@/modules/auth/auth.store";
+
+type ApiSession = {
+  _id: string;
+  leadId?: { _id: string; projectName?: string } | string | null;
+  messages: Array<{
+    role: "user" | "assistant";
+    content: string;
+    timestamp?: string;
+  }>;
+  createdAt?: string;
+  updatedAt?: string;
+};
 
 export default function AiScriptGenerator() {
-  const { data: aiData, isLoading } = useAiScriptSessionsQuery();
+  const isHydrated = useAuthStore((state) => state.isHydrated);
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const [apiSessions, setApiSessions] = useState<ApiSession[]>([]);
+  const [hasLoadedSessions, setHasLoadedSessions] = useState(false);
+  const socketRef = useRef<Socket | null>(null);
+  const showLoading = isHydrated && accessToken ? !hasLoadedSessions : false;
 
-  const apiSessions = aiData?.data?.sessions ?? [];
+  useEffect(() => {
+    if (!isHydrated || !accessToken) return;
+
+    const socket = createAdminSocket(accessToken);
+    if (!socket) {
+      return;
+    }
+
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      socket.emit("ai_script:list");
+    });
+
+    socket.on("ai_script:sessions", (payload: { sessions?: ApiSession[] }) => {
+      setApiSessions(payload.sessions ?? []);
+      setHasLoadedSessions(true);
+    });
+
+    socket.on("connect_error", () => {
+      setHasLoadedSessions(true);
+    });
+
+    socket.on("disconnect", () => {
+      setHasLoadedSessions(true);
+    });
+
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [accessToken, isHydrated]);
 
   const truncateSnippet = (text: string, wordCount: number = 8) => {
     const words = text.split(" ").slice(0, wordCount).join(" ");
     return text.split(" ").length > wordCount ? `${words}...` : words;
   };
 
-  const items = apiSessions.map((s: any) => {
+  const items = apiSessions.map((session) => {
     const lastMsg =
-      s.messages && s.messages.length
-        ? s.messages[s.messages.length - 1]
-        : (s.messages?.[0] ?? {});
-    const fullText = lastMsg.content ?? lastMsg.text ?? "";
+      session.messages && session.messages.length
+        ? session.messages[session.messages.length - 1]
+        : (session.messages?.[0] ?? {});
+    const fullText = lastMsg.content ?? "";
     const snippet = truncateSnippet(fullText);
-    const tone = s.tone ?? lastMsg.tone ?? "generated";
-    const name = s.client?.name ?? s.name ?? `Session ${s._id ?? s.id ?? ""}`;
+    const tone: "professional" | "generated" =
+      lastMsg.role === "user" ? "professional" : "generated";
+    const name =
+      session.leadId && typeof session.leadId === "object"
+        ? (session.leadId.projectName ?? `Session ${session._id}`)
+        : `Session ${session._id}`;
     const timestamp =
-      s.updatedAt ?? s.createdAt ?? lastMsg.timestamp ?? Date.now();
+      session.updatedAt ??
+      session.createdAt ??
+      lastMsg.timestamp ??
+      new Date(0).toISOString();
     const time = new Date(timestamp).toLocaleString();
     const icon = lastMsg.role === "user" ? MessageCircle : FileText;
     const bg =
-      tone === "friendly"
-        ? "bg-green-50 text-green-600"
-        : tone === "urgent"
-          ? "bg-red-50 text-red-600"
-          : "bg-purple-50 text-purple-600";
+      tone === "professional"
+        ? "bg-blue-50 text-blue-600"
+        : "bg-purple-50 text-purple-600";
 
     return {
       name,
@@ -80,7 +136,7 @@ export default function AiScriptGenerator() {
       </Link>
 
       <CardContent className="space-y-3">
-        {isLoading ? (
+        {showLoading ? (
           <>
             {[...Array(3)].map((_, i) => (
               <div
@@ -88,7 +144,7 @@ export default function AiScriptGenerator() {
                 className="flex items-center justify-between border rounded-md p-4 animate-pulse"
               >
                 <div className="flex items-start space-x-3 w-full">
-                  <div className="h-9 w-9 bg-gray-200 rounded-full flex-shrink-0" />
+                  <div className="h-9 w-9 bg-gray-200 rounded-full shrink-0" />
 
                   <div className="flex-1">
                     <div className="h-4 bg-gray-200 rounded w-24 mb-2" />
@@ -138,9 +194,7 @@ export default function AiScriptGenerator() {
                     className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
                       it.tone === "professional"
                         ? "bg-blue-100 text-blue-700"
-                        : it.tone === "friendly"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-red-100 text-red-700"
+                        : "bg-purple-100 text-purple-700"
                     }`}
                   >
                     {it.tone}
