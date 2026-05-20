@@ -6,7 +6,6 @@ import {
 } from "@tanstack/react-query";
 import { apiClient } from "@/modules/auth/auth.api";
 import {
-  getAiScriptSessionsProvider,
   escalateLeadProvider,
   getLeadDetailProvider,
   getScoredLeadsProvider,
@@ -89,14 +88,6 @@ export function useScoredLeadsQuery(page: number, limit: number) {
     queryKey: ["sales", "leads", "scored", page, limit],
     queryFn: () => getScoredLeadsProvider(page, limit),
     staleTime: 60 * 1000,
-  });
-}
-
-export function useAiScriptSessionsQuery() {
-  return useQuery({
-    queryKey: ["sales", "followups", "ai-script"],
-    queryFn: () => getAiScriptSessionsProvider(),
-    staleTime: 30 * 1000,
   });
 }
 
