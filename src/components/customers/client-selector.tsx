@@ -40,7 +40,7 @@ export default function ClientSelector({
   return (
     <Combobox
       items={clients}
-      itemToStringValue={(client: Client) => client.name}
+      itemToStringLabel={(client: Client) => client.name}
       value={clients.find((c) => c.id === value) || null}
       onValueChange={(val: Client | null | undefined) => {
         onValueChange(val);
