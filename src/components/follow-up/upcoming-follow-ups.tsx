@@ -12,7 +12,12 @@ import {
   Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useUpcomingFollowUpsQuery } from "@/modules/followups/followups.hooks";
+import {
+  useUpcomingFollowUpsQuery,
+  useCompleteFollowUpMutation,
+} from "@/modules/followups/followups.hooks";
+import SuccessDialog from "@/components/success-dialog";
+import { useEffect } from "react";
 import type { UpcomingFollowUpItem } from "@/modules/followups/followups.api";
 
 type ViewMode = "schedule" | "calendar" | "list";
@@ -25,13 +30,39 @@ interface FollowUp {
   time?: string;
   company?: string;
   status?: "overdue" | "upcoming" | "normal";
+  fullDate?: string;
 }
 
-export default function UpcomingFollowUps() {
+type Props = {
+  onScheduleFollowUp?: (date?: string | null) => void;
+};
+
+const formatDateForInput = (day: number) => {
+  const today = new Date();
+  const candidate = new Date(today.getFullYear(), today.getMonth(), day);
+
+  const year = candidate.getFullYear();
+  const month = String(candidate.getMonth() + 1).padStart(2, "0");
+  const date = String(candidate.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${date}`;
+};
+
+export default function UpcomingFollowUps({ onScheduleFollowUp }: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>("calendar");
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const { data: response, isLoading } = useUpcomingFollowUpsQuery();
   const apiFollowUps = response?.success ? response.data.followups : [];
+
+  const completeFollowUp = useCompleteFollowUpMutation();
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  useEffect(() => {
+    if (completeFollowUp.isSuccess) {
+      setShowSuccess(true);
+      completeFollowUp.reset();
+    }
+  }, [completeFollowUp, completeFollowUp.isSuccess]);
 
   const daysInMonth = Array.from({ length: 31 }, (_, i) => i + 1);
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -61,6 +92,7 @@ export default function UpcomingFollowUps() {
     return {
       id: f._id || String(index),
       date: day,
+      fullDate: f.followUpDate,
       customer,
       type,
       time,
@@ -71,6 +103,12 @@ export default function UpcomingFollowUps() {
 
   const mappedFollowUps = apiFollowUps.map(apiToFollowUp);
 
+  const now = new Date();
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  );
   const getFollowUpForDay = (day: number) =>
     mappedFollowUps.filter((f) => parseInt(f.date) === day);
 
@@ -86,7 +124,11 @@ export default function UpcomingFollowUps() {
             <span className="text-xl">📅</span>
             <h2 className="text-lg font-semibold">Upcoming Follow-Ups</h2>
           </div>
-          <Button size="sm" className="mr-2">
+          <Button
+            size="sm"
+            className="mr-2"
+            onClick={() => onScheduleFollowUp?.(null)}
+          >
             <PlusIcon />
             Schedule
           </Button>
@@ -160,21 +202,40 @@ export default function UpcomingFollowUps() {
               const hasFollowUp = followUps.length > 0;
               const isOverdue =
                 hasFollowUp && followUps.some((f) => f.status === "overdue");
-              const isToday = day === new Date().getDate();
+
+              const candidateDate = new Date(
+                now.getFullYear(),
+                now.getMonth(),
+                day,
+              );
+              const isPast = candidateDate < startOfToday;
+              const isToday =
+                candidateDate.getTime() === startOfToday.getTime();
 
               return (
                 <div
                   key={day}
                   onClick={() => {
+                    if (isPast) return; // disable interactions for past dates
+
+                    if (!hasFollowUp) {
+                      onScheduleFollowUp?.(formatDateForInput(day));
+                      return;
+                    }
+
                     setSelectedDay(day);
                     setViewMode("list");
                   }}
+                  aria-disabled={isPast}
                   className={cn(
-                    "aspect-square border rounded-md flex flex-col items-center justify-center p-1 text-sm relative cursor-pointer",
+                    "aspect-square border rounded-md flex flex-col items-center justify-center p-1 text-sm relative",
+                    // pointer cursor only when not past
+                    !isPast && "cursor-pointer",
                     isToday && "bg-blue-600 text-white font-bold",
-                    selectedDay === day && "ring-2 ring-blue-400",
+                    selectedDay === day && !isPast && "ring-2 ring-blue-400",
                     hasFollowUp && !isToday && "border-red-400",
                     !hasFollowUp && !isToday && "text-gray-700",
+                    isPast && "opacity-50 cursor-not-allowed",
                   )}
                 >
                   <span className="text-xs">{day}</span>
@@ -230,6 +291,10 @@ export default function UpcomingFollowUps() {
                 }
               })();
 
+              const formattedDate = followUp.fullDate
+                ? new Date(followUp.fullDate).toLocaleDateString()
+                : followUp.date;
+
               return (
                 <div
                   key={followUp.id}
@@ -248,6 +313,9 @@ export default function UpcomingFollowUps() {
                       </p>
                       <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
                         <span className="flex items-center gap-1">
+                          <Calendar className="w-4 h-4" /> {formattedDate}
+                        </span>
+                        <span className="flex items-center gap-1">
                           <Clock className="w-4 h-4" /> {followUp.time}
                         </span>
                         <span className="flex items-center gap-1">
@@ -258,7 +326,14 @@ export default function UpcomingFollowUps() {
                   </div>
 
                   <div className="text-gray-500">
-                    <Check className="w-5 h-5" />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => completeFollowUp.mutate(followUp.id)}
+                      disabled={completeFollowUp.isPending}
+                    >
+                      <Check className="w-5 h-5" />
+                    </Button>
                   </div>
                 </div>
               );
@@ -266,6 +341,13 @@ export default function UpcomingFollowUps() {
           )}
         </div>
       )}
+
+      <SuccessDialog
+        open={showSuccess}
+        onClose={() => setShowSuccess(false)}
+        title="Follow-up marked completed"
+        okLabel="Great"
+      />
     </Card>
   );
 }
