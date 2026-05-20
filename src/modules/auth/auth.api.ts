@@ -8,7 +8,7 @@ import type {
   LogoutResponse,
 } from "./auth.types";
 
-const FALLBACK_BASE_URL = "https://mr-storage-backend.vercel.app";
+export const FALLBACK_BASE_URL = "https://mr-storage-backend.onrender.com";
 
 export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? FALLBACK_BASE_URL,
