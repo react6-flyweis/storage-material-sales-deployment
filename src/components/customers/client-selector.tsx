@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   Combobox,
   ComboboxInput,
@@ -8,76 +7,59 @@ import {
   ComboboxEmpty,
 } from "@/components/ui/combobox";
 
-type Client = { id: string; name: string; company: string };
+import { useLeadsQuery } from "@/modules/leads/leads.hooks";
+
+type Client = {
+  id: string;
+  name: string;
+  customer: string;
+  customerId: string;
+};
 
 type Props = {
   value: string;
-  onValueChange: (value: string) => void;
+  onValueChange: (value: Client | null | undefined) => void;
   placeholder?: string;
 };
-
-// Mock client data
-const clients: Client[] = [
-  { id: "1", name: "John Smith", company: "Tech Solutions Inc." },
-  { id: "2", name: "Sarah Johnson", company: "Digital Marketing Pro" },
-  { id: "3", name: "Michael Brown", company: "Creative Design Studio" },
-  { id: "4", name: "Emily Davis", company: "Global Innovations LLC" },
-  { id: "5", name: "David Wilson", company: "Enterprise Systems Corp" },
-  { id: "6", name: "Lisa Anderson", company: "Strategic Consulting Group" },
-];
 
 export default function ClientSelector({
   value,
   onValueChange,
   placeholder = "Search clients...",
 }: Props) {
-  const [searchQuery, setSearchQuery] = useState("");
+  const { data, isLoading } = useLeadsQuery(1, 100);
 
-  const filteredClients = clients.filter(
-    (client) =>
-      client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.company.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const selectedClientData = clients.find((c) => c.id === value);
-  const displayValue = selectedClientData
-    ? `${selectedClientData.name} - ${selectedClientData.company}`
-    : searchQuery;
+  const clients =
+    data?.data.leads.map((lead) => ({
+      id: lead._id,
+      name: lead.projectName || "N/A",
+      customer: lead.customerId?.firstName || "N/A",
+      customerId: lead.customerId?._id || "",
+    })) || [];
 
   return (
     <Combobox
-      value={value}
-      onValueChange={(val) => {
-        const newVal = val ?? "";
-        onValueChange(newVal);
-        if (newVal) {
-          const client = clients.find((c) => c.id === newVal);
-          if (client) setSearchQuery(`${client.name} - ${client.company}`);
-        }
+      items={clients}
+      itemToStringValue={(client: Client) => client.name}
+      value={clients.find((c) => c.id === value) || null}
+      onValueChange={(val: Client | null | undefined) => {
+        onValueChange(val);
       }}
     >
-      <ComboboxInput
-        placeholder={placeholder}
-        value={displayValue}
-        onChange={(e) => {
-          setSearchQuery(e.target.value);
-          if (value && e.target.value !== displayValue) {
-            onValueChange("");
-          }
-        }}
-        showClear
-      />
-      <ComboboxContent>
+      <ComboboxInput placeholder={placeholder} />
+      <ComboboxContent className="pointer-events-auto">
+        <ComboboxEmpty>
+          {isLoading ? "Loading clients..." : "No client found"}
+        </ComboboxEmpty>
         <ComboboxList>
-          <ComboboxEmpty>No client found</ComboboxEmpty>
-          {filteredClients.map((client) => (
-            <ComboboxItem key={client.id} value={client.id}>
+          {(client: Client) => (
+            <ComboboxItem key={client.id} value={client}>
               <div className="flex flex-col">
                 <span className="font-medium text-gray-900">{client.name}</span>
-                <span className="text-sm text-gray-500">{client.company}</span>
+                <span className="text-sm text-gray-500">{client.customer}</span>
               </div>
             </ComboboxItem>
-          ))}
+          )}
         </ComboboxList>
       </ComboboxContent>
     </Combobox>
