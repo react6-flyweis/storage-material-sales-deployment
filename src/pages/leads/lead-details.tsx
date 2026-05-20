@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from "react-router";
+import { useLocation, useNavigate, useParams } from "react-router";
 import { ArrowLeft } from "lucide-react";
 import BasicDetails from "@/components/leads/basic-details";
 import QuotationCard from "@/components/leads/quotation-card";
@@ -15,15 +15,20 @@ import type { LeadDetailData } from "@/modules/leads/leads.api";
 const TABS = [
   { value: "basic-info", label: "Basic info" },
   { value: "quotation", label: "Quotation" },
-  { value: "open-chat", label: "Open Chat" },
+  { value: "chat", label: "Open Chat" },
   { value: "timeline", label: "Timeline" },
   { value: "follow-ups", label: "Follow Ups" },
   { value: "payments", label: "Payments" },
 ] as const;
 
+type LeadTab = (typeof TABS)[number]["value"];
+
+const TAB_VALUES = new Set<LeadTab>(TABS.map((tab) => tab.value));
+
 const defaultLead = {
   id: "—",
   name: "—",
+  customerId: "",
   workshop: "",
   category: "",
   assignedToName: "",
@@ -42,6 +47,7 @@ function mapDetailToLead(detail: LeadDetailData) {
   return {
     id: detail.lead._id,
     name: detail.customer.firstName || detail.customer.customerId || "Lead",
+    customerId: detail.customer._id,
     workshop: latestQuotation?.buildingType || detail.lead.buildingType || "",
     category: latestQuotation?.location || detail.lead.location || "",
     assignedToName: "",
@@ -115,6 +121,7 @@ function LeadDetailsSkeleton() {
 
 export default function LeadDetails() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { leadId } = useParams<{ leadId: string }>();
   const { data: response, isLoading } = useLeadDetailQuery(leadId);
 
@@ -122,6 +129,24 @@ export default function LeadDetails() {
   const lead = detail
     ? mapDetailToLead(detail)
     : { ...defaultLead, id: leadId ?? "—" };
+  const searchParams = new URLSearchParams(location.search);
+  const activeTabFromSearch = searchParams.get("tab") as LeadTab | null;
+  const activeTab: LeadTab =
+    activeTabFromSearch && TAB_VALUES.has(activeTabFromSearch)
+      ? activeTabFromSearch
+      : "basic-info";
+
+  const handleTabChange = (tab: string) => {
+    if (!leadId) {
+      return;
+    }
+    if (tab === "basic-info") {
+      navigate(`/leads/${leadId}`);
+      return;
+    }
+
+    navigate(`/leads/${leadId}?tab=${tab}`);
+  };
 
   if (isLoading) {
     return <LeadDetailsSkeleton />;
@@ -145,10 +170,14 @@ export default function LeadDetails() {
         </div>
 
         <div className="mt-6">
-          <Tabs defaultValue={TABS[0].value} className="w-full">
+          <Tabs
+            value={activeTab}
+            onValueChange={handleTabChange}
+            className="w-full"
+          >
             <TabsList variant="line" className="w-full justify-start ">
               {TABS.map((tab) => (
-                <TabsTrigger key={tab.value} value={tab.value} className="">
+                <TabsTrigger key={tab.value} value={tab.value}>
                   {tab.label}
                 </TabsTrigger>
               ))}
@@ -160,7 +189,7 @@ export default function LeadDetails() {
             <TabsContent value="quotation" className="mt-6">
               <QuotationCard />
             </TabsContent>
-            <TabsContent value="open-chat" className="mt-6">
+            <TabsContent value="chat" className="mt-6">
               <ChatCard lead={lead} recentMessages={detail?.recentMessages} />
             </TabsContent>
             <TabsContent value="timeline" className="mt-6">
