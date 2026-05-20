@@ -296,8 +296,19 @@ export type LeadDetailMessage = {
   _id?: string;
   text?: string;
   content?: string;
-  sender?: string;
+  sender?: string | null;
+  senderType?:
+    | "customer"
+    | "ai"
+    | "employee"
+    | "sales"
+    | "system"
+    | string
+    | null;
+  senderId?: string | null;
+  isRead?: boolean;
   createdAt?: string;
+  updatedAt?: string;
 };
 
 export type AiScriptMessage = {
@@ -316,22 +327,6 @@ export type AiScriptSession = {
   createdAt?: string;
   updatedAt?: string;
 };
-
-type AiScriptResponse = {
-  success: boolean;
-  message: string;
-  data: {
-    sessions: AiScriptSession[];
-  };
-};
-
-export async function getAiScriptSessionsProvider(): Promise<AiScriptResponse> {
-  const response = await apiClient.get<AiScriptResponse>(
-    "/api/sales/followups/ai-script",
-  );
-
-  return response.data;
-}
 
 export type LeadDetailData = {
   lead: LeadDetailLead;
