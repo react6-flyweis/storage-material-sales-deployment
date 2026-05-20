@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  AddNotesDialog,
+  // AddNotesDialog,
   type AddNotesFormValues,
 } from "@/pages/customers/customer-detail/add-notes-dialog";
 import UpdateStatusDialog from "@/pages/customers/customer-detail/update-status-dialog";
@@ -45,7 +45,7 @@ type BasicDetailsProps = {
 };
 
 export default function BasicDetails({ lead }: BasicDetailsProps) {
-  const [notes, setNotes] = useState<AddNotesFormValues[]>([]);
+  const [notes] = useState<AddNotesFormValues[]>([]);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
@@ -115,9 +115,9 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
     ? getLeadLifecycleStatusLabel(currentLifecycleStep.value)
     : "—";
 
-  const handleSaveNote = (data: AddNotesFormValues) => {
-    setNotes((current) => [data, ...current]);
-  };
+  // const handleSaveNote = (data: AddNotesFormValues) => {
+  //   setNotes((current) => [data, ...current]);
+  // };
 
   const handleOpenStatusDialog = () => {
     setStatusDialogOpen(true);
@@ -443,7 +443,13 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
             >
               Update Step Status
             </Button>
-            <AddNotesDialog onSave={handleSaveNote} />
+            <Button
+              variant="outline"
+              className="border-[#1D51A4] text-[#1D51A4] hover:bg-slate-50 rounded-[6px]"
+            >
+              Add Notes
+            </Button>
+            {/* <AddNotesDialog onSave={handleSaveNote} /> */}
           </div>
 
           <UpdateStatusDialog
@@ -611,7 +617,7 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
                   Add notes to keep track of communications.
                 </p>
                 <div className="mt-3 flex justify-center">
-                  <AddNotesDialog onSave={handleSaveNote} />
+                  {/* <AddNotesDialog onSave={handleSaveNote} /> */}
                 </div>
               </div>
             )}
