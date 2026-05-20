@@ -102,3 +102,47 @@ export async function getCommunicationTimelineProvider(
 
   return response.data;
 }
+
+export type CreateFollowUpPayload = {
+  leadId: string;
+  customerId: string;
+  followUpDate: string; // ISO string
+  modeOfContact: string;
+  notes?: string;
+  priority?: string;
+};
+
+export type CreateFollowUpResponse = {
+  success: boolean;
+  message: string;
+  data: {
+    followupId: string;
+  };
+};
+
+export async function createFollowUpProvider(
+  payload: CreateFollowUpPayload,
+): Promise<CreateFollowUpResponse> {
+  const response = await apiClient.post<CreateFollowUpResponse>(
+    "/api/sales/followups",
+    payload,
+  );
+
+  return response.data;
+}
+
+export type CompleteFollowUpResponse = {
+  success: boolean;
+  message: string;
+  data?: Record<string, unknown>;
+};
+
+export async function completeFollowUpProvider(
+  followUpId: string,
+): Promise<CompleteFollowUpResponse> {
+  const response = await apiClient.put<CompleteFollowUpResponse>(
+    `/api/sales/followups/${followUpId}/complete`,
+  );
+
+  return response.data;
+}
