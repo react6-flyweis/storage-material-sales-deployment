@@ -1,31 +1,8 @@
-import {
-  ArrowLeft,
-  Building2,
-  Calendar,
-  MapPin,
-  Mail,
-  Phone,
-  User,
-  FileText,
-  DollarSign,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import SuccessDialog from "@/components/success-dialog";
-import UpdateStatusDialog from "./update-status-dialog";
-import { AddNotesDialog, type AddNotesFormValues } from "./add-notes-dialog";
 import { useNavigate, useParams } from "react-router";
-import { useMemo, useState } from "react";
-import {
-  LEAD_LIFECYCLE_STEPS,
-  getLeadLifecycleStepId,
-} from "@/modules/leads/lifecycle-statuses";
+import { Button } from "@/components/ui/button";
+import { useLeadDetailQuery } from "@/modules/leads/leads.hooks";
+import { ArrowLeft } from "lucide-react";
+import BasicDetails from "@/components/leads/basic-details";
 
 const quickActionButtons = [
   { label: "View Quotation", path: "project-quotation" },
@@ -38,43 +15,18 @@ export default function ProjectDetailsPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const basePath = id ? `/customers/${id}` : "/customers";
+  const params = useParams<{ id?: string }>();
+  const leadId = params.id;
+  const { data: response, isLoading } = useLeadDetailQuery(leadId);
 
-  const [notes, setNotes] = useState<AddNotesFormValues[]>([
-    {
-      title: "Steel Investment",
-      notes:
-        "Reliable for long-distance steel transport.\nPreferred carrier for Texas routes.\nFast response time during bidding.",
-    },
-  ]);
-  const [selectedStatus, setSelectedStatus] = useState("initial_contact");
-  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
-  const [successDialogOpen, setSuccessDialogOpen] = useState(false);
-  const [successDialogTitle] = useState("Status Updated Successfully");
+  const detail = response?.success ? response.data : undefined;
 
-  const selectedStepId = useMemo(
-    () => getLeadLifecycleStepId(selectedStatus),
-    [selectedStatus],
-  );
-  const totalLifecycleSteps = LEAD_LIFECYCLE_STEPS.length;
-  const progressWidth =
-    totalLifecycleSteps > 1
-      ? ((selectedStepId - 1) / (totalLifecycleSteps - 1)) * 100
-      : 0;
-  const currentLifecycleLabel =
-    LEAD_LIFECYCLE_STEPS[selectedStepId - 1]?.label.replace(/\n/g, " ") ??
-    "Initial contact";
-
-  const handleSaveNote = (data: AddNotesFormValues) => {
-    setNotes((current) => [data, ...current]);
-  };
-
-  const handleOpenStatusDialog = () => {
-    setStatusDialogOpen(true);
-  };
+  if (isLoading) {
+    return <ProjectDetailsSkeleton />;
+  }
 
   return (
     <div className="space-y-6 p-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <Button
@@ -85,7 +37,9 @@ export default function ProjectDetailsPage() {
             <ArrowLeft className="h-4 w-4 mr-1" />
             Back
           </Button>
-          <h1 className="text-xl font-semibold">Project Details- Project 1</h1>
+          <h1 className="text-xl font-semibold">
+            Project Details- {detail?.lead.projectName}
+          </h1>
         </div>
       </div>
 
@@ -105,475 +59,41 @@ export default function ProjectDetailsPage() {
         </div>
       </div>
 
-      {/* Basic Info Card */}
-      <Card className="">
-        <CardHeader className="border-b  flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#EEF2FC]">
-              <Building2 className="h-6 w-6 text-[#1D51A4]" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-[16px] font-semibold text-slate-800">
-                  Project 1- ABC Warehouse
-                </h2>
-                <span className="inline-flex items-center rounded-full bg-[#DCFCE7] px-2 py-0.5 text-[12px] font-medium text-[#16A34A]">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A] mr-1.5"></span>
-                  In Progress
-                </span>
-              </div>
-              <p className="text-[13px] text-slate-500 mt-1">Q-2025-1047</p>
-            </div>
-          </div>
-        </CardHeader>
+      <BasicDetails lead={detail} />
+    </div>
+  );
+}
 
-        <CardContent className="pb-4 border-b">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="flex items-center gap-3">
-              <div className="text-slate-400">
-                <Building2 className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-[12px] text-slate-500">Building Type</p>
-                <p className="text-[14px] font-medium text-slate-800">
-                  Workshop
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="text-slate-400">
-                <DollarSign className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-[12px] text-slate-500">Quote Value</p>
-                <p className="text-[14px] font-medium text-slate-800">
-                  $12,500
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="text-slate-400">
-                <Calendar className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-[12px] text-slate-500">Created On</p>
-                <p className="text-[14px] font-medium text-slate-800">
-                  2024-10-10
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="text-slate-400">
-                <MapPin className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-[12px] text-slate-500">Location</p>
-                <p className="text-[14px] font-medium text-slate-800">
-                  1878 Bayonne Ave, Manchester, NNJ, 088765
-                </p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-
-        <CardFooter className="">
-          <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-4">
-              <h3 className="text-[14px] font-semibold text-slate-800">
-                Contact Information
-              </h3>
-              <div className="bg-[#F8FAFC] rounded-xl p-4 flex gap-4">
-                <div className="flex-1 space-y-2">
-                  <p className="text-[14px] font-medium text-slate-800 mb-1">
-                    John Doe
-                  </p>
-                  <div className="flex items-start gap-2">
-                    <Phone className="h-4 w-4 text-slate-400 shrink-0 mt-0.5" />
-                    <div className="flex text-[13px]">
-                      <span className="text-slate-500 w-16">Phone</span>
-                      <span className="font-medium text-slate-800">
-                        (163) 2459 315
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Mail className="h-4 w-4 text-slate-400 shrink-0 mt-0.5" />
-                    <div className="flex text-[13px]">
-                      <span className="text-slate-500 w-16">Email</span>
-                      <a
-                        href="mailto:darlee@example.com"
-                        className="font-medium text-[#1D51A4] hover:underline"
-                      >
-                        darlee@example.com
-                      </a>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <MapPin className="h-4 w-4 text-slate-400 shrink-0 mt-0.5" />
-                    <div className="flex flex-col text-[13px]">
-                      <span className="text-slate-500 w-16">Address</span>
-                      <span className="font-medium text-slate-800">
-                        1861 Bayonne Ave,
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <h3 className="text-[14px] font-semibold text-slate-800">
-                Assignment
-              </h3>
-              <div className="bg-[#F8FAFC] rounded-xl p-4 flex items-start gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#DCFCE7] text-[#16A34A] shrink-0">
-                  <User className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-[14px] font-medium text-slate-800">
-                    Assigned to: Sarah Lee
-                  </p>
-                  <p className="text-[13px] text-slate-500 mt-1">
-                    1 person working on this lead
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <h3 className="text-[14px] font-semibold text-slate-800">
-                Signed Contract/Agreement
-              </h3>
-              <div className="bg-[#F8FAFC] rounded-xl p-4 flex items-start gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#DCFCE7] text-[#16A34A] shrink-0">
-                  <FileText className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-[14px] font-medium text-slate-800">
-                    Signed contract/Agreement
-                  </p>
-                  <p className="text-[13px] text-slate-500 mt-1">
-                    Signed on: 12 April 2025
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardFooter>
-      </Card>
-
-      {/* Project Lifecycle */}
-      <Card className="">
-        <CardHeader>
-          <CardTitle>Project Lifecycle</CardTitle>
-        </CardHeader>
-
-        <CardContent>
-          <div className="relative min-w-225 mb-8">
-            <div className="absolute top-2.75 left-3 right-3 h-0.5 bg-[#E2E8F0] -z-10"></div>
-            <div
-              className="absolute top-2.75 left-3 h-0.5 bg-[#1D51A4] -z-10"
-              style={{ width: `${progressWidth}%` }}
-            ></div>
-
-            <div className="flex justify-between">
-              {LEAD_LIFECYCLE_STEPS.map((step) => {
-                const isCompleted = step.id < selectedStepId;
-                const isCurrent = step.id === selectedStepId;
-
-                return (
-                  <div
-                    key={step.id}
-                    className="flex flex-col items-center group relative w-16"
-                  >
-                    <div
-                      className={`flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-semibold mb-2 z-10 transition-colors
-                      ${
-                        isCompleted
-                          ? "bg-[#16A34A] text-white border-2 border-white"
-                          : isCurrent
-                            ? "bg-[#1D51A4] text-white border-2 border-white"
-                            : "bg-white border-2 border-[#E2E8F0] text-slate-400"
-                      }`}
-                    >
-                      {step.id}
-                    </div>
-                    <div className="text-center font-medium">
-                      <p
-                        className={`text-[11px] whitespace-pre-line leading-tight ${isCurrent ? "text-[#1D51A4]" : "text-slate-600"}`}
-                      >
-                        {step.label}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-[#F8FAFC] rounded-xl p-5 mb-5 border border-slate-100">
-            <div>
-              <p className="text-[14px] font-semibold text-slate-800 mb-1">
-                {currentLifecycleLabel} (Step {selectedStepId} of{" "}
-                {totalLifecycleSteps})
-              </p>
-              <p className="text-[12px] text-slate-500 leading-relaxed">
-                Move this project through the lifecycle states tracked by the
-                backend.
-              </p>
-            </div>
-
-            <div>
-              <div className="flex items-start gap-3 mb-4">
-                <Calendar className="h-5 w-5 text-slate-400 mt-0.5" />
-                <div>
-                  <p className="text-[12px] text-slate-500">
-                    Planned start date
-                  </p>
-                  <p className="text-[13px] font-medium text-slate-800">
-                    2024-10-10
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <Calendar className="h-5 w-5 text-slate-400 mt-0.5" />
-                <div>
-                  <p className="text-[12px] text-slate-500">
-                    Target Completion
-                  </p>
-                  <p className="text-[13px] font-medium text-slate-800">
-                    2024-10-10
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <div className="mb-4">
-                <p className="text-[12px] text-slate-500 mb-0.5">
-                  Assigned Planner
-                </p>
-                <p className="text-[13px] font-medium text-slate-800">
-                  Sarah Lee
-                </p>
-              </div>
-              <div>
-                <p className="text-[12px] text-slate-500 mb-0.5">Priority</p>
-                <p className="text-[13px] font-medium text-[#D97706] inline-flex items-center px-2 py-0.5 rounded-lg bg-[#FEF3C7]">
-                  Medium
-                </p>
-              </div>
-            </div>
-
-            <div>
-              <p className="text-[12px] text-slate-500 mb-1">Next Step</p>
-              <p className="text-[13px] font-medium text-slate-800">
-                Fabrication Production Started
-              </p>
-              <p className="text-[12px] text-slate-500 mt-1">
-                Upcoming After completion
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Button
-              variant="default"
-              className="bg-[#1D51A4] hover:bg-[#1D51A4]/90 text-white rounded-[6px]"
-              onClick={handleOpenStatusDialog}
-            >
-              Update Step Status
-            </Button>
-            <AddNotesDialog onSave={handleSaveNote} />
-          </div>
-
-          <UpdateStatusDialog
-            open={statusDialogOpen}
-            currentStatus={selectedStatus}
-            steps={LEAD_LIFECYCLE_STEPS}
-            onOpenChange={setStatusDialogOpen}
-            onSave={async (status) => {
-              setSelectedStatus(status);
-              setSuccessDialogOpen(true);
-            }}
-          />
-
-          <SuccessDialog
-            open={successDialogOpen}
-            onClose={() => setSuccessDialogOpen(false)}
-            title={successDialogTitle}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Grid: Status, Activity, Notes */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="rounded-2xl border border-[#E5E7EB] bg-white shadow-sm p-6 flex flex-col items-center justify-center text-center">
-          <div className="w-full flex justify-start mb-4">
-            <h3 className="text-[16px] font-bold text-slate-800">
-              Project Status
-            </h3>
-          </div>
-
-          <div className="relative w-32 h-32 mb-6">
-            {/* SVG Circle Progress */}
-            <svg
-              className="w-full h-full transform -rotate-90"
-              viewBox="0 0 100 100"
-            >
-              <circle
-                cx="50"
-                cy="50"
-                r="40"
-                stroke="currentColor"
-                strokeWidth="10"
-                fill="transparent"
-                className="text-slate-200"
-              />
-              <circle
-                cx="50"
-                cy="50"
-                r="40"
-                stroke="currentColor"
-                strokeWidth="10"
-                fill="transparent"
-                strokeDasharray="251.2"
-                strokeDashoffset={
-                  251.2 - (251.2 * selectedStepId) / totalLifecycleSteps
-                }
-                className="text-[#1D51A4]"
-              />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-[12px] text-slate-500">Step</span>
-              <span className="text-[28px] font-bold text-slate-800 leading-none">
-                {selectedStepId}
-              </span>
-              <span className="text-[11px] text-slate-500">
-                of {totalLifecycleSteps}
-              </span>
-            </div>
-          </div>
-
-          <div className="w-full text-left space-y-4">
-            <div>
-              <p className="text-[12px] text-slate-500">Current step</p>
-              <p className="text-[14px] font-medium text-[#1D51A4]">
-                {currentLifecycleLabel}
-              </p>
-            </div>
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <Calendar className="h-4 w-4 text-slate-600" />
-                <p className="text-[13px] font-semibold text-slate-800">
-                  Started on
-                </p>
-              </div>
-              <p className="text-[13px] text-slate-500 ml-6">2024-10-10</p>
-            </div>
-            <div>
-              <p className="text-[13px] font-semibold text-slate-800 mb-1">
-                Estimate Completion
-              </p>
-              <p className="text-[13px] text-slate-500">—</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="rounded-2xl border border-[#E5E7EB] bg-white shadow-sm p-6">
-          <h3 className="text-[16px] font-bold text-slate-800 mb-6">
-            Recent Activity
-          </h3>
-            <div className="relative pl-6 space-y-6">
-            <div className="absolute left-2.25 top-2 bottom-2 w-px bg-slate-200"></div>
-
-            <div className="relative">
-              <div className="absolute -left-6 top-1 h-3.5 w-3.5 rounded-full bg-white border-[3px] border-[#8B5CF6]"></div>
-              <p className="text-[13px] font-medium text-slate-800">
-                Step updated: material request completed
-              </p>
-              <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-1">
-                <Calendar className="h-3 w-3" /> 19 Jan 2025
-              </p>
-            </div>
-
-            <div className="relative">
-              <div className="absolute -left-6 top-1 h-3.5 w-3.5 rounded-full bg-white border-[3px] border-[#8B5CF6]"></div>
-              <p className="text-[13px] font-medium text-slate-800">
-                Additional material request #AMR-001 Created
-              </p>
-              <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-1">
-                <Calendar className="h-3 w-3" /> 18 Jan 2025
-              </p>
-            </div>
-
-            <div className="relative">
-              <div className="absolute -left-6 top-1 h-3.5 w-3.5 rounded-full bg-white border-[3px] border-[#8B5CF6]"></div>
-              <p className="text-[13px] font-medium text-slate-800">
-                Material Check Completed
-              </p>
-              <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-1">
-                <Calendar className="h-3 w-3" /> 18 Jan 2025
-              </p>
-            </div>
-
-            <div className="relative">
-              <div className="absolute -left-6 top-1 h-3.5 w-3.5 rounded-full bg-white border-[3px] border-[#8B5CF6]"></div>
-              <p className="text-[13px] font-medium text-slate-800">
-                BOM Review completed
-              </p>
-              <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-1">
-                <Calendar className="h-3 w-3" /> 17 Jan 2025
-              </p>
-            </div>
-
-            <div className="relative">
-              <div className="absolute -left-6 top-1 h-3.5 w-3.5 rounded-full bg-white border-[3px] border-[#8B5CF6]"></div>
-              <p className="text-[13px] font-medium text-slate-800">
-                2 unread messages
-              </p>
-              <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-1">
-                <Calendar className="h-3 w-3" /> 17 Jan 2025
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="rounded-2xl border border-[#E5E7EB] bg-white shadow-sm p-6 overflow-y-auto max-h-100">
-          <h3 className="text-[16px] font-bold text-slate-800 mb-4">Notes</h3>
-          <div className="space-y-4 text-[13px] text-slate-600">
-            {notes.map((note, index) => (
-              <div key={index} className="space-y-2">
-                <p className="text-[14px] font-medium text-slate-800">
-                  {note.title}
-                </p>
-                <p className="whitespace-pre-line">{note.notes}</p>
-              </div>
-            ))}
-          </div>
-        </Card>
+function ProjectDetailsSkeleton() {
+  return (
+    <div className="space-y-6 p-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-28 rounded-lg bg-slate-200 animate-pulse" />
+          <div className="h-6 w-64 rounded bg-slate-200 animate-pulse" />
+        </div>
       </div>
 
-      {/* Project Photos */}
-      <Card className="rounded-2xl border border-[#E5E7EB] bg-white shadow-sm p-6">
-        <h3 className="text-[16px] font-bold text-slate-800 mb-6">
-          Project Photos (Latest)
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {[1, 2, 3, 4, 5].map((i) => (
+      {/* Quick Actions Skeleton */}
+      <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, idx) => (
             <div
-              key={i}
-              className="aspect-video bg-slate-100 rounded-xl overflow-hidden border border-slate-200"
-            >
-              <img
-                src={`https://placehold.co/400x300/E2E8F0/A1A1AA?text=Photo+${i}`}
-                alt={`Project photo ${i}`}
-                className="w-full h-full object-cover"
-              />
-            </div>
+              key={idx}
+              className="h-10 rounded-[6px] bg-slate-200 animate-pulse"
+            />
           ))}
         </div>
-      </Card>
+      </div>
+
+      <div className="rounded-xl border border-slate-100 bg-white p-6 space-y-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-6 w-48 rounded bg-slate-200" />
+          <div className="h-4 w-full rounded bg-slate-200" />
+          <div className="h-4 w-5/6 rounded bg-slate-200" />
+          <div className="h-36 w-full rounded bg-slate-200" />
+        </div>
+      </div>
     </div>
   );
 }
