@@ -1,16 +1,28 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Send, Menu, Sparkles, Mail, Phone, Copy } from "lucide-react";
+import {
+  Send,
+  Menu,
+  MessageCircle,
+  Copy,
+  Check,
+  Share2,
+  AlertCircle,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import FollowUpDialog from "@/components/follow-up/follow-up-dialog";
+// import FollowUpDialog from "@/components/follow-up/follow-up-dialog";
 import SuccessDialog from "@/components/success-dialog";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
+  DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
+import { type Socket } from "socket.io-client";
+import { createAdminSocket } from "@/lib/socket";
+import { useAuthStore } from "@/modules/auth/auth.store";
 
 interface Message {
   id: string;
@@ -19,54 +31,239 @@ interface Message {
   timestamp: Date;
 }
 
-interface ApiMessage {
-  _id?: string;
-  content?: string;
-  role?: string;
-  timestamp?: string | number;
+interface ApiSession {
+  _id: string;
+  salesEmployeeId: string;
+  leadId: { _id: string; projectName: string } | null;
+  messages: Array<{
+    role: "user" | "assistant";
+    content: string;
+    timestamp?: string;
+  }>;
+  createdAt: string;
+  updatedAt: string;
 }
 
-import { useAiScriptSessionsQuery } from "@/modules/leads/leads.hooks";
-
 export default function AiScriptGeneratorPage() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const isHydrated = useAuthStore((state) => state.isHydrated);
+  const accessToken = useAuthStore((state) => state.accessToken);
+
   const [inputMessage, setInputMessage] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
-  const { data: aiData, isLoading: isAiLoading } = useAiScriptSessionsQuery();
+  const [apiSessions, setApiSessions] = useState<ApiSession[]>([]);
+  const [currentSessionMessages, setCurrentSessionMessages] = useState<
+    Message[]
+  >([]);
+  const [assistantBuffer, setAssistantBuffer] = useState("");
+  const [isAiTyping, setIsAiTyping] = useState(false);
+  const [socketError, setSocketError] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
-  const apiSessions = aiData?.data?.sessions ?? [];
-  const mappedApiMessages: Message[] | null = apiSessions.length
-    ? apiSessions[0].messages.map((m: ApiMessage) => ({
-        id: m._id ?? String(m.timestamp ?? ""),
-        text: m.content ?? "",
-        sender: m.role === "user" ? "user" : "ai",
-        timestamp: m.timestamp ? new Date(m.timestamp) : new Date(0),
-      }))
-    : null;
+  const socketRef = useRef<Socket | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const copyResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleSendMessage = () => {
-    if (inputMessage.trim()) {
-      const newMessage: Message = {
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "end",
+    });
+  }, [currentSessionMessages.length, assistantBuffer, isAiTyping]);
+
+  useEffect(() => {
+    return () => {
+      if (copyResetTimerRef.current) {
+        clearTimeout(copyResetTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isHydrated || !accessToken) return;
+
+    const socket = createAdminSocket(accessToken);
+
+    if (!socket) return;
+
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      setIsConnected(true);
+      setSocketError(null);
+
+      // Load sessions list
+      console.log("ai_script: requesting sessions list");
+      socket.emit("ai_script:list");
+    });
+
+    socket.on("disconnect", () => {
+      setIsConnected(false);
+    });
+
+    socket.on("connect_error", (err) => {
+      setIsConnected(false);
+      setSocketError(err.message || "Connection error");
+    });
+
+    // Merge incoming sessions with existing local sessions to avoid
+    // losing history if the server emits only a subset (e.g. last session).
+    socket.on(
+      "ai_script:sessions",
+      ({ sessions }: { sessions?: ApiSession[] }) => {
+        console.log("ai_script:sessions received", sessions);
+        if (!sessions) return;
+        setApiSessions((prev) => {
+          const map = new Map<string, ApiSession>(prev.map((s) => [s._id, s]));
+          sessions.forEach((s) => map.set(s._id, s));
+          const merged = Array.from(map.values());
+          console.log("apiSessions merged:", merged);
+          return merged;
+        });
+      },
+    );
+
+    socket.on(
+      "ai_script:session",
+      ({
+        sessionId,
+        messages,
+      }: {
+        sessionId: string;
+        messages: ApiSession["messages"];
+      }) => {
+        setActiveSessionId(sessionId);
+        const mappedMessages: Message[] = messages.map((m, i) => ({
+          id: `${m.timestamp || Date.now()}-${i}`,
+          text: m.content,
+          sender: m.role === "user" ? "user" : "ai",
+          timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
+        }));
+        setCurrentSessionMessages(mappedMessages);
+        setIsAiTyping(false);
+        setAssistantBuffer("");
+      },
+    );
+
+    socket.on("ai_script:typing", () => {
+      setAssistantBuffer("");
+      setIsAiTyping(true);
+    });
+
+    socket.on("ai_script:chunk", ({ delta }) => {
+      setAssistantBuffer((prev) => prev + delta);
+    });
+
+    socket.on("ai_script:done", ({ reply }) => {
+      setIsAiTyping(false);
+      const newMsg: Message = {
         id: Date.now().toString(),
-        text: inputMessage,
-        sender: "user",
+        text: reply,
+        sender: "ai",
         timestamp: new Date(),
       };
-      setMessages([...messages, newMessage]);
-      setInputMessage("");
+      setCurrentSessionMessages((prev) => [...prev, newMsg]);
+      setAssistantBuffer("");
 
-      // Simulate AI response
-      setTimeout(() => {
-        const aiResponse: Message = {
-          id: (Date.now() + 1).toString(),
-          text: "Thank you for your message. I'm processing your request...",
-          sender: "ai",
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, aiResponse]);
-      }, 1000);
+      // Refresh session list
+      socket.emit("ai_script:list");
+    });
+
+    socket.on("ai_script:error", ({ message }) => {
+      setIsAiTyping(false);
+      setAssistantBuffer("");
+      setSocketError(message);
+    });
+
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+    };
+    // Intentionally exclude `activeSessionId` so selecting a session doesn't
+    // force a socket reconnect and potentially lose the sessions list.
+  }, [isHydrated, accessToken]);
+
+  // const handleSessionSelect = (sessionId: string) => {
+  //   setActiveSessionId(sessionId);
+  //   setSocketError(null);
+  //   if (socketRef.current?.connected) {
+  //     socketRef.current.emit("ai_script:start", { sessionId });
+  //   }
+  // };
+
+  const handleCopyMessage = async (text: string, messageId: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedMessageId(messageId);
+
+      if (copyResetTimerRef.current) {
+        clearTimeout(copyResetTimerRef.current);
+      }
+
+      copyResetTimerRef.current = setTimeout(() => {
+        setCopiedMessageId((currentId) =>
+          currentId === messageId ? null : currentId,
+        );
+        copyResetTimerRef.current = null;
+      }, 2500);
+    } catch {
+      const fallbackInput = document.createElement("textarea");
+      fallbackInput.value = text;
+      fallbackInput.style.position = "fixed";
+      fallbackInput.style.opacity = "0";
+      document.body.appendChild(fallbackInput);
+      fallbackInput.focus();
+      fallbackInput.select();
+      document.execCommand("copy");
+      document.body.removeChild(fallbackInput);
+
+      setCopiedMessageId(messageId);
+
+      if (copyResetTimerRef.current) {
+        clearTimeout(copyResetTimerRef.current);
+      }
+
+      copyResetTimerRef.current = setTimeout(() => {
+        setCopiedMessageId((currentId) =>
+          currentId === messageId ? null : currentId,
+        );
+        copyResetTimerRef.current = null;
+      }, 2500);
     }
+  };
+
+  const handleShareMessage = async (text: string, messageId: string) => {
+    if (navigator.share) {
+      await navigator.share({
+        title: "AI Follow-Up Script",
+        text,
+      });
+      return;
+    }
+
+    await handleCopyMessage(text, messageId);
+  };
+
+  const handleSendMessage = () => {
+    if (!inputMessage.trim() || !socketRef.current?.connected) return;
+
+    const newMessage: Message = {
+      id: Date.now().toString(),
+      text: inputMessage,
+      sender: "user",
+      timestamp: new Date(),
+    };
+    setCurrentSessionMessages((prev) => [...prev, newMessage]);
+    setSocketError(null);
+
+    socketRef.current.emit("ai_script:message", {
+      ...(activeSessionId ? { sessionId: activeSessionId } : {}),
+      content: inputMessage,
+    });
+
+    setInputMessage("");
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -75,16 +272,64 @@ export default function AiScriptGeneratorPage() {
     }
   };
 
+  const sessionHistory = [...apiSessions]
+    .sort((left, right) => {
+      const rightDate = new Date(right.updatedAt || right.createdAt).getTime();
+      const leftDate = new Date(left.updatedAt || left.createdAt).getTime();
+      return rightDate - leftDate;
+    })
+    .map((session) => {
+      const lastMessage =
+        session.messages[session.messages.length - 1] ?? session.messages[0];
+      const leadName =
+        session.leadId && typeof session.leadId === "object"
+          ? (session.leadId.projectName ?? "Untitled lead")
+          : session.leadId
+            ? `Lead ${String(session.leadId)}`
+            : "Generic Script";
+
+      const snippet = (lastMessage?.content ?? "No messages yet")
+        .split(/\s+/)
+        .slice(0, 12)
+        .join(" ");
+
+      const fallbackTimestamp =
+        session.updatedAt ||
+        session.createdAt ||
+        lastMessage?.timestamp ||
+        new Date().toISOString();
+      const safeDateStr = isNaN(new Date(fallbackTimestamp).getTime())
+        ? new Date().toISOString()
+        : fallbackTimestamp;
+
+      return {
+        id: session._id,
+        leadName,
+        snippet,
+        time: new Date(safeDateStr).toLocaleString(),
+        messageCount: session.messages.length,
+        messages: session.messages,
+      };
+    });
+
+  // Do not auto-resolve to an existing session; default to starting a new chat
+  const resolvedActiveSessionId =
+    activeSessionId &&
+    sessionHistory.some((item) => item.id === activeSessionId)
+      ? activeSessionId
+      : null;
+
+  const mappedApiMessages = currentSessionMessages;
+
+  const isComposerDisabled = !isConnected;
+
   return (
     <div className="">
-      {/* Header */}
       <div className="bg-teal-400 text-white px-6 py-3 shadow-sm">
         <h1 className="text-lg font-medium">AI Follow-Up Script Generator</h1>
       </div>
 
-      {/* Main Content */}
-      <div className=" p-6">
-        {/* Chat Header */}
+      <div className="p-6">
         <Card className="bg-white shadow-sm mb-4 py-0">
           <div className="flex items-center justify-between px-4 py-3 border-b">
             <div className="flex items-center gap-2">
@@ -95,89 +340,75 @@ export default function AiScriptGeneratorPage() {
                   </Button>
                 </DropdownMenuTrigger>
 
-                <DropdownMenuContent className="w-120 p-2 bg-white rounded-lg shadow-md">
+                <DropdownMenuContent className="w-96 p-2 bg-white rounded-lg shadow-md">
+                  <div className="px-2 pb-2 pt-1 text-xs font-medium uppercase tracking-wide text-gray-500">
+                    Previous sessions
+                  </div>
                   <div className="space-y-2">
-                    {[
-                      {
-                        id: "m1",
-                        name: "Sarah Johnson",
-                        type: "mail",
-                        text: "Hi Sarah, Following up on our discussion about the implementation timeline...",
-                        time: "1 hour ago",
-                        tag: {
-                          label: "professional",
-                          color: "bg-blue-100 text-blue-700",
-                        },
-                      },
-                      {
-                        id: "m2",
-                        name: "Michael Chen",
-                        type: "phone",
-                        text: "Hi Michael, I hope you had a chance to review the demo video...",
-                        time: "3 hours ago",
-                        tag: {
-                          label: "friendly",
-                          color: "bg-green-100 text-green-700",
-                        },
-                      },
-                      {
-                        id: "m3",
-                        name: "Emily Davis",
-                        type: "mail",
-                        text: "Hi Emily, I wanted to reach out regarding the competitive analysis...",
-                        time: "5 hours ago",
-                        tag: {
-                          label: "urgent",
-                          color: "bg-red-100 text-red-700",
-                        },
-                      },
-                    ].map((item) => (
-                      <div
-                        key={item.id}
-                        className="border rounded-lg p-3 bg-white"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex  gap-3">
-                            <div className="flex  justify-center w-8 h-8 mt-1">
-                              {item.type === "mail" ? (
-                                <Mail className="w-4 h-4 text-gray-600" />
-                              ) : (
-                                <Phone className="w-4 h-4 text-gray-600" />
-                              )}
-                            </div>
-                            <div>
-                              <div className="flex items-center justify-between gap-2">
-                                <h4 className="text-sm font-medium text-gray-900">
-                                  {item.name}
-                                </h4>
-                                <span
-                                  className={`ml-2 rounded-full px-2 py-0.5 text-xs font-medium ${item.tag.color}`}
-                                >
-                                  {item.tag.label}
-                                </span>
+                    {sessionHistory.length ? (
+                      sessionHistory.map((item) => (
+                        <DropdownMenuItem
+                          key={item.id}
+                          className={cn(
+                            "flex w-full cursor-pointer flex-col items-stretch rounded-lg border p-3 outline-none",
+                            resolvedActiveSessionId === item.id
+                              ? "border-blue-200 bg-blue-50"
+                              : "border-gray-200 bg-white",
+                          )}
+                          onSelect={() => {
+                            setActiveSessionId(item.id);
+                            setSocketError(null);
+                            if (socketRef.current?.connected) {
+                              socketRef.current.emit("ai_script:start", {
+                                sessionId: item.id,
+                              });
+                            }
+                          }}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex min-w-0 gap-3">
+                              <div className="mt-1 flex h-8 w-8 items-center justify-center rounded-full bg-gray-100">
+                                <MessageCircle className="h-4 w-4 text-gray-600" />
                               </div>
-                              <p className="text-sm text-gray-600 truncate max-w-100 whitespace-pre-wrap">
-                                {item.text}
-                              </p>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <h4 className="truncate text-sm font-medium text-gray-900">
+                                    {item.leadName}
+                                  </h4>
+                                  {resolvedActiveSessionId === item.id ? (
+                                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                                      Open
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <p className="mt-1 line-clamp-2 text-sm text-gray-600">
+                                  {item.snippet}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                              {item.messageCount}
+                            </span>
+                          </div>
+
+                          <div className="mt-3 flex items-center justify-between text-xs text-gray-400">
+                            <span>{item.time}</span>
+                            <div className="flex items-center gap-2">
+                              <button className="rounded p-1 hover:bg-gray-100">
+                                <Copy className="h-4 w-4 text-gray-500" />
+                              </button>
+                              <button className="rounded p-1 hover:bg-gray-100">
+                                <Send className="h-4 w-4 text-gray-500" />
+                              </button>
                             </div>
                           </div>
-                        </div>
-
-                        <div className="mt-3 flex items-center justify-between">
-                          <span className="text-xs text-gray-400">
-                            {item.time}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <button className="p-1 rounded hover:bg-gray-100">
-                              <Copy className="w-4 h-4 text-gray-500" />
-                            </button>
-                            <button className="p-1 rounded hover:bg-gray-100">
-                              <Send className="w-4 h-4 text-gray-500" />
-                            </button>
-                          </div>
-                        </div>
+                        </DropdownMenuItem>
+                      ))
+                    ) : (
+                      <div className="rounded-lg border border-dashed border-gray-200 p-4 text-sm text-gray-500">
+                        No chat history yet.
                       </div>
-                    ))}
+                    )}
                   </div>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -186,7 +417,7 @@ export default function AiScriptGeneratorPage() {
               </h2>
             </div>
 
-            <FollowUpDialog
+            {/* <FollowUpDialog
               showClientSelector={true}
               onFollowUp={() => setShowSuccess(true)}
             >
@@ -194,85 +425,134 @@ export default function AiScriptGeneratorPage() {
                 <Sparkles className="h-4 w-4" />
                 Use Script
               </Button>
-            </FollowUpDialog>
+            </FollowUpDialog> */}
           </div>
 
-          {/* Messages Container */}
-          <div className="p-6 space-y-4 min-h-125 max-h-125 overflow-y-auto">
-            {isAiLoading ? (
-              <div className="space-y-3">
-                {[...Array(6)].map((_, i) => (
-                  <div
-                    key={i}
-                    className={cn(
-                      "max-w-[60%] rounded-lg px-4 py-3 animate-pulse bg-gray-200",
-                    )}
-                  />
-                ))}
+          <div className="p-6 space-y-4 min-h-[50vh] max-h-[100vh-160px] overflow-y-auto">
+            {!isConnected && !socketError && (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
+                Connecting to the script generator. This may take a moment...
               </div>
-            ) : mappedApiMessages ? (
-              mappedApiMessages.map((message) => (
-                <div
-                  key={message.id}
-                  className={cn(
-                    "flex",
-                    message.sender === "user" ? "justify-start" : "justify-end",
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "max-w-[80%] rounded-lg px-4 py-3",
-                      message.sender === "user"
-                        ? "bg-gray-200 text-gray-900"
-                        : "bg-blue-600 text-white",
-                    )}
-                  >
-                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                      {message.text}
-                    </p>
-                  </div>
-                </div>
-              ))
-            ) : (
-              messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={cn(
-                    "flex",
-                    message.sender === "user" ? "justify-start" : "justify-end",
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "max-w-[80%] rounded-lg px-4 py-3",
-                      message.sender === "user"
-                        ? "bg-gray-200 text-gray-900"
-                        : "bg-blue-600 text-white",
-                    )}
-                  >
-                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                      {message.text}
-                    </p>
-                  </div>
-                </div>
-              ))
             )}
+
+            {socketError && (
+              <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{socketError}</span>
+              </div>
+            )}
+
+            {isConnected &&
+              mappedApiMessages.length === 0 &&
+              !isAiTyping &&
+              !socketError && (
+                <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-14 text-center">
+                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white text-slate-400 shadow-sm">
+                    <MessageCircle className="h-5 w-5" />
+                  </div>
+                  <div className="font-medium text-gray-700">
+                    No messages yet
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    Start the conversation to generate a script.
+                  </div>
+                </div>
+              )}
+
+            {mappedApiMessages?.map((message) => (
+              <div
+                key={message.id}
+                className={cn(
+                  "flex",
+                  message.sender === "user" ? "justify-end" : "justify-start",
+                )}
+              >
+                <div className="max-w-[80%]">
+                  <div
+                    className={cn(
+                      " rounded-lg px-4 py-3",
+                      message.sender === "user"
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-100 text-gray-900",
+                    )}
+                  >
+                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                      {message.text}
+                    </p>
+                  </div>
+
+                  {message.sender === "ai" && message.text && (
+                    <div className="mt-1 flex items-center justify-end gap-1 opacity-70">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() =>
+                          handleCopyMessage(message.text, message.id)
+                        }
+                        aria-label="Copy message"
+                      >
+                        {copiedMessageId === message.id ? (
+                          <Check className="h-3 w-3" />
+                        ) : (
+                          <Copy className="h-3 w-3" />
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() =>
+                          handleShareMessage(message.text, message.id)
+                        }
+                      >
+                        <Share2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {isAiTyping && (
+              <div className="flex justify-start">
+                <div className="max-w-[80%]">
+                  <div className="rounded-lg px-4 py-3 bg-gray-100 text-gray-900 min-h-11">
+                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                      {assistantBuffer}
+                      {isAiTyping && (
+                        <span className="inline-block w-1.5 h-4 ml-1 bg-gray-400 animate-pulse align-middle" />
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Area */}
           <div className="px-4 py-3 border-t bg-gray-50">
             <div className="flex items-center gap-2">
               <Input
                 type="text"
-                placeholder="Type your message..."
+                placeholder={
+                  isComposerDisabled
+                    ? "Connecting to socket..."
+                    : "Type your message..."
+                }
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
                 className="flex-1 bg-white"
+                disabled={isComposerDisabled}
               />
               <Button
                 onClick={handleSendMessage}
                 className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
+                disabled={isComposerDisabled}
               >
                 <Send className="h-4 w-4" />
                 Send
@@ -280,6 +560,7 @@ export default function AiScriptGeneratorPage() {
             </div>
           </div>
         </Card>
+
         <SuccessDialog
           open={showSuccess}
           onClose={() => setShowSuccess(false)}
