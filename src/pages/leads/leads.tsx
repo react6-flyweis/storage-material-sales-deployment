@@ -29,7 +29,6 @@ import {
   TableRow,
   TableCell,
 } from "@/components/ui/table";
-import ChatDialog from "@/components/leads/chat-dialog";
 import MoveToOrdersDialog from "@/components/leads/move-to-orders-dialog";
 import SuccessDialog from "@/components/success-dialog";
 import ProgressDots from "@/components/ui/progress-dots";
@@ -472,20 +471,17 @@ export default function LeadsPage() {
                       </TableCell>
 
                       <TableCell className="">
-                        <ChatDialog
-                          lead={lead}
-                          trigger={
-                            <button className="flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-600">
-                              <MessageSquare className="h-4 w-4" />
-                              <span className="text-sm">Chat</span>
-                              {lead.chatCount > 0 && (
-                                <span className="ml-2 inline-flex items-center justify-center h-5 w-5 rounded-full bg-red-500 text-white text-xs">
-                                  {lead.chatCount}
-                                </span>
-                              )}
-                            </button>
-                          }
-                        />
+                        <Link to={`/leads/${lead.id}?tab=chat`}>
+                          <button className="flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-600">
+                            <MessageSquare className="h-4 w-4" />
+                            <span className="text-sm">Chat</span>
+                            {lead.chatCount > 0 && (
+                              <span className="ml-2 inline-flex items-center justify-center h-5 w-5 rounded-full bg-red-500 text-white text-xs">
+                                {lead.chatCount}
+                              </span>
+                            )}
+                          </button>
+                        </Link>
                       </TableCell>
 
                       <TableCell className="">
