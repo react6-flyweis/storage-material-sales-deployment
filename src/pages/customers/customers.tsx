@@ -218,9 +218,6 @@ export default function CustomersPage() {
                 </Button>
               }
             /> */}
-            <Button size="lg" className="">
-              Add New Customer
-            </Button>
           </div>
         </div>
 
