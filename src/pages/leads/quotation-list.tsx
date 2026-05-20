@@ -206,7 +206,11 @@ export default function QuotationListPage() {
           </div>
         }
         subtitle="Manage your assigned leads and track their progress."
-        action={<Button>Create New Inquiry</Button>}
+        action={
+          <Link to="/leads/new-inquiry">
+            <Button>Create New Inquiry</Button>
+          </Link>
+        }
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

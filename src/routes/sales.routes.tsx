@@ -99,6 +99,7 @@ const PurchaseOrderDetails = lazy(
 );
 const QuotationList = lazy(() => import("@/pages/leads/quotation-list"));
 const QuotationDetails = lazy(() => import("@/pages/leads/quotation-details"));
+const NewInquiry = lazy(() => import("@/pages/leads/new-inquiry"));
 
 // Invoice section
 const InvoiceForm = lazy(() => import("@/pages/invoices/invoice-form"));
@@ -140,6 +141,7 @@ export const salesRoutes: RouteObject[] = [
                 path: "request-delivery-change",
                 element: <RequestDeliveryChange />,
               },
+              { path: "projects/:id", element: <ProjectDetails /> },
               // /customers/meetings routes
               // /customers/:id routes
               {
@@ -147,7 +149,6 @@ export const salesRoutes: RouteObject[] = [
                 children: [
                   { index: true, element: <CustomerInfo /> },
                   { path: "contracts/:id", element: <ContractDetail /> },
-                  { path: "project-details", element: <ProjectDetails /> },
                   { path: "project-invoices", element: <ProjectInvoices /> },
                   { path: "project-quotation", element: <ProjectQuotation /> },
                   { path: "project-payments", element: <ProjectPayments /> },
@@ -178,6 +179,7 @@ export const salesRoutes: RouteObject[] = [
                 ],
               },
               { path: "quotation-list", element: <QuotationList /> },
+              { path: "new-inquiry", element: <NewInquiry /> },
               { path: "quotation-details", element: <QuotationDetails /> },
               { path: "quotation-details/:id", element: <QuotationDetails /> },
 
