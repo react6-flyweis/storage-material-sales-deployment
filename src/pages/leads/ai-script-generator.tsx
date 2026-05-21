@@ -2,15 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import {
-  Send,
-  Menu,
-  MessageCircle,
-  Copy,
-  Check,
-  Share2,
-  AlertCircle,
-} from "lucide-react";
+import { Send, Menu, MessageCircle, Copy, AlertCircle } from "lucide-react";
+import MessageItem from "@/components/message-item";
 import { cn } from "@/lib/utils";
 // import FollowUpDialog from "@/components/follow-up/follow-up-dialog";
 import SuccessDialog from "@/components/success-dialog";
@@ -60,11 +53,9 @@ export default function AiScriptGeneratorPage() {
   const [isAiTyping, setIsAiTyping] = useState(false);
   const [socketError, setSocketError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const copyResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({
@@ -72,14 +63,6 @@ export default function AiScriptGeneratorPage() {
       block: "end",
     });
   }, [currentSessionMessages.length, assistantBuffer, isAiTyping]);
-
-  useEffect(() => {
-    return () => {
-      if (copyResetTimerRef.current) {
-        clearTimeout(copyResetTimerRef.current);
-      }
-    };
-  }, []);
 
   useEffect(() => {
     if (!isHydrated || !accessToken) return;
@@ -192,59 +175,6 @@ export default function AiScriptGeneratorPage() {
   //     socketRef.current.emit("ai_script:start", { sessionId });
   //   }
   // };
-
-  const handleCopyMessage = async (text: string, messageId: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedMessageId(messageId);
-
-      if (copyResetTimerRef.current) {
-        clearTimeout(copyResetTimerRef.current);
-      }
-
-      copyResetTimerRef.current = setTimeout(() => {
-        setCopiedMessageId((currentId) =>
-          currentId === messageId ? null : currentId,
-        );
-        copyResetTimerRef.current = null;
-      }, 2500);
-    } catch {
-      const fallbackInput = document.createElement("textarea");
-      fallbackInput.value = text;
-      fallbackInput.style.position = "fixed";
-      fallbackInput.style.opacity = "0";
-      document.body.appendChild(fallbackInput);
-      fallbackInput.focus();
-      fallbackInput.select();
-      document.execCommand("copy");
-      document.body.removeChild(fallbackInput);
-
-      setCopiedMessageId(messageId);
-
-      if (copyResetTimerRef.current) {
-        clearTimeout(copyResetTimerRef.current);
-      }
-
-      copyResetTimerRef.current = setTimeout(() => {
-        setCopiedMessageId((currentId) =>
-          currentId === messageId ? null : currentId,
-        );
-        copyResetTimerRef.current = null;
-      }, 2500);
-    }
-  };
-
-  const handleShareMessage = async (text: string, messageId: string) => {
-    if (navigator.share) {
-      await navigator.share({
-        title: "AI Follow-Up Script",
-        text,
-      });
-      return;
-    }
-
-    await handleCopyMessage(text, messageId);
-  };
 
   const handleSendMessage = () => {
     if (!inputMessage.trim() || !socketRef.current?.connected) return;
@@ -460,60 +390,7 @@ export default function AiScriptGeneratorPage() {
               )}
 
             {mappedApiMessages?.map((message) => (
-              <div
-                key={message.id}
-                className={cn(
-                  "flex",
-                  message.sender === "user" ? "justify-end" : "justify-start",
-                )}
-              >
-                <div className="max-w-[80%]">
-                  <div
-                    className={cn(
-                      " rounded-lg px-4 py-3",
-                      message.sender === "user"
-                        ? "bg-blue-600 text-white"
-                        : "bg-gray-100 text-gray-900",
-                    )}
-                  >
-                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                      {message.text}
-                    </p>
-                  </div>
-
-                  {message.sender === "ai" && message.text && (
-                    <div className="mt-1 flex items-center justify-end gap-1 opacity-70">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() =>
-                          handleCopyMessage(message.text, message.id)
-                        }
-                        aria-label="Copy message"
-                      >
-                        {copiedMessageId === message.id ? (
-                          <Check className="h-3 w-3" />
-                        ) : (
-                          <Copy className="h-3 w-3" />
-                        )}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() =>
-                          handleShareMessage(message.text, message.id)
-                        }
-                      >
-                        <Share2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <MessageItem key={message.id} message={message} />
             ))}
 
             {isAiTyping && (
