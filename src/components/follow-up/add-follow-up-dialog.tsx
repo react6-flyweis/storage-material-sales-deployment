@@ -46,6 +46,7 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   initialDate?: string | null;
   leadId?: string | null;
+  onSuccess?: () => void;
 };
 
 const defaultFormValues = {
@@ -63,6 +64,7 @@ export default function AddFollowUpDialog({
   onOpenChange,
   initialDate,
   leadId,
+  onSuccess,
 }: Props) {
   const [showSuccess, setShowSuccess] = useState(false);
   const {
@@ -85,6 +87,8 @@ export default function AddFollowUpDialog({
   const notes = useWatch({ control, name: "notes" });
 
   const createFollowUp = useCreateFollowUpMutation();
+
+  const today = new Date().toISOString().split("T")[0];
 
   useEffect(() => {
     if (!open) {
@@ -114,6 +118,14 @@ export default function AddFollowUpDialog({
 
   const onSubmit = async (data: FollowUpFormData) => {
     const followUpDate = new Date(`${data.date}T${data.time}`).toISOString();
+
+    // Prevent scheduling follow-ups in the past
+    if (new Date(followUpDate) < new Date()) {
+      setError("date", {
+        message: "Follow-up date/time must be in the future.",
+      });
+      return;
+    }
 
     const payload = {
       leadId: data.leadId,
@@ -146,6 +158,13 @@ export default function AddFollowUpDialog({
 
         <form onSubmit={handleSubmit(onSubmit)}>
           <div className="p-4 space-y-4">
+            {errors.root && (
+              <div className="mb-2">
+                <FieldError>
+                  {errors.root.message as unknown as string}
+                </FieldError>
+              </div>
+            )}
             <Field>
               <FieldLabel>Client Name *</FieldLabel>
               <FieldContent>
@@ -164,6 +183,11 @@ export default function AddFollowUpDialog({
                 />
                 {errors.leadId && (
                   <FieldError>{errors.leadId.message}</FieldError>
+                )}
+                {errors.customerId && (
+                  <FieldError>
+                    {errors.customerId.message as unknown as string}
+                  </FieldError>
                 )}
               </FieldContent>
             </Field>
@@ -194,7 +218,7 @@ export default function AddFollowUpDialog({
             <Field>
               <FieldLabel>Follow-up Date *</FieldLabel>
               <FieldContent>
-                <Input type="date" {...register("date")} />
+                <Input type="date" {...register("date")} min={today} />
                 {errors.date && <FieldError>{errors.date.message}</FieldError>}
               </FieldContent>
             </Field>
@@ -274,7 +298,10 @@ export default function AddFollowUpDialog({
       </DialogContent>
       <SuccessDialog
         open={showSuccess}
-        onClose={() => setShowSuccess(false)}
+        onClose={() => {
+          setShowSuccess(false);
+          onSuccess?.();
+        }}
         title="Follow-up Added Successfully!"
       />
     </Dialog>
