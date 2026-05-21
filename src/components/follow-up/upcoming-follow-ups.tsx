@@ -74,7 +74,7 @@ export default function UpcomingFollowUps({ onScheduleFollowUp }: Props) {
       hour: "2-digit",
       minute: "2-digit",
     });
-    const customer = f.customerId?.firstName || "Unknown";
+    const customer = f.leadId?.projectName || "N/A";
     const type =
       f.modeOfContact === "call"
         ? "Call"
@@ -103,6 +103,15 @@ export default function UpcomingFollowUps({ onScheduleFollowUp }: Props) {
 
   const mappedFollowUps = apiFollowUps.map(apiToFollowUp);
 
+  // Sort follow-ups by date (soonest first) and prepare helpers
+  const sortedFollowUps = mappedFollowUps
+    .slice()
+    .sort(
+      (a, b) =>
+        new Date(a.fullDate || a.date).getTime() -
+        new Date(b.fullDate || b.date).getTime(),
+    );
+
   const now = new Date();
   const startOfToday = new Date(
     now.getFullYear(),
@@ -110,11 +119,16 @@ export default function UpcomingFollowUps({ onScheduleFollowUp }: Props) {
     now.getDate(),
   );
   const getFollowUpForDay = (day: number) =>
-    mappedFollowUps.filter((f) => parseInt(f.date) === day);
+    sortedFollowUps.filter((f) => parseInt(f.date) === day);
 
   const filteredFollowUps = selectedDay
-    ? mappedFollowUps.filter((f) => parseInt(f.date) === selectedDay)
-    : mappedFollowUps;
+    ? sortedFollowUps.filter((f) => parseInt(f.date) === selectedDay)
+    : sortedFollowUps;
+
+  // Only show the recent 4 when not viewing a specific day
+  const displayFollowUps = selectedDay
+    ? filteredFollowUps
+    : filteredFollowUps.slice(0, 4);
 
   return (
     <Card className="p-6">
@@ -269,7 +283,7 @@ export default function UpcomingFollowUps({ onScheduleFollowUp }: Props) {
               No follow-ups for this date
             </div>
           ) : (
-            filteredFollowUps.map((followUp) => {
+            displayFollowUps.map((followUp) => {
               const isOverdue = followUp.status === "overdue";
               const isUpcoming = followUp.status === "upcoming";
 
