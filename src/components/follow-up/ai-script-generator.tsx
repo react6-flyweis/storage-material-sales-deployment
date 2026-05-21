@@ -164,7 +164,7 @@ export default function AiScriptGenerator() {
             ))}
           </>
         ) : (
-          items.map((it) => {
+          items.slice(-3).map((it) => {
             const Icon = it.icon;
             return (
               <div
