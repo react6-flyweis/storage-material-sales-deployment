@@ -187,7 +187,11 @@ export default function LeadDetails() {
               <BasicDetails lead={detail} />
             </TabsContent>
             <TabsContent value="quotation" className="mt-6">
-              <QuotationCard />
+              <QuotationCard
+                quotation={detail?.quotations.find((q) => q.isLatest) ?? detail?.quotations[0]}
+                lead={detail?.lead}
+                customer={detail?.customer}
+              />
             </TabsContent>
             <TabsContent value="chat" className="mt-6">
               <ChatCard lead={lead} recentMessages={detail?.recentMessages} />
