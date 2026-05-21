@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useParams } from "react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import AddFollowUpDialog from "@/components/follow-up/add-follow-up-dialog";
 import {
   formatAuditAction,
@@ -101,6 +102,7 @@ export default function FollowUpsCard({
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [initialDate] = useState<string | null>(null);
   const { leadId } = useParams<{ leadId?: string }>();
+  const queryClient = useQueryClient();
 
   const activityEntries = useMemo(() => {
     const entries = [...auditLog].sort(
@@ -386,6 +388,13 @@ export default function FollowUpsCard({
         onOpenChange={(o) => setAddDialogOpen(o)}
         initialDate={initialDate}
         leadId={leadId ?? null}
+        onSuccess={() => {
+          if (leadId) {
+            void queryClient.invalidateQueries({
+              queryKey: ["sales", "leads", "detail", leadId],
+            });
+          }
+        }}
       />
     </>
   );
