@@ -1,10 +1,23 @@
-import quotationImage from "@/assets/images/quotation.png";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import { useNavigate } from "react-router";
+import { useNavigate, useParams } from "react-router";
+import QuotationCard, {
+  QuotationCardSkeleton,
+} from "@/components/leads/quotation-card";
+import { useLeadDetailQuery } from "@/modules/leads/leads.hooks";
 
 export default function ProjectQuotationPage() {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { data: response, isLoading } = useLeadDetailQuery(id);
+
+  if (isLoading) {
+    return <QuotationCardSkeleton />;
+  }
+
+  const detail = response?.success ? response.data : undefined;
+  const latestQuotation =
+    detail?.quotations.find((q) => q.isLatest) ?? detail?.quotations[0];
 
   return (
     <div className="space-y-6 p-6">
@@ -13,19 +26,22 @@ export default function ProjectQuotationPage() {
         <Button
           variant="default"
           onClick={() => navigate(-1)}
-          className="px-4 bg-[#3B82F6] hover:bg-[#2563EB] text-white"
+          className="px-4 font-sans"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
-        <h1 className="text-3xl font-bold text-[#0F172A]">
-          Project 1 - Quotation
+        <h1 className="text-3xl font-bold text-[#0F172A] font-sans">
+          {detail?.lead.projectName || "Project"} - Quotation
         </h1>
       </div>
 
-      <div className="overflow-x-auto">
-        <img src={quotationImage} alt="Quotation" className="w-full h-auto" />
-      </div>
+      {/* Slides Container Stack */}
+      <QuotationCard
+        quotation={latestQuotation}
+        lead={detail?.lead}
+        customer={detail?.customer}
+      />
     </div>
   );
 }
