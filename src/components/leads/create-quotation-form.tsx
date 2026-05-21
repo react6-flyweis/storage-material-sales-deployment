@@ -11,6 +11,10 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import ColorSelector, {
+  DEFAULT_COLORS,
+  ROOF_COLORS,
+} from "@/components/color-selector";
 import {
   Select,
   SelectContent,
@@ -41,6 +45,12 @@ type CreateQuotationFormValues = {
   roofStyle: "gable" | "gambrel" | "hip" | "flat";
   windLoad: number;
   snowLoad: number;
+  roofPanelType?: string;
+  wallPanelType?: string;
+  roofColor?: string;
+  wallColor?: string;
+  trimColor?: string;
+  baseAngleColor?: string;
   estimatedDelivery: string;
   basePrice: number;
   margin: string;
@@ -134,6 +144,12 @@ export default function CreateQuotationForm({
             roofStyle: "gable",
             windLoad: 0,
             snowLoad: 0,
+            roofPanelType: "",
+            wallPanelType: "",
+            roofColor: "",
+            wallColor: "",
+            trimColor: "",
+            baseAngleColor: "",
             estimatedDelivery: "",
             basePrice: 0,
             margin: "",
@@ -165,6 +181,12 @@ export default function CreateQuotationForm({
             roofStyle: "gable",
             windLoad: 120,
             snowLoad: 20,
+            roofPanelType: "Default",
+            wallPanelType: "Default",
+            roofColor: "Default",
+            wallColor: "Default",
+            trimColor: "Default",
+            baseAngleColor: "Default",
             estimatedDelivery: "4-6 weeks",
             basePrice: 24500,
             margin: "20%",
@@ -217,6 +239,12 @@ export default function CreateQuotationForm({
       preparedBy: values.preparedBy,
       leftEaveHeight: 24,
       rightEaveHeight: 24,
+      roofPanelType: values.roofPanelType || "",
+      wallPanelType: values.wallPanelType || "",
+      roofColor: values.roofColor || "",
+      wallColor: values.wallColor || "",
+      trimColor: values.trimColor || "",
+      baseAngleColor: values.baseAngleColor || "",
       roofSlope: "1:12",
       frameType: "Clear Span",
       endwallType: "Post & Beam",
@@ -224,10 +252,6 @@ export default function CreateQuotationForm({
       purlinType: "Z Purlin",
       bracingType: "Cross Bracing",
       roofPanel: "PBR 26 Gauge",
-      wallPanelType: "PBR 26 Gauge",
-      roofColor: "Galvalume",
-      wallColor: "Polar White",
-      trimColor: "Brite Red",
       baseAngle: "3x3x1/4",
       insulation: defaultInsuranceItems,
       shippingCost: 8000,
@@ -777,72 +801,107 @@ export default function CreateQuotationForm({
               <Label className="text-xs">
                 Roof Panel Type <span className="text-red-500">*</span>
               </Label>
-              <div className="flex gap-2 p-2 border rounded-md h-9 items-center">
-                <div className="w-5 h-5 rounded-full bg-gray-200 border border-gray-400" />
-                <div className="w-5 h-5 rounded-full bg-blue-600" />
-                <div className="w-5 h-5 rounded-full bg-red-600" />
-                <div className="w-5 h-5 rounded-full bg-green-600" />
-                <div className="w-5 h-5 rounded-full bg-orange-500" />
-              </div>
+              <Controller
+                name="roofPanelType"
+                control={control}
+                rules={{ required: "Roof panel type is required" }}
+                render={({ field }) => (
+                  <ColorSelector
+                    colors={DEFAULT_COLORS}
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+              <FieldError errors={[errors.roofPanelType]} />
             </div>
             <div className="">
               <Label className="text-xs">
                 Wall Panel Type <span className="text-red-500">*</span>
               </Label>
-              <div className="flex gap-2 p-2 border rounded-md h-9 items-center">
-                <div className="w-5 h-5 rounded-full bg-gray-200 border border-gray-400" />
-                <div className="w-5 h-5 rounded-full bg-blue-600" />
-                <div className="w-5 h-5 rounded-full bg-red-600" />
-                <div className="w-5 h-5 rounded-full bg-green-600" />
-                <div className="w-5 h-5 rounded-full bg-orange-500" />
-              </div>
+              <Controller
+                name="wallPanelType"
+                control={control}
+                rules={{ required: "Wall panel type is required" }}
+                render={({ field }) => (
+                  <ColorSelector
+                    colors={DEFAULT_COLORS}
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+              <FieldError errors={[errors.wallPanelType]} />
             </div>
             <div className="">
               <Label className="text-xs">Roof Color</Label>
-              <div className="flex gap-2 p-2 border rounded-md h-9 items-center">
-                <div className="w-5 h-5 rounded-full bg-gray-200 border border-black" />
-                <div className="w-5 h-5 rounded-full bg-blue-600" />
-                <div className="w-5 h-5 rounded-full bg-slate-600" />
-                <div className="w-5 h-5 rounded-full bg-red-600" />
-                <div className="w-5 h-5 rounded-full bg-orange-500" />
-              </div>
+              <Controller
+                name="roofColor"
+                control={control}
+                render={({ field }) => (
+                  <ColorSelector
+                    colors={ROOF_COLORS}
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+              <FieldError errors={[errors.roofColor]} />
             </div>
 
             <div className="">
               <Label className="text-xs">
                 Wall Color <span className="text-red-500">*</span>
               </Label>
-              <div className="flex gap-2 p-2 border rounded-md h-9 items-center">
-                <div className="w-5 h-5 rounded-full bg-gray-200 border border-gray-400" />
-                <div className="w-5 h-5 rounded-full bg-green-600" />
-                <div className="w-5 h-5 rounded-full bg-red-600" />
-                <div className="w-5 h-5 rounded-full bg-blue-600" />
-                <div className="w-5 h-5 rounded-full bg-orange-500" />
-              </div>
+              <Controller
+                name="wallColor"
+                control={control}
+                rules={{ required: "Wall color is required" }}
+                render={({ field }) => (
+                  <ColorSelector
+                    colors={DEFAULT_COLORS}
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+              <FieldError errors={[errors.wallColor]} />
             </div>
             <div className="">
               <Label className="text-xs">
                 Trim Color <span className="text-red-500">*</span>
               </Label>
-              <div className="flex gap-2 p-2 border rounded-md h-9 items-center">
-                <div className="w-5 h-5 rounded-full bg-gray-200 border border-gray-400" />
-                <div className="w-5 h-5 rounded-full bg-green-600" />
-                <div className="w-5 h-5 rounded-full bg-red-600" />
-                <div className="w-5 h-5 rounded-full bg-blue-600" />
-                <div className="w-5 h-5 rounded-full bg-orange-500" />
-              </div>
+              <Controller
+                name="trimColor"
+                control={control}
+                rules={{ required: "Trim color is required" }}
+                render={({ field }) => (
+                  <ColorSelector
+                    colors={DEFAULT_COLORS}
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+              <FieldError errors={[errors.trimColor]} />
             </div>
             <div className="">
               <Label className="text-xs">
                 Base Angle <span className="text-red-500">*</span>
               </Label>
-              <div className="flex gap-2 p-2 border rounded-md h-9 items-center">
-                <div className="w-5 h-5 rounded-full bg-gray-200 border border-black" />
-                <div className="w-5 h-5 rounded-full bg-blue-600" />
-                <div className="w-5 h-5 rounded-full bg-slate-600" />
-                <div className="w-5 h-5 rounded-full bg-red-600" />
-                <div className="w-5 h-5 rounded-full bg-orange-500" />
-              </div>
+              <Controller
+                name="baseAngleColor"
+                control={control}
+                rules={{ required: "Base angle color is required" }}
+                render={({ field }) => (
+                  <ColorSelector
+                    colors={ROOF_COLORS}
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+              <FieldError errors={[errors.baseAngleColor]} />
             </div>
           </div>
         </div>
