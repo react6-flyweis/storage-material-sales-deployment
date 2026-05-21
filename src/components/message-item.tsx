@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import rehypeRaw from "rehype-raw";
-import rehypeSanitize from "rehype-sanitize";
 import { Button } from "@/components/ui/button";
 import { Copy, Check, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -74,23 +72,40 @@ export default function MessageItem({ message }: { message: Message }) {
           )}
         >
           {isAi ? (
-            <div className="prose max-w-none text-sm leading-relaxed">
+            <div className="prose max-w-none text-sm leading-relaxed markdown-body">
               <ReactMarkdown
                 children={message.text}
                 remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeRaw, rehypeSanitize]}
                 components={{
+                  p: ({ node, ...props }) => (
+                    <p
+                      className="text-sm leading-relaxed whitespace-pre-wrap"
+                      {...props}
+                    />
+                  ),
+                  ul: ({ node, ...props }) => (
+                    <ul className="pl-5 my-2 list-disc" {...props} />
+                  ),
+                  ol: ({ node, ...props }) => (
+                    <ol className="pl-5 my-2 list-decimal" {...props} />
+                  ),
+                  blockquote: ({ node, ...props }) => (
+                    <blockquote
+                      className="pl-3 border-l-2 border-gray-200 italic my-2"
+                      {...props}
+                    />
+                  ),
                   // eslint-disable-next-line
                   code({ node, inline, className, children, ...props }) {
                     if (inline) {
                       return (
-                        <code className="bg-gray-100 px-1 rounded" {...props}>
+                        <code className="inline-code" {...props}>
                           {children}
                         </code>
                       );
                     }
                     return (
-                      <pre className="whitespace-pre-wrap bg-gray-900 text-white p-2 rounded">
+                      <pre className="code-block">
                         <code {...props}>{children}</code>
                       </pre>
                     );
