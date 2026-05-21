@@ -167,7 +167,12 @@ const defaultQuotationData = {
   },
 
   // Slide 10 (Doors & Options)
-  doorsTable: [] as Array<{ doorType: string; size: string; qty: string; cost: string }>,
+  doorsTable: [] as Array<{
+    doorType: string;
+    size: string;
+    qty: string;
+    cost: string;
+  }>,
   additionalOptions: [] as string[],
 
   // Slide 11 (Terms & Conditions)
@@ -291,7 +296,11 @@ const materialConfigs = [
   },
 ];
 
-export default function QuotationCard({ quotation, lead, customer }: QuotationCardProps) {
+export default function QuotationCard({
+  quotation,
+  lead,
+  customer,
+}: QuotationCardProps) {
   // Let's resolve formatted values
   const dateStr = quotation?.createdAt
     ? new Date(quotation.createdAt).toLocaleDateString("en-US", {
@@ -343,9 +352,10 @@ export default function QuotationCard({ quotation, lead, customer }: QuotationCa
         totalCogs: quotation?.basePrice
           ? `$ ${quotation.basePrice.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
           : "—",
-        cogsPsf: quotation?.basePrice && lead?.sqft
-          ? `$ ${(quotation.basePrice / Number(lead.sqft)).toFixed(2)}`
-          : "—",
+        cogsPsf:
+          quotation?.basePrice && lead?.sqft
+            ? `$ ${(quotation.basePrice / Number(lead.sqft)).toFixed(2)}`
+            : "—",
       },
       cogsTable: quotation?.includedMaterials?.length
         ? quotation.includedMaterials.map((mat) => ({
@@ -357,31 +367,36 @@ export default function QuotationCard({ quotation, lead, customer }: QuotationCa
         {
           description: "Total COGS",
           rate: "-",
-          psf: quotation?.basePrice && lead?.sqft
-            ? `$ ${(quotation.basePrice / Number(lead.sqft)).toFixed(2)}`
-            : "—",
+          psf:
+            quotation?.basePrice && lead?.sqft
+              ? `$ ${(quotation.basePrice / Number(lead.sqft)).toFixed(2)}`
+              : "—",
           amount: quotation?.basePrice
             ? `$${quotation.basePrice.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
             : "—",
         },
         {
           description: "Markup",
-          rate: quotation?.basePrice && quotation?.maxPrice
-            ? `${Math.round(((quotation.maxPrice - quotation.basePrice) / quotation.basePrice) * 100)}%`
-            : "—",
-          psf: quotation?.basePrice && quotation?.maxPrice && lead?.sqft
-            ? `$ ${((quotation.maxPrice - quotation.basePrice) / Number(lead.sqft)).toFixed(2)}`
-            : "—",
-          amount: quotation?.basePrice && quotation?.maxPrice
-            ? `$${(quotation.maxPrice - quotation.basePrice).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-            : "—",
+          rate:
+            quotation?.basePrice && quotation?.maxPrice
+              ? `${Math.round(((quotation.maxPrice - quotation.basePrice) / quotation.basePrice) * 100)}%`
+              : "—",
+          psf:
+            quotation?.basePrice && quotation?.maxPrice && lead?.sqft
+              ? `$ ${((quotation.maxPrice - quotation.basePrice) / Number(lead.sqft)).toFixed(2)}`
+              : "—",
+          amount:
+            quotation?.basePrice && quotation?.maxPrice
+              ? `$${(quotation.maxPrice - quotation.basePrice).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+              : "—",
         },
         {
           description: "Final Price (Including Markup)",
           rate: "",
-          psf: quotation?.maxPrice && lead?.sqft
-            ? `$ ${(quotation.maxPrice / Number(lead.sqft)).toFixed(2)}`
-            : "—",
+          psf:
+            quotation?.maxPrice && lead?.sqft
+              ? `$ ${(quotation.maxPrice / Number(lead.sqft)).toFixed(2)}`
+              : "—",
           amount: quotation?.maxPrice
             ? `$${quotation.maxPrice.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
             : "—",
@@ -393,7 +408,7 @@ export default function QuotationCard({ quotation, lead, customer }: QuotationCa
     },
     additionalOptions: quotation?.optionalAddOns?.length
       ? quotation.optionalAddOns.map((addon) =>
-          addon.price ? `${addon.name} ($${addon.price})` : addon.name
+          addon.price ? `${addon.name} ($${addon.price})` : addon.name,
         )
       : [],
     termsAndConditions: {
@@ -411,20 +426,23 @@ export default function QuotationCard({ quotation, lead, customer }: QuotationCa
     },
   };
 
-  const cogsTableData = quotationData.pricing.cogsTable.length > 0
-    ? quotationData.pricing.cogsTable
-    : [{ description: "—", amount: "—" }];
+  const cogsTableData =
+    quotationData.pricing.cogsTable.length > 0
+      ? quotationData.pricing.cogsTable
+      : [{ description: "—", amount: "—" }];
 
-  const doorsTableData = quotationData.doorsTable.length > 0
-    ? quotationData.doorsTable
-    : [{ doorType: "—", size: "—", qty: "—", cost: "—" }];
+  const doorsTableData =
+    quotationData.doorsTable.length > 0
+      ? quotationData.doorsTable
+      : [{ doorType: "—", size: "—", qty: "—", cost: "—" }];
 
-  const paymentTermsData = quotationData.termsAndConditions.paymentTerms.length > 0
-    ? quotationData.termsAndConditions.paymentTerms
-    : [
-        { label: "Payment Terms", value: "—" },
-        { label: "Currency", value: "—" },
-      ];
+  const paymentTermsData =
+    quotationData.termsAndConditions.paymentTerms.length > 0
+      ? quotationData.termsAndConditions.paymentTerms
+      : [
+          { label: "Payment Terms", value: "—" },
+          { label: "Currency", value: "—" },
+        ];
 
   const details = [
     {
@@ -1767,6 +1785,29 @@ export default function QuotationCard({ quotation, lead, customer }: QuotationCa
           </span>
         </div>
       </div>
+    </div>
+  );
+}
+
+export function QuotationCardSkeleton() {
+  return (
+    <div className="w-full flex flex-col items-center font-lato bg-white space-y-6 p-6">
+      {Array.from({ length: 3 }).map((_, slideIdx) => (
+        <div
+          key={slideIdx}
+          className="w-full aspect-[4/3] relative rounded-xl overflow-hidden border border-slate-100 bg-white"
+        >
+          <div className="absolute inset-0 p-6 animate-pulse space-y-4">
+            <div className="h-6 w-48 rounded bg-slate-200" />
+            <div className="h-4 w-3/4 rounded bg-slate-200" />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="h-6 rounded bg-slate-200" />
+              <div className="h-6 rounded bg-slate-200" />
+            </div>
+            <div className="h-36 w-full rounded bg-slate-200" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
