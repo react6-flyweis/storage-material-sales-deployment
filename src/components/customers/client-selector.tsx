@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import {
   Combobox,
   ComboboxInput,
@@ -28,6 +29,7 @@ export default function ClientSelector({
   placeholder = "Search clients...",
 }: Props) {
   const { data, isLoading } = useLeadsQuery(1, 100);
+  const lastEmittedLeadIdRef = useRef<string | null>(null);
 
   const clients =
     data?.data.leads.map((lead) => ({
@@ -37,11 +39,27 @@ export default function ClientSelector({
       customerId: lead.customerId?._id || "",
     })) || [];
 
+  const selectedClient = clients.find((client) => client.id === value) || null;
+
+  useEffect(() => {
+    if (!selectedClient) {
+      lastEmittedLeadIdRef.current = null;
+      return;
+    }
+
+    if (lastEmittedLeadIdRef.current === selectedClient.id) {
+      return;
+    }
+
+    lastEmittedLeadIdRef.current = selectedClient.id;
+    onValueChange(selectedClient);
+  }, [onValueChange, selectedClient]);
+
   return (
     <Combobox
       items={clients}
       itemToStringLabel={(client: Client) => client.name}
-      value={clients.find((c) => c.id === value) || null}
+      value={selectedClient}
       onValueChange={(val: Client | null | undefined) => {
         onValueChange(val);
       }}
