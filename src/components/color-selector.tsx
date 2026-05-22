@@ -9,7 +9,7 @@ export const DEFAULT_COLORS: ColorOption[] = [
 ];
 
 export const ROOF_COLORS: ColorOption[] = [
-  { name: "Default", className: "bg-gray-200 border border-black" },
+  { name: "Default", className: "bg-gray-200 border border-gray-400" },
   { name: "Blue", className: "bg-blue-600" },
   { name: "Slate", className: "bg-slate-600" },
   { name: "Red", className: "bg-red-600" },
