@@ -68,6 +68,7 @@ type LeadRow = {
   nextFollowUp: string;
   searchText: string;
   rawStatus: string;
+  rawData: LeadListItem;
 };
 
 const PAGE_SIZE = 20;
@@ -114,6 +115,7 @@ const mapLeadToRow = (lead: LeadListItem): LeadRow => {
     quoteValueNumber: lead.quoteValue,
     chatCount: 0,
     nextFollowUp: formatFollowUpDate(lead.nextFollowUp?.followUpDate),
+    rawData: lead,
     searchText: [
       lead._id,
       lead.projectName,
@@ -493,11 +495,7 @@ export default function LeadsPage() {
                           </Link>
 
                           <CreateQuotationDialog
-                            leadData={{
-                              name: lead.name,
-                              id: lead.id,
-                              customerId: lead.customerId,
-                            }}
+                            leadData={lead.rawData}
                             mode="edit"
                             trigger={
                               <Button variant="ghost" size="icon">
@@ -507,11 +505,7 @@ export default function LeadsPage() {
                           />
 
                           <CreateQuotationDialog
-                            leadData={{
-                              name: lead.name,
-                              id: lead.id,
-                              customerId: lead.customerId,
-                            }}
+                            leadData={lead.rawData}
                             mode="create"
                             trigger={
                               <Button variant="ghost" size="icon">
