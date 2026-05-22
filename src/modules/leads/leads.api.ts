@@ -234,6 +234,63 @@ export type LeadDetailQuotation = {
     description?: string;
     price?: number;
   }>;
+  width?: number;
+  length?: number;
+  height?: number;
+  leftEaveHeight?: number;
+  rightEaveHeight?: number;
+  roofSlope?: string;
+  windLoad?: string;
+  snowLoad?: string;
+  estimatedDelivery?: string;
+  companyName?: string;
+  preparedBy?: string;
+  proposalDate?: string;
+  validity?: string;
+  frameType?: string;
+  endwallType?: string;
+  girtType?: string;
+  purlinType?: string;
+  bracingType?: string;
+  roofPanel?: string;
+  wallPanelType?: string;
+  roofColor?: string;
+  wallColor?: string;
+  trimColor?: string;
+  baseAngle?: string;
+  shippingCost?: number;
+  deliveryType?: string;
+  shippingIncluded?: boolean;
+  materialCost?: number;
+  freightCost?: number;
+  markupPercent?: number;
+  doors?: Array<{
+    doorCategory: string;
+    doorType: string;
+    size: string;
+    qty: number;
+    notes: string;
+  }>;
+  insulation?: Array<{
+    insulationType: string;
+    thickness: string;
+    material: string;
+  }>;
+  // Fallbacks / flat fields for preview mapping
+  insulationTypeRoof?: string;
+  insulationThicknessRoof?: string;
+  insulationMaterialRoof?: string;
+  insulationTypeWall?: string;
+  insulationThicknessWall?: string;
+  insulationMaterialWall?: string;
+  doorType?: string;
+  doorSize?: string;
+  doorQty?: string | number;
+  doorNotes?: string;
+  personnelDoorType?: string;
+  personnelDoorSize?: string;
+  personnelDoorQty?: string | number;
+  personnelDoorNotes?: string;
 };
 
 export type LeadDetailAuditEntry = {
