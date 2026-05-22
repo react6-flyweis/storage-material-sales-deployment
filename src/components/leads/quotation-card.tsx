@@ -296,11 +296,35 @@ const materialConfigs = [
   },
 ];
 
+interface ExtendedQuotation extends LeadDetailQuotation {
+  clientNotes?: string;
+  totalArea?: string | number;
+  roofLiveLoad?: string;
+  deadLoad?: string;
+  exposure?: string;
+  seismicZone?: string;
+  seismicCoefficientSc?: string;
+  seismicCoefficientST?: string;
+  seismicDesignCategory?: string;
+  roofPanelType?: string;
+  roofPanelColor?: string;
+  wallPanelColor?: string;
+  baseAngleColor?: string;
+  gutters?: string;
+  downspouts?: string;
+  eaveColor?: string;
+  rakeColor?: string;
+  cornerColor?: string;
+  fasciaColor?: string;
+  baseTrimColor?: string;
+}
+
 export default function QuotationCard({
-  quotation,
+  quotation: rawQuotation,
   lead,
   customer,
 }: QuotationCardProps) {
+  const quotation = rawQuotation as ExtendedQuotation | undefined;
   // Let's resolve formatted values
   const dateStr = quotation?.createdAt
     ? new Date(quotation.createdAt).toLocaleDateString("en-US", {
@@ -314,9 +338,31 @@ export default function QuotationCard({
     ? `${Math.max(1, Math.ceil((new Date(quotation.validTill).getTime() - new Date(quotation.createdAt).getTime()) / (1000 * 60 * 60 * 24)))} Days`
     : "—";
 
-  const widthVal = lead?.width ? `${lead.width} ft` : "—";
-  const lengthVal = lead?.length ? `${lead.length} ft` : "—";
-  const eaveHeightVal = lead?.height ? `${lead.height} ft` : "—";
+  const widthVal = quotation?.width
+    ? `${quotation.width} ft`
+    : lead?.width
+    ? `${lead.width} ft`
+    : "—";
+
+  const lengthVal = quotation?.length
+    ? `${quotation.length} ft`
+    : lead?.length
+    ? `${lead.length} ft`
+    : "—";
+
+  const eaveHeightVal = quotation?.height
+    ? `${quotation.height} ft`
+    : lead?.height
+    ? `${lead.height} ft`
+    : "—";
+
+  const leftEaveHeightVal = quotation?.leftEaveHeight
+    ? `${quotation.leftEaveHeight} ft`
+    : eaveHeightVal;
+
+  const rightEaveHeightVal = quotation?.rightEaveHeight
+    ? `${quotation.rightEaveHeight} ft`
+    : eaveHeightVal;
 
   // Let's construct quotationData dynamically
   const quotationData = {
@@ -329,22 +375,89 @@ export default function QuotationCard({
       siteLocation: lead?.location || quotation?.location || "—",
       date: dateStr,
       validity: validityStr,
+      preparedBy: {
+        ...defaultQuotationData.proposalInfo.preparedBy,
+        name: quotation?.preparedBy || defaultQuotationData.proposalInfo.preparedBy.name,
+      },
     },
     overview: {
       ...defaultQuotationData.overview,
       projectName: lead?.projectName || "—",
       projectLocation: lead?.location || quotation?.location || "—",
       buildingCode: quotation?.buildingType || "—",
-      description: quotation?.specialNote || quotation?.internalNotes || "—",
+      description: quotation?.specialNote || quotation?.clientNotes || quotation?.internalNotes || "—",
     },
     buildingDetails: {
       ...defaultQuotationData.buildingDetails,
       width: widthVal,
       length: lengthVal,
-      leftEaveHeight: eaveHeightVal,
-      rightEaveHeight: eaveHeightVal,
-      roofSlope: quotation?.roofStyle || "—",
-      totalArea: lead?.sqft ? `${lead.sqft} SQ ft` : "—",
+      leftEaveHeight: leftEaveHeightVal,
+      rightEaveHeight: rightEaveHeightVal,
+      roofSlope: quotation?.roofSlope || quotation?.roofStyle || "—",
+      totalArea: quotation?.totalArea
+        ? `${quotation.totalArea} SQ ft`
+        : quotation?.sqft
+        ? `${quotation.sqft} SQ ft`
+        : lead?.sqft
+        ? `${lead.sqft} SQ ft`
+        : "—",
+    },
+    designLoads: {
+      ...defaultQuotationData.designLoads,
+      roofLiveLoad: quotation?.roofLiveLoad || "—",
+      roofSnowLoad: quotation?.snowLoad ? `${quotation.snowLoad}` : "—",
+      deadLoad: quotation?.deadLoad || "—",
+      windVelocity: quotation?.windLoad ? `${quotation.windLoad}` : "—",
+      exposure: quotation?.exposure || "—",
+      seismicZone: quotation?.seismicZone || "—",
+      seismicCoefficientSc: quotation?.seismicCoefficientSc || "—",
+      seismicCoefficientST: quotation?.seismicCoefficientST || "—",
+      seismicDesignCategory: quotation?.seismicDesignCategory || "—",
+    },
+    specifications: {
+      ...defaultQuotationData.specifications,
+      endwallType: quotation?.endwallType || "—",
+      roofSnowLoad: quotation?.snowLoad ? `${quotation.snowLoad}` : "—",
+      deadLoad: quotation?.deadLoad || "—",
+      windVelocity: quotation?.windLoad ? `${quotation.windLoad}` : "—",
+      exposure: quotation?.exposure || "—",
+      seismicZone: quotation?.seismicZone || "—",
+    },
+    panels: {
+      ...defaultQuotationData.panels,
+      roofPanelType: quotation?.roofPanel || quotation?.roofPanelType || "—",
+      roofPanelColor: quotation?.roofColor || quotation?.roofPanelColor || "—",
+      wallPanelType: quotation?.wallPanelType || "—",
+      wallPanelColor: quotation?.wallColor || quotation?.wallPanelColor || "—",
+      baseAngle: quotation?.baseAngle || quotation?.baseAngleColor || "—",
+    },
+    insulation: {
+      ...defaultQuotationData.insulation,
+      roofInsulation: quotation?.insulationTypeRoof
+        ? `${quotation.insulationTypeRoof} (${quotation.insulationThicknessRoof || ""} in) ${quotation.insulationMaterialRoof || ""}`.trim()
+        : quotation?.insulation?.[0]?.insulationType
+        ? `${quotation.insulation[0].insulationType} (${quotation.insulation[0].thickness || ""}) ${quotation.insulation[0].material || ""}`.trim()
+        : "—",
+      wallInsulation: quotation?.insulationTypeWall
+        ? `${quotation.insulationTypeWall} (${quotation.insulationThicknessWall || ""} in) ${quotation.insulationMaterialWall || ""}`.trim()
+        : quotation?.insulation?.[1]?.insulationType
+        ? `${quotation.insulation[1].insulationType} (${quotation.insulation[1].thickness || ""}) ${quotation.insulation[1].material || ""}`.trim()
+        : "—",
+    },
+    gutters: {
+      ...defaultQuotationData.gutters,
+      gutters: quotation?.gutters || "—",
+      downspouts: quotation?.downspouts || "—",
+    },
+    materials: {
+      ...defaultQuotationData.materials,
+      eaveColor: quotation?.trimColor || quotation?.eaveColor || "—",
+      rakeColor: quotation?.trimColor || quotation?.rakeColor || "—",
+      cornerColor: quotation?.trimColor || quotation?.cornerColor || "—",
+      fasciaColor: quotation?.trimColor || quotation?.fasciaColor || "—",
+      baseTrimColor: quotation?.trimColor || quotation?.baseTrimColor || "—",
+      roofPanelColor: quotation?.roofColor || quotation?.roofPanelColor || "—",
+      wallPanelColor: quotation?.wallColor || quotation?.wallPanelColor || "—",
     },
     pricing: {
       ...defaultQuotationData.pricing,
@@ -353,23 +466,34 @@ export default function QuotationCard({
           ? `$ ${quotation.basePrice.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
           : "—",
         cogsPsf:
-          quotation?.basePrice && lead?.sqft
-            ? `$ ${(quotation.basePrice / Number(lead.sqft)).toFixed(2)}`
+          quotation?.basePrice && (quotation?.sqft || lead?.sqft)
+            ? `$ ${(quotation.basePrice / Number(quotation?.sqft || lead?.sqft)).toFixed(2)}`
             : "—",
       },
-      cogsTable: quotation?.includedMaterials?.length
-        ? quotation.includedMaterials.map((mat) => ({
-            description: mat.name,
-            amount: mat.quantity ? `${mat.quantity} units` : "Included",
-          }))
-        : [],
+      cogsTable: [
+        ...(quotation?.materialCost
+          ? [{ description: "Material Cost", amount: `$${quotation.materialCost.toLocaleString()}` }]
+          : []),
+        ...(quotation?.freightCost || quotation?.shippingCost
+          ? [{
+              description: "Freight / Shipping Cost",
+              amount: `$${(quotation.freightCost || quotation.shippingCost || 0).toLocaleString()}`,
+            }]
+          : []),
+        ...(quotation?.includedMaterials?.length
+          ? quotation.includedMaterials.map((mat) => ({
+              description: mat.name,
+              amount: mat.quantity ? `${mat.quantity} units` : "Included",
+            }))
+          : []),
+      ],
       pricingSummaryTable: [
         {
           description: "Total COGS",
           rate: "-",
           psf:
-            quotation?.basePrice && lead?.sqft
-              ? `$ ${(quotation.basePrice / Number(lead.sqft)).toFixed(2)}`
+            quotation?.basePrice && (quotation?.sqft || lead?.sqft)
+              ? `$ ${(quotation.basePrice / Number(quotation?.sqft || lead?.sqft)).toFixed(2)}`
               : "—",
           amount: quotation?.basePrice
             ? `$${quotation.basePrice.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -378,12 +502,14 @@ export default function QuotationCard({
         {
           description: "Markup",
           rate:
-            quotation?.basePrice && quotation?.maxPrice
+            quotation?.markupPercent
+              ? `${quotation.markupPercent}%`
+              : quotation?.basePrice && quotation?.maxPrice
               ? `${Math.round(((quotation.maxPrice - quotation.basePrice) / quotation.basePrice) * 100)}%`
               : "—",
           psf:
-            quotation?.basePrice && quotation?.maxPrice && lead?.sqft
-              ? `$ ${((quotation.maxPrice - quotation.basePrice) / Number(lead.sqft)).toFixed(2)}`
+            quotation?.basePrice && quotation?.maxPrice && (quotation?.sqft || lead?.sqft)
+              ? `$ ${((quotation.maxPrice - quotation.basePrice) / Number(quotation?.sqft || lead?.sqft)).toFixed(2)}`
               : "—",
           amount:
             quotation?.basePrice && quotation?.maxPrice
@@ -394,8 +520,8 @@ export default function QuotationCard({
           description: "Final Price (Including Markup)",
           rate: "",
           psf:
-            quotation?.maxPrice && lead?.sqft
-              ? `$ ${(quotation.maxPrice / Number(lead.sqft)).toFixed(2)}`
+            quotation?.maxPrice && (quotation?.sqft || lead?.sqft)
+              ? `$ ${(quotation.maxPrice / Number(quotation?.sqft || lead?.sqft)).toFixed(2)}`
               : "—",
           amount: quotation?.maxPrice
             ? `$${quotation.maxPrice.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -406,6 +532,40 @@ export default function QuotationCard({
         ? `All prices are in ${quotation.currency || "USD"} and Valid till ${new Date(quotation.validTill).toLocaleDateString()}.`
         : "—",
     },
+    doorsTable: [
+      ...(quotation?.doors?.length
+        ? quotation.doors.map((d) => ({
+            doorType: `${d.doorCategory ? d.doorCategory + " - " : ""}${d.doorType || ""}`,
+            size: d.size || "—",
+            qty: d.qty ? String(d.qty) : "—",
+            cost: "Included",
+          }))
+        : []),
+      ...(!quotation?.doors?.length && (quotation?.doorType || quotation?.personnelDoorType)
+        ? [
+            ...(quotation?.doorType
+              ? [
+                  {
+                    doorType: `Roll Up Door (${quotation.doorType})`,
+                    size: quotation.doorSize || "—",
+                    qty: quotation.doorQty ? String(quotation.doorQty) : "—",
+                    cost: "Included",
+                  },
+                ]
+              : []),
+            ...(quotation?.personnelDoorType
+              ? [
+                  {
+                    doorType: `Personnel Door (${quotation.personnelDoorType})`,
+                    size: quotation.personnelDoorSize || "—",
+                    qty: quotation.personnelDoorQty ? String(quotation.personnelDoorQty) : "—",
+                    cost: "Included",
+                  },
+                ]
+              : []),
+          ]
+        : []),
+    ],
     additionalOptions: quotation?.optionalAddOns?.length
       ? quotation.optionalAddOns.map((addon) =>
           addon.price ? `${addon.name} ($${addon.price})` : addon.name,
