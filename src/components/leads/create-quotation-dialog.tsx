@@ -1,14 +1,11 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import CreateQuotationForm from "@/components/leads/create-quotation-form";
+import type { LeadListItem } from "@/modules/leads/leads.api";
 
 interface CreateQuotationDialogProps {
   trigger: React.ReactNode;
-  leadData?: {
-    name: string;
-    id: string;
-    customerId?: string;
-  };
+  leadData?: LeadListItem;
   mode?: "create" | "edit";
 }
 
