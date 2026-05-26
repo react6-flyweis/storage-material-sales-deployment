@@ -1,8 +1,13 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router";
 import { Eye, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import TitleSubtitle from "@/components/TitleSubtitle";
+import {
+  getLeadLifecycleBadgeClassName,
+  getLeadLifecycleStatusLabel,
+} from "@/modules/leads/lifecycle-statuses";
 import { useEscalatedLeadsQuery } from "@/modules/leads/leads.hooks";
 import {
   Table,
@@ -58,25 +63,6 @@ const statusLabels: Record<EscalationStatus, string> = {
   resolved: "Resolved",
 };
 
-const lifecycleStatusClasses: Record<string, string> = {
-  warm: "bg-violet-100 text-violet-700",
-  hot: "bg-amber-100 text-amber-700",
-  cold: "bg-sky-100 text-sky-700",
-};
-
-const normalizeLifecycleStatus = (value?: string | null) => {
-  if (!value) return undefined;
-  const v = value.toString().trim().toLowerCase();
-  if (v.includes("hot")) return "Hot";
-  if (v.includes("warm")) return "Warm";
-  if (v.includes("cold")) return "Cold";
-  // fallback: try keywords
-  if (v === "negotiation") return "Hot"; //negotiation
-  if (v === "w") return "Warm"; //
-  if (v === "proposal_sent") return "Cold"; // proposal_sent
-  return undefined;
-};
-
 const formatDate = (value: string) =>
   new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
@@ -121,15 +107,14 @@ const getEscalationRows = (leads: EscalatedLeadItem[]): EscalatedLead[] =>
     quoteId: getCustomerCode(lead.customerId) || "N/A",
     type: formatLeadType(lead),
     assignedTo: undefined,
-    lifecycleStatus: normalizeLifecycleStatus(
-      lead.lifecycleStatus as string | undefined,
-    ),
+    lifecycleStatus: lead.lifecycleStatus as string | undefined,
     escalatedDate: formatDate(lead.escalation.createdAt),
     escalationStatus: lead.escalation.status || "pending",
     note: lead.escalation.note?.trim() || "No note provided.",
   }));
 
 export default function EscalatedLeadsPage() {
+  const navigate = useNavigate();
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
   const {
     data: escalationsResponse,
@@ -303,13 +288,12 @@ export default function EscalatedLeadsPage() {
 
                       <TableCell className="px-3 py-3">
                         <Badge
-                          className={`rounded-full px-2.5 py-0.5 ${
-                            lifecycleStatusClasses[
-                              (lead.lifecycleStatus || "").toLowerCase()
-                            ] ?? "bg-slate-100 text-slate-700"
-                          }`}
+                          className={`rounded-full px-2.5 py-0.5 ${getLeadLifecycleBadgeClassName(
+                            lead.lifecycleStatus,
+                          )}`}
                         >
-                          {lead.lifecycleStatus ?? "Not available"}
+                          {getLeadLifecycleStatusLabel(lead.lifecycleStatus) ??
+                            "Not available"}
                         </Badge>
                       </TableCell>
 
@@ -334,7 +318,8 @@ export default function EscalatedLeadsPage() {
                           <button
                             type="button"
                             className="text-purple-600"
-                            aria-label="View lead"
+                            aria-label={`View ${lead.name}`}
+                            onClick={() => navigate(`/leads/${lead.leadId}`)}
                           >
                             <Eye className="h-4 w-4" />
                           </button>
