@@ -12,6 +12,8 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { useCreateSalesCustomerProjectMutation } from "@/modules/customers/customers.hooks";
+import BuildingTypeSelector from "@/components/building-type-selector";
 import {
   Select,
   SelectContent,
@@ -19,7 +21,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useCreateSalesCustomerProjectMutation } from "@/modules/customers/customers.hooks";
 
 type AddNewProjectFormValues = {
   firstName: string;
@@ -134,8 +135,7 @@ export default function AddNewProjectPage() {
         onSubmit={handleSubmit(onSubmit)}
         className="space-y-7 rounded-lg border border-slate-200 bg-white p-5 sm:p-6"
       >
-        <FieldGroup>
-          <section className="space-y-4">
+        {/* <section className="space-y-4">
             <h2 className="text-base font-semibold text-slate-900">
               Personal Information (Auto-fill)
             </h2>
@@ -174,63 +174,63 @@ export default function AddNewProjectPage() {
                 />
               </Field>
             </div>
-          </section>
+          </section> */}
 
-          <section className="space-y-4">
-            <h2 className="text-base font-semibold text-slate-900">
-              Site Location/Address
-            </h2>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <Field data-invalid={Boolean(errors.city)}>
-                <FieldLabel htmlFor="city">City *</FieldLabel>
-                <Input
-                  id="city"
-                  placeholder="Enter City"
-                  aria-invalid={Boolean(errors.city)}
-                  {...register("city", {
-                    required: requiredFieldMessage,
-                  })}
-                />
-                {errors.city && <FieldError errors={[errors.city]} />}
-              </Field>
-              <Field data-invalid={Boolean(errors.landmark)}>
-                <FieldLabel htmlFor="landmark">Landmark *</FieldLabel>
-                <Input
-                  id="landmark"
-                  placeholder="Near this -----"
-                  aria-invalid={Boolean(errors.landmark)}
-                  {...register("landmark", {
-                    required: requiredFieldMessage,
-                  })}
-                />
-                {errors.landmark && <FieldError errors={[errors.landmark]} />}
-              </Field>
-              <Field data-invalid={Boolean(errors.fullAddress)}>
-                <FieldLabel htmlFor="fullAddress">Full Address *</FieldLabel>
-                <Input
-                  id="fullAddress"
-                  placeholder="Enter Full Address"
-                  aria-invalid={Boolean(errors.fullAddress)}
-                  {...register("fullAddress", {
-                    required: requiredFieldMessage,
-                  })}
-                />
-                {errors.fullAddress && (
-                  <FieldError errors={[errors.fullAddress]} />
-                )}
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="state">State</FieldLabel>
-                <Input
-                  id="state"
-                  placeholder="Enter State"
-                  {...register("state")}
-                />
-              </Field>
-            </div>
-          </section>
+        <section className="space-y-4">
+          <h2 className="text-base font-semibold text-slate-900">
+            Site Location/Address
+          </h2>
+          <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Field data-invalid={Boolean(errors.city)}>
+              <FieldLabel htmlFor="city">City *</FieldLabel>
+              <Input
+                id="city"
+                placeholder="Enter City"
+                aria-invalid={Boolean(errors.city)}
+                {...register("city", {
+                  required: requiredFieldMessage,
+                })}
+              />
+              {errors.city && <FieldError errors={[errors.city]} />}
+            </Field>
+            <Field data-invalid={Boolean(errors.landmark)}>
+              <FieldLabel htmlFor="landmark">Landmark *</FieldLabel>
+              <Input
+                id="landmark"
+                placeholder="Near this -----"
+                aria-invalid={Boolean(errors.landmark)}
+                {...register("landmark", {
+                  required: requiredFieldMessage,
+                })}
+              />
+              {errors.landmark && <FieldError errors={[errors.landmark]} />}
+            </Field>
+            <Field data-invalid={Boolean(errors.fullAddress)}>
+              <FieldLabel htmlFor="fullAddress">Full Address *</FieldLabel>
+              <Input
+                id="fullAddress"
+                placeholder="Enter Full Address"
+                aria-invalid={Boolean(errors.fullAddress)}
+                {...register("fullAddress", {
+                  required: requiredFieldMessage,
+                })}
+              />
+              {errors.fullAddress && (
+                <FieldError errors={[errors.fullAddress]} />
+              )}
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="state">State</FieldLabel>
+              <Input
+                id="state"
+                placeholder="Enter State"
+                {...register("state")}
+              />
+            </Field>
+          </FieldGroup>
+        </section>
 
-          <section className="space-y-4">
+        {/* <section className="space-y-4">
             <h2 className="text-base font-semibold text-slate-900">
               Company Information (Auto-fill)
             </h2>
@@ -252,170 +252,162 @@ export default function AddNewProjectPage() {
                 />
               </Field>
             </div>
-          </section>
+          </section> */}
 
-          <section className="space-y-4">
-            <h2 className="text-base font-semibold text-slate-900">
-              Project Specification
-            </h2>
+        <section className="space-y-4">
+          <h2 className="text-base font-semibold text-slate-900">
+            Project Specification
+          </h2>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <Field data-invalid={Boolean(errors.width)}>
-                <Controller
-                  control={control}
-                  name="width"
-                  rules={{ required: requiredFieldMessage, min: 1 }}
-                  render={({ field }) => (
-                    <Counter
-                      id="width"
-                      label="Width (ft/m) *"
-                      value={field.value}
-                      onChange={field.onChange}
-                    />
-                  )}
-                />
-                {errors.width && <FieldError errors={[errors.width]} />}
-              </Field>
-
-              <Field data-invalid={Boolean(errors.length)}>
-                <Controller
-                  control={control}
-                  name="length"
-                  rules={{ required: requiredFieldMessage, min: 1 }}
-                  render={({ field }) => (
-                    <Counter
-                      id="length"
-                      label="Length (ft/m) *"
-                      value={field.value}
-                      onChange={field.onChange}
-                    />
-                  )}
-                />
-                {errors.length && <FieldError errors={[errors.length]} />}
-              </Field>
-
-              <Field>
-                <Controller
-                  control={control}
-                  name="height"
-                  render={({ field }) => (
-                    <Counter
-                      id="height"
-                      label="Height (ft/m)"
-                      value={field.value}
-                      onChange={field.onChange}
-                    />
-                  )}
-                />
-              </Field>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 ">
-              <Field data-invalid={Boolean(errors.buildingType)}>
-                <FieldLabel htmlFor="buildingType">Building Type *</FieldLabel>
-                <Controller
-                  control={control}
-                  name="buildingType"
-                  rules={{ required: requiredFieldMessage }}
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger
-                        id="buildingType"
-                        className="w-full"
-                        aria-invalid={Boolean(errors.buildingType)}
-                      >
-                        <SelectValue placeholder="Select Building Type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Warehouse">Warehouse</SelectItem>
-                        <SelectItem value="Industrial Shed">
-                          Industrial Shed
-                        </SelectItem>
-                        <SelectItem value="Commercial Unit">
-                          Commercial Unit
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                {errors.buildingType && (
-                  <FieldError errors={[errors.buildingType]} />
+          <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <Field data-invalid={Boolean(errors.width)}>
+              <FieldLabel htmlFor="width">Width (ft/m) *</FieldLabel>
+              <Controller
+                control={control}
+                name="width"
+                rules={{ required: requiredFieldMessage, min: 1 }}
+                render={({ field }) => (
+                  <Counter
+                    id="width"
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
                 )}
-              </Field>
+              />
+              {errors.width && <FieldError errors={[errors.width]} />}
+            </Field>
 
-              <Field data-invalid={Boolean(errors.roofStyle)}>
-                <FieldLabel htmlFor="roofStyle">Roof Style *</FieldLabel>
-                <Controller
-                  control={control}
-                  name="roofStyle"
-                  rules={{ required: requiredFieldMessage }}
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger
-                        id="roofStyle"
-                        className="w-full"
-                        aria-invalid={Boolean(errors.roofStyle)}
-                      >
-                        <SelectValue placeholder="Select Roof Style" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Gable">Gable Roof</SelectItem>
-                        <SelectItem value="Flat">Flat Roof</SelectItem>
-                        <SelectItem value="Shed">Shed Roof</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                {errors.roofStyle && <FieldError errors={[errors.roofStyle]} />}
-              </Field>
-            </div>
+            <Field data-invalid={Boolean(errors.length)}>
+              <FieldLabel htmlFor="length">Length (ft/m) *</FieldLabel>
+              <Controller
+                control={control}
+                name="length"
+                rules={{ required: requiredFieldMessage, min: 1 }}
+                render={({ field }) => (
+                  <Counter
+                    id="length"
+                    // label="Length (ft/m) *"
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+              {errors.length && <FieldError errors={[errors.length]} />}
+            </Field>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <Field>
-                <Controller
-                  control={control}
-                  name="doors"
-                  render={({ field }) => (
-                    <Counter
-                      id="doors"
-                      label="Doors"
-                      value={field.value}
-                      onChange={field.onChange}
-                    />
-                  )}
-                />
-              </Field>
-              <Field>
-                <Controller
-                  control={control}
-                  name="windows"
-                  render={({ field }) => (
-                    <Counter
-                      id="windows"
-                      label="Windows"
-                      value={field.value}
-                      onChange={field.onChange}
-                    />
-                  )}
-                />
-              </Field>
-              <Field>
-                <Controller
-                  control={control}
-                  name="insulation"
-                  render={({ field }) => (
-                    <Counter
-                      id="insulation"
-                      label="Insulation"
-                      value={field.value}
-                      onChange={field.onChange}
-                    />
-                  )}
-                />
-              </Field>
-            </div>
-          </section>
-        </FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="height">Height (ft/m)</FieldLabel>
+              <Controller
+                control={control}
+                name="height"
+                render={({ field }) => (
+                  <Counter
+                    id="height"
+                    // label="Height (ft/m)"
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+            </Field>
+          </FieldGroup>
+
+          <div className="grid grid-cols-1 gap-4 ">
+            <Field data-invalid={Boolean(errors.buildingType)}>
+              <FieldLabel htmlFor="buildingType">Building Type *</FieldLabel>
+              <Controller
+                control={control}
+                name="buildingType"
+                rules={{ required: requiredFieldMessage }}
+                render={({ field }) => (
+                  <BuildingTypeSelector
+                    id="buildingType"
+                    value={field.value}
+                    onChange={field.onChange}
+                    className="mt-2"
+                  />
+                )}
+              />
+              {errors.buildingType && (
+                <FieldError errors={[errors.buildingType]} />
+              )}
+            </Field>
+
+            <Field data-invalid={Boolean(errors.roofStyle)}>
+              <FieldLabel htmlFor="roofStyle">Roof Style *</FieldLabel>
+              <Controller
+                control={control}
+                name="roofStyle"
+                rules={{ required: requiredFieldMessage }}
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger
+                      id="roofStyle"
+                      className="w-full"
+                      aria-invalid={Boolean(errors.roofStyle)}
+                    >
+                      <SelectValue placeholder="Select Roof Style" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Gable">Gable Roof</SelectItem>
+                      <SelectItem value="Flat">Flat Roof</SelectItem>
+                      <SelectItem value="Shed">Shed Roof</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.roofStyle && <FieldError errors={[errors.roofStyle]} />}
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <Field>
+              <FieldLabel htmlFor="doors">Doors</FieldLabel>
+              <Controller
+                control={control}
+                name="doors"
+                render={({ field }) => (
+                  <Counter
+                    id="doors"
+                    // label="Doors"
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="windows">Windows</FieldLabel>
+              <Controller
+                control={control}
+                name="windows"
+                render={({ field }) => (
+                  <Counter
+                    id="windows"
+                    // label="Windows"
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="insulation">Insulation</FieldLabel>
+              <Controller
+                control={control}
+                name="insulation"
+                render={({ field }) => (
+                  <Counter
+                    id="insulation"
+                    // label="Insulation"
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+            </Field>
+          </div>
+        </section>
 
         <div className="flex items-center justify-end gap-3 pt-2">
           <Button
