@@ -1,5 +1,7 @@
 import { useLocation, useNavigate, useParams } from "react-router";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Upload } from "lucide-react";
+import { UploadFileDialog } from "@/components/upload-file-dialog";
+import MoveToOrdersDialog from "@/components/leads/move-to-orders-dialog";
 import BasicDetails from "@/components/leads/basic-details";
 import QuotationCard from "@/components/leads/quotation-card";
 import ChatCard from "@/components/leads/chat-card";
@@ -155,17 +157,68 @@ export default function LeadDetails() {
   return (
     <div className="p-5">
       <div className=" rounded-b-lg">
-        <div className="flex items-start gap-4">
-          <Button onClick={() => navigate(-1)} aria-label="Back">
-            <ArrowLeft />
-            <span>Back</span>
-          </Button>
+        <div className="flex items-start justify-between">
+          <div className="flex items-start gap-4">
+            <Button onClick={() => navigate(-1)} aria-label="Back">
+              <ArrowLeft />
+              <span>Back</span>
+            </Button>
 
-          <div>
-            <h1 className="text-2xl font-semibold">Lead Details</h1>
-            <p className="text-sm text-gray-600">
-              Stay updated with your latest activities and alerts
-            </p>
+            <div>
+              <h1 className="text-2xl font-semibold">Lead Details</h1>
+              <p className="text-sm text-gray-600">
+                Stay updated with your latest activities and alerts
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <MoveToOrdersDialog
+              leadId={leadId}
+              trigger={
+                <Button className="rounded-sm shadow-md" size="sm">
+                  <span>Convert to PO</span>
+                </Button>
+              }
+            />
+
+            <Button
+              size="sm"
+              className="rounded-sm shadow-md"
+              onClick={() => {
+                if (!leadId) return;
+                navigate(`/leads/${leadId}/agreement`);
+              }}
+            >
+              <span>View Agreement</span>
+            </Button>
+
+            <UploadFileDialog
+              title="Upload Agreement"
+              description="Upload agreement document for this lead."
+              accept=".pdf,.doc,.docx"
+              onUpload={async (files) => {
+                if (!leadId) return;
+                try {
+                  const fd = new FormData();
+                  files.forEach((f) => fd.append("files", f));
+
+                  // TODO: trigger a refetch or show a success toast
+                } catch (err) {
+                  // TODO: show error to user
+                  console.error("Agreement upload failed", err);
+                }
+              }}
+            >
+              <Button
+                variant="outline"
+                className="rounded-sm border-blue-500 shadow-md"
+                size="sm"
+              >
+                <Upload />
+                <span>Upload Agreement</span>
+              </Button>
+            </UploadFileDialog>
           </div>
         </div>
 
@@ -188,7 +241,10 @@ export default function LeadDetails() {
             </TabsContent>
             <TabsContent value="quotation" className="mt-6">
               <QuotationCard
-                quotation={detail?.quotations.find((q) => q.isLatest) ?? detail?.quotations[0]}
+                quotation={
+                  detail?.quotations.find((q) => q.isLatest) ??
+                  detail?.quotations[0]
+                }
                 lead={detail?.lead}
                 customer={detail?.customer}
               />
