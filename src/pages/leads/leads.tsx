@@ -10,11 +10,11 @@ import {
   Redo,
   TrendingUp,
   Search,
-  Pen,
+  // Pen,
   AlertCircle,
 } from "lucide-react";
 import ImportLeadsDialog from "@/components/leads/import-leads-dialog";
-import CreateQuotationDialog from "@/components/leads/create-quotation-dialog";
+// import CreateQuotationDialog from "@/components/leads/create-quotation-dialog";
 import EscalateLeadDialog from "@/components/leads/escalate-lead-dialog";
 import Pagination from "@/components/Pagination";
 import { Card, CardContent } from "@/components/ui/card";
@@ -494,7 +494,7 @@ export default function LeadsPage() {
                             </Button>
                           </Link>
 
-                          <CreateQuotationDialog
+                          {/* <CreateQuotationDialog
                             leadData={lead.rawData}
                             mode="edit"
                             trigger={
@@ -512,7 +512,7 @@ export default function LeadsPage() {
                                 <FileText className=" text-red-800" />
                               </Button>
                             }
-                          />
+                          /> */}
 
                           <MoveToOrdersDialog
                             leadId={lead.id}
