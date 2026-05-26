@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  AddNotesDialog,
   // AddNotesDialog,
   type AddNotesFormValues,
 } from "@/pages/customers/customer-detail/add-notes-dialog";
@@ -39,13 +40,20 @@ import {
   getLeadLifecycleStepId,
   getLeadLifecycleStatusLabel,
 } from "@/modules/leads/lifecycle-statuses";
+import {
+  buildLeadScoreBreakdown,
+  getLeadScoreFillColorClass,
+  getLeadScoreTag,
+  getLeadScoreTextColorClass,
+} from "@/modules/leads/leads.scoring";
+import { Badge } from "@/components/ui/badge";
 
 type BasicDetailsProps = {
   lead?: LeadDetailData;
 };
 
 export default function BasicDetails({ lead }: BasicDetailsProps) {
-  const [notes] = useState<AddNotesFormValues[]>([]);
+  const [notes, setNotes] = useState<AddNotesFormValues[]>([]);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
@@ -57,11 +65,12 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
     lead?.quotations.find((quotation) => quotation.isLatest) ??
     lead?.quotations[0];
 
-  const projectTitle =
-    leadData?.buildingType?.trim() ||
-    customer?.firstName?.trim() ||
-    "Lead Details";
-  const projectReference = leadData?.customerId || leadData?._id || "—";
+  const apiScoreBreakdown = lead?.lead.leadScoring?.scoreBreakdown;
+  const normalizedScore = lead?.lead.leadScoring?.score ?? 0;
+  const scoreBreakdown = buildLeadScoreBreakdown(apiScoreBreakdown);
+
+  const projectTitle = leadData?.projectName ?? "";
+  const projectReference = leadData?._id || "—";
   const statusLabel = leadData?.lifecycleStatus
     ? formatLifecycleStatus(leadData.lifecycleStatus)
     : "—";
@@ -71,10 +80,9 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
   const statusDotClassName = getLeadLifecycleBadgeDotClassName(
     leadData?.lifecycleStatus,
   );
-  const buildingType =
-    latestQuotation?.buildingType || leadData?.buildingType || "—";
+  const buildingType = leadData?.buildingType || "—";
   const quoteValue = formatLeadCurrency(
-    leadData?.quoteValue ?? latestQuotation?.basePrice ?? 0,
+    leadData?.quoteValue ?? 0,
     latestQuotation?.currency ?? "USD",
   );
   const createdOn = formatLeadDate(leadData?.createdAt);
@@ -86,16 +94,17 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
   const contactAddress = leadData?.location || "—";
   const assignedToName =
     getAssignedEmployeeName(lead?.auditLog ?? []) ||
-    (leadData?.assignedSales ? "Assigned sales rep" : "Unassigned");
+    (leadData?.assignedSales ?? "Unassigned");
   const assignmentSummary = leadData?.assignedSales
     ? "Sales rep assigned to this lead"
     : "No sales rep assigned yet";
   const signedAgreementSummary = leadData?.documents?.length
     ? `${leadData.documents.length} document${leadData.documents.length === 1 ? "" : "s"} attached`
     : "No signed agreement uploaded";
-  const signedAgreementDate = leadData?.updatedAt
-    ? `Last updated: ${formatLeadDate(leadData.updatedAt)}`
-    : "No update available";
+  const signedAgreementDate =
+    leadData?.documents && leadData.documents.length > 0
+      ? `Uploaded on ${formatLeadDate(String(leadData?.documents?.[0] ?? ""))}`
+      : "";
 
   const activeStatus =
     selectedStatus ?? leadData?.lifecycleStatus ?? "initial_contact";
@@ -115,9 +124,9 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
     ? getLeadLifecycleStatusLabel(currentLifecycleStep.value)
     : "—";
 
-  // const handleSaveNote = (data: AddNotesFormValues) => {
-  //   setNotes((current) => [data, ...current]);
-  // };
+  const handleSaveNote = (data: AddNotesFormValues) => {
+    setNotes((current) => [data, ...current]);
+  };
 
   const handleOpenStatusDialog = () => {
     setStatusDialogOpen(true);
@@ -443,13 +452,13 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
             >
               Update Step Status
             </Button>
-            <Button
+            {/* <Button
               variant="outline"
               className="border-[#1D51A4] text-[#1D51A4] hover:bg-slate-50 rounded-[6px]"
             >
               Add Notes
-            </Button>
-            {/* <AddNotesDialog onSave={handleSaveNote} /> */}
+            </Button> */}
+            <AddNotesDialog onSave={handleSaveNote} />
           </div>
 
           <UpdateStatusDialog
@@ -550,21 +559,18 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
             <div className="absolute left-2.25 top-2 bottom-2 w-px bg-slate-200"></div>
 
             {lead?.activityLog && lead.activityLog.length > 0 ? (
-              lead.activityLog.map((entry: any, index: number) => {
-                const id = entry._id ?? entry.id ?? index;
+              lead.activityLog.map((entry, index) => {
+                const id = entry._id ?? entry._id ?? index;
                 const title =
                   entry?.metadata?.activityType ||
                   entry.action ||
                   entry.type ||
-                  entry.title ||
-                  entry.message ||
-                  String(entry);
-                const message = entry?.metadata?.notes ?? entry.message ?? "";
+                  "";
+                const message = entry?.metadata?.notes ?? "";
                 const outcome = entry?.metadata?.outcome
                   ? ` — ${entry.metadata.outcome}`
                   : "";
-                const timestamp =
-                  entry.createdAt ?? entry.timestamp ?? entry.date ?? "";
+                const timestamp = entry.createdAt ?? "";
 
                 return (
                   <div key={id} className="relative">
@@ -623,6 +629,72 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
             )}
           </div>
         </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 lg:w-3/4 gap-4">
+        <div className="p-4 rounded-lg border bg-white">
+          <div className="text-xs tracking-wider text-gray-500 font-semibold">
+            LEAD SCORING
+          </div>
+          <div className="mt-3 flex items-end gap-2">
+            <span
+              className={`text-4xl font-bold leading-none ${getLeadScoreTextColorClass(
+                normalizedScore,
+              )}`}
+            >
+              {normalizedScore}
+            </span>
+            <span className="text-gray-400 text-lg">/100</span>
+          </div>
+          <div className="mt-3">
+            <Badge
+              variant="secondary"
+              className={`${getLeadScoreFillColorClass(normalizedScore)} text-white`}
+            >
+              {getLeadScoreTag(normalizedScore)}
+            </Badge>
+          </div>
+        </div>
+
+        <div className="lg:col-span-2 p-4 rounded-lg border bg-white">
+          <div className="text-xs tracking-wider text-gray-500 font-semibold mb-3">
+            SCORE BREAKDOWN
+          </div>
+
+          <div className="space-y-3">
+            {scoreBreakdown.map((item) => {
+              const itemPercent = Math.max(
+                0,
+                Math.min(100, (item.value / item.max) * 100),
+              );
+              return (
+                <div key={item.label}>
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="font-medium text-gray-800">
+                      {item.label}
+                    </span>
+                    <span
+                      className={`font-semibold ${getLeadScoreTextColorClass(
+                        item.value,
+                      )}`}
+                    >
+                      {item.value}/{item.max}
+                    </span>
+                  </div>
+                  <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${getLeadScoreFillColorClass(
+                        item.value,
+                      )}`}
+                      style={{ width: `${itemPercent}%` }}
+                    />
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">{item.hint}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );
