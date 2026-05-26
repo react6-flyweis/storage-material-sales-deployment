@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router";
 import { Eye, Loader2, MessageSquare } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import ProgressDots from "@/components/ui/progress-dots";
 import {
   Table,
   TableBody,
@@ -13,6 +15,7 @@ import {
 
 type PurchaseOrderRow = {
   id: string;
+  leadId?: string;
   leadName: string;
   quoteId: string;
   location: string;
@@ -27,10 +30,7 @@ type PurchaseOrderRow = {
 };
 import { usePurchaseOrdersQuery } from "@/modules/purchase-orders/purchase-orders.hooks";
 import TitleSubtitle from "@/components/TitleSubtitle";
-import {
-  getLeadProgress,
-  formatLifecycleStatus,
-} from "@/modules/leads/leads.utils";
+import { formatLifecycleStatus } from "@/modules/leads/leads.utils";
 
 function PurchaseOrdersSkeleton() {
   return (
@@ -52,6 +52,7 @@ function EmptyState() {
 }
 
 export default function AllPurchaseOrdersPage() {
+  const navigate = useNavigate();
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
 
   const page = 1;
@@ -63,6 +64,7 @@ export default function AllPurchaseOrdersPage() {
 
     return items.map((o) => ({
       id: o._id,
+      leadId: o.leadId?._id ?? undefined,
       leadName: o.customerId?.firstName ?? o.leadId?.projectName ?? "Unknown",
       quoteId: o.quotationId ?? "",
       location: "",
@@ -221,30 +223,7 @@ export default function AllPurchaseOrdersPage() {
                       </TableCell>
 
                       <TableCell className="">
-                        <div className="flex flex-col items-start">
-                          <div className="flex items-center gap-2">
-                            {Array.from({ length: 8 }).map((_, i) => {
-                              const progress = getLeadProgress(order.rawStatus);
-                              return (
-                                <span
-                                  key={i}
-                                  className={`h-2.5 w-2.5 rounded-full ${
-                                    i < progress
-                                      ? "bg-green-500"
-                                      : "bg-slate-300"
-                                  }`}
-                                />
-                              );
-                            })}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-sm text-indigo-600 mt-1 underline"
-                          >
-                            Step {getLeadProgress(order.rawStatus)}/8
-                          </button>
-                        </div>
+                        <ProgressDots rawStatus={order.rawStatus} />
                       </TableCell>
 
                       <TableCell className="">
@@ -279,10 +258,12 @@ export default function AllPurchaseOrdersPage() {
                           <button
                             type="button"
                             aria-label={`View ${order.leadName}`}
-                            // onClick={(e) => {
-                            //   e.stopPropagation();
-                            //   navigate(`/leads/purchase-orders/${order.id}`);
-                            // }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (order.leadId) {
+                                navigate(`/leads/${order.leadId}`);
+                              }
+                            }}
                             className="text-indigo-600"
                           >
                             <Eye className="h-4 w-4" />
