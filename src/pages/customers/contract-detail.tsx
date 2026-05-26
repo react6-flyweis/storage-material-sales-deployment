@@ -361,7 +361,7 @@ export default function ContractDetail() {
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
           <Button
-            onClick={() => navigate("/customers/contracts")}
+            onClick={() => navigate(-1)}
             className="gap-2 bg-blue-600 hover:bg-blue-700"
           >
             <ArrowLeft className="h-4 w-4" />
