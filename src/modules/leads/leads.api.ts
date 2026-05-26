@@ -109,20 +109,20 @@ export async function getScoredLeadsProvider(page: number, limit: number) {
 }
 
 export type CreateLeadPayload = {
-  firstName: string;
-  lastName?: string;
-  emailAddress?: string;
-  phoneNumber?: string;
-  countryCode?: string;
-  companyName?: string;
-  projectType?: string;
-  city?: string;
-  roofStyle?: string;
-  width?: number;
-  length?: number;
-  height?: number;
-  estimatedValue?: number;
-  leadStatus?: string;
+  customerId: string;
+  projectName: string;
+  buildingType: string;
+  location: string;
+  source: string;
+  quoteValue: number;
+  roofStyle: string;
+  width: number;
+  length: number;
+  height: number;
+  doors: number;
+  windows: number;
+  insulation: number;
+  leadStatus: string;
   notes?: string;
 };
 
@@ -161,6 +161,20 @@ export type LeadDetailCustomer = {
   };
 };
 
+export type LeadScoreBreakdown = {
+  projectSize?: { points?: number; reason?: string };
+  budgetSignals?: { points?: number; reason?: string };
+  timeline?: { points?: number; reason?: string };
+  decisionMaker?: { points?: number; reason?: string };
+  projectClarity?: { points?: number; reason?: string };
+};
+
+export type LeadScoring = {
+  score?: number;
+  requirements?: string;
+  lastScoredAt?: string;
+  scoreBreakdown?: LeadScoreBreakdown;
+};
 export type LeadDetailLead = {
   _id: string;
   customerId: string;
@@ -192,12 +206,7 @@ export type LeadDetailLead = {
   isTerminated?: boolean;
   terminationReason?: string;
   terminatedAt?: string | null;
-  leadScoring?: {
-    score: number;
-    requirements?: string;
-    lastScoredAt?: string;
-    scoreBreakdown?: Record<string, { points: number; reason: string }>;
-  };
+  leadScoring?: LeadScoring;
   documents?: unknown[];
   createdAt: string;
   updatedAt: string;
