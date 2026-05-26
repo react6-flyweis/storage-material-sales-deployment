@@ -120,7 +120,7 @@ export default function LeadScoring() {
         ) : leads.length === 0 ? (
           <LeadScoringEmptyState />
         ) : (
-          leads.map((lead) => (
+          leads.slice(0, 3).map((lead) => (
             <div
               key={lead.id}
               className="flex items-center justify-between bg-gray-50 rounded-md p-4"
