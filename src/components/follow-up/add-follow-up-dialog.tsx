@@ -67,6 +67,7 @@ export default function AddFollowUpDialog({
   onSuccess,
 }: Props) {
   const [showSuccess, setShowSuccess] = useState(false);
+  const shouldHideLeadSelector = Boolean(leadId);
   const {
     register,
     control,
@@ -100,7 +101,7 @@ export default function AddFollowUpDialog({
       date: initialDate ?? "",
       leadId: leadId ?? "",
     });
-  }, [initialDate, open, reset]);
+  }, [initialDate, leadId, open, reset]);
 
   useEffect(() => {
     if (leadId) {
@@ -165,32 +166,34 @@ export default function AddFollowUpDialog({
                 </FieldError>
               </div>
             )}
-            <Field>
-              <FieldLabel>Client Name *</FieldLabel>
-              <FieldContent>
-                <Controller
-                  control={control}
-                  name="leadId"
-                  render={({ field }) => (
-                    <ClientSelector
-                      value={field.value}
-                      onValueChange={(client) => {
-                        field.onChange(client?.id || "");
-                        setValue("customerId", client?.customerId || "");
-                      }}
-                    />
+            <div className={shouldHideLeadSelector ? "hidden" : ""}>
+              <Field>
+                <FieldLabel>Select Lead</FieldLabel>
+                <FieldContent>
+                  <Controller
+                    control={control}
+                    name="leadId"
+                    render={({ field }) => (
+                      <ClientSelector
+                        value={field.value}
+                        onValueChange={(client) => {
+                          field.onChange(client?.id || "");
+                          setValue("customerId", client?.customerId || "");
+                        }}
+                      />
+                    )}
+                  />
+                  {errors.leadId && (
+                    <FieldError>{errors.leadId.message}</FieldError>
                   )}
-                />
-                {errors.leadId && (
-                  <FieldError>{errors.leadId.message}</FieldError>
-                )}
-                {errors.customerId && (
-                  <FieldError>
-                    {errors.customerId.message as unknown as string}
-                  </FieldError>
-                )}
-              </FieldContent>
-            </Field>
+                  {errors.customerId && (
+                    <FieldError>
+                      {errors.customerId.message as unknown as string}
+                    </FieldError>
+                  )}
+                </FieldContent>
+              </Field>
+            </div>
 
             <Field>
               <FieldLabel>Mode of Contact *</FieldLabel>
