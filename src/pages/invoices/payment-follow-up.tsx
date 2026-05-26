@@ -21,7 +21,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Link } from "react-router";
+import AddFollowUpDialog from "@/components/follow-up/add-follow-up-dialog";
 
 interface PaymentFollowUp {
   id: string;
@@ -90,6 +90,7 @@ const mockData: PaymentFollowUp[] = [
 export default function PaymentFollowUp() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [isAddOpen, setIsAddOpen] = useState(false);
 
   // Filter data based on search and status
   const filteredData = useMemo(() => {
@@ -186,12 +187,15 @@ export default function PaymentFollowUp() {
             </div>
           </div>
 
-          <Link to="/leads/add">
-            <Button className="flex items-center gap-2" variant="default">
-              <Plus className="w-4 h-4" />
-              Add Follow-Up
-            </Button>
-          </Link>
+          <Button
+            className="flex items-center gap-2"
+            variant="default"
+            onClick={() => setIsAddOpen(true)}
+          >
+            <Plus className="w-4 h-4" />
+            Add Follow-Up
+          </Button>
+          <AddFollowUpDialog open={isAddOpen} onOpenChange={setIsAddOpen} />
         </div>
       </div>
 
