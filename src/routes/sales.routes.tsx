@@ -88,6 +88,7 @@ const AiScriptGeneratorPage = lazy(
   () => import("@/pages/leads/ai-script-generator"),
 );
 const LeadScoring = lazy(() => import("@/pages/leads/lead-scoring"));
+const ActivityLogPage = lazy(() => import("@/pages/leads/activity-log"));
 const FollowUpKpis = lazy(() => import("@/pages/leads/follow-up-kpis"));
 const AIMarketing = lazy(() => import("@/pages/leads/ai-marketing"));
 const EscalatedLeads = lazy(() => import("@/pages/leads/escalated-leads"));
@@ -205,6 +206,10 @@ export const salesRoutes: RouteObject[] = [
                     element: <LeadScoring />,
                   },
                   {
+                    path: "activity-log",
+                    element: <ActivityLogPage />,
+                  },
+                  {
                     path: "kpis",
                     element: <FollowUpKpis />,
                   },
@@ -226,6 +231,7 @@ export const salesRoutes: RouteObject[] = [
                 path: ":leadId",
                 children: [
                   { index: true, element: <LeadDetails /> },
+                  { path: "agreement", element: <ContractDetail /> },
                   { path: "timeline", element: <SingleLeadTimelinePage /> },
                   {
                     path: "emails",
