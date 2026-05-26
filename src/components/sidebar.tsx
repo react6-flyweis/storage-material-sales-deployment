@@ -11,14 +11,30 @@ import { useState, useEffect } from "react";
 // icons
 import dashboardIcon from "@/assets/icons/sidebar/dashboard.svg";
 import customerIcon from "@/assets/icons/sidebar/customer.svg";
-import deliveryIcon from "@/assets/icons/sidebar/delivery.svg";
 import callIcon from "@/assets/icons/sidebar/call.svg";
-import invoices from "@/assets/icons/sidebar/invoices.svg";
 import leadsIcon from "@/assets/icons/sidebar/leads.svg";
 import notificationIcon from "@/assets/icons/sidebar/notifications.svg";
-import freightIcon from "@/assets/icons/sidebar/freights.svg";
-import salesIcon from "@/assets/icons/sidebar/sales.svg";
-import communicationIcon from "@/assets/icons/sidebar/communication.svg";
+import invoices from "@/assets/icons/sidebar/invoices.svg";
+
+// import deliveryIcon from "@/assets/icons/sidebar/delivery.svg";
+// import freightIcon from "@/assets/icons/sidebar/freights.svg";
+// import salesIcon from "@/assets/icons/sidebar/sales.svg";
+// import communicationIcon from "@/assets/icons/sidebar/communication.svg";
+
+// Leads
+import escalatedLeadsIcon from "@/assets/icons/sidebar/escalated-leads.svg";
+import followupIcon from "@/assets/icons/sidebar/followup.svg";
+// import followupKpiIcon from "@/assets/icons/sidebar/followup-kpi.svg";
+// import insightIcon from "@/assets/icons/sidebar/insight.svg";
+import leadScoringIcon from "@/assets/icons/sidebar/lead-scoring.svg";
+import purchaseOrdersIcon from "@/assets/icons/sidebar/purchase-orders.svg";
+import activityLogIcon from "@/assets/icons/sidebar/activity-log.svg";
+import aiScriptIcon from "@/assets/icons/sidebar/ai-script.svg";
+
+import overviewIcon from "@/assets/icons/sidebar/overview.svg";
+
+//
+import invoiceListIcon from "@/assets/icons/sidebar/invoice-list.svg";
 
 import activeBgImage from "@/assets/images/active-bg.png";
 
@@ -84,7 +100,6 @@ const navigationGroups: NavigationGroup[] = [
     link: "/customers",
     items: [],
   },
-
   {
     id: "links" as NavGroup,
     icon: leadsIcon,
@@ -95,54 +110,97 @@ const navigationGroups: NavigationGroup[] = [
       {
         path: "/leads/follow-up",
         label: "Follow ups",
+        icon: followupIcon,
         collapsible: true,
         subItems: [
-          { path: "/leads/follow-up", label: "Overview" },
           {
-            path: "/leads/follow-up/communication-timeline",
-            label: "Lead Communication Timeline",
+            path: "/leads/follow-up",
+            label: "Overview",
+            icon: overviewIcon,
           },
+          // Activity log
+          // {
+          //   path: "/leads/follow-up/communication-timeline",
+          //   label: "Lead Communication Timeline",
+          // },
+          // {
+          //   path: "/leads/follow-up/smart-reminders",
+          //   label: "Smart Follow up Reminders",
+          // },
           {
-            path: "/leads/follow-up/smart-reminders",
-            label: "Smart Follow up Reminders",
+            path: "/leads/follow-up/activity-log",
+            label: "Activity Log",
+            icon: activityLogIcon,
           },
           {
             path: "/leads/follow-up/script-generator",
             label: "AI Follow-Up Script Generator",
+            icon: aiScriptIcon,
           },
-          { path: "/leads/follow-up/scoring", label: "Lead Scoring" },
-          { path: "/leads/follow-up/kpis", label: "Follow-Up KPIs" },
+          {
+            path: "/leads/follow-up/scoring",
+            label: "Lead Scoring",
+            icon: leadScoringIcon,
+          },
+          {
+            path: "/leads/payment-follow-up",
+            label: "Payment Follow-Up",
+            icon: leadScoringIcon,
+          },
+          // {
+          //   path: "/leads/follow-up/kpis",
+          //   label: "Follow-Up KPIs",
+          //   icon: followupKpiIcon,
+          // },
+          // insights
+          // {
+          //   path: "/leads/follow-up/insights",
+          //   label: "Insights",
+          //   icon: insightIcon,
+          // },
         ],
       },
-      { path: "/leads/ai-marketing", label: "AI Support" },
-      // { path: "/leads/escalated-queries", label: "Escalated Queries" },
-      // escalated queries
-      // payment follow-up
-      {
-        path: "/leads/payment-follow-up",
-        label: "Payment Follow-Up",
-      },
-      // new quotation list
-      {
-        path: "/leads/quotation-list",
-        label: "Quote List",
-      },
+      // { path: "/leads/ai-marketing", label: "AI Support" },
       {
         path: "/leads/escalated",
         label: "Escalated Leads",
+        icon: escalatedLeadsIcon,
       },
       {
         path: "/leads/purchase-orders",
         label: "All Purchase Orders",
+        icon: purchaseOrdersIcon,
       },
+      // new quotation list
+      // {
+      //   path: "/leads/quotation-list",
+      //   label: "New Quotation List",
+      //   icon: invoiceListIcon,
+      // },
     ],
   },
 
   {
+    id: "documents" as NavGroup,
+    icon: invoices,
+    label: "Invoices",
+    color: "bg-[#3AB449]",
+    link: "/invoice",
+    items: [
+      // invite list
+      { path: "/invoice/list", label: "Invoice List", icon: invoiceListIcon },
+      // sales growth
+      // {
+      //   path: "/invoice/sales-growth",
+      //   label: "Sales Growth",
+      // },
+    ],
+  },
+  {
     id: "messages" as NavGroup,
     icon: callIcon,
     label: "Communication",
-    color: "bg-[#3AB449]",
+    color: "bg-[#EAB308]",
     link: "/communication",
     items: [],
   },
@@ -157,66 +215,50 @@ const navigationGroups: NavigationGroup[] = [
     items: [],
   },
 
-  {
-    id: "documents" as NavGroup,
-    icon: invoices,
-    label: "Invoices",
-    color: "bg-[#a855f7]",
-    link: "/invoice",
-    items: [
-      // invite list
-      // { path: "/invoice/list", label: "Invoice List" },
-      // sales growth
-      // {
-      //   path: "/invoice/sales-growth",
-      //   label: "Sales Growth",
-      // },
-    ],
-  },
-  {
-    id: "deliveries" as NavGroup,
-    icon: deliveryIcon,
-    label: "Customer Delivery",
-    color: "bg-[#F54900]",
-    link: "/deliveries",
-    items: [
-      // project deliveries
-      {
-        path: "/deliveries/projects",
-        label: "Project Deliveries",
-      },
-      // request delivery/change
-      {
-        path: "/customers/request-delivery-change",
-        label: "Request Delivery / Change",
-      },
-    ],
-  },
+  // {
+  //   id: "deliveries" as NavGroup,
+  //   icon: deliveryIcon,
+  //   label: "Customer Delivery",
+  //   color: "bg-[#F54900]",
+  //   link: "/deliveries",
+  //   items: [
+  //     // project deliveries
+  //     {
+  //       path: "/deliveries/projects",
+  //       label: "Project Deliveries",
+  //     },
+  //     // request delivery/change
+  //     {
+  //       path: "/customers/request-delivery-change",
+  //       label: "Request Delivery / Change",
+  //     },
+  //   ],
+  // },
   // awarded freight
-  {
-    id: "awarded-freight" as NavGroup,
-    icon: freightIcon,
-    label: "Awarded Freight",
-    color: "bg-[#9810FA]",
-    link: "/awarded-freight",
-    items: [],
-  },
-  {
-    id: "sales" as NavGroup,
-    icon: salesIcon,
-    label: "Sales",
-    color: "bg-[#F54900]",
-    link: "/sales",
-    items: [],
-  },
-  {
-    id: "communication" as NavGroup,
-    icon: communicationIcon,
-    label: "Communication",
-    color: "bg-[#155DFC]",
-    link: "/customer-communication",
-    items: [],
-  },
+  // {
+  //   id: "awarded-freight" as NavGroup,
+  //   icon: freightIcon,
+  //   label: "Awarded Freight",
+  //   color: "bg-[#9810FA]",
+  //   link: "/awarded-freight",
+  //   items: [],
+  // },
+  // {
+  //   id: "sales" as NavGroup,
+  //   icon: salesIcon,
+  //   label: "Sales",
+  //   color: "bg-[#F54900]",
+  //   link: "/sales",
+  //   items: [],
+  // },
+  // {
+  //   id: "communication" as NavGroup,
+  //   icon: communicationIcon,
+  //   label: "Communication",
+  //   color: "bg-[#155DFC]",
+  //   link: "/customer-communication",
+  //   items: [],
+  // },
   // sales
   // communication
 ];
@@ -646,7 +688,6 @@ export function Sidebar({
     </>
   );
 }
-
 function SidebarItemIcon({
   src,
   alt,
