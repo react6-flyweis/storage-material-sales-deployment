@@ -93,12 +93,15 @@ export default function AddNewProjectPage() {
         buildingType: values.buildingType,
         location: values.location,
         roofStyle: values.roofStyle,
+        quoteValue: values.estimatedValue
+          ? Number.parseInt(values.estimatedValue, 10)
+          : 0,
         width: values.width,
         length: values.length,
-        estimatedValue: values.estimatedValue
-          ? Number.parseInt(values.estimatedValue, 10)
-          : undefined,
-        priority: values.priority,
+        height: values.height,
+        doors: values.doors,
+        windows: values.windows,
+        insulation: values.insulation,
       });
       setShowSuccess(true);
       reset(defaultValues);

@@ -223,8 +223,13 @@ export type CreateSalesCustomerProjectPayload = {
   buildingType: string;
   location: string;
   roofStyle: string;
+  quoteValue: number;
   width: number;
   length: number;
+  height: number;
+  doors: number;
+  windows: number;
+  insulation: number;
 };
 
 export type CreateSalesCustomerProjectResponse = {
