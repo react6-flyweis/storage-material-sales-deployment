@@ -128,6 +128,7 @@ export default function LeadDetails() {
   const { data: response, isLoading } = useLeadDetailQuery(leadId);
 
   const detail = response?.success ? response.data : undefined;
+  const canMoveToOrders = !detail?.lead.isRaisedToPO;
   const lead = detail
     ? mapDetailToLead(detail)
     : { ...defaultLead, id: leadId ?? "—" };
@@ -173,14 +174,16 @@ export default function LeadDetails() {
           </div>
 
           <div className="flex items-center gap-3">
-            <MoveToOrdersDialog
-              leadId={leadId}
-              trigger={
-                <Button className="rounded-sm shadow-md" size="sm">
-                  <span>Convert to PO</span>
-                </Button>
-              }
-            />
+            {canMoveToOrders && (
+              <MoveToOrdersDialog
+                leadId={leadId}
+                trigger={
+                  <Button className="rounded-sm shadow-md" size="sm">
+                    <span>Convert to PO</span>
+                  </Button>
+                }
+              />
+            )}
 
             <Button
               size="sm"
