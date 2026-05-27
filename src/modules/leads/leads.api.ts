@@ -29,6 +29,7 @@ export type LeadListItem = {
   buildingType: string;
   location: string;
   nextFollowUp: LeadFollowUpSummary | null;
+  isRaisedToPO?: boolean;
 };
 
 export type LeadsListResponse = {
