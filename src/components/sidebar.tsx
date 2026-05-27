@@ -28,7 +28,7 @@ import followupIcon from "@/assets/icons/sidebar/followup.svg";
 // import insightIcon from "@/assets/icons/sidebar/insight.svg";
 import leadScoringIcon from "@/assets/icons/sidebar/lead-scoring.svg";
 import purchaseOrdersIcon from "@/assets/icons/sidebar/purchase-orders.svg";
-import activityLogIcon from "@/assets/icons/sidebar/activity-log.svg";
+// import activityLogIcon from "@/assets/icons/sidebar/activity-log.svg";
 import aiScriptIcon from "@/assets/icons/sidebar/ai-script.svg";
 
 import overviewIcon from "@/assets/icons/sidebar/overview.svg";
@@ -127,11 +127,11 @@ const navigationGroups: NavigationGroup[] = [
           //   path: "/leads/follow-up/smart-reminders",
           //   label: "Smart Follow up Reminders",
           // },
-          {
-            path: "/leads/follow-up/activity-log",
-            label: "Activity Log",
-            icon: activityLogIcon,
-          },
+          // {
+          //   path: "/leads/follow-up/activity-log",
+          //   label: "Activity Log",
+          //   icon: activityLogIcon,
+          // },
           {
             path: "/leads/follow-up/script-generator",
             label: "AI Follow-Up Script Generator",
