@@ -68,6 +68,7 @@ type LeadRow = {
   nextFollowUp: string;
   searchText: string;
   rawStatus: string;
+  isRaisedToPO: boolean;
   rawData: LeadListItem;
 };
 
@@ -115,6 +116,7 @@ const mapLeadToRow = (lead: LeadListItem): LeadRow => {
     quoteValueNumber: lead.quoteValue,
     chatCount: 0,
     nextFollowUp: formatFollowUpDate(lead.nextFollowUp?.followUpDate),
+    isRaisedToPO: lead.isRaisedToPO ?? false,
     rawData: lead,
     searchText: [
       lead._id,
@@ -514,14 +516,16 @@ export default function LeadsPage() {
                             }
                           /> */}
 
-                          <MoveToOrdersDialog
-                            leadId={lead.id}
-                            trigger={
-                              <Button variant="ghost" size="icon">
-                                <Redo className=" text-red-500" />
-                              </Button>
-                            }
-                          />
+                          {!lead.isRaisedToPO && (
+                            <MoveToOrdersDialog
+                              leadId={lead.id}
+                              trigger={
+                                <Button variant="ghost" size="icon">
+                                  <Redo className=" text-red-500" />
+                                </Button>
+                              }
+                            />
+                          )}
 
                           <EscalateLeadDialog
                             leadId={lead.id}
