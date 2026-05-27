@@ -149,24 +149,15 @@ export function useCreateLeadMutation() {
 type MoveLeadToOrdersVariables = {
   leadId: string;
   poNumber: string;
-  invoiceId: string;
-  quotationId: string;
 };
 
 export function useMoveLeadToOrdersMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      leadId,
-      poNumber,
-      invoiceId,
-      quotationId,
-    }: MoveLeadToOrdersVariables) =>
+    mutationFn: ({ leadId, poNumber }: MoveLeadToOrdersVariables) =>
       moveLeadToOrdersProvider(leadId, {
         poNumber,
-        invoiceId,
-        quotationId,
       }),
     onSuccess: (response, variables) => {
       if (!response.success) {

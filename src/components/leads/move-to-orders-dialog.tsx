@@ -12,10 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getApiErrorMessage } from "@/lib/api-error";
-import {
-  useLeadDetailQuery,
-  useMoveLeadToOrdersMutation,
-} from "@/modules/leads/leads.hooks";
+import { useMoveLeadToOrdersMutation } from "@/modules/leads/leads.hooks";
 
 interface MoveToOrdersDialogProps {
   trigger: React.ReactNode;
@@ -27,35 +24,29 @@ export default function MoveToOrdersDialog({
   leadId,
 }: MoveToOrdersDialogProps) {
   const [open, setOpen] = useState(false);
-  const [poNumber, setPoNumber] = useState("2145654332");
+  const [poNumber, setPoNumber] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const moveLeadToOrdersMutation = useMoveLeadToOrdersMutation();
-  const { data: leadResponse } = useLeadDetailQuery(leadId, open);
+  // const { data: leadResponse } = useLeadDetailQuery(leadId, open);
 
-  const leadDetail = leadResponse?.success ? leadResponse.data : undefined;
-  const latestQuotation =
-    leadDetail?.quotations.find((quotation) => quotation.isLatest) ??
-    leadDetail?.quotations[0];
-  const latestInvoice = [...(leadDetail?.payments.invoices ?? [])].sort(
-    (left, right) => {
-      const leftTime = new Date(left.createdAt).getTime();
-      const rightTime = new Date(right.createdAt).getTime();
+  // const leadDetail = leadResponse?.success ? leadResponse.data : undefined;
+  // const latestQuotation =
+  //   leadDetail?.quotations.find((quotation) => quotation.isLatest) ??
+  //   leadDetail?.quotations[0];
+  // const latestInvoice = [...(leadDetail?.payments.invoices ?? [])].sort(
+  //   (left, right) => {
+  //     const leftTime = new Date(left.createdAt).getTime();
+  //     const rightTime = new Date(right.createdAt).getTime();
 
-      return rightTime - leftTime;
-    },
-  )[0];
+  //     return rightTime - leftTime;
+  //   },
+  // )[0];
 
-  const quotationId = latestQuotation?._id;
-  const invoiceId = latestInvoice?._id;
+  // const quotationId = latestQuotation?._id;
+  // const invoiceId = latestInvoice?._id;
 
   const handleMove = async () => {
-    if (
-      !leadId ||
-      !quotationId ||
-      !invoiceId ||
-      !poNumber.trim() ||
-      moveLeadToOrdersMutation.isPending
-    ) {
+    if (!leadId || !poNumber.trim() || moveLeadToOrdersMutation.isPending) {
       return;
     }
 
@@ -65,8 +56,6 @@ export default function MoveToOrdersDialog({
       await moveLeadToOrdersMutation.mutateAsync({
         leadId,
         poNumber: poNumber.trim(),
-        invoiceId,
-        quotationId,
       });
 
       setOpen(false);
@@ -121,11 +110,7 @@ export default function MoveToOrdersDialog({
             size="lg"
             onClick={handleMove}
             disabled={
-              moveLeadToOrdersMutation.isPending ||
-              !leadId ||
-              !quotationId ||
-              !invoiceId ||
-              !poNumber.trim()
+              moveLeadToOrdersMutation.isPending || !leadId || !poNumber.trim()
             }
             className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-8 py-3"
           >

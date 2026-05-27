@@ -450,8 +450,6 @@ export async function escalateLeadProvider(
 
 export type MoveLeadToOrdersPayload = {
   poNumber: string;
-  invoiceId: string;
-  quotationId: string;
 };
 
 export type MoveLeadToOrdersResponse = {
