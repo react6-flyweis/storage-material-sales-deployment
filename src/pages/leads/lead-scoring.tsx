@@ -18,7 +18,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { useScoredLeadsQuery } from "@/modules/leads/leads.hooks";
+import SuccessDialog from "@/components/success-dialog";
+import {
+  useScoredLeadsQuery,
+  useUpdateLeadTemperatureMutation,
+} from "@/modules/leads/leads.hooks";
 import {
   formatLifecycleStatus,
   getLeadProgress,
@@ -32,7 +36,7 @@ interface LeadScore {
   progress: number;
   status: string;
   quoteValue: number;
-  score: "Hot" | "Warm" | "Cold";
+  temperature: "hot" | "warm" | "cold";
   lastActivity: string;
   lastActivityDate?: string; // ISO date string for filtering
 }
@@ -46,7 +50,7 @@ interface LeadFilters {
 
 function filterLeadScores(
   leads: LeadScore[],
-  overrides: Record<string, LeadScore["score"]>,
+  overrides: Record<string, LeadScore["temperature"]>,
   filters: LeadFilters,
 ) {
   const normalizedClient = filters.client.trim().toLowerCase();
@@ -54,7 +58,7 @@ function filterLeadScores(
   return leads
     .map((lead) => ({
       ...lead,
-      score: overrides[lead.id] ?? lead.score,
+      temperature: overrides[lead.id] ?? lead.temperature,
     }))
     .filter((lead) => {
       if (filters.status !== "all" && lead.status !== filters.status) {
@@ -132,13 +136,35 @@ export default function LeadScoring() {
   const [dateTo, setDateTo] = useState("");
   const [status, setStatus] = useState("all");
   const [client, setClient] = useState("");
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const [overrides, setOverrides] = useState<
-    Record<string, LeadScore["score"]>
+    Record<string, LeadScore["temperature"]>
   >({});
 
-  const updateLeadScore = (id: string, newScore: LeadScore["score"]) => {
-    setOverrides((s) => ({ ...s, [id]: newScore }));
+  const updateLeadTemperatureMutation = useUpdateLeadTemperatureMutation();
+
+  const updateLeadTemperature = (
+    id: string,
+    newTemperature: LeadScore["temperature"],
+  ) => {
+    setOverrides((s) => ({ ...s, [id]: newTemperature }));
+
+    updateLeadTemperatureMutation.mutate(
+      { leadId: id, temperature: newTemperature },
+      {
+        onSuccess: () => {
+          setShowSuccess(true);
+        },
+        onError: () => {
+          setOverrides((current) => {
+            const next = { ...current };
+            delete next[id];
+            return next;
+          });
+        },
+      },
+    );
   };
 
   // fetch scored leads from API
@@ -151,9 +177,9 @@ export default function LeadScoring() {
 
   const apiLeads: LeadScore[] = (scoredResp?.data?.leads || []).map((l) => {
     const scoreNum = l.leadScoring?.score ?? 0;
-
-    const scoreLabel: LeadScore["score"] =
-      scoreNum >= 70 ? "Hot" : scoreNum >= 40 ? "Warm" : "Cold";
+    const temperatureValue: LeadScore["temperature"] =
+      l.leadScoring?.temperature ??
+      (scoreNum >= 70 ? "hot" : scoreNum >= 40 ? "warm" : "cold");
 
     const lifecycle = l.lifecycleStatus || "";
     const statusLabel = formatLifecycleStatus(lifecycle || "initial_contact");
@@ -167,7 +193,7 @@ export default function LeadScoring() {
       progress,
       status: statusLabel as LeadScore["status"],
       quoteValue: l.quoteValue || 0,
-      score: scoreLabel,
+      temperature: temperatureValue,
       lastActivity: `${scoreNum} pts`,
       lastActivityDate: undefined,
     };
@@ -184,17 +210,21 @@ export default function LeadScoring() {
     [apiLeads, overrides, status, client, dateFrom, dateTo],
   );
 
-  const getScoreBadgeClass = (score: string) => {
-    switch (score) {
-      case "Hot":
+  const getTemperatureBadgeClass = (temperature: string) => {
+    switch (temperature) {
+      case "hot":
         return "bg-red-500 hover:bg-red-600 text-white";
-      case "Warm":
+      case "warm":
         return "bg-yellow-500 hover:bg-yellow-600 text-white";
-      case "Cold":
+      case "cold":
         return "bg-green-500 hover:bg-green-600 text-white";
       default:
         return "bg-gray-500 text-white";
     }
+  };
+
+  const formatTemperatureLabel = (temperature: LeadScore["temperature"]) => {
+    return temperature.charAt(0).toUpperCase() + temperature.slice(1);
   };
 
   const getStatusBadgeClass = (status: string) => {
@@ -272,8 +302,9 @@ export default function LeadScoring() {
               <label className="text-sm font-medium text-gray-700">
                 Status
               </label>
+              // TODO: integrate all lifecycle status
               <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger className="bg-white">
+                <SelectTrigger className="bg-white w-full">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -372,22 +403,30 @@ export default function LeadScoring() {
                     </TableCell>
                     <TableCell>
                       <Select
-                        value={lead.score}
+                        value={lead.temperature}
                         onValueChange={(val) =>
-                          updateLeadScore(lead.id, val as LeadScore["score"])
+                          updateLeadTemperature(
+                            lead.id,
+                            val as LeadScore["temperature"],
+                          )
                         }
+                        disabled={updateLeadTemperatureMutation.isPending}
                       >
                         <SelectTrigger
-                          className={`${getScoreBadgeClass(
-                            lead.score,
+                          className={`${getTemperatureBadgeClass(
+                            lead.temperature,
                           )} rounded-full px-4`}
                         >
-                          <SelectValue />
+                          <SelectValue
+                            placeholder={formatTemperatureLabel(
+                              lead.temperature,
+                            )}
+                          />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Hot">Hot</SelectItem>
-                          <SelectItem value="Warm">Warm</SelectItem>
-                          <SelectItem value="Cold">Cold</SelectItem>
+                          <SelectItem value="hot">Hot</SelectItem>
+                          <SelectItem value="warm">Warm</SelectItem>
+                          <SelectItem value="cold">Cold</SelectItem>
                         </SelectContent>
                       </Select>
                     </TableCell>
@@ -401,6 +440,12 @@ export default function LeadScoring() {
           )}
         </div>
       </div>
+
+      <SuccessDialog
+        open={showSuccess}
+        onClose={() => setShowSuccess(false)}
+        title="Lead temperature updated"
+      />
     </div>
   );
 }
