@@ -70,7 +70,7 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
   const scoreBreakdown = buildLeadScoreBreakdown(apiScoreBreakdown);
 
   const projectTitle = leadData?.projectName ?? "";
-  const projectReference = leadData?._id || "—";
+  const projectReference = leadData?.jobId || "—";
   const statusLabel = leadData?.lifecycleStatus
     ? formatLifecycleStatus(leadData.lifecycleStatus)
     : "—";
