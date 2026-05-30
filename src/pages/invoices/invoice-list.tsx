@@ -1,17 +1,26 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import { useNavigate } from "react-router";
 import {
   FileText,
   Download,
   Printer,
-  Calendar,
+  Search,
+  Eye,
   DollarSign,
   CheckCircle,
   CreditCard,
   AlertCircle,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableHeader,
@@ -21,162 +30,203 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import Pagination from "@/components/Pagination";
+import DateRangePicker from "@/components/ui/date-range-picker";
+import ClientSelector from "@/components/customers/client-selector";
+import {
+  useInvoiceStatsQuery,
+  useInvoicesQuery,
+} from "@/modules/invoices/invoices.hooks";
+import type { InvoiceStatus } from "@/modules/invoices/invoices.api";
+import type { DateRange } from "react-day-picker";
 
-type Invoice = {
+type SelectedClient = {
   id: string;
-  invoiceNumber: string;
+  name: string;
   customer: string;
-  dueDate: string; // ISO
-  amount: number;
-  paid: number;
-  status: "Paid" | "Unpaid";
+  customerId: string;
 };
 
-const initialInvoices: Invoice[] = [
-  {
-    id: "1",
-    invoiceNumber: "INV001",
-    customer: "Carl Evans",
-    dueDate: "2024-12-24",
-    amount: 500,
-    paid: 500,
-    status: "Paid",
-  },
-  {
-    id: "2",
-    invoiceNumber: "INV002",
-    customer: "Minerva Rameriz",
-    dueDate: "2024-12-10",
-    amount: 1500,
-    paid: 1500,
-    status: "Paid",
-  },
-  {
-    id: "3",
-    invoiceNumber: "INV003",
-    customer: "Robert Lamon",
-    dueDate: "2024-11-27",
-    amount: 600,
-    paid: 600,
-    status: "Paid",
-  },
-  {
-    id: "4",
-    invoiceNumber: "INV004",
-    customer: "Patricia Lewis",
-    dueDate: "2024-11-18",
-    amount: 1000,
-    paid: 1000,
-    status: "Paid",
-  },
-  {
-    id: "5",
-    invoiceNumber: "INV005",
-    customer: "Mark Joslyn",
-    dueDate: "2024-11-06",
-    amount: 1200,
-    paid: 1200,
-    status: "Paid",
-  },
-  {
-    id: "6",
-    invoiceNumber: "INV006",
-    customer: "Marsha Betts",
-    dueDate: "2024-10-25",
-    amount: 800,
-    paid: 800,
-    status: "Paid",
-  },
-  {
-    id: "7",
-    invoiceNumber: "INV007",
-    customer: "Daniel Jude",
-    dueDate: "2024-10-14",
-    amount: 2000,
-    paid: 2000,
-    status: "Paid",
-  },
-  {
-    id: "8",
-    invoiceNumber: "INV008",
-    customer: "Emma Bates",
-    dueDate: "2024-10-03",
-    amount: 100,
-    paid: 100,
-    status: "Paid",
-  },
-  {
-    id: "9",
-    invoiceNumber: "INV009",
-    customer: "Richard Fralick",
-    dueDate: "2024-09-20",
-    amount: 300,
-    paid: 300,
-    status: "Paid",
-  },
-  {
-    id: "10",
-    invoiceNumber: "INV010",
-    customer: "Michelle Robison",
-    dueDate: "2024-09-10",
-    amount: 5000,
-    paid: 0,
-    status: "Unpaid",
-  },
+const statusOptions: Array<{ value: "All" | InvoiceStatus; label: string }> = [
+  { value: "All", label: "All" },
+  { value: "draft", label: "Draft" },
+  { value: "sent", label: "Sent" },
+  { value: "paid", label: "Paid" },
+  { value: "overdue", label: "Overdue" },
+  { value: "cancelled", label: "Cancelled" },
 ];
+
+const statusBadgeStyles: Record<
+  InvoiceStatus,
+  { bg: string; text: string; label: string }
+> = {
+  draft: { bg: "bg-slate-600", text: "text-white", label: "Draft" },
+  sent: { bg: "bg-blue-600", text: "text-white", label: "Sent" },
+  paid: { bg: "bg-green-600", text: "text-white", label: "Paid" },
+  overdue: { bg: "bg-red-600", text: "text-white", label: "Overdue" },
+  cancelled: {
+    bg: "bg-zinc-100",
+    text: "text-zinc-700",
+    label: "Cancelled",
+  },
+};
 
 function formatCurrency(n: number) {
   return `$${n.toLocaleString()}`;
 }
 
+function formatDateParam(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function formatDisplayDate(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function getStatusBadgeClasses(status: InvoiceStatus) {
+  return statusBadgeStyles[status] ?? statusBadgeStyles.draft;
+}
+
+function InvoiceSummarySkeleton() {
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div
+          key={index}
+          className="bg-white rounded-md p-4 shadow flex items-center gap-4 border border-slate-200 animate-pulse"
+        >
+          <div className="w-10 h-10 rounded-md bg-slate-200" />
+          <div className="flex-1 space-y-2">
+            <div className="h-3 w-20 rounded bg-slate-200" />
+            <div className="h-6 w-24 rounded bg-slate-200" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function InvoiceTableSkeleton() {
+  return (
+    <div className="p-4 space-y-3 animate-pulse">
+      {Array.from({ length: 5 }).map((_, index) => (
+        <div
+          key={index}
+          className="grid grid-cols-6 gap-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3"
+        >
+          {Array.from({ length: 6 }).map((__, cellIndex) => (
+            <div key={cellIndex} className="h-4 rounded bg-slate-200" />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="p-8 text-center text-gray-500">
+      <p className="text-base font-medium text-gray-700">No invoices found</p>
+      <p className="mt-2 text-sm">
+        Adjust the filters or search criteria to see results.
+      </p>
+    </div>
+  );
+}
+
 export default function InvoiceListPage() {
-  const [invoices] = useState(initialInvoices);
-  const [query, setQuery] = useState("");
-  const [customerFilter, setCustomerFilter] = useState("All");
-  const [statusFilter, setStatusFilter] = useState("All");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [selectedClient, setSelectedClient] = useState<SelectedClient | null>(
+    null,
+  );
+  const [statusFilter, setStatusFilter] = useState<"All" | InvoiceStatus>(
+    "All",
+  );
+  const [searchQuery, setSearchQuery] = useState("");
+  const { data: stats, isPending } = useInvoiceStatsQuery();
+  const loadingStats = isPending && !stats;
 
-  // pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(20);
 
-  const filtered = useMemo(() => {
-    return invoices.filter((inv) => {
-      if (customerFilter !== "All" && inv.customer !== customerFilter)
-        return false;
-      if (statusFilter !== "All" && inv.status !== statusFilter) return false;
-      if (
-        query &&
-        !`${inv.invoiceNumber} ${inv.customer}`
-          .toLowerCase()
-          .includes(query.toLowerCase())
-      )
-        return false;
-      return true;
-    });
-  }, [invoices, customerFilter, statusFilter, query]);
+  const navigate = useNavigate();
 
-  const totalAmount = filtered.reduce((s, i) => s + i.amount, 0);
-  const totalPaid = filtered.reduce((s, i) => s + i.paid, 0);
-  const totalUnpaid = filtered.reduce((s, i) => s + (i.amount - i.paid), 0);
-  const overdue = filtered.reduce((s, i) => {
-    const now = new Date();
-    const due = new Date(i.dueDate);
-    if (due < now && i.amount - i.paid > 0) return s + (i.amount - i.paid);
-    return s;
-  }, 0);
+  const startDate = dateRange?.from ? formatDateParam(dateRange.from) : "";
+  const endDate = dateRange?.to ? formatDateParam(dateRange.to) : "";
 
-  // page slice
-  const totalItems = filtered.length;
+  const {
+    data: invoicesResponse,
+    isLoading: loadingInvoices,
+    isError: invoicesError,
+  } = useInvoicesQuery({
+    startDate,
+    endDate,
+    status: statusFilter === "All" ? "" : statusFilter,
+    leadId: selectedClient?.id || "",
+    search: searchQuery,
+    page: currentPage,
+    limit: rowsPerPage,
+  });
+
+  const invoices = invoicesResponse?.data.invoices ?? [];
+  const totalItems = invoicesResponse?.data.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalItems / rowsPerPage));
-  const current = Math.min(currentPage, totalPages);
-  const start = (current - 1) * rowsPerPage;
-  const paginated = filtered.slice(start, start + rowsPerPage);
 
-  const customers = useMemo(() => {
-    const set = new Set<string>();
-    invoices.forEach((i) => set.add(i.customer));
-    return ["All", ...Array.from(set)];
-  }, [invoices]);
+  const hasActiveFilters =
+    Boolean(dateRange?.from || dateRange?.to) ||
+    Boolean(selectedClient) ||
+    statusFilter !== "All" ||
+    searchQuery.trim().length > 0;
+
+  const current = Math.min(currentPage, totalPages);
+
+  const summaryCards = [
+    {
+      key: "totalAmount",
+      title: "Total Amount",
+      value: stats?.totalAmount ?? 0,
+      icon: DollarSign,
+      iconClassName: "bg-green-500 text-white",
+      borderClassName: "border-green-200",
+    },
+    {
+      key: "totalPaid",
+      title: "Total Paid",
+      value: stats?.totalPaid ?? 0,
+      icon: CheckCircle,
+      iconClassName: "bg-blue-600 text-white",
+      borderClassName: "border-blue-200",
+    },
+    {
+      key: "totalUnpaid",
+      title: "Total Unpaid",
+      value: stats?.totalUnpaid ?? 0,
+      icon: CreditCard,
+      iconClassName: "bg-orange-500 text-white",
+      borderClassName: "border-orange-200",
+    },
+    {
+      key: "overdue",
+      title: "Overdue",
+      value: stats?.overdue ?? 0,
+      icon: AlertCircle,
+      iconClassName: "bg-red-600 text-white",
+      borderClassName: "border-red-200",
+    },
+  ];
 
   return (
     <div className="p-6 space-y-6">
@@ -187,122 +237,128 @@ export default function InvoiceListPage() {
             Dashboard &gt; Invoice Report
           </p>
         </div>
-        {/* action buttons moved into table header for compact layout */}
       </div>
 
-      {/* Summary */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-md p-4 shadow flex items-center gap-4 border border-green-200">
-          <div className="w-10 h-10 flex items-center justify-center rounded-md bg-green-500 text-white">
-            <DollarSign className="text-white" />
-          </div>
-          <div>
-            <div className="text-xs text-gray-500">Total Amount</div>
-            <div className="text-xl font-semibold">
-              {formatCurrency(totalAmount)}
-            </div>
-          </div>
-        </div>
+      {loadingStats ? (
+        <InvoiceSummarySkeleton />
+      ) : (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {summaryCards.map((card) => {
+            const Icon = card.icon;
 
-        <div className="bg-white rounded-md p-4 shadow flex items-center gap-4 border border-blue-200">
-          <div className="w-10 h-10 flex items-center justify-center rounded-md bg-blue-600 text-white">
-            <CheckCircle className="text-white" />
-          </div>
-          <div>
-            <div className="text-xs text-gray-500">Total Paid</div>
-            <div className="text-xl font-semibold">
-              {formatCurrency(totalPaid)}
-            </div>
-          </div>
+            return (
+              <div
+                key={card.key}
+                className={`bg-white rounded-md p-4 shadow flex items-center gap-4 border ${card.borderClassName}`}
+              >
+                <div
+                  className={`w-10 h-10 flex items-center justify-center rounded-md ${card.iconClassName}`}
+                >
+                  <Icon className="text-white" />
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">{card.title}</div>
+                  <div className="text-xl font-semibold">
+                    {formatCurrency(card.value)}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
+      )}
 
-        <div className="bg-white rounded-md p-4 shadow flex items-center gap-4 border border-orange-200">
-          <div className="w-10 h-10 flex items-center justify-center rounded-md bg-orange-500 text-white">
-            <CreditCard className="text-white" />
-          </div>
-          <div>
-            <div className="text-xs text-gray-500">Total Unpaid</div>
-            <div className="text-xl font-semibold">
-              {formatCurrency(totalUnpaid)}
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-md p-4 shadow flex items-center gap-4 border border-red-200">
-          <div className="w-10 h-10 flex items-center justify-center rounded-md bg-red-600 text-white">
-            <AlertCircle className="text-white" />
-          </div>
-          <div>
-            <div className="text-xs text-gray-500">Overdue</div>
-            <div className="text-xl font-semibold">
-              {formatCurrency(overdue)}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Filters */}
       <Card>
         <CardContent>
-          <div className="flex flex-col md:flex-row gap-4 items-center">
-            <div className="w-full md:w-1/3">
+          <div className="grid gap-4 lg:grid-cols-4">
+            <div className="w-full">
               <label className="text-xs text-gray-500">Choose Date</label>
-              <div className="relative mt-1">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 size-4" />
-                <Input
-                  readOnly
-                  value="01 Jan-2025 - 12-Dec-2025"
-                  className="pl-10"
+              <div className="mt-1 space-y-2">
+                <DateRangePicker
+                  value={dateRange}
+                  className="w-full"
+                  onChange={(range) => {
+                    setDateRange(range);
+                    setCurrentPage(1);
+                  }}
                 />
               </div>
             </div>
 
-            <div className="w-full md:w-1/3">
-              <label className="text-xs text-gray-500">Customer</label>
-              <select
-                className="border rounded px-3 py-2 w-full mt-1"
-                value={customerFilter}
-                onChange={(e) => setCustomerFilter(e.target.value)}
-              >
-                {customers.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
+            <div className="w-full">
+              <label className="text-xs text-gray-500">Project</label>
+              <div className="mt-1">
+                <ClientSelector
+                  value={selectedClient?.id || ""}
+                  placeholder="Search project/leads..."
+                  onValueChange={(client) => {
+                    setSelectedClient(client ?? null);
+                    setCurrentPage(1);
+                  }}
+                />
+              </div>
             </div>
 
-            <div className="w-full md:w-1/3 flex items-end justify-between">
-              <div className="w-2/3">
-                <label className="text-xs text-gray-500">Status</label>
-                <select
-                  className="border rounded px-3 py-2 w-full mt-1"
+            <div className="w-full">
+              <label className="text-xs text-gray-500">Status</label>
+              <div className="mt-1">
+                <Select
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                >
-                  <option value="All">All</option>
-                  <option value="Paid">Paid</option>
-                  <option value="Unpaid">Unpaid</option>
-                </select>
-              </div>
-              <div className="ml-4">
-                <Button
-                  onClick={() => {
-                    setQuery("");
-                    setCustomerFilter("All");
-                    setStatusFilter("All");
+                  onValueChange={(value) => {
+                    setStatusFilter(value as "All" | InvoiceStatus);
+                    setCurrentPage(1);
                   }}
-                  className="bg-orange-500 text-white px-6 py-2"
                 >
-                  Search
-                </Button>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="w-full">
+              <label className="text-xs text-gray-500">Search</label>
+              <div className="mt-1 flex items-end gap-3">
+                <div className="relative flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
+                  <Input
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    placeholder="Search invoice, customer..."
+                    className="pl-9"
+                  />
+                </div>
+                {hasActiveFilters ? (
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setDateRange(undefined);
+                      setSelectedClient(null);
+                      setStatusFilter("All");
+                      setSearchQuery("");
+                      setCurrentPage(1);
+                    }}
+                    className="bg-orange-500 text-white px-6 py-2"
+                  >
+                    Reset
+                  </Button>
+                ) : null}
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Table */}
       <Card className="p-0">
         <CardContent className="p-0">
           <div className="p-4 flex items-center justify-between">
@@ -336,7 +392,7 @@ export default function InvoiceListPage() {
                     Invoice Number
                   </TableHead>
                   <TableHead className="text-left px-6 py-3 text-sm text-gray-600">
-                    Customer
+                    Project
                   </TableHead>
                   <TableHead className="text-left px-6 py-3 text-sm text-gray-600">
                     Due Date
@@ -345,47 +401,78 @@ export default function InvoiceListPage() {
                     Amount
                   </TableHead>
                   <TableHead className="text-left px-6 py-3 text-sm text-gray-600">
-                    Paid
-                  </TableHead>
-                  <TableHead className="text-left px-6 py-3 text-sm text-gray-600">
-                    Amount Due
-                  </TableHead>
-                  <TableHead className="text-left px-6 py-3 text-sm text-gray-600">
                     Status
+                  </TableHead>
+                  <TableHead className="text-left px-6 py-3 text-sm text-gray-600">
+                    Actions
                   </TableHead>
                 </tr>
               </TableHeader>
-              <TableBody>
-                {paginated.map((inv) => (
-                  <TableRow key={inv.id}>
-                    <TableCell className="text-orange-500 font-medium px-6 py-4">
-                      {inv.invoiceNumber}
-                    </TableCell>
-                    <TableCell>{inv.customer}</TableCell>
-                    <TableCell>
-                      {new Date(inv.dueDate).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>{formatCurrency(inv.amount)}</TableCell>
-                    <TableCell>{formatCurrency(inv.paid)}</TableCell>
-                    <TableCell>
-                      {formatCurrency(inv.amount - inv.paid)}
-                    </TableCell>
-                    <TableCell className="px-6 py-4">
-                      {inv.status === "Paid" ? (
-                        <span className="inline-flex items-center gap-2 bg-green-400 text-white px-2 py-0.5 rounded-md text-sm font-medium">
-                          <span className="w-2 h-2 bg-white rounded-full" />
-                          Paid
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-2 bg-red-400 text-white px-2 py-0.5 rounded-md text-sm font-medium">
-                          <span className="w-2 h-2 bg-white rounded-full" />
-                          Unpaid
-                        </span>
-                      )}
+              {loadingInvoices ? (
+                <TableBody>
+                  <TableRow>
+                    <TableCell colSpan={6} className="p-0">
+                      <InvoiceTableSkeleton />
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
+                </TableBody>
+              ) : invoices.length === 0 ? (
+                <TableBody>
+                  <TableRow>
+                    <TableCell colSpan={6} className="p-0">
+                      <EmptyState />
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              ) : (
+                <TableBody>
+                  {invoices.map((inv) => {
+                    const status = getStatusBadgeClasses(inv.status);
+
+                    return (
+                      <TableRow key={inv.invoice._id}>
+                        <TableCell className="text-orange-500 font-medium px-6 py-4">
+                          {inv.invoiceNumber ||
+                            inv.invoice.invoiceNumber ||
+                            "—"}
+                        </TableCell>
+                        <TableCell className="px-6 py-4">
+                          {inv.projectName || "—"}
+                        </TableCell>
+                        <TableCell className="px-6 py-4">
+                          {formatDisplayDate(
+                            inv.dueDate || inv.invoice.dueDate || "",
+                          )}
+                        </TableCell>
+                        <TableCell className="px-6 py-4">
+                          {formatCurrency(
+                            inv.amount ?? inv.invoice.totalAmount ?? 0,
+                          )}
+                        </TableCell>
+                        <TableCell className="px-6 py-4">
+                          <span
+                            className={`inline-flex items-center gap-2 ${status.bg} ${status.text} px-2 py-0.5 rounded-md text-sm font-medium`}
+                          >
+                            <span className="w-2 h-2 bg-white rounded-full" />
+                            {status.label}
+                          </span>
+                        </TableCell>
+                        <TableCell className="px-6 py-4">
+                          <Button
+                            title="View"
+                            variant="ghost"
+                            onClick={() =>
+                              navigate(`/invoice/${inv.invoice._id}`)
+                            }
+                          >
+                            <Eye />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              )}
             </Table>
           </div>
 
@@ -393,12 +480,18 @@ export default function InvoiceListPage() {
             totalItems={totalItems}
             currentPage={current}
             rowsPerPage={rowsPerPage}
+            rowsPerPageOptions={[20, 50, 100]}
             onPageChange={(p) => setCurrentPage(p)}
             onRowsPerPageChange={(r) => {
               setRowsPerPage(r);
               setCurrentPage(1);
             }}
           />
+          {invoicesError ? (
+            <div className="px-4 pb-4 text-sm text-red-600">
+              Failed to load invoices.
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </div>
