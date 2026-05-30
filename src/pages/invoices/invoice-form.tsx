@@ -1,5 +1,7 @@
-import { useForm, Controller, useFieldArray } from "react-hook-form";
+import { useEffect, useState } from "react";
+import { useForm, Controller, useFieldArray, useWatch } from "react-hook-form";
 import { Calendar, Plus, UserPlus } from "lucide-react";
+import { useNavigate } from "react-router";
 import InvoiceLineItem from "./invoice-line-item";
 import AddMarkupDialog from "@/components/invoice/add-markup-dialog";
 import AddDiscountDialog from "@/components/invoice/add-discount-dialog";
@@ -9,20 +11,23 @@ import AddClientDialog from "@/components/invoice/add-client-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import steelLogo from "@/assets/steel-building-depot-logo.png";
-import { useNavigate } from "react-router";
+import { getApiErrorMessage } from "@/lib/api-error";
+import {
+  useCreateInvoiceMutation,
+  useEditInvoiceMutation,
+} from "@/modules/invoices/invoices.hooks";
+import type {
+  InvoiceDetail,
+  InvoiceLineItem as ApiInvoiceLineItem,
+} from "@/modules/invoices/invoices.api";
+import SuccessDialog from "@/components/success-dialog";
 
-export interface LineItem {
+type LineItem = Omit<ApiInvoiceLineItem, "markup" | "tax"> & {
   id: string;
-  description: string;
-  notes: string;
-  rate: number;
   markup: string;
-  quantity: number;
-  tax: boolean;
+  tax: number;
   selectedTax?: string;
-  images: string[];
-  items: string[];
-}
+};
 
 export interface InvoiceFormValues {
   invoiceNumber: string;
@@ -45,45 +50,151 @@ export interface InvoiceFormValues {
   taxes: { name: string; rate: string }[];
 }
 
-export default function InvoiceForm() {
-  const { register, control, handleSubmit, watch, setValue, getValues } =
-    useForm<InvoiceFormValues>({
-      defaultValues: {
-        invoiceNumber: "2460",
-        date: "10-25-2025",
-        daysToPay: "15",
-        poNumber: "",
-        groupSections: false,
-        markupType: "%",
-        markupValue: "",
-        discountType: "%",
-        discountValue: "",
-        depositType: "%",
-        depositValue: "",
-        paymentScheduleType: "%",
-        paymentSchedulePayments: [],
-        clientId: "",
-        clientName: "",
-        clientAvatar: "",
-        taxes: [{ name: "Argyle", rate: "8.25" }],
-        lineItems: [
-          {
-            id: "1",
-            description: "Building 1",
-            notes: "",
-            rate: 75000,
-            markup: "Markup",
-            quantity: 1,
-            tax: true,
-            selectedTax: "",
-            images: ["Image123.png"],
-            items: [],
-          },
-        ],
-      },
-    });
+const defaultLineItems: InvoiceFormValues["lineItems"] = [
+  {
+    id: "",
+    description: "",
+    notes: "",
+    rate: 0,
+    markup: "Markup",
+    quantity: 0,
+    tax: 0,
+    total: 0,
+    selectedTax: "",
+    images: [],
+    items: [],
+  },
+];
 
+const defaultFormValues: InvoiceFormValues = {
+  invoiceNumber: "",
+  date: "",
+  daysToPay: "",
+  poNumber: "",
+  groupSections: false,
+  markupType: "%",
+  markupValue: "",
+  discountType: "%",
+  discountValue: "",
+  depositType: "%",
+  depositValue: "",
+  paymentScheduleType: "%",
+  paymentSchedulePayments: [],
+  clientId: "",
+  clientName: "",
+  clientAvatar: "",
+  taxes: [{ name: "Argyle", rate: "8.25" }],
+  lineItems: defaultLineItems,
+};
+
+function formatDateForInput(value?: string | null) {
+  if (!value) return defaultFormValues.date;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toISOString().slice(0, 10);
+}
+
+function getCustomerName(customer?: InvoiceDetail["customerId"]) {
+  if (!customer || typeof customer !== "object") return "";
+
+  return (
+    `${customer.firstName ?? ""} ${customer.lastName ?? ""}`.trim() ||
+    customer.email ||
+    customer.customerId ||
+    ""
+  );
+}
+
+function invoiceToFormValues(
+  invoice?: InvoiceDetail | null,
+): InvoiceFormValues {
+  const customer =
+    invoice && typeof invoice.customerId === "object"
+      ? invoice.customerId
+      : null;
+
+  return {
+    ...defaultFormValues,
+    invoiceNumber: invoice?.invoiceNumber ?? defaultFormValues.invoiceNumber,
+    date: formatDateForInput(invoice?.date),
+    daysToPay:
+      invoice?.daysToPay != null
+        ? String(invoice.daysToPay)
+        : defaultFormValues.daysToPay,
+    poNumber: invoice?.poNumber ?? defaultFormValues.poNumber,
+    clientId: invoice?.leadId ?? defaultFormValues.clientId,
+    clientName: getCustomerName(customer) || defaultFormValues.clientName,
+    lineItems:
+      invoice?.lineItems?.length && invoice.lineItems.length > 0
+        ? invoice.lineItems.map((item, index) => ({
+            id: item._id ?? item.id ?? `${invoice._id ?? "invoice"}-${index}`,
+            description: item.description ?? "",
+            notes: item.notes ?? "",
+            rate: item.rate ?? 0,
+            markup: "Markup",
+            quantity: item.quantity ?? 1,
+            tax: item.tax ?? 0,
+            total:
+              item.total ??
+              (item.rate ?? 0) * (item.quantity ?? 0) + (item.tax ?? 0),
+            selectedTax: "",
+            images: item.images ?? item.photos ?? [],
+            items: item.items ?? [],
+          }))
+        : defaultLineItems,
+  };
+}
+
+function parseNumericInput(value: string, fallback = 0) {
+  const parsed = Number.parseFloat(value);
+
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function getAdjustmentAmount(
+  value: string,
+  type: "%" | "$",
+  baseAmount: number,
+) {
+  const numericValue = parseNumericInput(value);
+
+  if (!numericValue) {
+    return 0;
+  }
+
+  return type === "%" ? (baseAmount * numericValue) / 100 : numericValue;
+}
+
+type InvoiceFormProps = {
+  invoice?: InvoiceDetail | null;
+};
+
+export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   const navigate = useNavigate();
+  const createInvoiceMutation = useCreateInvoiceMutation();
+  const editInvoiceMutation = useEditInvoiceMutation();
+  const isEdit = Boolean(invoice && invoice._id);
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [createdInvoiceId, setCreatedInvoiceId] = useState<string | null>(null);
+  const {
+    register,
+    control,
+    handleSubmit,
+    setValue,
+    getValues,
+    reset,
+    setError,
+  } = useForm<InvoiceFormValues>({
+    defaultValues: defaultFormValues,
+  });
+
+  const formValues = useWatch({ control }) as Partial<InvoiceFormValues>;
+
+  useEffect(() => {
+    reset(invoiceToFormValues(invoice));
+  }, [invoice, reset]);
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -91,20 +202,28 @@ export default function InvoiceForm() {
     keyName: "fieldId",
   });
 
-  const watchLineItems = watch("lineItems");
-  const invoiceNumber = watch("invoiceNumber");
-  const markupType = watch("markupType");
-  const markupValue = watch("markupValue");
-  const discountType = watch("discountType");
-  const discountValue = watch("discountValue");
-  const depositType = watch("depositType");
-  const depositValue = watch("depositValue");
-  const paymentScheduleType = watch("paymentScheduleType");
-  const paymentSchedulePayments = watch("paymentSchedulePayments");
-  const clientId = watch("clientId");
-  const clientName = watch("clientName");
-  const clientAvatar = watch("clientAvatar");
-  const taxes = watch("taxes");
+  const watchLineItems = (formValues.lineItems ??
+    defaultFormValues.lineItems) as InvoiceFormValues["lineItems"];
+  const invoiceNumber =
+    formValues?.invoiceNumber ?? defaultFormValues.invoiceNumber;
+  const markupType = formValues?.markupType ?? defaultFormValues.markupType;
+  const markupValue = formValues?.markupValue ?? defaultFormValues.markupValue;
+  const discountType =
+    formValues?.discountType ?? defaultFormValues.discountType;
+  const discountValue =
+    formValues?.discountValue ?? defaultFormValues.discountValue;
+  const depositType = formValues?.depositType ?? defaultFormValues.depositType;
+  const depositValue =
+    formValues?.depositValue ?? defaultFormValues.depositValue;
+  const paymentScheduleType =
+    formValues?.paymentScheduleType ?? defaultFormValues.paymentScheduleType;
+  const paymentSchedulePayments = (formValues.paymentSchedulePayments ??
+    defaultFormValues.paymentSchedulePayments) as InvoiceFormValues["paymentSchedulePayments"];
+  const clientId = formValues?.clientId ?? defaultFormValues.clientId;
+  const clientName = formValues?.clientName ?? defaultFormValues.clientName;
+
+  const taxes = (formValues.taxes ??
+    defaultFormValues.taxes) as InvoiceFormValues["taxes"];
 
   // const [notesOpen, setNotesOpen] = useState<Record<string, boolean>>({});
 
@@ -120,7 +239,8 @@ export default function InvoiceForm() {
       rate: 0,
       markup: "Markup",
       quantity: 1,
-      tax: false,
+      tax: 0,
+      total: 0,
       selectedTax: "",
       images: [],
       items: [],
@@ -138,7 +258,7 @@ export default function InvoiceForm() {
     const items = watchLineItems || [];
     return items.reduce(
       (sum, item) =>
-        sum + (parseFloat(String(item.rate || 0)) || 0) * (item.quantity || 0),
+        sum + (parseFloat(String(item.total ?? item.rate ?? 0)) || 0),
       0,
     );
   };
@@ -153,43 +273,122 @@ export default function InvoiceForm() {
       const selectedName = item.selectedTax;
       const t = available.find((a) => a.name === selectedName);
       const rate = t ? parseFloat(t.rate || "0") : 0;
-      return sum + itemSubtotal * (rate / 100);
+      const lineTax = parseFloat(String(item.tax ?? 0)) || 0;
+      return sum + (lineTax || itemSubtotal * (rate / 100));
     }, 0);
   };
 
   const calculateTotal = () => calculateSubtotal() + calculateTax();
 
-  const onSubmit = (data: InvoiceFormValues) => {
-    console.log("submit", data);
-    handlePreview();
-  };
+  const onSubmit = async (data: InvoiceFormValues) => {
+    const isEdit = Boolean(invoice && invoice._id);
 
-  const handlePreview = () => {
-    const values = getValues();
-    const items = (values.lineItems || []).map((li) => ({
-      id: li.id,
-      description: li.description,
-      notes: li.notes,
-      rate: li.rate,
-      quantity: li.quantity,
-      photos: li.images || [],
-    }));
+    if (!clientId) {
+      console.error("Project is required before creating an invoice draft.");
+      return;
+    }
 
-    navigate("/invoice/preview", {
-      state: {
-        invoiceNumber: values.invoiceNumber || invoiceNumber,
-        date: values.date,
-        daysToPay: values.daysToPay,
-        items,
-        subtotal: calculateSubtotal(),
-        taxAmount: calculateTax(),
-        total: calculateTotal(),
-      },
-    });
+    const lineItemsSubtotal = (data.lineItems || []).reduce((sum, item) => {
+      const rate = parseNumericInput(String(item.rate ?? 0));
+      const quantity = parseNumericInput(String(item.quantity ?? 0));
+      const tax = parseNumericInput(String(item.tax ?? 0));
+      const itemTotal = parseNumericInput(
+        String(item.total ?? 0),
+        rate * quantity + tax,
+      );
+
+      return sum + itemTotal;
+    }, 0);
+
+    const markupTotal = getAdjustmentAmount(
+      data.markupValue,
+      data.markupType,
+      lineItemsSubtotal,
+    );
+    const discount = getAdjustmentAmount(
+      data.discountValue,
+      data.discountType,
+      lineItemsSubtotal,
+    );
+    const depositAmount = getAdjustmentAmount(
+      data.depositValue,
+      data.depositType,
+      lineItemsSubtotal,
+    );
+    const totalAmount = Math.max(
+      0,
+      lineItemsSubtotal + markupTotal - discount - depositAmount,
+    );
+
+    const payload = {
+      date: data.date || undefined,
+      daysToPay: (() => {
+        const parsedDaysToPay = Number.parseInt(data.daysToPay, 10);
+
+        return Number.isFinite(parsedDaysToPay) ? parsedDaysToPay : undefined;
+      })(),
+      lineItems: (data.lineItems || []).map((item) => ({
+        description: item.description?.trim() || undefined,
+        notes: item.notes?.trim() || undefined,
+        images: item.images ?? [],
+        items: item.items ?? [],
+        rate: parseNumericInput(String(item.rate ?? 0)),
+        markup: 0,
+        quantity: parseNumericInput(String(item.quantity ?? 0)),
+        tax: parseNumericInput(String(item.tax ?? 0)),
+        total: parseNumericInput(String(item.total ?? 0)),
+      })),
+      subtotal: lineItemsSubtotal,
+      markupTotal,
+      discount,
+      depositAmount,
+      totalAmount,
+    };
+
+    try {
+      if (isEdit) {
+        const invoiceId = invoice!._id;
+        const response = await editInvoiceMutation.mutateAsync({
+          invoiceId,
+          payload,
+        });
+
+        const updatedInvoice = response.data.invoice;
+        if (updatedInvoice?._id) {
+          setCreatedInvoiceId(updatedInvoice._id);
+          setSuccessOpen(true);
+        }
+      } else {
+        const response = await createInvoiceMutation.mutateAsync({
+          leadId: clientId,
+          payload,
+        });
+
+        const createdInvoice = response.data.invoice;
+        if (createdInvoice?._id) {
+          setCreatedInvoiceId(createdInvoice._id);
+          setSuccessOpen(true);
+        }
+      }
+    } catch (error) {
+      setError("root", {
+        type: "manual",
+        message: getApiErrorMessage(error),
+      });
+    }
   };
 
   return (
     <div className="md:px-5 px-2 md:pt-5 pb-10 space-y-6 min-w-xs">
+      <SuccessDialog
+        open={successOpen}
+        onClose={() => {
+          setSuccessOpen(false);
+          if (createdInvoiceId) navigate(`/invoice/${createdInvoiceId}`);
+        }}
+        title={isEdit ? "Invoice updated" : "Invoice created"}
+        okLabel="View invoice"
+      />
       {/* Header */}
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
@@ -204,6 +403,9 @@ export default function InvoiceForm() {
           </Button>
           <Button
             onClick={handleSubmit(onSubmit)}
+            disabled={
+              createInvoiceMutation.isPending || editInvoiceMutation.isPending
+            }
             className="bg-[#2563EB] hover:bg-blue-700 text-white px-6"
           >
             Save
@@ -222,7 +424,7 @@ export default function InvoiceForm() {
               </div>
             </div>
 
-            <div className="text-sm text-gray-500 leading-relaxed max-w-[250px]">
+            <div className="text-sm text-gray-500 leading-relaxed max-w-62.5">
               1851 Madison Ave Suite 300
               <br />
               Council Bluffs, IA
@@ -257,11 +459,6 @@ export default function InvoiceForm() {
               >
                 {clientName ? (
                   <div className="flex items-center gap-3">
-                    <img
-                      src={clientAvatar}
-                      alt={clientName}
-                      className="w-8 h-8 rounded-full object-cover"
-                    />
                     <div className="text-sm font-medium text-gray-900">
                       {clientName}
                     </div>
