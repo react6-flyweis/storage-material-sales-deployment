@@ -1,25 +1,95 @@
-import { useNavigate, useLocation } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, Mail, Wallet } from "lucide-react";
+import { Mail, Wallet } from "lucide-react";
 import logo from "@/assets/steel-building-depot-logo.png";
 import SuccessDialog from "@/components/success-dialog";
+import { useInvoiceDetailQuery } from "@/modules/invoices/invoices.hooks";
+
+function formatCurrency(value: number) {
+  return value.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function formatInvoiceDate(value?: string | null) {
+  if (!value) return "-";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+}
 
 export default function InvoicePreview() {
   const navigate = useNavigate();
-  const location = useLocation();
+  const params = useParams();
   const [showSuccess, setShowSuccess] = useState(false);
+  const invoiceId = params.id;
   const {
-    invoiceNumber = "2460",
-    date = "2025-10-25",
-    daysToPay = "15",
-    items = [],
-    subtotal = 0,
-    taxAmount = 0,
-    total = 0,
-  } = location.state || {};
+    data: invoiceDetailResponse,
+    isLoading,
+    isError,
+  } = useInvoiceDetailQuery(invoiceId);
 
-  const deposit = total * 0.25;
+  const invoice = invoiceDetailResponse?.data.invoice;
+
+  const items =
+    invoice?.lineItems?.map((item, index) => ({
+      id:
+        item._id ??
+        item.id ??
+        `${invoice?._id ?? invoiceId ?? "item"}-${index}`,
+      description: item.description ?? undefined,
+      notes: item.notes ?? undefined,
+      rate: item.rate ?? 0,
+      quantity: item.quantity ?? 0,
+      total: item.total ?? (item.rate ?? 0) * (item.quantity ?? 0),
+      images: item.images ?? item.photos ?? [],
+    })) ?? [];
+
+  const invoiceNumber = invoice?.invoiceNumber ?? "-";
+  const date = formatInvoiceDate(invoice?.date);
+  const daysToPay = invoice?.daysToPay ?? "-";
+  const subtotal = invoice?.subtotal ?? 0;
+  const taxAmount = 0;
+  const total = invoice?.totalAmount ?? 0;
+  const deposit = invoice?.depositAmount ?? total * 0.25;
+
+  if (!invoiceId) {
+    return (
+      <div className="md:px-5 px-2 md:pt-5 pb-10">
+        <div className="mx-auto max-w-3xl rounded-lg border border-gray-200 bg-white p-8 text-center text-gray-500">
+          Open an invoice from the list to preview it.
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="md:px-5 px-2 md:pt-5 pb-10">
+        <div className="mx-auto max-w-3xl rounded-lg border border-gray-200 bg-white p-8 text-center text-gray-500">
+          Loading invoice details...
+        </div>
+      </div>
+    );
+  }
+
+  if (isError || !invoice) {
+    return (
+      <div className="md:px-5 px-2 md:pt-5 pb-10">
+        <div className="mx-auto max-w-3xl rounded-lg border border-gray-200 bg-white p-8 text-center text-gray-500">
+          Invoice details could not be loaded.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -29,39 +99,38 @@ export default function InvoicePreview() {
           <div className="flex gap-2">
             <Button
               variant="outline"
-              className="bg-white hover:bg-gray-50 text-gray-700 border-gray-200 min-w-[100px]"
-              onClick={() => navigate("/invoice")}
+              className="bg-white hover:bg-gray-50 text-gray-700 border-gray-200 min-w-25"
+              onClick={() => navigate(-1)}
             >
-              Edit
-            </Button>
-            <Button
-              className="bg-[#2563EB] hover:bg-blue-700 text-white min-w-[100px] gap-2"
-              onClick={() => setShowSuccess(true)}
-            >
-              <Mail className="w-4 h-4" />
-              Email
+              Back
             </Button>
           </div>
           <div className="flex gap-4">
             <Button
               variant="outline"
-              onClick={() => navigate("/invoice")}
-              className="bg-white hover:bg-gray-50 text-gray-700 border-gray-200 min-w-[100px]"
+              className="bg-white hover:bg-gray-50 text-gray-700 border-gray-200 min-w-25"
+              onClick={() => navigate("edit")}
+            >
+              Edit
+            </Button>
+            <Button
+              className="bg-[#2563EB] hover:bg-blue-700 text-white min-w-25 gap-2"
+              // onClick={() => setShowSuccess(true)}
+            >
+              <Mail className="w-4 h-4" />
+              Email
+            </Button>
+            <Button
+              variant="outline"
+              className="bg-white hover:bg-gray-50 text-gray-700 border-gray-200 min-w-25"
             >
               <Wallet />
               Payments
             </Button>
-            <Button
-              onClick={() => navigate("/invoice")}
-              className="min-w-[100px] gap-2"
-            >
-              More
-              <ChevronDown />
-            </Button>
           </div>
         </div>
 
-        <div className="bg-white rounded-[4px] p-6 sm:p-14 shadow-sm mx-auto max-w-8xl">
+        <div className="bg-white rounded-lg p-6 sm:p-14 shadow-sm mx-auto max-w-8xl">
           <h1 className="text-center text-gray-300 font-bold text-md md:text-xl tracking-widest uppercase mb-12">
             Invoice
           </h1>
@@ -90,10 +159,12 @@ export default function InvoicePreview() {
               </div>
             </div>
 
-            <div className="min-w-[200px] space-y-2">
+            <div className="min-w-50 space-y-2">
               <div className="flex justify-between text-xs">
                 <span className="text-gray-500 font-medium">Payment terms</span>
-                <span className="text-gray-900">{daysToPay} days</span>
+                <span className="text-gray-900">
+                  {daysToPay === "-" ? "-" : `${daysToPay} days`}
+                </span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-gray-500 font-medium">Invoice #</span>
@@ -122,7 +193,7 @@ export default function InvoicePreview() {
             </div>
 
             <div className="space-y-8">
-              {items.map((item: any, index: number) => (
+              {items.map((item, index) => (
                 <div
                   key={item.id}
                   className={index > 0 ? "border-t border-gray-100 pt-4" : ""}
@@ -134,9 +205,9 @@ export default function InvoicePreview() {
                     {/* Calculate item total */}
                     <span className="text-xs text-gray-600">
                       $
-                      {(item.rate * item.quantity).toLocaleString("en-US", {
-                        minimumFractionDigits: 2,
-                      })}
+                      {formatCurrency(
+                        item.total ?? (item.rate ?? 0) * (item.quantity ?? 0),
+                      )}
                     </span>
                   </div>
 
@@ -147,9 +218,9 @@ export default function InvoicePreview() {
                   )}
 
                   {/* Display Photos if any */}
-                  {item.photos && item.photos.length > 0 && (
+                  {item.images && item.images.length > 0 && (
                     <div className="flex flex-wrap gap-4 mt-3 mb-4">
-                      {item.photos.map((photo: string, i: number) => (
+                      {item.images.map((photo: string, i: number) => (
                         <div
                           key={i}
                           className="w-64 h-40 overflow-hidden rounded-sm bg-gray-100"
@@ -174,7 +245,7 @@ export default function InvoicePreview() {
               {/* Fallback to show something if no items */}
               {items.length === 0 && (
                 <div className="text-center text-gray-400 text-sm py-4">
-                  No items added
+                  No line items available
                 </div>
               )}
             </div>
@@ -186,82 +257,25 @@ export default function InvoicePreview() {
               <div className="flex justify-between text-xs">
                 <span className="text-gray-900 font-bold">Subtotal</span>
                 <span className="text-gray-500">
-                  $
-                  {Number(subtotal).toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                  })}
+                  ${formatCurrency(Number(subtotal))}
                 </span>
               </div>
               <div className="flex justify-between text-xs border-b border-gray-100 pb-3">
                 <span className="text-gray-500">Tax</span>
                 <span className="text-gray-500">
-                  $
-                  {Number(taxAmount).toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                  })}
+                  ${formatCurrency(Number(taxAmount))}
                 </span>
               </div>
               <div className="flex justify-between text-xs pt-1">
                 <span className="text-gray-900 font-bold">Total</span>
                 <span className="text-gray-900 font-bold">
-                  $
-                  {Number(total).toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                  })}
+                  ${formatCurrency(Number(total))}
                 </span>
               </div>
               <div className="flex justify-between text-xs pt-2 border-t border-gray-100">
                 <span className="text-gray-900 font-medium">Deposit Due</span>
                 <span className="text-gray-900 font-bold">
-                  $
-                  {deposit.toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                  })}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Payment Schedule */}
-          <div className="mb-16 max-w-lg ml-auto">
-            <h3 className="text-xs font-bold text-gray-900 mb-4">
-              Payment Schedule
-            </h3>
-            <div className="space-y-3">
-              <div className="flex justify-between text-xs border-b border-gray-50 pb-2">
-                <span className="text-gray-500">Deposit(25%)</span>
-                <span className="text-gray-500">
-                  $
-                  {(total * 0.25).toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                  })}
-                </span>
-              </div>
-              <div className="flex justify-between text-xs border-b border-gray-50 pb-2">
-                <span className="text-gray-500">1st payment 50% (50%)</span>
-                <span className="text-gray-900 font-medium">
-                  $
-                  {(total * 0.5).toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                  })}
-                </span>
-              </div>
-              <div className="flex justify-between text-xs border-b border-gray-50 pb-2">
-                <span className="text-gray-500">2nd payment 20%</span>
-                <span className="text-gray-500">
-                  $
-                  {(total * 0.2).toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                  })}
-                </span>
-              </div>
-              <div className="flex justify-between text-xs pb-2">
-                <span className="text-gray-500">Final payment (5%)</span>
-                <span className="text-gray-500">
-                  $
-                  {(total * 0.05).toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                  })}
+                  ${formatCurrency(Number(deposit))}
                 </span>
               </div>
             </div>
