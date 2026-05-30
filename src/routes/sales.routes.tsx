@@ -104,8 +104,9 @@ const NewInquiry = lazy(() => import("@/pages/leads/new-inquiry"));
 
 // Invoice section
 const InvoiceForm = lazy(() => import("@/pages/invoices/invoice-form"));
+const InvoiceEdit = lazy(() => import("@/pages/invoices/invoice-edit"));
 const InvoiceList = lazy(() => import("@/pages/invoices/invoice-list"));
-const SalesGrowth = lazy(() => import("@/pages/invoices/sales-growth"));
+// const SalesGrowth = lazy(() => import("@/pages/invoices/sales-growth"));
 const PaymentFollowUp = lazy(
   () => import("@/pages/invoices/payment-follow-up"),
 );
@@ -283,10 +284,10 @@ export const salesRoutes: RouteObject[] = [
             children: [
               { index: true, element: <InvoiceForm /> },
               { path: "list", element: <InvoiceList /> },
-              { path: "preview", element: <InvoicePreviewPage /> },
               { path: "new", element: <InvoiceForm /> },
-              { path: ":id", element: <InvoiceForm /> },
-              { path: "sales-growth", element: <SalesGrowth /> },
+              { path: ":id", element: <InvoicePreviewPage /> },
+              { path: ":id/edit", element: <InvoiceEdit /> },
+              // { path: "sales-growth", element: <SalesGrowth /> },
             ],
           },
 
