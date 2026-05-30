@@ -13,6 +13,7 @@ import {
   importLeadsProvider,
   createLeadProvider,
   moveLeadToOrdersProvider,
+  updateLeadTemperatureProvider,
   updateLeadLifecycleProvider,
   type ImportLeadsPayload,
 } from "./leads.api";
@@ -183,6 +184,30 @@ export function useUpdateLeadLifecycleMutation() {
   return useMutation({
     mutationFn: ({ leadId, lifecycleStatus }: UpdateLeadLifecycleVariables) =>
       updateLeadLifecycleProvider(leadId, { lifecycleStatus }),
+    onSuccess: (response, variables) => {
+      if (!response.success) {
+        return;
+      }
+
+      void queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["sales", "leads", "detail", variables.leadId],
+      });
+    },
+  });
+}
+
+type UpdateLeadTemperatureVariables = {
+  leadId: string;
+  temperature: "hot" | "warm" | "cold";
+};
+
+export function useUpdateLeadTemperatureMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ leadId, temperature }: UpdateLeadTemperatureVariables) =>
+      updateLeadTemperatureProvider(leadId, { temperature }),
     onSuccess: (response, variables) => {
       if (!response.success) {
         return;

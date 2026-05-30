@@ -53,7 +53,9 @@ export type ScoredLeadItem = {
   lifecycleStatus: string;
   quoteValue: number;
   leadScoring: {
-    score: number;
+    score?: number;
+    temperature?: "hot" | "warm" | "cold";
+    temperatureManual?: boolean;
     projectSize: { points: number; reason: string };
     budgetSignals: { points: number; reason: string };
     timeline: { points: number; reason: string };
@@ -486,6 +488,35 @@ export async function updateLeadLifecycleProvider(
 ) {
   const response = await apiClient.put<UpdateLeadLifecycleResponse>(
     `/api/sales/leads/${leadId}/lifecycle`,
+    payload,
+  );
+
+  return response.data;
+}
+
+export type UpdateLeadTemperaturePayload = {
+  temperature: "hot" | "warm" | "cold";
+};
+
+export type UpdateLeadTemperatureResponse = {
+  success: boolean;
+  message: string;
+  data?: {
+    lead: {
+      leadId: string;
+      projectId: string;
+      temperature: "hot" | "warm" | "cold";
+      temperatureManual: boolean;
+    };
+  };
+};
+
+export async function updateLeadTemperatureProvider(
+  leadId: string,
+  payload: UpdateLeadTemperaturePayload,
+) {
+  const response = await apiClient.put<UpdateLeadTemperatureResponse>(
+    `/api/sales/leads/${leadId}/temperature`,
     payload,
   );
 
