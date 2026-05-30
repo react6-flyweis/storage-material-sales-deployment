@@ -1,4 +1,5 @@
 import { apiClient } from "@/modules/auth/auth.api";
+import type { InvoiceLineItem } from "@/modules/invoices/invoices.api";
 
 type AdminCustomerPhone = {
   number?: string;
@@ -47,16 +48,7 @@ export type AdminCustomerProject = {
   updatedAt?: string;
 };
 
-export type AdminCustomerInvoiceLineItem = {
-  images?: string[];
-  items?: string[];
-  rate?: number;
-  markup?: number;
-  quantity?: number;
-  tax?: number;
-  total?: number;
-  _id?: string;
-};
+export type AdminCustomerInvoiceLineItem = InvoiceLineItem;
 
 export type AdminCustomerInvoice = {
   _id: string;
