@@ -1,4 +1,5 @@
-import { Controller } from "react-hook-form";
+import { useEffect } from "react";
+import { Controller, useWatch } from "react-hook-form";
 import type {
   Control,
   UseFormRegister,
@@ -20,9 +21,11 @@ import {
 } from "@/components/ui/select";
 import TaxDialog from "@/components/invoice/tax-dialog";
 
-import type { InvoiceFormValues, LineItem } from "./invoice-form";
+import type { InvoiceFormValues } from "./invoice-form";
 
 type FieldType = FieldArrayWithId<InvoiceFormValues, "lineItems", "fieldId">;
+
+type LineItem = InvoiceFormValues["lineItems"][number];
 
 type Props = {
   field: FieldType;
@@ -46,6 +49,32 @@ export default function InvoiceLineItem({
   remove,
   taxes = [],
 }: Props) {
+  const watchedLineItem = useWatch({
+    control,
+    name: `lineItems.${index}` as const,
+  }) as LineItem | undefined;
+
+  useEffect(() => {
+    const currentItem = watchedLineItem ?? item;
+    const rate = Number(currentItem?.rate ?? 0);
+    const quantity = Number(currentItem?.quantity ?? 0);
+    const subtotal = rate * quantity;
+    const selectedTax = currentItem?.selectedTax;
+    const matchingTax = taxes.find((tax) => tax.name === selectedTax);
+    const derivedTax = matchingTax
+      ? subtotal * (Number(matchingTax.rate || 0) / 100)
+      : Number(currentItem?.tax ?? 0);
+    const nextTotal = subtotal + derivedTax;
+
+    if ((currentItem?.tax ?? 0) !== derivedTax) {
+      setValue(`lineItems.${index}.tax`, derivedTax);
+    }
+
+    if ((currentItem?.total ?? 0) !== nextTotal) {
+      setValue(`lineItems.${index}.total`, nextTotal);
+    }
+  }, [index, item, setValue, taxes, watchedLineItem]);
+
   const removeImage = (imageIndex: number) => {
     const items = getValues("lineItems") || [];
     const images = items[index]?.images || [];
@@ -70,17 +99,12 @@ export default function InvoiceLineItem({
         <div className="grid grid-cols-2 xl:grid-cols-12   bg-white divide-x">
           {/* Description & Item List - Full width on mobile */}
           <div className="col-span-2 md:col-span-4 p-3 flex items-center gap-4 border-b md:border-b-0 border-gray-100">
-            {item?.description ? (
-              <span className="text-gray-400 text-sm pl-2">
-                {item.description}
-              </span>
-            ) : (
-              <Input
-                {...register(`lineItems.${index}.description` as const)}
-                placeholder="Description"
-                className="text-gray-400 text-sm border-0 focus:ring-0 px-2"
-              />
-            )}
+            <Input
+              {...register(`lineItems.${index}.description` as const)}
+              defaultValue={item?.description ?? undefined}
+              placeholder="Description"
+              className="text-gray-400 text-sm border-0 focus:ring-0 px-2"
+            />
             <div className="ml-auto">
               <ItemListDialog
                 initialItems={item?.items || []}
@@ -104,23 +128,16 @@ export default function InvoiceLineItem({
             <span className="md:hidden text-gray-400 text-[10px] uppercase tracking-wide mb-1">
               Rate
             </span>
-            {item?.rate ? (
-              <span className="text-gray-600 text-sm font-medium">
-                $
-                {(item.rate || 0).toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                })}
-              </span>
-            ) : (
-              <Input
-                type="number"
-                {...register(`lineItems.${index}.rate` as const, {
-                  valueAsNumber: true,
-                })}
-                placeholder="0.00"
-                className="text-gray-600 text-sm border-0 focus:ring-0 w-full"
-              />
-            )}
+            <Input
+              type="number"
+              step="0.01"
+              defaultValue={item?.rate ?? undefined}
+              {...register(`lineItems.${index}.rate` as const, {
+                valueAsNumber: true,
+              })}
+              placeholder="0.00"
+              className="text-gray-600 text-sm border-0 focus:ring-0 w-full"
+            />
           </div>
 
           {/* Markup */}
@@ -154,7 +171,15 @@ export default function InvoiceLineItem({
             <span className="md:hidden text-gray-400 text-[10px] uppercase tracking-wide mb-1">
               Quantity
             </span>
-            <span className="text-gray-600 text-sm">{item?.quantity || 1}</span>
+            <Input
+              type="number"
+              {...register(`lineItems.${index}.quantity` as const, {
+                valueAsNumber: true,
+              })}
+              placeholder="1"
+              className="text-gray-600 text-sm border-0 focus:ring-0 w-full"
+              min={0}
+            />
           </div>
 
           {/* Tax */}
@@ -186,10 +211,10 @@ export default function InvoiceLineItem({
             </span>
             <span className="text-gray-900 md:text-gray-600 text-base md:text-sm font-bold md:font-medium">
               $
-              {((item?.rate || 0) * (item?.quantity || 0)).toLocaleString(
-                "en-US",
-                { minimumFractionDigits: 2 }
-              )}
+              {(
+                (item?.total ?? (item?.rate || 0) * (item?.quantity || 0)) ||
+                0
+              ).toLocaleString("en-US", { minimumFractionDigits: 2 })}
             </span>
           </div>
         </div>
@@ -230,7 +255,7 @@ export default function InvoiceLineItem({
               key={idx}
               className="flex items-center gap-2 text-xs text-gray-500 bg-white/0 px-2 py-1 rounded-md"
             >
-              <span className="truncate max-w-[160px]">{image}</span>
+              <span className="truncate max-w-40">{image}</span>
               <button
                 type="button"
                 onClick={() => removeImage(idx)}
