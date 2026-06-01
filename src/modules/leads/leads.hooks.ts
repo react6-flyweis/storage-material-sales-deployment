@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-query";
 import { apiClient } from "@/modules/auth/auth.api";
 import {
+  createLeadNoteProvider,
   escalateLeadProvider,
   getLeadDetailProvider,
   getScoredLeadsProvider,
@@ -126,6 +127,30 @@ export function useEscalateLeadMutation() {
       void queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
       void queryClient.invalidateQueries({
         queryKey: ["sales", "escalations"],
+      });
+    },
+  });
+}
+
+type CreateLeadNoteVariables = {
+  leadId: string;
+  note: string;
+};
+
+export function useCreateLeadNoteMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ leadId, note }: CreateLeadNoteVariables) =>
+      createLeadNoteProvider(leadId, { note }),
+    onSuccess: (response, variables) => {
+      if (!response.success) {
+        return;
+      }
+
+      void queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["sales", "leads", "detail", variables.leadId],
       });
     },
   });

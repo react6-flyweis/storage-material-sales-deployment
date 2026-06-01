@@ -1,4 +1,5 @@
 import { apiClient } from "@/modules/auth/auth.api";
+import type { AuthUser } from "../auth/auth.types";
 
 export type ImportLeadsPayload = {
   csv: string;
@@ -21,6 +22,7 @@ export type LeadListItem = {
   _id: string;
   projectName: string;
   customerId: LeadCustomerSummary;
+  jobId: string;
   lifecycleStatus: string;
   quoteValue: number;
   leadScoring?: {
@@ -343,6 +345,13 @@ export type LeadDetailFollowUp = {
   createdAt?: string;
 };
 
+export type LeadDetailNote = {
+  _id: string;
+  note: string;
+  addedAt: string;
+  addedBy: AuthUser;
+};
+
 export type LeadDetailInvoice = {
   _id: string;
   invoiceNumber: string;
@@ -411,6 +420,7 @@ export type LeadDetailData = {
   payments: LeadDetailPayments;
   buildings: unknown[];
   budget: unknown;
+  leadNotes: LeadDetailNote[];
   recentMessages: LeadDetailMessage[];
   shipments: unknown[];
 };
@@ -444,6 +454,27 @@ export async function escalateLeadProvider(
 ) {
   const response = await apiClient.post<EscalateLeadResponse>(
     `/api/sales/leads/${leadId}/escalate`,
+    payload,
+  );
+
+  return response.data;
+}
+
+export type CreateLeadNotePayload = {
+  note: string;
+};
+
+export type CreateLeadNoteResponse = {
+  success: boolean;
+  message: string;
+};
+
+export async function createLeadNoteProvider(
+  leadId: string,
+  payload: CreateLeadNotePayload,
+) {
+  const response = await apiClient.post<CreateLeadNoteResponse>(
+    `/api/sales/leads/${leadId}/notes`,
     payload,
   );
 
