@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import LeadLifecycleStatusSelect from "@/components/leads/lead-lifecycle-status-select";
 import {
   Table,
   TableBody,
@@ -23,18 +24,20 @@ import {
   useScoredLeadsQuery,
   useUpdateLeadTemperatureMutation,
 } from "@/modules/leads/leads.hooks";
+import { getLeadProgress } from "@/modules/leads/leads.utils";
 import {
-  formatLifecycleStatus,
-  getLeadProgress,
-} from "@/modules/leads/leads.utils";
+  getLeadLifecycleBadgeClassName,
+  getLeadLifecycleStatusLabel,
+} from "@/modules/leads/lifecycle-statuses";
 
 interface LeadScore {
   id: string;
   name: string;
   leadId: string;
+  jobId: string;
   location: string;
   progress: number;
-  status: string;
+  lifecycleStatus: string;
   quoteValue: number;
   temperature: "hot" | "warm" | "cold";
   lastActivity: string;
@@ -61,7 +64,10 @@ function filterLeadScores(
       temperature: overrides[lead.id] ?? lead.temperature,
     }))
     .filter((lead) => {
-      if (filters.status !== "all" && lead.status !== filters.status) {
+      if (
+        filters.status !== "all" &&
+        lead.lifecycleStatus !== filters.status
+      ) {
         return false;
       }
 
@@ -181,17 +187,17 @@ export default function LeadScoring() {
       l.leadScoring?.temperature ??
       (scoreNum >= 70 ? "hot" : scoreNum >= 40 ? "warm" : "cold");
 
-    const lifecycle = l.lifecycleStatus || "";
-    const statusLabel = formatLifecycleStatus(lifecycle || "initial_contact");
-    const progress = getLeadProgress(lifecycle || "initial_contact");
+    const lifecycle = l.lifecycleStatus || "initial_contact";
+    const progress = getLeadProgress(lifecycle);
 
     return {
       id: l._id,
-      name: l.customerId?.firstName || "",
+      name: l.projectName || "Untitled Lead",
       leadId: l._id,
-      location: l.projectName || "",
+      jobId:l.jobId,
+      location: l.customerId.firstName || "",
       progress,
-      status: statusLabel as LeadScore["status"],
+      lifecycleStatus: lifecycle,
       quoteValue: l.quoteValue || 0,
       temperature: temperatureValue,
       lastActivity: `${scoreNum} pts`,
@@ -225,17 +231,6 @@ export default function LeadScoring() {
 
   const formatTemperatureLabel = (temperature: LeadScore["temperature"]) => {
     return temperature.charAt(0).toUpperCase() + temperature.slice(1);
-  };
-
-  const getStatusBadgeClass = (status: string) => {
-    switch (status) {
-      case "Proposal sent":
-        return "bg-purple-100 text-purple-700 hover:bg-purple-200";
-      case "Quotation Sent":
-        return "bg-orange-100 text-orange-700 hover:bg-orange-200";
-      default:
-        return "bg-gray-100 text-gray-700";
-    }
   };
 
   const renderProgressDots = (progress: number) => {
@@ -302,17 +297,11 @@ export default function LeadScoring() {
               <label className="text-sm font-medium text-gray-700">
                 Status
               </label>
-              // TODO: integrate all lifecycle status
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger className="bg-white w-full">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="Proposal sent">Proposal sent</SelectItem>
-                  <SelectItem value="Quotation Sent">Quotation Sent</SelectItem>
-                </SelectContent>
-              </Select>
+              <LeadLifecycleStatusSelect
+                value={status}
+                onValueChange={setStatus}
+                triggerClassName="bg-white w-full"
+              />
             </div>
 
             <div className="space-y-2">
@@ -371,14 +360,14 @@ export default function LeadScoring() {
               </TableHeader>
               <TableBody>
                 {filteredLeads.map((lead) => (
-                  <TableRow key={lead.id} className="hover:bg-gray-50">
+                  <TableRow key={lead.leadId} className="hover:bg-gray-50">
                     <TableCell>
                       <div>
                         <div className="font-medium text-gray-900">
                           {lead.name}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {lead.leadId}
+                          {lead.jobId}
                         </div>
                         <div className="text-sm text-gray-400">
                           {lead.location}
@@ -394,8 +383,12 @@ export default function LeadScoring() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge className={getStatusBadgeClass(lead.status)}>
-                        {lead.status}
+                      <Badge
+                        className={getLeadLifecycleBadgeClassName(
+                          lead.lifecycleStatus,
+                        )}
+                      >
+                        {getLeadLifecycleStatusLabel(lead.lifecycleStatus)}
                       </Badge>
                     </TableCell>
                     <TableCell className="font-medium">
