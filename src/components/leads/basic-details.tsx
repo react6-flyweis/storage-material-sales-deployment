@@ -9,25 +9,25 @@ import {
 } from "@/components/ui/card";
 import {
   AddNotesDialog,
-  // AddNotesDialog,
-  type AddNotesFormValues,
+  // type AddNotesFormValues,
 } from "@/pages/customers/customer-detail/add-notes-dialog";
 import UpdateStatusDialog from "@/pages/customers/customer-detail/update-status-dialog";
 import {
   Building2,
-  DollarSign,
   Calendar,
   MapPin,
   Phone,
   Mail,
-  User,
+  // User,
   FileText,
+  CircleDollarSign,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { LeadDetailData } from "@/modules/leads/leads.api";
 import {
   formatLeadCurrency,
   formatLeadDate,
+  formatLeadDateTime,
   formatLifecycleStatus,
   formatPhone,
   getAssignedEmployeeName,
@@ -49,11 +49,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 
 type BasicDetailsProps = {
-  lead?: LeadDetailData;
+  lead: LeadDetailData;
 };
 
 export default function BasicDetails({ lead }: BasicDetailsProps) {
-  const [notes, setNotes] = useState<AddNotesFormValues[]>([]);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
@@ -64,12 +63,23 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
   const latestQuotation =
     lead?.quotations.find((quotation) => quotation.isLatest) ??
     lead?.quotations[0];
+  const sortedFollowUps = [...(lead?.followUps ?? [])].sort((left, right) => {
+    const leftTime = left.followUpDate
+      ? new Date(left.followUpDate).getTime()
+      : 0;
+    const rightTime = right.followUpDate
+      ? new Date(right.followUpDate).getTime()
+      : 0;
+
+    return leftTime - rightTime;
+  });
+  const nextFollowUp = sortedFollowUps[0];
 
   const apiScoreBreakdown = lead?.lead.leadScoring?.scoreBreakdown;
   const normalizedScore = lead?.lead.leadScoring?.score ?? 0;
   const scoreBreakdown = buildLeadScoreBreakdown(apiScoreBreakdown);
 
-  const projectTitle = leadData?.projectName ?? "";
+  const projectTitle = leadData?.projectName || "Untitled Lead";
   const projectReference = leadData?.jobId || "—";
   const statusLabel = leadData?.lifecycleStatus
     ? formatLifecycleStatus(leadData.lifecycleStatus)
@@ -86,28 +96,43 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
     latestQuotation?.currency ?? "USD",
   );
   const createdOn = formatLeadDate(leadData?.createdAt);
-  const location = latestQuotation?.location || leadData?.location || "—";
-  const contactName =
-    customer?.firstName?.trim() || customer?.customerId || "Customer";
+  const location = leadData?.location || "—";
+  const contactName = customer?.firstName?.trim() || "-";
   const contactPhone = formatPhone(customer?.phone);
   const contactEmail = customer?.email || "—";
   const contactAddress = leadData?.location || "—";
-  const assignedToName =
-    getAssignedEmployeeName(lead?.auditLog ?? []) ||
-    (leadData?.assignedSales ?? "Unassigned");
-  const assignmentSummary = leadData?.assignedSales
-    ? "Sales rep assigned to this lead"
-    : "No sales rep assigned yet";
+  // const assignedToName =
+  //   getAssignedEmployeeName(lead?.auditLog ?? []) ||
+  //   (leadData?.assignedSales ?? "Unassigned");
+  // const assignmentSummary = leadData?.assignedSales
+  //   ? "Sales rep assigned to this lead"
+  //   : "No sales rep assigned yet";
   const signedAgreementSummary = leadData?.documents?.length
     ? `${leadData.documents.length} document${leadData.documents.length === 1 ? "" : "s"} attached`
     : "No signed agreement uploaded";
-  const signedAgreementDate =
-    leadData?.documents && leadData.documents.length > 0
-      ? `Uploaded on ${formatLeadDate(String(leadData?.documents?.[0] ?? ""))}`
-      : "";
-
   const activeStatus =
     selectedStatus ?? leadData?.lifecycleStatus ?? "initial_contact";
+  const signedAgreementDate = nextFollowUp?.followUpDate
+    ? `Next follow-up: ${formatLeadDate(nextFollowUp.followUpDate)}`
+    : "No follow-up scheduled";
+  const leadStartDate = formatLeadDate(leadData?.createdAt);
+  const targetCompletionDate = latestQuotation?.validTill
+    ? formatLeadDate(latestQuotation.validTill)
+    : "—";
+  const assignedPlanner = leadData?.assignedSales ?? "—";
+  const priorityLabel =
+    latestQuotation?.priorityLevel ?? nextFollowUp?.priority ?? "—";
+  const nextStepLabel = (() => {
+    const activeStepIndex = LEAD_LIFECYCLE_STEPS.findIndex(
+      (step) => step.value === activeStatus,
+    );
+    const nextStep = LEAD_LIFECYCLE_STEPS[activeStepIndex + 1];
+
+    return nextStep
+      ? getLeadLifecycleStatusLabel(nextStep.value)
+      : "No further steps";
+  })();
+
   const selectedStepId = useMemo(
     () => getLeadLifecycleStepId(activeStatus),
     [activeStatus],
@@ -123,10 +148,6 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
   const currentLifecycleLabel = currentLifecycleStep
     ? getLeadLifecycleStatusLabel(currentLifecycleStep.value)
     : "—";
-
-  const handleSaveNote = (data: AddNotesFormValues) => {
-    setNotes((current) => [data, ...current]);
-  };
 
   const handleOpenStatusDialog = () => {
     setStatusDialogOpen(true);
@@ -178,63 +199,53 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
         <CardContent className="pb-4 border-b">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="flex items-center gap-3">
-              <div className="text-slate-400">
+              <div>
                 <Building2 className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-[12px] text-slate-500">Building Type</p>
-                <p className="text-[14px] font-medium text-slate-800">
-                  {buildingType}
-                </p>
+                <p className="">Building Type</p>
+                <p className="text-sm text-muted-foreground">{buildingType}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className="text-slate-400">
-                <DollarSign className="h-5 w-5" />
+              <div>
+                <CircleDollarSign className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-[12px] text-slate-500">Quote Value</p>
-                <p className="text-[14px] font-medium text-slate-800">
-                  {quoteValue}
-                </p>
+                <p className="">Quote Value</p>
+                <p className="text-sm text-muted-foreground">{quoteValue}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className="text-slate-400">
+              <div>
                 <Calendar className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-[12px] text-slate-500">Created On</p>
-                <p className="text-[14px] font-medium text-slate-800">
-                  {createdOn}
-                </p>
+                <p className="">Created On</p>
+                <p className="text-sm text-muted-foreground">{createdOn}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className="text-slate-400">
+              <div>
                 <MapPin className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-[12px] text-slate-500">Location</p>
-                <p className="text-[14px] font-medium text-slate-800">
-                  {location}
-                </p>
+                <p className="">Location</p>
+                <p className="text-sm text-muted-foreground">{location}</p>
               </div>
             </div>
           </div>
         </CardContent>
 
         <CardFooter className="">
-          <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <h3 className="text-[14px] font-semibold text-slate-800">
                 Contact Information
               </h3>
               <div className="bg-[#F8FAFC] rounded-xl p-4 flex gap-4">
                 <div className="flex-1 space-y-2">
-                  <p className="text-[14px] font-medium text-slate-800 mb-1">
-                    {contactName}
-                  </p>
+                  <p className=" mb-1">{contactName}</p>
                   <div className="flex items-start gap-2">
                     <Phone className="h-4 w-4 text-slate-400 shrink-0 mt-0.5" />
                     <div className="flex text-[13px]">
@@ -262,7 +273,7 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
                   </div>
                   <div className="flex items-start gap-2">
                     <MapPin className="h-4 w-4 text-slate-400 shrink-0 mt-0.5" />
-                    <div className="flex flex-col text-[13px]">
+                    <div className="flex text-sm">
                       <span className="text-slate-500 w-16">Address</span>
                       <span className="font-medium text-slate-800">
                         {contactAddress}
@@ -273,7 +284,7 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
               </div>
             </div>
 
-            <div className="space-y-4">
+            {/* <div className="space-y-4">
               <h3 className="text-[14px] font-semibold text-slate-800">
                 Assignment
               </h3>
@@ -282,15 +293,18 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
                   <User className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-[14px] font-medium text-slate-800">
-                    Assigned to: {assignedToName}
+                  <p className="">
+                    Assigned to:
+                    <span className="text-sm text-muted-foreground">
+                      {assignedToName}
+                    </span>
                   </p>
-                  <p className="text-[13px] text-slate-500 mt-1">
+                  <p className="text-sm text-muted-foreground mt-1">
                     {assignmentSummary}
                   </p>
                 </div>
               </div>
-            </div>
+            </div> */}
 
             <div className="space-y-4">
               <h3 className="text-[14px] font-semibold text-slate-800">
@@ -301,13 +315,11 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
                   <FileText className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-[14px] font-medium text-slate-800">
-                    Signed contract/Agreement
-                  </p>
-                  <p className="text-[13px] text-slate-500 mt-1">
+                  <p className="">Signed contract/Agreement</p>
+                  <p className="text-sm text-muted-foreground mt-1">
                     {signedAgreementSummary}
                   </p>
-                  <p className="text-[13px] text-slate-500 mt-1">
+                  <p className="text-sm text-muted-foreground mt-1">
                     {signedAgreementDate}
                   </p>
                 </div>
@@ -376,15 +388,13 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-[#F8FAFC] rounded-xl p-5 mb-5 border border-slate-100">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-[#F8FAFC] rounded-xl p-5 mb-5 border border-slate-100 divide-x divide-slate-600">
             <div>
-              <p className="text-[14px] font-semibold text-slate-800 mb-1">
-                {currentLifecycleLabel} (Step {selectedStepId} of{" "}
-                {totalLifecycleSteps})
+              <p className=" mb-1">
+                Progress ({selectedStepId} of {totalLifecycleSteps})
               </p>
-              <p className="text-[12px] text-slate-500 leading-relaxed">
-                Move this lead through the sales lifecycle and keep the current
-                stage aligned with the backend status.
+              <p className="text-sm text-muted-foreground mt-1">
+                Current step: {currentLifecycleLabel}
               </p>
             </div>
 
@@ -392,52 +402,40 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
               <div className="flex items-start gap-3 mb-4">
                 <Calendar className="h-5 w-5 text-slate-400 mt-0.5" />
                 <div>
-                  <p className="text-[12px] text-slate-500">
-                    Planned start date
-                  </p>
-                  <p className="text-[13px] font-medium text-slate-800">
-                    2024-10-10
+                  <p className="font-semibold">Lead Generated</p>
+                  <p className="text-sm text-muted-foreground">
+                    {leadStartDate}
                   </p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <Calendar className="h-5 w-5 text-slate-400 mt-0.5" />
                 <div>
-                  <p className="text-[12px] text-slate-500">
-                    Target Completion
-                  </p>
-                  <p className="text-[13px] font-medium text-slate-800">
-                    2024-10-10
-                  </p>
+                  <p className="font-semibold">Payment Done</p>
+                  <p className="text-sm text-muted-foreground">-</p>
                 </div>
               </div>
             </div>
 
             <div>
-              <div className="mb-4">
-                <p className="text-[12px] text-slate-500 mb-0.5">
-                  Assigned Planner
-                </p>
-                <p className="text-[13px] font-medium text-slate-800">
-                  Sarah Lee
-                </p>
-              </div>
-              <div>
-                <p className="text-[12px] text-slate-500 mb-0.5">Priority</p>
-                <p className="text-[13px] font-medium text-[#D97706] inline-flex items-center px-2 py-0.5 rounded-lg bg-[#FEF3C7]">
-                  Medium
-                </p>
-              </div>
+              <p className=" mb-0.5 font-semibold">Assigned Sales</p>
+              <p className="text-sm text-muted-foreground mb-2">
+                {assignedPlanner}
+              </p>
+              <p className=" mb-0.5 font-semibold">Priority</p>
+              <p className="inline-flex items-center rounded-lg bg-[#FEF3C7] px-2 py-0.5 text-[13px] font-medium text-[#D97706]">
+                {priorityLabel}
+              </p>
             </div>
 
             <div>
-              <p className="text-[12px] text-slate-500 mb-1">Next Step</p>
-              <p className="text-[13px] font-medium text-slate-800">
-                Fabrication Production Started
-              </p>
-              <p className="text-[12px] text-slate-500 mt-1">
-                Upcoming After completion
-              </p>
+              <p className=" mb-1 ">Next Step</p>
+              <p className="text-sm text-muted-foreground">{nextStepLabel}</p>
+              {nextStepLabel && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Automatically sent to admin and accounts
+                </p>
+              )}
             </div>
           </div>
 
@@ -458,7 +456,7 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
             >
               Add Notes
             </Button> */}
-            <AddNotesDialog onSave={handleSaveNote} />
+            <AddNotesDialog leadId={leadData?._id} />
           </div>
 
           <UpdateStatusDialog
@@ -516,7 +514,7 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-[12px] text-slate-500">Step</span>
+              <span className="">Step</span>
               <span className="text-[28px] font-bold text-slate-800 leading-none">
                 {selectedStepId}
               </span>
@@ -528,7 +526,7 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
 
           <div className="w-full text-left space-y-4">
             <div>
-              <p className="text-[12px] text-slate-500">Current step</p>
+              <p className="">Current step</p>
               <p className="text-[14px] font-medium text-[#1D51A4]">
                 {currentLifecycleLabel}
               </p>
@@ -540,13 +538,17 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
                   Started on
                 </p>
               </div>
-              <p className="text-[13px] text-slate-500 ml-6">2024-10-10</p>
+              <p className="text-[13px] text-slate-500 ml-6">
+                {formatLeadDate(leadData?.createdAt)}
+              </p>
             </div>
             <div>
               <p className="text-[13px] font-semibold text-slate-800 mb-1">
                 Estimate Completion
               </p>
-              <p className="text-[13px] text-slate-500">—</p>
+              <p className="text-[13px] text-slate-500">
+                {targetCompletionDate}
+              </p>
             </div>
           </div>
         </Card>
@@ -560,7 +562,7 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
 
             {lead?.activityLog && lead.activityLog.length > 0 ? (
               lead.activityLog.map((entry, index) => {
-                const id = entry._id ?? entry._id ?? index;
+                const id = entry._id ?? index;
                 const title =
                   entry?.metadata?.activityType ||
                   entry.action ||
@@ -570,23 +572,19 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
                 const outcome = entry?.metadata?.outcome
                   ? ` — ${entry.metadata.outcome}`
                   : "";
-                const timestamp = entry.createdAt ?? "";
+                const timestamp = formatLeadDateTime(entry.createdAt);
 
                 return (
                   <div key={id} className="relative">
                     <div className="absolute -left-6 top-1 h-3.5 w-3.5 rounded-full bg-white border-[3px] border-[#8B5CF6]"></div>
-                    <p className="text-[13px] font-medium text-slate-800">
-                      {title}
-                    </p>
+                    <p className="text-sm text-muted-foreground">{title}</p>
                     <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-1">
                       <Calendar className="h-3 w-3" /> {timestamp}
                     </p>
                     {message && (
                       <p className="text-[13px] text-slate-600 mt-2 whitespace-pre-line">
                         {message}
-                        <span className="text-[12px] text-slate-500">
-                          {outcome}
-                        </span>
+                        <span className="">{outcome}</span>
                       </p>
                     )}
                   </div>
@@ -607,15 +605,20 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
         <Card className="p-6 gap-0">
           <h3 className="text-[16px] font-bold text-slate-800 mb-4">Notes</h3>
           <div className="space-y-4 text-[13px] text-slate-600">
-            {notes.length > 0 ? (
-              notes.map((note, index) => (
-                <div key={index} className="space-y-2">
-                  <p className="text-[14px] font-medium text-slate-800">
-                    {note.title}
-                  </p>
-                  <p className="whitespace-pre-line">{note.notes}</p>
-                </div>
-              ))
+            {lead?.leadNotes?.length ? (
+              <>
+                {lead?.leadNotes?.map((note) => (
+                  <div key={note._id} className="space-y-2">
+                    <p className="whitespace-pre-line">{note.note}</p>
+                    <p className="text-xs flex flex-col text-muted-foreground gap-1">
+                      {note.addedBy.name}
+                      <span className="">
+                        {formatLeadDate(note.addedAt)}
+                      </span>
+                    </p>
+                  </div>
+                ))}
+              </>
             ) : (
               <div className="py-6 text-center text-slate-500">
                 <p className="font-medium text-slate-800 mb-1">No notes yet</p>
