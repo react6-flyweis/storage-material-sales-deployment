@@ -4,7 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Mail, Wallet } from "lucide-react";
 import logo from "@/assets/steel-building-depot-logo.png";
 import SuccessDialog from "@/components/success-dialog";
-import { useInvoiceDetailQuery } from "@/modules/invoices/invoices.hooks";
+import {
+  useInvoiceDetailQuery,
+  useSendInvoiceMutation,
+} from "@/modules/invoices/invoices.hooks";
 
 function formatCurrency(value: number) {
   return value.toLocaleString("en-US", {
@@ -30,12 +33,36 @@ export default function InvoicePreview() {
   const navigate = useNavigate();
   const params = useParams();
   const [showSuccess, setShowSuccess] = useState(false);
+  const [sendFailed, setSendFailed] = useState(false);
   const invoiceId = params.id;
   const {
     data: invoiceDetailResponse,
     isLoading,
     isError,
   } = useInvoiceDetailQuery(invoiceId);
+  const sendInvoiceMutation = useSendInvoiceMutation();
+
+  const handleSendEmail = async () => {
+    if (!invoiceId || sendInvoiceMutation.isPending) {
+      return;
+    }
+
+    setSendFailed(false);
+
+    try {
+      const response = await sendInvoiceMutation.mutateAsync(invoiceId);
+      if (!response.success) {
+        console.error("Failed to send invoice email:", response);
+        setSendFailed(true);
+        return;
+      }
+
+      setShowSuccess(true);
+    } catch (error) {
+      console.error("Failed to send invoice email:", error);
+      setSendFailed(true);
+    }
+  };
 
   const invoice = invoiceDetailResponse?.data.invoice;
 
@@ -105,7 +132,8 @@ export default function InvoicePreview() {
               Back
             </Button>
           </div>
-          <div className="flex gap-4">
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex gap-4">
             <Button
               variant="outline"
               className="bg-white hover:bg-gray-50 text-gray-700 border-gray-200 min-w-25"
@@ -115,10 +143,11 @@ export default function InvoicePreview() {
             </Button>
             <Button
               className="bg-[#2563EB] hover:bg-blue-700 text-white min-w-25 gap-2"
-              // onClick={() => setShowSuccess(true)}
+              onClick={handleSendEmail}
+              disabled={sendInvoiceMutation.isPending}
             >
               <Mail className="w-4 h-4" />
-              Email
+              {sendInvoiceMutation.isPending ? "Sending..." : "Email"}
             </Button>
             <Button
               variant="outline"
@@ -127,6 +156,10 @@ export default function InvoicePreview() {
               <Wallet />
               Payments
             </Button>
+            </div>
+            {sendFailed && (
+              <p className="text-[10px] text-destructive">Send failed</p>
+            )}
           </div>
         </div>
 
