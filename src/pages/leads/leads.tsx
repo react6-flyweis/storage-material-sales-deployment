@@ -30,6 +30,8 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import MoveToOrdersDialog from "@/components/leads/move-to-orders-dialog";
+import LeadLifecycleStatusSelect from "@/components/leads/lead-lifecycle-status-select";
+import BuildingTypeSelector from "@/components/building-type-selector";
 import SuccessDialog from "@/components/success-dialog";
 import ProgressDots from "@/components/ui/progress-dots";
 import {
@@ -183,11 +185,11 @@ export default function LeadsPage() {
         return false;
       }
 
-      if (buildingType !== "all") {
-        const typeMatch = lead.workshop
-          .toLowerCase()
-          .includes(buildingType.toLowerCase());
-        if (!typeMatch) return false;
+      if (
+        buildingType !== "all" &&
+        lead.workshop.toLowerCase() !== buildingType.toLowerCase()
+      ) {
+        return false;
       }
 
       if (projectValue !== "all") {
@@ -201,11 +203,8 @@ export default function LeadsPage() {
         if (!matchesValue) return false;
       }
 
-      if (statusFilter !== "all") {
-        const statusMatch = lead.rawStatus
-          .toLowerCase()
-          .includes(statusFilter.toLowerCase());
-        if (!statusMatch) return false;
+      if (statusFilter !== "all" && lead.rawStatus !== statusFilter) {
+        return false;
       }
 
       return true;
@@ -324,19 +323,14 @@ export default function LeadsPage() {
           </div> */}
 
           <div className="flex flex-wrap gap-3 ">
-            <Select value={buildingType} onValueChange={setBuildingType}>
-              <SelectTrigger className="w-full sm:w-40 bg-white">
-                <SelectValue placeholder="Building types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="garages">Garages</SelectItem>
-                <SelectItem value="workshops">Workshops</SelectItem>
-                <SelectItem value="commercial">Commercial</SelectItem>
-                <SelectItem value="sales-storage">Sales Storage</SelectItem>
-                <SelectItem value="arch-buildings">Arch Buildings</SelectItem>
-              </SelectContent>
-            </Select>
+            <BuildingTypeSelector
+              value={buildingType}
+              onChange={setBuildingType}
+              includeAll
+              allLabel="All"
+              placeholder="Building types"
+              triggerClassName="w-full sm:w-40 bg-white"
+            />
 
             <Select value={projectValue} onValueChange={setProjectValue}>
               <SelectTrigger className="w-full sm:w-40 bg-white">
@@ -354,17 +348,13 @@ export default function LeadsPage() {
               </SelectContent>
             </Select>
 
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-40 bg-white">
-                <SelectValue placeholder="All Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="proposal">Proposal sent</SelectItem>
-                <SelectItem value="quotation">Quotation Sent</SelectItem>
-                <SelectItem value="closed">Closed</SelectItem>
-              </SelectContent>
-            </Select>
+            <LeadLifecycleStatusSelect
+              value={statusFilter}
+              onValueChange={setStatusFilter}
+              triggerClassName="w-full sm:w-40 bg-white"
+              placeholder="All Status"
+              allLabel="All Status"
+            />
           </div>
         </div>
 
@@ -438,7 +428,7 @@ export default function LeadsPage() {
                             {lead.name}
                           </span>
                           <span className="text-sm text-gray-500">
-                            {lead.id}
+                            {lead.rawData.jobId}
                           </span>
                           <span className="text-sm text-gray-500">
                             {lead.workshop} · {lead.category}
