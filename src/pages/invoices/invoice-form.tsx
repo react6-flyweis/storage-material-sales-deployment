@@ -882,7 +882,7 @@ export default function InvoiceForm({
         <div className="hidden md:grid grid-cols-12 gap-4 bg-gray-50/50 py-3 px-4 rounded-lg mb-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
           <div className="col-span-5">Description</div>
           <div className="col-span-2 text-center">Rate</div>
-          <div className="col-span-1 text-center">Markup</div>
+          {/* <div className="col-span-1 text-center">Markup</div> */}
           <div className="col-span-2 text-center">Quantity</div>
           <div className="col-span-1 text-center">Tax</div>
           <div className="col-span-1 text-right">Total</div>

@@ -98,7 +98,7 @@ export default function InvoiceLineItem({
         {/* Main Item Row */}
         <div className="grid grid-cols-2 xl:grid-cols-12   bg-white divide-x">
           {/* Description & Item List - Full width on mobile */}
-          <div className="col-span-2 md:col-span-4 p-3 flex items-center gap-4 border-b md:border-b-0 border-gray-100">
+          <div className="col-span-2 md:col-span-5 p-3 flex items-center gap-4 border-b md:border-b-0 border-gray-100">
             <Input
               {...register(`lineItems.${index}.description` as const)}
               defaultValue={item?.description ?? undefined}
@@ -141,7 +141,7 @@ export default function InvoiceLineItem({
           </div>
 
           {/* Markup */}
-          <div className="col-span-1 md:col-span-2 p-3 flex flex-col md:flex-row items-start md:items-center justify-center border-b md:border-b-0 border-gray-100">
+          {/* <div className="col-span-1 md:col-span-2 p-3 flex flex-col md:flex-row items-start md:items-center justify-center border-b md:border-b-0 border-gray-100">
             <span className="md:hidden text-gray-400 text-[10px] uppercase tracking-wide mb-1">
               Markup
             </span>
@@ -164,10 +164,10 @@ export default function InvoiceLineItem({
                 </Select>
               )}
             />
-          </div>
+          </div> */}
 
           {/* Quantity */}
-          <div className="col-span-1  p-3 flex flex-col md:flex-row items-start md:items-center justify-center border-b md:border-b-0 ">
+          <div className="col-span-1 md:col-span-2  p-3 flex flex-col md:flex-row items-start md:items-center justify-center border-b md:border-b-0 ">
             <span className="md:hidden text-gray-400 text-[10px] uppercase tracking-wide mb-1">
               Quantity
             </span>
