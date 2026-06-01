@@ -18,6 +18,7 @@ type InvoiceCustomerReference = {
 export type InvoiceDocument = {
   _id: string;
   leadId?: string | null;
+  paymentScheduleId?: string | null;
   customerId?: string | InvoiceCustomerReference | null;
   invoiceNumber?: string | null;
   poNumber?: string | null;
@@ -147,6 +148,7 @@ export type CreateInvoiceDraftPayload = {
   discount?: number;
   depositAmount?: number;
   totalAmount: number;
+  paymentScheduleId?: string;
   paymentScheduleStageId?: string;
 };
 
@@ -216,6 +218,19 @@ export async function editInvoiceDraftProvider(
   const response = await apiClient.put<CreateInvoiceDraftResponse>(
     `/api/invoices/${invoiceId}`,
     payload,
+  );
+
+  return response.data;
+}
+
+export type SendInvoiceResponse = {
+  success: boolean;
+  message: string;
+};
+
+export async function sendInvoiceProvider(invoiceId: string) {
+  const response = await apiClient.post<SendInvoiceResponse>(
+    `/api/invoices/${invoiceId}/send`,
   );
 
   return response.data;
