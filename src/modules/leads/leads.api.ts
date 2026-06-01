@@ -48,6 +48,7 @@ export type LeadsListResponse = {
 export type ScoredLeadItem = {
   _id: string;
   projectName?: string;
+  jobId: string,
   customerId: {
     _id: string;
     firstName: string;
