@@ -7,6 +7,7 @@ import {
   XIcon,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useAuthStore } from "@/modules/auth/auth.store";
 
 // icons
 import dashboardIcon from "@/assets/icons/sidebar/dashboard.svg";
@@ -278,6 +279,7 @@ export function Sidebar({
 }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
+  const currentUser = useAuthStore((state) => state.user);
   const [hoveredGroup, setHoveredGroup] = useState<{
     label: string;
     top: number;
@@ -383,6 +385,9 @@ export function Sidebar({
     window.innerHeight
       ? calculatedPadding
       : 10;
+
+  const userDisplayName = currentUser?.name ?? "Sales User";
+  const userDisplayEmail = currentUser?.email ?? "sales@steelpro.com";
 
   const handleGroupChange = (group: (typeof navigationGroups)[0]) => {
     navigate(group.link);
@@ -499,9 +504,9 @@ export function Sidebar({
               <div className="flex items-center gap-3">
                 <div>
                   <h2 className="text-lg font-bold text-gray-800">
-                    Sales User
+                    {userDisplayName}
                   </h2>
-                  <p className="text-xs text-gray-500">sales@steelpro.com</p>
+                  <p className="text-xs text-gray-500">{userDisplayEmail}</p>
                 </div>
               </div>
               <Button
