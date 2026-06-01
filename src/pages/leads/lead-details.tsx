@@ -11,8 +11,6 @@ import PaymentsCard from "@/components/leads/payments-card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLeadDetailQuery } from "@/modules/leads/leads.hooks";
-import { getLeadProgress } from "@/modules/leads/leads.utils";
-import type { LeadDetailData } from "@/modules/leads/leads.api";
 
 const TABS = [
   { value: "basic-info", label: "Basic info" },
@@ -26,41 +24,6 @@ const TABS = [
 type LeadTab = (typeof TABS)[number]["value"];
 
 const TAB_VALUES = new Set<LeadTab>(TABS.map((tab) => tab.value));
-
-const defaultLead = {
-  id: "—",
-  name: "—",
-  customerId: "",
-  workshop: "",
-  category: "",
-  assignedToName: "",
-  assignmentStatus: "",
-  progress: 0,
-  status: "",
-  statusColor: "orange",
-  quoteValue: "",
-  chatCount: 0,
-};
-
-function mapDetailToLead(detail: LeadDetailData) {
-  const latestQuotation =
-    detail.quotations.find((q) => q.isLatest) ?? detail.quotations[0];
-
-  return {
-    id: detail.lead._id,
-    name: detail.customer.firstName || detail.customer.customerId || "Lead",
-    customerId: detail.customer._id,
-    workshop: latestQuotation?.buildingType || detail.lead.buildingType || "",
-    category: latestQuotation?.location || detail.lead.location || "",
-    assignedToName: "",
-    assignmentStatus: detail.lead.assignedSales ? "Assigned" : "",
-    progress: getLeadProgress(detail.lead.lifecycleStatus),
-    status: detail.lead.lifecycleStatus,
-    statusColor: "orange",
-    quoteValue: String(detail.lead.quoteValue),
-    chatCount: detail.recentMessages.length,
-  };
-}
 
 function LeadDetailsSkeleton() {
   return (
@@ -129,9 +92,6 @@ export default function LeadDetails() {
 
   const detail = response?.success ? response.data : undefined;
   const canMoveToOrders = !detail?.lead.isRaisedToPO;
-  const lead = detail
-    ? mapDetailToLead(detail)
-    : { ...defaultLead, id: leadId ?? "—" };
   const searchParams = new URLSearchParams(location.search);
   const activeTabFromSearch = searchParams.get("tab") as LeadTab | null;
   const activeTab: LeadTab =
@@ -151,7 +111,7 @@ export default function LeadDetails() {
     navigate(`/leads/${leadId}?tab=${tab}`);
   };
 
-  if (isLoading) {
+  if (isLoading || !detail) {
     return <LeadDetailsSkeleton />;
   }
 
@@ -253,10 +213,14 @@ export default function LeadDetails() {
               />
             </TabsContent>
             <TabsContent value="chat" className="mt-6">
-              <ChatCard lead={lead} recentMessages={detail?.recentMessages} />
+              <ChatCard
+                lead={detail.lead}
+                customer={detail.customer}
+                recentMessages={detail.recentMessages}
+              />
             </TabsContent>
             <TabsContent value="timeline" className="mt-6">
-              <TimelineCard lead={lead} />
+              <TimelineCard lead={detail.lead} />
             </TabsContent>
             <TabsContent value="follow-ups" className="mt-6">
               <FollowUpsCard
@@ -266,7 +230,7 @@ export default function LeadDetails() {
             </TabsContent>
             <TabsContent value="payments" className="mt-6">
               <PaymentsCard
-                leadId={detail?.lead._id}
+                leadId={detail?.lead.jobId}
                 paymentsData={detail?.payments}
               />
             </TabsContent>
