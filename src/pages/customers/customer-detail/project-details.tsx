@@ -21,7 +21,7 @@ export default function ProjectDetailsPage() {
 
   const detail = response?.success ? response.data : undefined;
 
-  if (isLoading) {
+  if (isLoading || !detail) {
     return <ProjectDetailsSkeleton />;
   }
 

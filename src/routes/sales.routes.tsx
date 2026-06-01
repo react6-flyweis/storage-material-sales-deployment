@@ -73,9 +73,9 @@ const SingleLeadTimelinePage = lazy(
 const SingleLeadEmailsPage = lazy(
   () => import("@/pages/leads/single-lead-emails"),
 );
-const SingleLeadChatsPage = lazy(
-  () => import("@/pages/leads/single-lead-chats"),
-);
+// const SingleLeadChatsPage = lazy(
+//   () => import("@/pages/leads/single-lead-chats"),
+// );
 const SmartReminders = lazy(() => import("@/pages/leads/smart-reminders"));
 const SmartReminderDetail = lazy(() => import("@/pages/leads/single-reminder"));
 const SingleLeadNotesPage = lazy(
@@ -238,10 +238,10 @@ export const salesRoutes: RouteObject[] = [
                     path: "emails",
                     element: <SingleLeadEmailsPage />,
                   },
-                  {
-                    path: "chats",
-                    element: <SingleLeadChatsPage />,
-                  },
+                  // {
+                  //   path: "chats",
+                  //   element: <SingleLeadChatsPage />,
+                  // },
                   {
                     path: "notes",
                     element: <SingleLeadNotesPage />,

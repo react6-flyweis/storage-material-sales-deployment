@@ -30,7 +30,7 @@ import {
   formatLeadDateTime,
   formatLifecycleStatus,
   formatPhone,
-  getAssignedEmployeeName,
+  // getAssignedEmployeeName,
 } from "@/modules/leads/leads.utils";
 import { useUpdateLeadLifecycleMutation } from "@/modules/leads/leads.hooks";
 import {
