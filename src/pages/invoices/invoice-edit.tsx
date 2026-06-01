@@ -12,6 +12,7 @@ export default function InvoiceEditPage() {
   } = useInvoiceDetailQuery(invoiceId);
 
   const invoice = invoiceDetailResponse?.data.invoice;
+  const paymentSchedule = invoiceDetailResponse?.data.paymentSchedule;
 
   if (!invoiceId) {
     return (
@@ -43,5 +44,5 @@ export default function InvoiceEditPage() {
     );
   }
 
-  return <InvoiceForm invoice={invoice} />;
+  return <InvoiceForm invoice={invoice} paymentSchedule={paymentSchedule} />;
 }
