@@ -1,40 +1,39 @@
 import { CheckCircle } from "lucide-react";
-import { Card } from "../ui/card";
+import { Card } from "@/components/ui/card";
 import {
   LEAD_LIFECYCLE_STEPS,
-  getLeadProgress,
-} from "../../modules/leads/leads.utils";
-
-type Lead = {
-  id: string;
-  name: string;
-  progress?: number;
-  status?: string;
-};
+  getLeadLifecycleStepId,
+  getLeadLifecycleStatusLabel,
+} from "@/modules/leads/lifecycle-statuses";
+import type { LeadDetailLead } from "src/modules/leads/leads.api";
 
 const progressSteps = LEAD_LIFECYCLE_STEPS;
 
-export default function TimelineCard({ lead }: { lead: Lead }) {
+export default function TimelineCard({ lead }: { lead: LeadDetailLead }) {
+  const progress = getLeadLifecycleStepId(lead.lifecycleStatus ?? "");
   return (
     <Card className="flex flex-col gap-6 p-6">
       <div>
         <div className="text-sm text-gray-500">
-          Lead ID-<span className="font-semibold">{lead.id}</span>
+          {/* Lead ID- */}
+          <span className="font-semibold">{lead.jobId}</span>
         </div>
       </div>
 
       <h4 className="text-sm font-medium text-gray-900">Progress Steps</h4>
       <div className="">
         <div className="space-y-3">
-          {progressSteps.map((step, i) => {
-            const idx = i + 1;
-            const progress =
-              lead.progress ?? getLeadProgress(lead.status ?? "");
+          {progressSteps.map((step) => {
+            const idx = step.id;
+            const progress = getLeadLifecycleStepId(lead.lifecycleStatus ?? "");
             const completed = idx <= progress;
             const isCurrent =
               idx === progress + 1 && progress < progressSteps.length;
             return (
-              <div key={step} className="flex items-center justify-between">
+              <div
+                key={step.value}
+                className="flex items-center justify-between"
+              >
                 <div className="flex items-center gap-3">
                   <div
                     className={`h-8 w-8 rounded-full flex items-center justify-center ${
@@ -61,7 +60,7 @@ export default function TimelineCard({ lead }: { lead: Lead }) {
                             : "text-gray-700"
                       }`}
                     >
-                      {step}
+                      {getLeadLifecycleStatusLabel(step.value)}
                     </div>
                     {isCurrent && (
                       <div className="text-xs text-gray-500">Current Step</div>
@@ -77,8 +76,6 @@ export default function TimelineCard({ lead }: { lead: Lead }) {
         </div>
         <div className="mt-2 pt-2 text-xs text-gray-500 border-t">
           {(() => {
-            const progress =
-              lead.progress ?? getLeadProgress(lead.status ?? "");
             const completedCount = Math.max(0, progress);
             const currentIndex =
               completedCount >= progressSteps.length
