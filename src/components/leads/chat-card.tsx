@@ -7,7 +7,11 @@ import { type Socket } from "socket.io-client";
 import { apiClient } from "@/modules/auth/auth.api";
 import { createAdminSocket } from "@/lib/socket";
 import { useAuthStore } from "@/modules/auth/auth.store";
-import type { LeadDetailMessage } from "@/modules/leads/leads.api";
+import type {
+  LeadDetailCustomer,
+  LeadDetailLead,
+  LeadDetailMessage,
+} from "@/modules/leads/leads.api";
 
 type ChatMessage = {
   id: string;
@@ -18,16 +22,17 @@ type ChatMessage = {
   createdAt: string;
 };
 
-type Lead = {
-  id: string;
-  name: string;
-  customerId?: string;
-  assignedSalesName?: string;
-  chatCount?: number;
-};
+// type Lead = {
+//   id: string;
+//   name: string;
+//   customerId?: string;
+//   assignedSalesName?: string;
+//   chatCount?: number;
+// };
 
 type Props = {
-  lead: Lead;
+  lead: LeadDetailLead;
+  customer: LeadDetailCustomer;
   recentMessages?: LeadDetailMessage[];
 };
 
@@ -109,7 +114,7 @@ function mergeMessages(existing: ChatMessage[], incoming: ChatMessage[]) {
   );
 }
 
-export default function ChatCard({ lead, recentMessages }: Props) {
+export default function ChatCard({ lead, customer, recentMessages }: Props) {
   const isHydrated = useAuthStore((state) => state.isHydrated);
   const accessToken = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.user);
@@ -144,7 +149,7 @@ export default function ChatCard({ lead, recentMessages }: Props) {
     }
 
     async function loadFullHistory() {
-      if (!lead.id) {
+      if (!lead._id) {
         setIsLoadingHistory(false);
         return;
       }
@@ -153,7 +158,7 @@ export default function ChatCard({ lead, recentMessages }: Props) {
 
       try {
         const response = await apiClient.get<PublicChatHistoryResponse>(
-          `/api/public/chat/history/${lead.id}`,
+          `/api/public/chat/history/${lead._id}`,
         );
 
         const historyMessages = response.data.data.messages
@@ -183,7 +188,7 @@ export default function ChatCard({ lead, recentMessages }: Props) {
     return () => {
       isActive = false;
     };
-  }, [lead.id, recentMessages]);
+  }, [lead._id, recentMessages]);
 
   const stopTyping = useCallback(() => {
     const socket = socketRef.current;
@@ -197,8 +202,8 @@ export default function ChatCard({ lead, recentMessages }: Props) {
       return;
     }
 
-    socket.emit("sales_typing_stop", { leadId: lead.id });
-  }, [lead.id]);
+    socket.emit("sales_typing_stop", { leadId: lead._id });
+  }, [lead._id]);
 
   const markMessagesRead = useCallback(() => {
     const socket = socketRef.current;
@@ -207,8 +212,8 @@ export default function ChatCard({ lead, recentMessages }: Props) {
       return;
     }
 
-    socket.emit("mark_messages_read", { leadId: lead.id });
-  }, [lead.id]);
+    socket.emit("mark_messages_read", { leadId: lead._id });
+  }, [lead._id]);
 
   function emitTypingStart() {
     const socket = socketRef.current;
@@ -217,14 +222,14 @@ export default function ChatCard({ lead, recentMessages }: Props) {
       return;
     }
 
-    socket.emit("sales_typing_start", { leadId: lead.id });
+    socket.emit("sales_typing_start", { leadId: lead._id });
 
     if (typingTimeoutRef.current) {
       window.clearTimeout(typingTimeoutRef.current);
     }
 
     typingTimeoutRef.current = window.setTimeout(() => {
-      socket.emit("sales_typing_stop", { leadId: lead.id });
+      socket.emit("sales_typing_stop", { leadId: lead._id });
       typingTimeoutRef.current = null;
     }, 1200);
   }
@@ -238,21 +243,21 @@ export default function ChatCard({ lead, recentMessages }: Props) {
   }, [messages, markMessagesRead]);
 
   useEffect(() => {
-    if (!isHydrated || !lead.id || !accessToken) {
+    if (!isHydrated || !lead._id || !accessToken) {
       return;
     }
 
     console.log({ accessToken });
 
-    const socket = createAdminSocket(accessToken, ["websocket"]);
+    const socket = createAdminSocket(accessToken);
 
     if (!socket) return;
 
     socketRef.current = socket;
 
     const joinLeadChat = () => {
-      socket.emit("join_lead_chat", { leadId: lead.id });
-      socket.emit("mark_messages_read", { leadId: lead.id });
+      socket.emit("join_lead_chat", { leadId: lead._id });
+      socket.emit("mark_messages_read", { leadId: lead._id });
     };
 
     const handleConnect = () => {
@@ -304,7 +309,7 @@ export default function ChatCard({ lead, recentMessages }: Props) {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [accessToken, isHydrated, lead.id, stopTyping]);
+  }, [accessToken, isHydrated, lead._id, stopTyping]);
 
   useEffect(() => {
     return () => {
@@ -331,7 +336,7 @@ export default function ChatCard({ lead, recentMessages }: Props) {
     }
 
     socket.emit("sales_message", {
-      leadId: lead.id,
+      leadId: lead._id,
       content,
     });
 
@@ -339,9 +344,9 @@ export default function ChatCard({ lead, recentMessages }: Props) {
     stopTyping();
   };
 
-  const currentUserName = currentUser?.name ?? "Support";
+  // const currentUserName = currentUser?.name ?? "Support";
   const canSend = Boolean(
-    isHydrated && lead.id && lead.customerId && isConnected && input.trim(),
+    isHydrated && lead._id && lead.customerId && isConnected && input.trim(),
   );
 
   return (
@@ -349,7 +354,8 @@ export default function ChatCard({ lead, recentMessages }: Props) {
       <div className="px-6 pt-6 pb-4 border-b">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div className="text-sm text-gray-500">
-            Lead ID-<span className="font-semibold">{lead.id}</span>
+            {/* Lead ID- */}
+            <span className="font-semibold">{lead.jobId}</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-500">
             {isConnected ? (
@@ -371,16 +377,18 @@ export default function ChatCard({ lead, recentMessages }: Props) {
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10 bg-gray-100">
             <AvatarFallback className="text-sm text-gray-600 font-medium">
-              {lead.name
+              {customer.firstName
                 .split(" ")
                 .map((n) => n[0])
                 .join("")}
             </AvatarFallback>
           </Avatar>
           <div>
-            <div className="text-base font-semibold">Chat with {lead.name}</div>
+            <div className="text-base font-semibold">
+              Chat with {customer.firstName}
+            </div>
             <div className="text-xs text-gray-500">
-              {lead.assignedSalesName ?? currentUserName}
+              {lead.projectName ?? "Untitled Lead"}
             </div>
           </div>
         </div>
@@ -417,10 +425,8 @@ export default function ChatCard({ lead, recentMessages }: Props) {
                 : isSalesMessage
                   ? message.senderId === currentUser?._id
                     ? "You"
-                    : (message.senderName ??
-                      lead.assignedSalesName ??
-                      "Support")
-                  : lead.name;
+                    : (message.senderName ?? lead.assignedSales ?? "Support")
+                  : lead.projectName;
 
               return (
                 <div
@@ -436,7 +442,8 @@ export default function ChatCard({ lead, recentMessages }: Props) {
                       >
                         {isAiMessage
                           ? "AI"
-                          : lead.name
+                          : lead.projectName ||
+                            ""
                               .split(" ")
                               .map((value) => value[0])
                               .join("")}
