@@ -9,6 +9,7 @@ import {
   getInvoiceDetailProvider,
   getInvoiceStatsProvider,
   getInvoicesProvider,
+  sendInvoiceProvider,
   type CreateInvoiceDraftPayload,
   type InvoiceListParams,
 } from "./invoices.api";
@@ -106,6 +107,20 @@ export function useEditInvoiceMutation() {
       import("./invoices.api").then((m) =>
         m.editInvoiceDraftProvider(invoiceId, payload),
       ),
+    onSuccess: (response) => {
+      if (!response.success) return;
+
+      void queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      void queryClient.invalidateQueries({ queryKey: ["invoices", "detail"] });
+    },
+  });
+}
+
+export function useSendInvoiceMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (invoiceId: string) => sendInvoiceProvider(invoiceId),
     onSuccess: (response) => {
       if (!response.success) return;
 
