@@ -1,80 +1,69 @@
-import { Card } from "../ui/card";
+import { useState } from "react";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import SuccessDialog from "@/components/success-dialog";
 import type { LeadDetailPayments } from "@/modules/leads/leads.api";
-import { formatLeadCurrency, formatLeadDate } from "@/modules/leads/leads.utils";
-
-type Payment = {
-  invoice: string;
-  date: string;
-  amount: string;
-  status: "Pending" | "Confirmed" | "Failed";
-};
+import {
+  formatLeadCurrency,
+  formatLeadDate,
+} from "@/modules/leads/leads.utils";
+import { useSendInvoiceMutation } from "@/modules/invoices/invoices.hooks";
 
 type Props = {
   leadId?: string;
   paymentsData?: LeadDetailPayments;
 };
 
-const defaultPayments: Payment[] = [
-  {
-    invoice: "INV 2024-001",
-    date: "27-01-2025",
-    amount: "$12,500",
-    status: "Pending",
-  },
-  {
-    invoice: "INV 2024-002",
-    date: "27-01-2025",
-    amount: "$12,500",
-    status: "Confirmed",
-  },
-  {
-    invoice: "INV 2024-003",
-    date: "27-01-2025",
-    amount: "$12,500",
-    status: "Confirmed",
-  },
-  {
-    invoice: "INV 2024-004",
-    date: "27-01-2025",
-    amount: "$12,500",
-    status: "Confirmed",
-  },
-];
-
-function mapPayments(data: LeadDetailPayments): Payment[] {
-  return data.invoices.map((invoice) => ({
-    invoice: invoice.invoiceNumber,
-    date: formatLeadDate(invoice.date ?? invoice.createdAt),
-    amount: formatLeadCurrency(invoice.totalAmount),
-    status: invoice.paidAt ? "Confirmed" : "Pending",
-  }));
-}
-
 export default function PaymentsCard({ leadId, paymentsData }: Props) {
-  const payments =
-    paymentsData && paymentsData.invoices.length > 0
-      ? mapPayments(paymentsData)
-      : defaultPayments;
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [sendFailedInvoiceId, setSendFailedInvoiceId] = useState<string | null>(
+    null,
+  );
+  const sendInvoiceMutation = useSendInvoiceMutation();
+
+  const handleSendEmail = async (invoiceId: string) => {
+    if (sendInvoiceMutation.isPending) {
+      return;
+    }
+
+    setSendFailedInvoiceId(null);
+
+    try {
+      const response = await sendInvoiceMutation.mutateAsync(invoiceId);
+      if (!response.success) {
+        console.error("Failed to send invoice email:", response);
+        setSendFailedInvoiceId(invoiceId);
+        return;
+      }
+
+      setShowSuccess(true);
+    } catch (error) {
+      console.error("Failed to send invoice email:", error);
+      setSendFailedInvoiceId(invoiceId);
+    }
+  };
+
   const total = paymentsData
     ? formatLeadCurrency(paymentsData.totalPaid + paymentsData.totalPending)
-    : "$15,000";
+    : formatLeadCurrency(0);
   const paid = paymentsData
     ? formatLeadCurrency(paymentsData.totalPaid)
-    : "$0";
+    : formatLeadCurrency(0);
   const outstanding = paymentsData
     ? formatLeadCurrency(paymentsData.totalPending)
-    : "$15,000";
+    : formatLeadCurrency(0);
+  const invoices = paymentsData?.invoices ?? [];
 
   return (
+    <>
     <Card className=" p-6">
       <div>
         <div className="text-sm text-gray-500">
-          Lead ID-
-          <span className="font-semibold">{leadId ?? "LD-2025-001"}</span>
+          <span className="font-semibold">{leadId}</span>
         </div>
       </div>
+
       <div className="p-4 rounded bg-blue-50">
         <h3 className="text-lg font-semibold">Financial Summary</h3>
         <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
@@ -104,44 +93,86 @@ export default function PaymentsCard({ leadId, paymentsData }: Props) {
                 <th className="text-left px-6 py-3">INVOICE #</th>
                 <th className="text-left px-6 py-3">DATE</th>
                 <th className="text-left px-6 py-3">AMOUNT</th>
-                <th className="text-left px-6 py-3">DATE</th>
                 <th className="text-left px-6 py-3">STATUS</th>
               </tr>
             </thead>
             <tbody>
-              {payments.map((p, i) => (
-                <tr key={i} className="border-t">
-                  <td className="px-6 py-4">{p.invoice}</td>
-                  <td className="px-6 py-4 text-blue-600">{p.invoice}</td>
-                  <td className="px-6 py-4 font-semibold">{p.amount}</td>
-                  <td className="px-6 py-4">{p.date}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-4">
-                      <Badge
-                        variant="secondary"
-                        className={
-                          p.status === "Pending"
-                            ? "bg-yellow-50 text-yellow-700"
-                            : p.status === "Confirmed"
-                            ? "bg-green-50 text-green-700"
-                            : "bg-red-50 text-red-700"
-                        }
-                      >
-                        {p.status}
-                      </Badge>
-                      {p.status === "Pending" && (
-                        <Button variant="link" className="text-sm">
-                          Notify
-                        </Button>
-                      )}
+              {invoices.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-6 py-12 text-center">
+                    <div className="mx-auto max-w-sm space-y-2">
+                      <p className="text-base font-medium text-gray-900">
+                        No payment records yet
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Payments will appear here once invoices are created or
+                        marked as paid.
+                      </p>
                     </div>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                invoices.map((invoice) => {
+                  const status = invoice.paidAt ? "Confirmed" : "Pending";
+
+                  return (
+                    <tr key={invoice._id} className="border-t">
+                      <td className="px-6 py-4">{invoice.invoiceNumber}</td>
+                      <td className="px-6 py-4 text-gray-600">
+                        {formatLeadDate(invoice.date ?? invoice.createdAt)}
+                      </td>
+                      <td className="px-6 py-4 font-semibold">
+                        {formatLeadCurrency(invoice.totalAmount)}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-4">
+                          <Badge
+                            variant="secondary"
+                            className={
+                              status === "Pending"
+                                ? "bg-yellow-50 text-yellow-700"
+                                : "bg-green-50 text-green-700"
+                            }
+                          >
+                            {status}
+                          </Badge>
+                          {status === "Pending" ? (
+                            <div className="flex flex-col items-start">
+                              <Button
+                                variant="link"
+                                className="text-sm h-auto p-0"
+                                onClick={() => handleSendEmail(invoice._id)}
+                                disabled={sendInvoiceMutation.isPending}
+                              >
+                                {sendInvoiceMutation.isPending &&
+                                sendInvoiceMutation.variables === invoice._id
+                                  ? "Sending..."
+                                  : "Notify"}
+                              </Button>
+                              {sendFailedInvoiceId === invoice._id && (
+                                <span className="text-[10px] text-destructive">
+                                  Send failed
+                                </span>
+                              )}
+                            </div>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
       </div>
     </Card>
+    <SuccessDialog
+      open={showSuccess}
+      onClose={() => setShowSuccess(false)}
+      title="Email Sent"
+      okLabel="Done"
+    />
+    </>
   );
 }
