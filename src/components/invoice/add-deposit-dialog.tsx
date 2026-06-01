@@ -12,11 +12,24 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  exceedsMoneyLimit,
+  exceedsPercentLimit,
+  getAdjustmentAmount,
+  getRemainingAfterAdjustment,
+  getRemainingPercentAfterAdjustment,
+  parseNumericInput,
+  roundMoney,
+  roundPercent,
+} from "@/lib/invoice-amounts";
 
 type Props = {
   children?: React.ReactNode;
   initialType?: "%" | "$";
   initialValue?: string;
+  maxAmount?: number;
+  reservedScheduleValue?: string;
+  reservedScheduleType?: "%" | "$";
   onDone: (payload: { type: "%" | "$"; value: string }) => void;
 };
 
@@ -24,6 +37,9 @@ export default function AddDepositDialog({
   children,
   initialType = "%",
   initialValue = "",
+  maxAmount,
+  reservedScheduleValue = "",
+  reservedScheduleType = "%",
   onDone,
 }: Props) {
   const [open, setOpen] = React.useState(false);
@@ -35,9 +51,81 @@ export default function AddDepositDialog({
     setValue(initialValue);
   }, [initialType, initialValue]);
 
+  const hasMaxAmount = Number.isFinite(maxAmount) && (maxAmount ?? 0) > 0;
+  const numericValue = parseNumericInput(value.trim());
+  const invoiceTotal = maxAmount ?? 0;
+
+  const maxDepositDollars = hasMaxAmount
+    ? getRemainingAfterAdjustment(
+        invoiceTotal,
+        reservedScheduleValue,
+        reservedScheduleType,
+      )
+    : Infinity;
+
+  const maxDepositPercent = hasMaxAmount
+    ? getRemainingPercentAfterAdjustment(
+        invoiceTotal,
+        reservedScheduleValue,
+        reservedScheduleType,
+      )
+    : 100;
+
+  const enteredDepositDollars = getAdjustmentAmount(
+    value.trim(),
+    type,
+    invoiceTotal,
+  );
+
+  const validationError =
+    !value.trim()
+      ? ""
+      : type === "%"
+        ? exceedsPercentLimit(numericValue, maxDepositPercent)
+          ? reservedScheduleValue.trim()
+            ? "Deposit and payment schedule cannot exceed 100%"
+            : "Deposit exceeds 100%"
+          : ""
+        : hasMaxAmount &&
+            exceedsMoneyLimit(enteredDepositDollars, maxDepositDollars)
+          ? reservedScheduleValue.trim()
+            ? "Deposit and payment schedule cannot exceed the invoice total"
+            : "Deposit exceeds the invoice total"
+          : "";
+
+  const remainingLabel = React.useMemo(() => {
+    if (!value.trim()) {
+      if (type === "%") {
+        return `${maxDepositPercent.toFixed(2)}% available`;
+      }
+      if (hasMaxAmount) {
+        return `$${maxDepositDollars.toFixed(2)} available`;
+      }
+      return "";
+    }
+
+    if (type === "%") {
+      const rem = roundPercent(Math.max(0, maxDepositPercent - numericValue));
+      return `${rem.toFixed(2)}% Remaining`;
+    }
+    if (hasMaxAmount) {
+      const rem = roundMoney(Math.max(0, maxDepositDollars - enteredDepositDollars));
+      return `$${rem.toFixed(2)} Remaining`;
+    }
+    return `$${enteredDepositDollars.toFixed(2)}`;
+  }, [
+    enteredDepositDollars,
+    hasMaxAmount,
+    maxDepositDollars,
+    maxDepositPercent,
+    numericValue,
+    type,
+    value,
+  ]);
+
   const handleDone = () => {
     const trimmed = value.trim();
-    if (!trimmed) return;
+    if (!trimmed || validationError) return;
     onDone({ type, value: trimmed });
     setOpen(false);
   };
@@ -99,6 +187,17 @@ export default function AddDepositDialog({
                   </div>
                 </div>
               </div>
+
+              {remainingLabel && (
+                <div className="text-center">
+                  <div className="text-blue-600">{remainingLabel}</div>
+                  {validationError && (
+                    <div className="text-sm text-red-500 mt-2">
+                      {validationError}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -116,6 +215,7 @@ export default function AddDepositDialog({
           <Button
             size="lg"
             onClick={handleDone}
+            disabled={!!validationError || !value.trim()}
             className="rounded-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white"
           >
             Done
