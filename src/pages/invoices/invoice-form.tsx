@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm, Controller, useFieldArray, useWatch } from "react-hook-form";
 import { Calendar, Plus, UserPlus } from "lucide-react";
 import { useNavigate } from "react-router";
@@ -8,6 +8,7 @@ import AddDiscountDialog from "@/components/invoice/add-discount-dialog";
 import AddDepositDialog from "@/components/invoice/add-deposit-dialog";
 import PaymentScheduleDialog from "@/components/invoice/payment-schedule-dialog";
 import AddClientDialog from "@/components/invoice/add-client-dialog";
+import CustomerProjectSelector from "@/components/invoice/customer-project-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import steelLogo from "@/assets/steel-building-depot-logo.png";
@@ -16,9 +17,16 @@ import {
   useCreateInvoiceMutation,
   useEditInvoiceMutation,
 } from "@/modules/invoices/invoices.hooks";
+import { usePaymentScheduleByLeadQuery } from "@/modules/payment-schedules/payment-schedules.hooks";
+import {
+  getDepositFromScheduleStages,
+  isDepositStageName,
+  paymentScheduleToDialogValues,
+} from "@/modules/payment-schedules/payment-schedules.utils";
 import type {
   InvoiceDetail,
   InvoiceLineItem as ApiInvoiceLineItem,
+  PaymentScheduleDocument,
 } from "@/modules/invoices/invoices.api";
 import SuccessDialog from "@/components/success-dialog";
 
@@ -43,8 +51,13 @@ export interface InvoiceFormValues {
   depositType: "%" | "$";
   depositValue: string;
   paymentScheduleType: "%" | "$";
-  paymentSchedulePayments: { name: string; amount: string }[];
+  paymentSchedulePayments: {
+    name: string;
+    amount: string;
+    dueDate?: string;
+  }[];
   clientId: string;
+  leadId: string;
   clientName: string;
   clientAvatar: string;
   taxes: { name: string; rate: string }[];
@@ -81,6 +94,7 @@ const defaultFormValues: InvoiceFormValues = {
   paymentScheduleType: "%",
   paymentSchedulePayments: [],
   clientId: "",
+  leadId: "",
   clientName: "",
   clientAvatar: "",
   taxes: [{ name: "Argyle", rate: "8.25" }],
@@ -107,13 +121,135 @@ function getCustomerName(customer?: InvoiceDetail["customerId"]) {
   );
 }
 
+function getInvoiceClientId(invoice?: InvoiceDetail | null) {
+  if (!invoice?.customerId) return "";
+
+  if (typeof invoice.customerId === "string") {
+    return invoice.customerId;
+  }
+
+  return invoice.customerId._id ?? "";
+}
+
+function formatCurrency(value: number) {
+  return value.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function dollarAmountToFormValue(amount?: number | null) {
+  if (amount == null || amount === 0) return "";
+
+  return String(amount);
+}
+
+function formatAdjustmentDisplay(
+  value: string,
+  type: "%" | "$",
+  baseAmount: number,
+) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const numericValue = parseNumericInput(trimmed);
+  if (type === "%") {
+    const amount = getAdjustmentAmount(trimmed, type, baseAmount);
+    if (amount > 0) {
+      return `${trimmed}% ($${formatCurrency(amount)})`;
+    }
+    return `${trimmed}%`;
+  }
+
+  return `$${formatCurrency(numericValue)}`;
+}
+
+function ensureDepositInSchedulePayments(
+  payments: InvoiceFormValues["paymentSchedulePayments"],
+  depositValue: string,
+): InvoiceFormValues["paymentSchedulePayments"] {
+  const trimmedDeposit = depositValue.trim();
+  const nonDepositPayments = payments.filter(
+    (payment) => !isDepositStageName(payment.name),
+  );
+
+  if (!trimmedDeposit) {
+    return nonDepositPayments;
+  }
+
+  const existingDeposit = payments.find((payment) =>
+    isDepositStageName(payment.name),
+  );
+
+  return [
+    {
+      name: "Deposit",
+      amount: trimmedDeposit,
+      dueDate: existingDeposit?.dueDate,
+    },
+    ...nonDepositPayments,
+  ];
+}
+
+function formatPaymentScheduleDisplay(
+  payments: { name: string; amount: string; dueDate?: string }[],
+  type: "%" | "$",
+) {
+  return payments
+    .filter((payment) => payment.name.trim() || payment.amount.trim())
+    .map((payment) => {
+      const name = payment.name.trim() || "Payment";
+      const amount = payment.amount.trim();
+      if (!amount) return name;
+
+      if (type === "$") {
+        return `${name} $${formatCurrency(parseNumericInput(amount))}`;
+      }
+
+      return `${name} ${amount}%`;
+    });
+}
+
+function paymentScheduleToFormValues(
+  schedule?: PaymentScheduleDocument | null,
+): Pick<InvoiceFormValues, "paymentScheduleType" | "paymentSchedulePayments"> {
+  const { type, payments } = paymentScheduleToDialogValues(schedule);
+  if (!payments.length) {
+    return {
+      paymentScheduleType: defaultFormValues.paymentScheduleType,
+      paymentSchedulePayments: defaultFormValues.paymentSchedulePayments,
+    };
+  }
+
+  return {
+    paymentScheduleType: type,
+    paymentSchedulePayments: payments,
+  };
+}
+
+function resolveDepositFormValue(invoice?: InvoiceDetail | null) {
+  return dollarAmountToFormValue(invoice?.depositAmount);
+}
+
+function lineItemMarkupLabel(markup?: number | null) {
+  if (markup != null && markup > 0) return "Fixed";
+
+  return "Markup";
+}
+
 function invoiceToFormValues(
   invoice?: InvoiceDetail | null,
+  paymentSchedule?: PaymentScheduleDocument | null,
 ): InvoiceFormValues {
   const customer =
     invoice && typeof invoice.customerId === "object"
       ? invoice.customerId
       : null;
+  const markupValue = dollarAmountToFormValue(invoice?.markupTotal);
+  const discountValue = dollarAmountToFormValue(invoice?.discount);
+  const depositValue = resolveDepositFormValue(invoice);
+  const scheduleValues = paymentScheduleToFormValues(paymentSchedule);
+  const depositType = depositValue ? "$" : defaultFormValues.depositType;
 
   return {
     ...defaultFormValues,
@@ -124,8 +260,20 @@ function invoiceToFormValues(
         ? String(invoice.daysToPay)
         : defaultFormValues.daysToPay,
     poNumber: invoice?.poNumber ?? defaultFormValues.poNumber,
-    clientId: invoice?.leadId ?? defaultFormValues.clientId,
+    clientId: getInvoiceClientId(invoice),
+    leadId: invoice?.leadId ?? defaultFormValues.leadId,
     clientName: getCustomerName(customer) || defaultFormValues.clientName,
+    markupType: markupValue ? "$" : defaultFormValues.markupType,
+    markupValue,
+    discountType: discountValue ? "$" : defaultFormValues.discountType,
+    discountValue,
+    depositType,
+    depositValue,
+    ...scheduleValues,
+    paymentSchedulePayments: ensureDepositInSchedulePayments(
+      scheduleValues.paymentSchedulePayments,
+      depositValue,
+    ),
     lineItems:
       invoice?.lineItems?.length && invoice.lineItems.length > 0
         ? invoice.lineItems.map((item, index) => ({
@@ -133,7 +281,7 @@ function invoiceToFormValues(
             description: item.description ?? "",
             notes: item.notes ?? "",
             rate: item.rate ?? 0,
-            markup: "Markup",
+            markup: lineItemMarkupLabel(item.markup),
             quantity: item.quantity ?? 1,
             tax: item.tax ?? 0,
             total:
@@ -167,17 +315,38 @@ function getAdjustmentAmount(
   return type === "%" ? (baseAmount * numericValue) / 100 : numericValue;
 }
 
+function getScheduleAllocatedTotal(
+  payments: InvoiceFormValues["paymentSchedulePayments"],
+) {
+  return payments
+    .filter((payment) => !isDepositStageName(payment.name))
+    .reduce(
+      (sum, payment) => sum + parseNumericInput(payment.amount),
+      0,
+    );
+}
+
 type InvoiceFormProps = {
   invoice?: InvoiceDetail | null;
+  paymentSchedule?: PaymentScheduleDocument | null;
 };
 
-export default function InvoiceForm({ invoice }: InvoiceFormProps) {
+export default function InvoiceForm({
+  invoice,
+  paymentSchedule,
+}: InvoiceFormProps) {
   const navigate = useNavigate();
   const createInvoiceMutation = useCreateInvoiceMutation();
   const editInvoiceMutation = useEditInvoiceMutation();
   const isEdit = Boolean(invoice && invoice._id);
+  const isSummaryReadOnly =
+    isEdit && Boolean(invoice?.status) && invoice?.status !== "draft";
   const [successOpen, setSuccessOpen] = useState(false);
   const [createdInvoiceId, setCreatedInvoiceId] = useState<string | null>(null);
+  const [paymentScheduleId, setPaymentScheduleId] = useState<string | null>(
+    paymentSchedule?._id ?? invoice?.paymentScheduleId ?? null,
+  );
+  const lastAppliedLeadScheduleIdRef = useRef<string | null>(null);
   const {
     register,
     control,
@@ -191,10 +360,81 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   });
 
   const formValues = useWatch({ control }) as Partial<InvoiceFormValues>;
+  const leadIdForSchedule = formValues?.leadId ?? defaultFormValues.leadId;
+  const leadScheduleQuery = usePaymentScheduleByLeadQuery(
+    leadIdForSchedule || undefined,
+    Boolean(leadIdForSchedule) && !isSummaryReadOnly,
+  );
 
   useEffect(() => {
-    reset(invoiceToFormValues(invoice));
-  }, [invoice, reset]);
+    reset(invoiceToFormValues(invoice, paymentSchedule));
+    setPaymentScheduleId(
+      paymentSchedule?._id ?? invoice?.paymentScheduleId ?? null,
+    );
+    lastAppliedLeadScheduleIdRef.current = invoice?.leadId ?? null;
+  }, [invoice, paymentSchedule, reset]);
+
+  useEffect(() => {
+    if (!leadIdForSchedule) {
+      lastAppliedLeadScheduleIdRef.current = null;
+      if (!isEdit) {
+        setPaymentScheduleId(null);
+        setValue(
+          "paymentSchedulePayments",
+          ensureDepositInSchedulePayments([], getValues("depositValue")),
+        );
+      }
+      return;
+    }
+
+    if (!leadScheduleQuery.isSuccess) {
+      return;
+    }
+
+    if (lastAppliedLeadScheduleIdRef.current === leadIdForSchedule) {
+      return;
+    }
+
+    lastAppliedLeadScheduleIdRef.current = leadIdForSchedule;
+
+    const schedule = leadScheduleQuery.data?.schedule ?? null;
+    const depositFromSchedule = getDepositFromScheduleStages(schedule?.stages);
+    const currentDepositValue = getValues("depositValue");
+
+    if (!schedule) {
+      setPaymentScheduleId(null);
+      setValue(
+        "paymentSchedulePayments",
+        ensureDepositInSchedulePayments([], currentDepositValue),
+      );
+      return;
+    }
+
+    const scheduleValues = paymentScheduleToFormValues(schedule);
+    const depositValue = depositFromSchedule?.depositValue ?? currentDepositValue;
+
+    if (depositFromSchedule) {
+      setValue("depositType", depositFromSchedule.depositType);
+      setValue("depositValue", depositFromSchedule.depositValue);
+    }
+
+    setPaymentScheduleId(schedule._id);
+    setValue("paymentScheduleType", scheduleValues.paymentScheduleType);
+    setValue(
+      "paymentSchedulePayments",
+      ensureDepositInSchedulePayments(
+        scheduleValues.paymentSchedulePayments,
+        depositValue,
+      ),
+    );
+  }, [
+    isEdit,
+    leadIdForSchedule,
+    leadScheduleQuery.isSuccess,
+    leadScheduleQuery.data,
+    setValue,
+    getValues,
+  ]);
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -219,9 +459,16 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
     formValues?.paymentScheduleType ?? defaultFormValues.paymentScheduleType;
   const paymentSchedulePayments = (formValues.paymentSchedulePayments ??
     defaultFormValues.paymentSchedulePayments) as InvoiceFormValues["paymentSchedulePayments"];
+  const schedulePaymentsWithDeposit = ensureDepositInSchedulePayments(
+    paymentSchedulePayments,
+    depositValue,
+  );
+  const hasNonDepositSchedulePayments = schedulePaymentsWithDeposit.some(
+    (payment) => !isDepositStageName(payment.name),
+  );
   const clientId = formValues?.clientId ?? defaultFormValues.clientId;
+  const leadId = formValues?.leadId ?? defaultFormValues.leadId;
   const clientName = formValues?.clientName ?? defaultFormValues.clientName;
-
   const taxes = (formValues.taxes ??
     defaultFormValues.taxes) as InvoiceFormValues["taxes"];
 
@@ -278,13 +525,93 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
     }, 0);
   };
 
-  const calculateTotal = () => calculateSubtotal() + calculateTax();
+  const calculateTotal = () => {
+    const subtotal = calculateSubtotal();
+    const markup = getAdjustmentAmount(markupValue, markupType, subtotal);
+    const discount = getAdjustmentAmount(discountValue, discountType, subtotal);
+
+    return Math.max(0, subtotal + markup - discount);
+  };
+
+  const invoiceTotal = calculateTotal();
+  const scheduleAllocatedTotal = getScheduleAllocatedTotal(
+    schedulePaymentsWithDeposit,
+  );
+
+  const syncDepositToSchedule = (type: "%" | "$", value: string) => {
+    setValue("depositType", type);
+    setValue("depositValue", value);
+    if (!hasNonDepositSchedulePayments) {
+      setValue("paymentScheduleType", type);
+    }
+    setValue(
+      "paymentSchedulePayments",
+      ensureDepositInSchedulePayments(paymentSchedulePayments, value),
+    );
+  };
+
+  const clearDepositFromSchedule = () => {
+    setValue("depositValue", "");
+    setValue(
+      "paymentSchedulePayments",
+      ensureDepositInSchedulePayments(paymentSchedulePayments, ""),
+    );
+  };
+
+  const applyPaymentScheduleToForm = (payload: {
+    scheduleId: string;
+    type: "%" | "$";
+    payments: InvoiceFormValues["paymentSchedulePayments"];
+    depositType?: "%" | "$";
+    depositValue?: string;
+  }) => {
+    const resolvedDepositValue = payload.depositValue ?? depositValue;
+
+    if (payload.depositType && payload.depositValue) {
+      setValue("depositType", payload.depositType);
+      setValue("depositValue", payload.depositValue);
+    }
+
+    setPaymentScheduleId(payload.scheduleId);
+    setValue("paymentScheduleType", payload.type);
+    setValue(
+      "paymentSchedulePayments",
+      ensureDepositInSchedulePayments(
+        payload.payments,
+        resolvedDepositValue,
+      ),
+    );
+  };
+
+  const handlePaymentScheduleDone = (
+    payload: Parameters<typeof applyPaymentScheduleToForm>[0],
+  ) => {
+    applyPaymentScheduleToForm(payload);
+  };
+
+  const handlePaymentScheduleLoaded = (
+    payload: Parameters<typeof applyPaymentScheduleToForm>[0],
+  ) => {
+    applyPaymentScheduleToForm(payload);
+    lastAppliedLeadScheduleIdRef.current = leadId;
+  };
+
+  const clearPaymentSchedule = () => {
+    setPaymentScheduleId(null);
+    setValue(
+      "paymentSchedulePayments",
+      ensureDepositInSchedulePayments([], depositValue),
+    );
+  };
 
   const onSubmit = async (data: InvoiceFormValues) => {
     const isEdit = Boolean(invoice && invoice._id);
 
-    if (!clientId) {
-      console.error("Project is required before creating an invoice draft.");
+    if (!leadId) {
+      setError("root", {
+        type: "manual",
+        message: "Client and project are required before saving the invoice.",
+      });
       return;
     }
 
@@ -317,16 +644,13 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
     );
     const totalAmount = Math.max(
       0,
-      lineItemsSubtotal + markupTotal - discount - depositAmount,
+      lineItemsSubtotal + markupTotal - discount,
     );
 
+    const parsedDaysToPay = Number.parseInt(data.daysToPay, 10);
     const payload = {
       date: data.date || undefined,
-      daysToPay: (() => {
-        const parsedDaysToPay = Number.parseInt(data.daysToPay, 10);
-
-        return Number.isFinite(parsedDaysToPay) ? parsedDaysToPay : undefined;
-      })(),
+      daysToPay: Number.isFinite(parsedDaysToPay) ? parsedDaysToPay : undefined,
       lineItems: (data.lineItems || []).map((item) => ({
         description: item.description?.trim() || undefined,
         notes: item.notes?.trim() || undefined,
@@ -343,6 +667,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
       discount,
       depositAmount,
       totalAmount,
+      ...(paymentScheduleId ? { paymentScheduleId } : {}),
     };
 
     try {
@@ -360,7 +685,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
         }
       } else {
         const response = await createInvoiceMutation.mutateAsync({
-          leadId: clientId,
+          leadId,
           payload,
         });
 
@@ -441,19 +766,21 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
 
           {/* Right: Invoice Meta & Client Add */}
           <div className="flex-1 max-w-2xl flex flex-col gap-6">
-            <div className="flex justify-end">
+            <div className="flex flex-col items-end gap-4">
               <AddClientDialog
                 initialSelected={clientId || null}
                 onDone={(client) => {
                   if (!client) {
                     setValue("clientId", "");
                     setValue("clientName", "");
+                    setValue("leadId", "");
                     setValue("clientAvatar", "");
                     return;
                   }
 
                   setValue("clientId", client.id);
                   setValue("clientName", client.name);
+                  setValue("leadId", "");
                   setValue("clientAvatar", client.avatar || "");
                 }}
               >
@@ -468,6 +795,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                         e.stopPropagation();
                         setValue("clientId", "");
                         setValue("clientName", "");
+                        setValue("leadId", "");
                         setValue("clientAvatar", "");
                       }}
                       className="text-gray-500 hover:text-red-500 ml-2"
@@ -485,6 +813,16 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                   </Button>
                 )}
               </AddClientDialog>
+
+              <CustomerProjectSelector
+                customerId={clientId}
+                value={leadId}
+                // disabled={!clientId || isSummaryReadOnly}
+                disabled={isSummaryReadOnly}
+                onValueChange={(project) => {
+                  setValue("leadId", project?._id ?? "");
+                }}
+              />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
@@ -506,6 +844,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                   <Input
                     id="date"
                     type="date"
+                    placeholder="dd/mm/yyyy"
                     {...register("date")}
                     className="bg-white border-gray-200 h-11"
                   />
@@ -523,12 +862,14 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                 />
               </div>
               <div className="space-y-2">
+                {/* hide in create */}
                 <label className="text-sm font-medium text-gray-700">
                   PO number
                 </label>
                 <Input
                   id="poNumber"
                   placeholder="PO number"
+                  disabled
                   {...register("poNumber")}
                   className="bg-white border-gray-200 h-11"
                 />
@@ -620,34 +961,47 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                 })}
               </span>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Markup</span>
+            <div className="flex justify-between text-sm gap-4">
+              <span className="text-gray-500 shrink-0">Markup</span>
 
-              {markupValue ? (
-                <div className="flex items-center gap-3">
-                  <span className="font-medium">
-                    {markupValue}
-                    {markupType}
+              {markupValue.trim() ? (
+                <div className="flex items-center gap-3 text-right">
+                  <span className="text-gray-900 font-medium">
+                    {formatAdjustmentDisplay(
+                      markupValue,
+                      markupType,
+                      calculateSubtotal(),
+                    )}
                   </span>
-                  <AddMarkupDialog
-                    initialType={markupType}
-                    initialValue={markupValue}
-                    onDone={({ type, value }) => {
-                      setValue("markupType", type);
-                      setValue("markupValue", value);
-                    }}
-                  >
-                    <button className="text-blue-500 text-xs font-medium hover:underline">
-                      Edit
-                    </button>
-                  </AddMarkupDialog>
-                  <button
-                    onClick={() => setValue("markupValue", "")}
-                    className="text-gray-500 hover:text-red-500"
-                  >
-                    Remove
-                  </button>
+                  {!isSummaryReadOnly && (
+                    <>
+                      <AddMarkupDialog
+                        initialType={markupType}
+                        initialValue={markupValue}
+                        onDone={({ type, value }) => {
+                          setValue("markupType", type);
+                          setValue("markupValue", value);
+                        }}
+                      >
+                        <button
+                          type="button"
+                          className="text-blue-500 text-xs font-medium hover:underline"
+                        >
+                          Edit
+                        </button>
+                      </AddMarkupDialog>
+                      <button
+                        type="button"
+                        onClick={() => setValue("markupValue", "")}
+                        className="text-gray-500 hover:text-red-500"
+                      >
+                        Remove
+                      </button>
+                    </>
+                  )}
                 </div>
+              ) : isSummaryReadOnly ? (
+                <span className="text-gray-400">—</span>
               ) : (
                 <AddMarkupDialog
                   initialType={markupType}
@@ -657,40 +1011,56 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                     setValue("markupValue", value);
                   }}
                 >
-                  <button className="text-blue-500 text-xs font-medium hover:underline">
+                  <button
+                    type="button"
+                    className="text-blue-500 text-xs font-medium hover:underline"
+                  >
                     Add
                   </button>
                 </AddMarkupDialog>
               )}
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Discount</span>
+            <div className="flex justify-between text-sm gap-4">
+              <span className="text-gray-500 shrink-0">Discount</span>
 
-              {discountValue ? (
-                <div className="flex items-center gap-3">
-                  <span className="font-medium">
-                    {discountValue}
-                    {discountType}
+              {discountValue.trim() ? (
+                <div className="flex items-center gap-3 text-right">
+                  <span className="text-gray-900 font-medium">
+                    {formatAdjustmentDisplay(
+                      discountValue,
+                      discountType,
+                      calculateSubtotal(),
+                    )}
                   </span>
-                  <AddDiscountDialog
-                    initialType={discountType}
-                    initialValue={discountValue}
-                    onDone={({ type, value }) => {
-                      setValue("discountType", type);
-                      setValue("discountValue", value);
-                    }}
-                  >
-                    <button className="text-blue-500 text-xs font-medium hover:underline">
-                      Edit
-                    </button>
-                  </AddDiscountDialog>
-                  <button
-                    onClick={() => setValue("discountValue", "")}
-                    className="text-gray-500 hover:text-red-500"
-                  >
-                    Remove
-                  </button>
+                  {!isSummaryReadOnly && (
+                    <>
+                      <AddDiscountDialog
+                        initialType={discountType}
+                        initialValue={discountValue}
+                        onDone={({ type, value }) => {
+                          setValue("discountType", type);
+                          setValue("discountValue", value);
+                        }}
+                      >
+                        <button
+                          type="button"
+                          className="text-blue-500 text-xs font-medium hover:underline"
+                        >
+                          Edit
+                        </button>
+                      </AddDiscountDialog>
+                      <button
+                        type="button"
+                        onClick={() => setValue("discountValue", "")}
+                        className="text-gray-500 hover:text-red-500"
+                      >
+                        Remove
+                      </button>
+                    </>
+                  )}
                 </div>
+              ) : isSummaryReadOnly ? (
+                <span className="text-gray-400">—</span>
               ) : (
                 <AddDiscountDialog
                   initialType={discountType}
@@ -700,110 +1070,187 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                     setValue("discountValue", value);
                   }}
                 >
-                  <button className="text-blue-500 text-xs font-medium hover:underline">
+                  <button
+                    type="button"
+                    className="text-blue-500 text-xs font-medium hover:underline"
+                  >
                     Add
                   </button>
                 </AddDiscountDialog>
               )}
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Request a deposit</span>
+            <div className="flex justify-between text-sm gap-4">
+              <span className="text-gray-500 shrink-0">Request a deposit</span>
 
-              {depositValue ? (
-                <div className="flex items-center gap-3">
-                  <span className="font-medium">
-                    {depositValue}
-                    {depositType}
+              {depositValue.trim() ? (
+                <div className="flex items-center gap-3 text-right">
+                  <span className="text-gray-900 font-medium">
+                    {formatAdjustmentDisplay(
+                      depositValue,
+                      depositType,
+                      calculateSubtotal(),
+                    )}
                   </span>
-                  <AddDepositDialog
-                    initialType={depositType}
-                    initialValue={depositValue}
-                    onDone={({ type, value }) => {
-                      setValue("depositType", type);
-                      setValue("depositValue", value);
-                    }}
-                  >
-                    <button className="text-blue-500 text-xs font-medium hover:underline">
-                      Edit
-                    </button>
-                  </AddDepositDialog>
-                  <button
-                    onClick={() => setValue("depositValue", "")}
-                    className="text-gray-500 hover:text-red-500"
-                  >
-                    Remove
-                  </button>
+                  {!isSummaryReadOnly && (
+                    <>
+                      <AddDepositDialog
+                        initialType={depositType}
+                        initialValue={depositValue}
+                        maxAmount={invoiceTotal}
+                        reservedScheduleValue={
+                          scheduleAllocatedTotal > 0
+                            ? String(scheduleAllocatedTotal)
+                            : ""
+                        }
+                        reservedScheduleType={paymentScheduleType}
+                        onDone={({ type, value }) => syncDepositToSchedule(type, value)}
+                      >
+                        <button
+                          type="button"
+                          className="text-blue-500 text-xs font-medium hover:underline"
+                        >
+                          Edit
+                        </button>
+                      </AddDepositDialog>
+                      <button
+                        type="button"
+                        onClick={clearDepositFromSchedule}
+                        className="text-gray-500 hover:text-red-500"
+                      >
+                        Remove
+                      </button>
+                    </>
+                  )}
                 </div>
+              ) : isSummaryReadOnly ? (
+                <span className="text-gray-400">—</span>
               ) : (
                 <AddDepositDialog
                   initialType={depositType}
                   initialValue={depositValue}
-                  onDone={({ type, value }) => {
-                    setValue("depositType", type);
-                    setValue("depositValue", value);
-                  }}
+                  maxAmount={invoiceTotal}
+                  reservedScheduleValue={
+                    scheduleAllocatedTotal > 0
+                      ? String(scheduleAllocatedTotal)
+                      : ""
+                  }
+                  reservedScheduleType={paymentScheduleType}
+                  onDone={({ type, value }) => syncDepositToSchedule(type, value)}
                 >
-                  <button className="text-blue-500 text-xs font-medium hover:underline">
+                  <button
+                    type="button"
+                    className="text-blue-500 text-xs font-medium hover:underline"
+                  >
                     Add
                   </button>
                 </AddDepositDialog>
               )}
             </div>
 
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Payment Schedule</span>
+            <div className="flex justify-between text-sm gap-4">
+              <span className="text-gray-500 shrink-0">Payment Schedule</span>
 
-              {((paymentSchedulePayments || [])?.length || 0) > 0 ? (
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {(paymentSchedulePayments || []).map(
-                      (
-                        p: {
-                          name: string;
-                          amount: string;
-                        },
-                        i: number,
-                      ) => (
-                        <div
-                          key={i}
-                          className="bg-gray-100 px-3 py-1 rounded text-sm"
+              {hasNonDepositSchedulePayments ? (
+                <div className="flex items-center gap-3 text-right">
+                  <div className="flex items-center justify-end gap-2 flex-wrap">
+                    {formatPaymentScheduleDisplay(
+                      schedulePaymentsWithDeposit,
+                      paymentScheduleType,
+                    ).map((label, index) => (
+                      <div
+                        key={`${label}-${index}`}
+                        className="bg-gray-100 px-3 py-1 rounded text-sm text-gray-900"
+                      >
+                        {label}
+                      </div>
+                    ))}
+
+                    {!isSummaryReadOnly && (
+                      <PaymentScheduleDialog
+                        leadId={leadId}
+                        maxAmount={invoiceTotal}
+                        depositType={depositType}
+                        depositValue={depositValue}
+                        existingScheduleId={paymentScheduleId}
+                        initialType={paymentScheduleType}
+                        initialPayments={schedulePaymentsWithDeposit}
+                        onScheduleLoaded={handlePaymentScheduleLoaded}
+                        onDone={handlePaymentScheduleDone}
+                      >
+                        <button
+                          type="button"
+                          className="text-blue-500 text-xs font-medium hover:underline"
                         >
-                          {p.name} {p.amount}
-                        </div>
-                      ),
+                          Edit
+                        </button>
+                      </PaymentScheduleDialog>
                     )}
-
-                    <PaymentScheduleDialog
-                      initialType={paymentScheduleType}
-                      initialPayments={paymentSchedulePayments}
-                      onDone={({ type, payments }) => {
-                        setValue("paymentScheduleType", type);
-                        setValue("paymentSchedulePayments", payments);
-                      }}
-                    >
-                      <button className="text-blue-500 text-xs font-medium hover:underline">
-                        Edit
-                      </button>
-                    </PaymentScheduleDialog>
                   </div>
 
-                  <button
-                    onClick={() => setValue("paymentSchedulePayments", [])}
-                    className="text-gray-500 hover:text-red-500"
-                  >
-                    Remove
-                  </button>
+                  {!isSummaryReadOnly && (
+                    <button
+                      type="button"
+                      onClick={clearPaymentSchedule}
+                      className="text-gray-500 hover:text-red-500"
+                    >
+                      Remove
+                    </button>
+                  )}
                 </div>
+              ) : depositValue.trim() ? (
+                <div className="flex items-center gap-3 text-right">
+                  <div className="flex items-center justify-end gap-2 flex-wrap">
+                    {formatPaymentScheduleDisplay(
+                      schedulePaymentsWithDeposit,
+                      paymentScheduleType,
+                    ).map((label, index) => (
+                      <div
+                        key={`${label}-${index}`}
+                        className="bg-gray-100 px-3 py-1 rounded text-sm text-gray-900"
+                      >
+                        {label}
+                      </div>
+                    ))}
+                  </div>
+                  {!isSummaryReadOnly && (
+                    <PaymentScheduleDialog
+                      leadId={leadId}
+                      maxAmount={invoiceTotal}
+                      depositType={depositType}
+                      depositValue={depositValue}
+                      existingScheduleId={paymentScheduleId}
+                      initialType={paymentScheduleType}
+                      initialPayments={schedulePaymentsWithDeposit}
+                      onScheduleLoaded={handlePaymentScheduleLoaded}
+                      onDone={handlePaymentScheduleDone}
+                    >
+                      <button
+                        type="button"
+                        className="text-blue-500 text-xs font-medium hover:underline"
+                      >
+                        Add
+                      </button>
+                    </PaymentScheduleDialog>
+                  )}
+                </div>
+              ) : isSummaryReadOnly ? (
+                <span className="text-gray-400">—</span>
               ) : (
                 <PaymentScheduleDialog
+                  leadId={leadId}
+                  maxAmount={invoiceTotal}
+                  depositType={depositType}
+                  depositValue={depositValue}
+                  existingScheduleId={paymentScheduleId}
                   initialType={paymentScheduleType}
-                  initialPayments={paymentSchedulePayments}
-                  onDone={({ type, payments }) => {
-                    setValue("paymentScheduleType", type);
-                    setValue("paymentSchedulePayments", payments);
-                  }}
+                  initialPayments={schedulePaymentsWithDeposit}
+                  onScheduleLoaded={handlePaymentScheduleLoaded}
+                  onDone={handlePaymentScheduleDone}
                 >
-                  <button className="text-blue-500 text-xs font-medium hover:underline">
+                  <button
+                    type="button"
+                    className="text-blue-500 text-xs font-medium hover:underline"
+                  >
                     Add
                   </button>
                 </PaymentScheduleDialog>
