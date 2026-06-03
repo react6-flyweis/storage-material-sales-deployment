@@ -1,9 +1,9 @@
 import { io, type Socket } from "socket.io-client";
 
 export function getSocketBaseUrl() {
-  const apiBase = import.meta.env.VITE_CHAT_SOCKET_BASE_URL ;
+  const apiBase = import.meta.env.VITE_API_BASE_URL;
 
-  return apiBase;
+  return apiBase || "";
 
   // try {
   //   return new URL(apiBase).origin;
@@ -14,7 +14,7 @@ export function getSocketBaseUrl() {
 
 export function createAdminSocket(
   accessToken: string | null | undefined,
-  transports: string[] = [ "polling"],
+  transports: string[] = ["polling"],
   namespace = "/admin",
 ): Socket | null {
   if (!accessToken) return null;
