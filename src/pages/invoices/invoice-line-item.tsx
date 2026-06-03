@@ -39,6 +39,15 @@ type Props = {
   taxes?: { name: string; rate: string }[];
 };
 
+const getFilenameFromUrl = (url: string) => {
+  try {
+    const decoded = decodeURIComponent(url);
+    return decoded.substring(decoded.lastIndexOf("/") + 1);
+  } catch {
+    return url;
+  }
+};
+
 export default function InvoiceLineItem({
   index,
   item,
@@ -232,11 +241,10 @@ export default function InvoiceLineItem({
         {/* Upload Row */}
         <div className="border-t border-gray-100 p-3 bg-gray-50/10 flex items-center gap-4 flex-wrap">
           <UploadImageDialog
-            onUpload={(files: File[]) => {
-              const names = files.map((f) => f.name);
+            onUpload={(urls: string[]) => {
               const items = getValues("lineItems") || [];
               const images = items[index]?.images || [];
-              const combined = [...images, ...names].slice(0, 4);
+              const combined = [...images, ...urls].slice(0, 4);
               setValue(`lineItems.${index}.images`, combined);
             }}
           >
@@ -255,12 +263,12 @@ export default function InvoiceLineItem({
               key={idx}
               className="flex items-center gap-2 text-xs text-gray-500 bg-white/0 px-2 py-1 rounded-md"
             >
-              <span className="truncate max-w-40">{image}</span>
+              <span className="truncate max-w-40">{getFilenameFromUrl(image)}</span>
               <button
                 type="button"
                 onClick={() => removeImage(idx)}
                 className="text-red-500 hover:text-red-700 text-xs font-medium"
-                title={`Remove ${image}`}
+                title={`Remove ${getFilenameFromUrl(image)}`}
               >
                 ×
               </button>
