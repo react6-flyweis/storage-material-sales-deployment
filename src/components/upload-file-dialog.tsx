@@ -9,7 +9,18 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { FolderUp, XCircle } from "lucide-react";
+import { FolderUp, XCircle, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { apiClient } from "@/modules/auth/auth.api";
+import axios from "axios";
+
+interface FileUploadState {
+  id: string;
+  file: File;
+  progress: number;
+  status: "idle" | "uploading" | "completed" | "failed";
+  error?: string;
+  url?: string;
+}
 
 type Props = {
   title?: string;
@@ -20,7 +31,9 @@ type Props = {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   children?: React.ReactNode;
-  onUpload?: (files: File[]) => void;
+  onUpload?: (urls: string[]) => void;
+  onUploadComplete?: (files: { url: string; name: string }[]) => void;
+  folder?: string;
 };
 
 export function UploadFileDialog({
@@ -33,20 +46,28 @@ export function UploadFileDialog({
   onOpenChange,
   children,
   onUpload,
+  onUploadComplete,
+  folder = "documents",
 }: Props) {
   const [internalOpen, setInternalOpen] = React.useState(false);
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setOpen = onOpenChange || setInternalOpen;
 
-  const [files, setFiles] = React.useState<File[]>([]);
+  const [uploadStates, setUploadStates] = React.useState<FileUploadState[]>([]);
+  const [isUploading, setIsUploading] = React.useState(false);
   const [isDragging, setIsDragging] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement | null>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const list = e.target.files;
     if (!list) return;
-    const newFiles = Array.from(list);
-    setFiles((s) => [...s, ...newFiles].slice(0, maxFiles));
+    const newFiles = Array.from(list).map((file) => ({
+      id: `${file.name}-${file.size}-${Date.now()}-${Math.random()}`,
+      file,
+      progress: 0,
+      status: "idle" as const,
+    }));
+    setUploadStates((s) => [...s, ...newFiles].slice(0, maxFiles));
   };
 
   const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
@@ -54,8 +75,13 @@ export function UploadFileDialog({
     setIsDragging(false);
     const list = e.dataTransfer?.files;
     if (!list) return;
-    const newFiles = Array.from(list);
-    setFiles((s) => [...s, ...newFiles].slice(0, maxFiles));
+    const newFiles = Array.from(list).map((file) => ({
+      id: `${file.name}-${file.size}-${Date.now()}-${Math.random()}`,
+      file,
+      progress: 0,
+      status: "idle" as const,
+    }));
+    setUploadStates((s) => [...s, ...newFiles].slice(0, maxFiles));
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLLabelElement>) => {
@@ -65,12 +91,120 @@ export function UploadFileDialog({
 
   const handleDragLeave = () => setIsDragging(false);
 
-  const handleUpload = () => {
-    if (files.length && onUpload) {
-      onUpload(files);
+  const handleUpload = async () => {
+    if (!uploadStates.length) return;
+    setIsUploading(true);
+
+    try {
+      const uploadPromises = uploadStates.map(async (state) => {
+        if (state.status === "completed") return { url: state.url || "", name: state.file.name };
+
+        setUploadStates((prev) =>
+          prev.map((item) =>
+            item.id === state.id
+              ? { ...item, status: "uploading" as const, progress: 0, error: undefined }
+              : item
+          )
+        );
+
+        try {
+          // 1. Get presigned URL
+          const presignedRes = await apiClient.post<{
+            success: boolean;
+            message: string;
+            data: {
+              uploadUrl: string;
+              fileUrl: string;
+              key: string;
+            };
+          }>("/api/upload/presigned-url", {
+            fileName: state.file.name,
+            fileType: state.file.type || "application/octet-stream",
+            folder,
+          });
+
+          if (!presignedRes.data.success || !presignedRes.data.data.uploadUrl) {
+            throw new Error(presignedRes.data.message || "Failed to get upload URL");
+          }
+
+          const { uploadUrl, fileUrl } = presignedRes.data.data;
+
+          // 2. Put file to S3
+          await axios.put(uploadUrl, state.file, {
+            headers: {
+              "Content-Type": state.file.type || "application/octet-stream",
+            },
+            onUploadProgress: (progressEvent) => {
+              const total = progressEvent.total ?? state.file.size;
+              const currentProgress = Math.round(
+                (progressEvent.loaded * 100) / total
+              );
+              setUploadStates((prev) =>
+                prev.map((item) =>
+                  item.id === state.id
+                    ? { ...item, progress: currentProgress }
+                    : item
+                )
+              );
+            },
+          });
+
+          // 3. Mark completed
+          setUploadStates((prev) =>
+            prev.map((item) =>
+              item.id === state.id
+                ? { ...item, status: "completed" as const, progress: 100, url: fileUrl }
+                : item
+            )
+          );
+
+          return { url: fileUrl, name: state.file.name };
+        } catch (err: unknown) {
+          const errorMsg =
+            err && typeof err === "object" && "response" in err
+              ? (err as { response?: { data?: { message?: string } } }).response?.data?.message ||
+                (err as { message?: string }).message ||
+                "Upload failed"
+              : err instanceof Error
+              ? err.message
+              : "Upload failed";
+          setUploadStates((prev) =>
+            prev.map((item) =>
+              item.id === state.id
+                ? { ...item, status: "failed" as const, error: errorMsg }
+                : item
+            )
+          );
+          throw new Error(errorMsg);
+        }
+      });
+
+      const results = await Promise.allSettled(uploadPromises);
+      const successfulFiles = results
+        .filter(
+          (r): r is PromiseFulfilledResult<{ url: string; name: string }> =>
+            r.status === "fulfilled" && !!r.value
+        )
+        .map((r) => r.value);
+
+      const successfulUrls = successfulFiles.map((f) => f.url);
+      const hasFailures = results.some((r) => r.status === "rejected");
+
+      if (!hasFailures && (onUpload || onUploadComplete)) {
+        if (onUploadComplete) {
+          onUploadComplete(successfulFiles);
+        }
+        if (onUpload) {
+          onUpload(successfulUrls);
+        }
+        setUploadStates([]);
+        setOpen(false);
+      }
+    } catch (e) {
+      console.error("Some uploads failed:", e);
+    } finally {
+      setIsUploading(false);
     }
-    setFiles([]);
-    setOpen(false);
   };
 
   const formatSize = (bytes: number) => {
@@ -81,8 +215,14 @@ export function UploadFileDialog({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + sizes[i];
   };
 
+  const handleClose = () => {
+    if (isUploading) return;
+    setUploadStates([]);
+    setOpen(false);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(v) => { if (!isUploading) setOpen(v); }}>
       {children && <DialogTrigger asChild>{children}</DialogTrigger>}
 
       <DialogContent className="sm:max-w-lg p-6 gap-0">
@@ -107,7 +247,7 @@ export function UploadFileDialog({
                 isDragging
                   ? "border-[#1D51A4] bg-blue-50/50"
                   : "border-blue-300 bg-white"
-              }`}
+              } ${isUploading ? "opacity-50 pointer-events-none" : ""}`}
             >
               <input
                 ref={inputRef}
@@ -115,6 +255,7 @@ export function UploadFileDialog({
                 accept={accept}
                 multiple
                 onChange={handleInputChange}
+                disabled={isUploading}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
 
@@ -134,8 +275,14 @@ export function UploadFileDialog({
 
                 <div>
                   <Button
+                    type="button"
                     variant="outline"
+                    disabled={isUploading}
                     className="border-[#2563EB] text-[#2563EB] hover:bg-blue-50 h-9 px-6 rounded-[8px]"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      inputRef.current?.click();
+                    }}
                   >
                     Browse files
                   </Button>
@@ -147,56 +294,113 @@ export function UploadFileDialog({
 
         <div className="text-[13px] text-slate-500 mb-4">{supportText}</div>
 
-        {files.length > 0 && (
-          <div className="space-y-3 mb-6 max-h-[160px] overflow-y-auto pr-1">
-            {files.map((f, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between p-3 border rounded-[10px] bg-white border-slate-200"
-              >
-                <div className="flex items-center gap-3 overflow-hidden">
-                  <div className="flex-shrink-0 w-10 h-10 bg-[#EF4444] rounded-[8px] flex flex-col items-center justify-center text-white font-bold text-[10px]">
-                    PDF
-                  </div>
-                  <div className="overflow-hidden">
-                    <div className="text-[14px] font-medium text-slate-800 truncate">
-                      {f.name}
-                    </div>
-                    <div className="text-[12px] text-slate-500">
-                      {formatSize(f.size)}
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() =>
-                    setFiles((s) => s.filter((_, idx) => idx !== i))
-                  }
-                  className="text-slate-400 hover:text-red-500 p-1 flex-shrink-0"
-                  type="button"
+        {uploadStates.length > 0 && (
+          <div className="space-y-3 mb-6 max-h-[240px] overflow-y-auto pr-1">
+            {uploadStates.map((f) => {
+              const fileTypeExt = f.file.name.split(".").pop()?.toUpperCase() || "FILE";
+              return (
+                <div
+                  key={f.id}
+                  className="flex flex-col p-3 border rounded-[10px] bg-white border-slate-200"
                 >
-                  <XCircle className="w-5 h-5" />
-                </button>
-              </div>
-            ))}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <div className="flex-shrink-0 w-10 h-10 bg-[#EF4444] rounded-[8px] flex flex-col items-center justify-center text-white font-bold text-[10px]">
+                        {fileTypeExt}
+                      </div>
+                      <div className="overflow-hidden">
+                        <div className="text-[14px] font-medium text-slate-800 truncate">
+                          {f.file.name}
+                        </div>
+                        <div className="text-[12px] text-slate-500">
+                          {formatSize(f.file.size)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {f.status === "uploading" && (
+                        <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                      )}
+                      {f.status === "completed" && (
+                        <CheckCircle2 className="w-5 h-5 text-green-500" />
+                      )}
+                      {f.status === "failed" && (
+                        <AlertCircle className="w-5 h-5 text-red-500" />
+                      )}
+                      {f.status === "idle" && !isUploading && (
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setUploadStates((s) => s.filter((item) => item.id !== f.id));
+                          }}
+                          className="text-slate-400 hover:text-red-500 p-1 flex-shrink-0"
+                          type="button"
+                        >
+                          <XCircle className="w-5 h-5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {f.status === "uploading" && (
+                    <div className="w-full mt-3">
+                      <div className="w-full bg-slate-100 rounded-full h-1.5">
+                        <div
+                          className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+                          style={{ width: `${f.progress}%` }}
+                        />
+                      </div>
+                      <div className="text-[11px] text-slate-500 text-right mt-1 font-medium">
+                        {f.progress}%
+                      </div>
+                    </div>
+                  )}
+
+                  {f.status === "failed" && f.error && (
+                    <div className="text-[11px] text-red-500 mt-1.5 font-medium truncate">
+                      {f.error}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
         <DialogFooter className="mt-2 sm:justify-end gap-3 flex-row justify-end">
           <Button
+            type="button"
             variant="outline"
+            disabled={isUploading}
             className="rounded-[8px] min-w-[100px] border-slate-200"
-            onClick={() => {
-              setFiles([]);
-              setOpen(false);
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleClose();
             }}
           >
             Cancel
           </Button>
           <Button
-            className="rounded-[8px] min-w-[100px] bg-[#2563EB] hover:bg-[#1d4ed8] text-white"
-            onClick={handleUpload}
+            type="button"
+            className="rounded-[8px] min-w-[100px] bg-[#2563EB] hover:bg-[#1d4ed8] text-white flex items-center justify-center gap-2"
+            disabled={isUploading || uploadStates.length === 0}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleUpload();
+            }}
           >
-            Upload
+            {isUploading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Uploading...
+              </>
+            ) : (
+              "Upload"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
