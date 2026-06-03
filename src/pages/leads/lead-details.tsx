@@ -1,6 +1,6 @@
 import { useLocation, useNavigate, useParams } from "react-router";
-import { ArrowLeft, Upload } from "lucide-react";
-import { UploadFileDialog } from "@/components/upload-file-dialog";
+import { ArrowLeft } from "lucide-react";
+import UploadAgreementDialog from "@/components/leads/upload-agreement-dialog";
 import MoveToOrdersDialog from "@/components/leads/move-to-orders-dialog";
 import BasicDetails from "@/components/leads/basic-details";
 import QuotationCard from "@/components/leads/quotation-card";
@@ -156,32 +156,7 @@ export default function LeadDetails() {
               <span>View Agreement</span>
             </Button>
 
-            <UploadFileDialog
-              title="Upload Agreement"
-              description="Upload agreement document for this lead."
-              accept=".pdf,.doc,.docx"
-              onUpload={async (files) => {
-                if (!leadId) return;
-                try {
-                  const fd = new FormData();
-                  files.forEach((f) => fd.append("files", f));
-
-                  // TODO: trigger a refetch or show a success toast
-                } catch (err) {
-                  // TODO: show error to user
-                  console.error("Agreement upload failed", err);
-                }
-              }}
-            >
-              <Button
-                variant="outline"
-                className="rounded-sm border-blue-500 shadow-md"
-                size="sm"
-              >
-                <Upload />
-                <span>Upload Agreement</span>
-              </Button>
-            </UploadFileDialog>
+            <UploadAgreementDialog leadId={leadId} />
           </div>
         </div>
 

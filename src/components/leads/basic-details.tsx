@@ -355,13 +355,12 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
                   >
                     <div
                       className={`flex size-8 items-center justify-center rounded-full  font-semibold mb-2 z-10 transition-colors
-                      ${
-                        isCompleted
+                      ${isCompleted
                           ? "bg-[#16A34A] text-white border-2 border-white"
                           : isCurrent
                             ? "bg-[#1D51A4] text-white border-2 border-white"
                             : "bg-white border-2 border-[#E2E8F0] text-slate-400"
-                      }`}
+                        }`}
                     >
                       {step.id}
                     </div>
@@ -418,10 +417,10 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
             </div>
 
             <div>
-              <p className=" mb-0.5 font-semibold">Assigned Sales</p>
+              {/* <p className=" mb-0.5 font-semibold">Assigned Sales</p>
               <p className="text-sm text-muted-foreground mb-2">
                 {assignedPlanner}
-              </p>
+              </p> */}
               <p className=" mb-0.5 font-semibold">Priority</p>
               <p className="inline-flex items-center rounded-lg bg-[#FEF3C7] px-2 py-0.5 text-[13px] font-medium text-[#D97706]">
                 {priorityLabel}
