@@ -15,7 +15,7 @@ import type {
 
 type ChatMessage = {
   id: string;
-  senderType: "customer" | "ai" | "sales";
+  senderType: "customer" | "ai" | "sales" | "admin";
   senderId?: string | null;
   senderName?: string | null;
   content: string;
@@ -61,17 +61,6 @@ function formatMessageTime(value?: string) {
   });
 }
 
-function normalizeSenderType(senderType?: string | null) {
-  if (senderType === "sales" || senderType === "employee") {
-    return "sales";
-  }
-
-  if (senderType === "ai") {
-    return "ai";
-  }
-
-  return "customer";
-}
 
 function toChatMessage(
   message: LeadDetailMessage | LeadChatMessagePayload,
@@ -82,11 +71,9 @@ function toChatMessage(
     return null;
   }
 
-  const senderType = normalizeSenderType(message.senderType);
-
   return {
     id: message._id ?? `${message.createdAt ?? Date.now()}-${content}`,
-    senderType,
+    senderType: (message.senderType ?? "customer") as "customer" | "ai" | "sales" | "admin",
     senderId: message.senderId ?? null,
     senderName:
       "senderName" in message
@@ -425,8 +412,11 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
                 : isSalesMessage
                   ? message.senderId === currentUser?._id
                     ? "You"
-                    : (message.senderName ?? lead.assignedSales ?? "Support")
-                  : lead.projectName;
+                    : (message.senderName ?? "Another Sales")
+                  : message.senderType === "customer"
+                    ? customer.firstName
+                    : "";
+              // : lead.projectName;
 
               return (
                 <div
@@ -442,8 +432,12 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
                       >
                         {isAiMessage
                           ? "AI"
-                          : lead.projectName ||
-                            ""
+                          : message.senderType === "customer"
+                            ? customer.firstName
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                            : (lead.projectName || "")
                               .split(" ")
                               .map((value) => value[0])
                               .join("")}
@@ -453,27 +447,24 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
 
                   <div className="flex max-w-[70%] flex-col gap-1">
                     <div
-                      className={`text-sm font-medium text-gray-700 ${
-                        isSalesMessage ? "text-right" : "text-left"
-                      }`}
+                      className={`text-sm font-medium text-gray-700 ${isSalesMessage ? "text-right" : "text-left"
+                        }`}
                     >
                       {senderLabel}
                     </div>
                     <div
-                      className={`whitespace-pre-wrap rounded-lg p-3 text-sm ${
-                        isSalesMessage
-                          ? "rounded-br-sm bg-blue-600 text-white"
-                          : isAiMessage
-                            ? "rounded-bl-sm bg-blue-50 text-blue-950"
-                            : "rounded-bl-sm bg-gray-100 text-gray-900"
-                      }`}
+                      className={`whitespace-pre-wrap rounded-lg p-3 text-sm ${isSalesMessage
+                        ? "rounded-br-sm bg-blue-600 text-white"
+                        : isAiMessage
+                          ? "rounded-bl-sm bg-blue-50 text-blue-950"
+                          : "rounded-bl-sm bg-gray-100 text-gray-900"
+                        }`}
                     >
                       {message.content}
                     </div>
                     <div
-                      className={`text-xs text-gray-400 ${
-                        isSalesMessage ? "text-right" : "text-left"
-                      }`}
+                      className={`text-xs text-gray-400 ${isSalesMessage ? "text-right" : "text-left"
+                        }`}
                     >
                       {formatMessageTime(message.createdAt)}
                     </div>
