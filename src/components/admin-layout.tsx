@@ -3,6 +3,7 @@ import { Sidebar } from "@/components/sidebar";
 import { Header } from "@/components/header";
 import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { LeadSocketListener } from "@/components/leads/lead-socket-listener";
 
 export function AdminLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -30,6 +31,7 @@ export function AdminLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden">
+      <LeadSocketListener />
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={closeSidebar}
