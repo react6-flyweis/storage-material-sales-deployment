@@ -119,7 +119,7 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
   const targetCompletionDate = latestQuotation?.validTill
     ? formatLeadDate(latestQuotation.validTill)
     : "—";
-  const assignedPlanner = leadData?.assignedSales ?? "—";
+  // const assignedPlanner = leadData?.assignedSales ?? "—";
   const priorityLabel =
     latestQuotation?.priorityLevel ?? nextFollowUp?.priority ?? "—";
   const nextStepLabel = (() => {
