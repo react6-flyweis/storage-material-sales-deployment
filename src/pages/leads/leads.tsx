@@ -44,37 +44,18 @@ import {
 import { useLeadsQuery } from "@/modules/leads/leads.hooks";
 import {
   exportLeadsProvider,
-  type LeadListItem,
 } from "@/modules/leads/leads.api";
 import { useLeadsStatsQuery } from "@/lib/metrics";
 import {
   formatLifecycleStatus,
-  getLeadProgress,
   getStatusBadgeClassName,
+  LEAD_NO_NAME,
+  type LeadStatusType,
 } from "@/modules/leads/leads.utils";
+import FilterTabs from "@/components/FilterTabs";
+import { Input } from "@/components/ui/input";
 
-type LeadRow = {
-  id: string;
-  customerId: string;
-  name: string;
-  workshop: string;
-  category: string;
-  assignedTo: string | null;
-  assignedToName: string;
-  progress: number;
-  status: string;
-  statusClassName: string;
-  quoteValue: string;
-  quoteValueNumber: number;
-  chatCount: number;
-  nextFollowUp: string;
-  searchText: string;
-  rawStatus: string;
-  isRaisedToPO: boolean;
-  rawData: LeadListItem;
-};
-
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 const createCsvFilename = () => {
   const date = new Date().toISOString().slice(0, 10);
@@ -99,65 +80,39 @@ const formatFollowUpDate = (value?: string | null) => {
   }).format(new Date(value));
 };
 
-const mapLeadToRow = (lead: LeadListItem): LeadRow => {
-  const status = formatLifecycleStatus(lead.lifecycleStatus);
-  const progress = getLeadProgress(lead.lifecycleStatus);
-
-  return {
-    id: lead._id,
-    customerId: lead.customerId._id,
-    name: lead.projectName || "Untitled Lead",
-    workshop: lead.buildingType || "-",
-    category: lead.location || "-",
-    assignedTo: null,
-    assignedToName: "",
-    progress,
-    status,
-    statusClassName: getStatusBadgeClassName(lead.lifecycleStatus),
-    quoteValue: formatCurrency(lead.quoteValue),
-    quoteValueNumber: lead.quoteValue,
-    chatCount: 0,
-    nextFollowUp: formatFollowUpDate(lead.nextFollowUp?.followUpDate),
-    isRaisedToPO: lead.isRaisedToPO ?? false,
-    rawData: lead,
-    searchText: [
-      lead._id,
-      lead.projectName,
-      lead.customerId?.firstName,
-      lead.customerId?.email,
-      lead.lifecycleStatus,
-      lead.buildingType,
-      lead.location,
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase(),
-    rawStatus: lead.lifecycleStatus,
-  };
-};
-
 export default function LeadsPage() {
+
+  const [startDate, setStartDate] = useState<string | undefined>(undefined);
+  const [endDate, setEndDate] = useState<string | undefined>(undefined);
   const [buildingType, setBuildingType] = useState("all");
   const [projectValue, setProjectValue] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [searchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
+
   const [exporting, setExporting] = useState(false);
   const [showExportSuccess, setShowExportSuccess] = useState(false);
+
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(PAGE_SIZE);
+
   const { data: metrics, isPending } = useLeadsStatsQuery();
   const loading = isPending && !metrics;
-  const { data: leadsResponse, isPending: leadsLoading } = useLeadsQuery(
-    currentPage,
-    rowsPerPage,
-  );
+  const { data: leadsResponse, isPending: leadsLoading } = useLeadsQuery({
+    page: currentPage,
+    limit: rowsPerPage,
+    search: searchQuery ? searchQuery.trim() : undefined,
+    buildingType: buildingType === "all" ? undefined : buildingType,
+    lifecycleStatus: statusFilter === "all" ? undefined : statusFilter,
+    startDate,
+    endDate,
+  });
 
   const leadsData = leadsResponse?.data.leads;
   const leads = useMemo(() => leadsData ?? [], [leadsData]);
   const totalItems = leadsResponse?.data.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalItems / rowsPerPage));
-  const leadRows = useMemo(() => leads.map(mapLeadToRow), [leads]);
 
   useEffect(() => {
     setSelectedLeads([]);
@@ -168,6 +123,8 @@ export default function LeadsPage() {
     projectValue,
     statusFilter,
     searchQuery,
+    startDate,
+    endDate,
   ]);
 
   useEffect(() => {
@@ -176,44 +133,9 @@ export default function LeadsPage() {
     }
   }, [currentPage, totalPages]);
 
-  // Filter leads based on all criteria
-  const filteredLeads = useMemo(() => {
-    const normalizedSearch = searchQuery.trim().toLowerCase();
-
-    return leadRows.filter((lead) => {
-      if (normalizedSearch && !lead.searchText.includes(normalizedSearch)) {
-        return false;
-      }
-
-      if (
-        buildingType !== "all" &&
-        lead.workshop.toLowerCase() !== buildingType.toLowerCase()
-      ) {
-        return false;
-      }
-
-      if (projectValue !== "all") {
-        const matchesValue =
-          (projectValue === "small" && lead.quoteValueNumber < 50000) ||
-          (projectValue === "medium" &&
-            lead.quoteValueNumber >= 50000 &&
-            lead.quoteValueNumber <= 200000) ||
-          (projectValue === "large" && lead.quoteValueNumber > 200000);
-
-        if (!matchesValue) return false;
-      }
-
-      if (statusFilter !== "all" && lead.rawStatus !== statusFilter) {
-        return false;
-      }
-
-      return true;
-    });
-  }, [leadRows, searchQuery, buildingType, projectValue, statusFilter]);
-
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedLeads(filteredLeads.map((lead) => lead.id));
+      setSelectedLeads(leads.map((lead) => lead._id));
     } else {
       setSelectedLeads([]);
     }
@@ -231,7 +153,13 @@ export default function LeadsPage() {
     try {
       setExporting(true);
 
-      const csv = await exportLeadsProvider(currentPage, rowsPerPage);
+      const csv = await exportLeadsProvider({
+        search: searchQuery ? searchQuery.trim() : undefined,
+        buildingType: buildingType === "all" ? undefined : buildingType,
+        lifecycleStatus: statusFilter === "all" ? undefined : statusFilter,
+        startDate,
+        endDate,
+      });
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -248,7 +176,14 @@ export default function LeadsPage() {
   };
 
   return (
-    <>
+    <div>
+      <FilterTabs
+        onPeriodChange={(_, range) => {
+          setStartDate(range.startDate?.toISOString());
+          setEndDate(range.endDate?.toISOString());
+          setCurrentPage(1);
+        }}
+      />
       <div className="p-4 sm:p-6 space-y-6">
         {/* Header */}
         <div>
@@ -311,28 +246,39 @@ export default function LeadsPage() {
               {exporting ? "Exporting..." : "Export Data"}
             </Button>
           </div>
-          {/* 
-          <div className="relative w-full lg:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search leads..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-white"
-            />
-          </div> */}
 
           <div className="flex flex-wrap gap-3 ">
+            <div className="relative w-full lg:w-54">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search leads..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="pl-10 bg-white"
+              />
+            </div>
             <BuildingTypeSelector
               value={buildingType}
-              onChange={setBuildingType}
+              onChange={(val) => {
+                setBuildingType(val);
+                setCurrentPage(1);
+              }}
               includeAll
               allLabel="All"
               placeholder="Building types"
               triggerClassName="w-full sm:w-40 bg-white"
             />
 
-            <Select value={projectValue} onValueChange={setProjectValue}>
+            <Select
+              value={projectValue}
+              onValueChange={(val) => {
+                setProjectValue(val);
+                setCurrentPage(1);
+              }}
+            >
               <SelectTrigger className="w-full sm:w-40 bg-white">
                 <SelectValue placeholder="Project value" />
               </SelectTrigger>
@@ -350,7 +296,10 @@ export default function LeadsPage() {
 
             <LeadLifecycleStatusSelect
               value={statusFilter}
-              onValueChange={setStatusFilter}
+              onValueChange={(val) => {
+                setStatusFilter(val);
+                setCurrentPage(1);
+              }}
               triggerClassName="w-full sm:w-40 bg-white"
               placeholder="All Status"
               allLabel="All Status"
@@ -368,8 +317,8 @@ export default function LeadsPage() {
                     <input
                       type="checkbox"
                       checked={
-                        selectedLeads.length === filteredLeads.length &&
-                        filteredLeads.length > 0
+                        selectedLeads.length === leads.length &&
+                        leads.length > 0
                       }
                       onChange={(e) => handleSelectAll(e.target.checked)}
                       className="rounded border-gray-300"
@@ -408,15 +357,15 @@ export default function LeadsPage() {
                       Loading leads...
                     </TableCell>
                   </TableRow>
-                ) : filteredLeads.length > 0 ? (
-                  filteredLeads.map((lead) => (
-                    <TableRow key={lead.id}>
+                ) : leads.length > 0 ? (
+                  leads.map((lead) => (
+                    <TableRow key={lead._id}>
                       <TableCell className="">
                         <input
                           type="checkbox"
-                          checked={selectedLeads.includes(lead.id)}
+                          checked={selectedLeads.includes(lead._id)}
                           onChange={(e) =>
-                            handleSelectLead(lead.id, e.target.checked)
+                            handleSelectLead(lead._id, e.target.checked)
                           }
                           className="rounded border-gray-300"
                         />
@@ -425,69 +374,59 @@ export default function LeadsPage() {
                       <TableCell className="">
                         <div className="flex flex-col">
                           <span className="font-semibold text-gray-900 uppercase">
-                            {lead.name}
+                            {lead.projectName || LEAD_NO_NAME}
                           </span>
                           <span className="text-sm text-gray-500">
-                            {lead.rawData.jobId}
+                            {lead.jobId}
                           </span>
                           <span className="text-sm text-gray-500">
-                            {lead.workshop} · {lead.category}
+                            {lead.buildingType || "-"} · {lead.location || "-"}
                           </span>
-                          {lead.assignedTo && (
-                            <span className="text-sm text-gray-700 mt-1">
-                              Assigned to {lead.assignedToName}
-                            </span>
-                          )}
                         </div>
                       </TableCell>
 
                       <TableCell className="">
-                        <ProgressDots rawStatus={lead.rawStatus} />
+                        <ProgressDots rawStatus={lead.lifecycleStatus} />
                       </TableCell>
 
                       <TableCell className="">
                         <Badge
-                          className={`${lead.statusClassName} rounded-full px-4 py-1 text-sm`}
+                          className={`${getStatusBadgeClassName(lead.lifecycleStatus)} rounded-full px-4 py-1 text-sm`}
                           variant="secondary"
                         >
-                          {lead.status}
+                          {formatLifecycleStatus(lead.lifecycleStatus as LeadStatusType)}
                         </Badge>
                       </TableCell>
 
                       <TableCell className="">
                         <span className="font-medium text-gray-900">
-                          {lead.quoteValue}
+                          {formatCurrency(lead.quoteValue)}
                         </span>
                       </TableCell>
 
                       <TableCell className=" text-sm text-gray-600">
-                        {lead.nextFollowUp}
+                        {formatFollowUpDate(lead.nextFollowUp?.followUpDate)}
                       </TableCell>
 
                       <TableCell className="">
-                        <Link to={`/leads/${lead.id}?tab=chat`}>
+                        <Link to={`/leads/${lead._id}?tab=chat`}>
                           <button className="flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-600">
                             <MessageSquare className="h-4 w-4" />
                             <span className="text-sm">Chat</span>
-                            {lead.chatCount > 0 && (
-                              <span className="ml-2 inline-flex items-center justify-center h-5 w-5 rounded-full bg-red-500 text-white text-xs">
-                                {lead.chatCount}
-                              </span>
-                            )}
                           </button>
                         </Link>
                       </TableCell>
 
                       <TableCell className="">
                         <div className="flex items-center gap-1">
-                          <Link to={`/leads/${lead.id}`}>
+                          <Link to={`/leads/${lead._id}`}>
                             <Button variant="ghost" size="icon">
                               <Eye className=" text-purple-600 stroke-2" />
                             </Button>
                           </Link>
 
                           {/* <CreateQuotationDialog
-                            leadData={lead.rawData}
+                            leadData={lead}
                             mode="edit"
                             trigger={
                               <Button variant="ghost" size="icon">
@@ -497,7 +436,7 @@ export default function LeadsPage() {
                           />
 
                           <CreateQuotationDialog
-                            leadData={lead.rawData}
+                            leadData={lead}
                             mode="create"
                             trigger={
                               <Button variant="ghost" size="icon">
@@ -508,7 +447,7 @@ export default function LeadsPage() {
 
                           {!lead.isRaisedToPO && (
                             <MoveToOrdersDialog
-                              leadId={lead.id}
+                              leadId={lead._id}
                               trigger={
                                 <Button variant="ghost" size="icon">
                                   <Redo className=" text-red-500" />
@@ -518,8 +457,8 @@ export default function LeadsPage() {
                           )}
 
                           <EscalateLeadDialog
-                            leadId={lead.id}
-                            leadName={lead.name}
+                            leadId={lead._id}
+                            leadName={lead.projectName || "Untitled Lead"}
                             trigger={
                               <Button variant="ghost" size="icon">
                                 <AlertCircle className=" text-gray-500" />
@@ -567,6 +506,6 @@ export default function LeadsPage() {
         title="Export completed"
         okLabel="Great"
       />
-    </>
+    </div>
   );
 }
