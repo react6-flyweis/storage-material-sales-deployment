@@ -29,6 +29,21 @@ function formatInvoiceDate(value?: string | null) {
   });
 }
 
+function formatStageName(
+  name: string | null | undefined,
+  amount: number | null | undefined,
+  amountType: string | null | undefined,
+) {
+  const stageName = name || "Payment";
+  if (amountType === "percentage" && amount != null) {
+    const pctStr = `${amount}%`;
+    if (!stageName.includes("%")) {
+      return `${stageName} (${pctStr})`;
+    }
+  }
+  return stageName;
+}
+
 export default function InvoicePreview() {
   const navigate = useNavigate();
   const params = useParams();
@@ -65,6 +80,7 @@ export default function InvoicePreview() {
   };
 
   const invoice = invoiceDetailResponse?.data.invoice;
+  const paymentSchedule = invoiceDetailResponse?.data.paymentSchedule;
 
   const items =
     invoice?.lineItems?.map((item, index) => ({
@@ -78,15 +94,19 @@ export default function InvoicePreview() {
       quantity: item.quantity ?? 0,
       total: item.total ?? (item.rate ?? 0) * (item.quantity ?? 0),
       images: item.images ?? item.photos ?? [],
+      tax: item.tax ?? 0,
     })) ?? [];
 
   const invoiceNumber = invoice?.invoiceNumber ?? "-";
   const date = formatInvoiceDate(invoice?.date);
   const daysToPay = invoice?.daysToPay ?? "-";
   const subtotal = invoice?.subtotal ?? 0;
-  const taxAmount = 0;
+  const taxAmount = invoice?.lineItems?.reduce((sum, item) => sum + (item.tax ?? 0), 0) ?? 0;
+  const markup = invoice?.markupTotal ?? 0;
+  const discount = invoice?.discount ?? 0;
   const total = invoice?.totalAmount ?? 0;
   const deposit = invoice?.depositAmount ?? total * 0.25;
+  const stages = paymentSchedule?.stages ?? [];
 
   if (!invoiceId) {
     return (
@@ -293,6 +313,22 @@ export default function InvoicePreview() {
                   ${formatCurrency(Number(subtotal))}
                 </span>
               </div>
+              {markup > 0 && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Markup</span>
+                  <span className="text-gray-500">
+                    ${formatCurrency(Number(markup))}
+                  </span>
+                </div>
+              )}
+              {discount > 0 && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Discount</span>
+                  <span className="text-gray-500">
+                    -${formatCurrency(Number(discount))}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between text-xs border-b border-gray-100 pb-3">
                 <span className="text-gray-500">Tax</span>
                 <span className="text-gray-500">
@@ -313,6 +349,40 @@ export default function InvoicePreview() {
               </div>
             </div>
           </div>
+
+          {/* Payment Schedule Section */}
+          {stages.length > 0 && (
+            <div className="mt-12 pt-6 border-t border-gray-800">
+              <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">
+                Payment Schedule
+              </h2>
+              <div className="border-t border-b border-gray-200 divide-y divide-gray-100">
+                {stages.map((stage) => {
+                  const label = formatStageName(
+                    stage.stageName,
+                    stage.amount,
+                    stage.amountType,
+                  );
+                  const amount =
+                    stage.amountType === "percentage"
+                      ? (total * (stage.amount ?? 0)) / 100
+                      : (stage.amount ?? 0);
+
+                  return (
+                    <div
+                      key={stage._id}
+                      className="flex justify-between py-3 text-xs"
+                    >
+                      <span className="text-gray-600 font-medium">{label}</span>
+                      <span className="text-gray-900 font-bold">
+                        ${formatCurrency(amount)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Footer */}
           <div className="border-t border-gray-200 pt-6">

@@ -36,7 +36,7 @@ import {
   useInvoiceStatsQuery,
   useInvoicesQuery,
 } from "@/modules/invoices/invoices.hooks";
-import type { InvoiceStatus } from "@/modules/invoices/invoices.api";
+import { InvoiceStatus } from "@/modules/invoices/invoices.api";
 import type { DateRange } from "react-day-picker";
 
 type SelectedClient = {
@@ -48,22 +48,22 @@ type SelectedClient = {
 
 const statusOptions: Array<{ value: "All" | InvoiceStatus; label: string }> = [
   { value: "All", label: "All" },
-  { value: "draft", label: "Draft" },
-  { value: "sent", label: "Sent" },
-  { value: "paid", label: "Paid" },
-  { value: "overdue", label: "Overdue" },
-  { value: "cancelled", label: "Cancelled" },
+  { value: InvoiceStatus.DRAFT, label: "Draft" },
+  { value: InvoiceStatus.SENT, label: "Sent" },
+  { value: InvoiceStatus.PAID, label: "Paid" },
+  { value: InvoiceStatus.OVERDUE, label: "Overdue" },
+  { value: InvoiceStatus.CANCELLED, label: "Cancelled" },
 ];
 
 const statusBadgeStyles: Record<
   InvoiceStatus,
   { bg: string; text: string; label: string }
 > = {
-  draft: { bg: "bg-slate-600", text: "text-white", label: "Draft" },
-  sent: { bg: "bg-blue-600", text: "text-white", label: "Sent" },
-  paid: { bg: "bg-green-600", text: "text-white", label: "Paid" },
-  overdue: { bg: "bg-red-600", text: "text-white", label: "Overdue" },
-  cancelled: {
+  [InvoiceStatus.DRAFT]: { bg: "bg-slate-600", text: "text-white", label: "Draft" },
+  [InvoiceStatus.SENT]: { bg: "bg-blue-600", text: "text-white", label: "Sent" },
+  [InvoiceStatus.PAID]: { bg: "bg-green-600", text: "text-white", label: "Paid" },
+  [InvoiceStatus.OVERDUE]: { bg: "bg-red-600", text: "text-white", label: "Overdue" },
+  [InvoiceStatus.CANCELLED]: {
     bg: "bg-zinc-100",
     text: "text-zinc-700",
     label: "Cancelled",
