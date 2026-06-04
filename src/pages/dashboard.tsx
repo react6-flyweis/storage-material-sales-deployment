@@ -13,14 +13,14 @@ import { useState } from "react";
 import { useDashboardMetricsQuery } from "@/lib/metrics";
 
 export default function Dashboard() {
-  const [period, setPeriod] = useState<Period>("quarter");
+  const [period, setPeriod] = useState<Period>();
   const { data: metrics, isPending } = useDashboardMetricsQuery(period);
   const loading = isPending && !metrics;
 
   return (
     <div className="">
       {/* Tabs */}
-      <FilterTabs onPeriodChange={setPeriod} initialPeriod={period} />
+      <FilterTabs onPeriodChange={setPeriod} />
 
       <div className="lg:pr-5 lg:pt-5 p-5 lg:p-0 space-y-5">
         {/* Header */}

@@ -1,6 +1,10 @@
-import type { Period } from "@/components/FilterTabs";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/modules/auth/auth.api";
+import {
+  getPeriodRange,
+  type DateRange,
+  type Period,
+} from "@/components/FilterTabs";
 
 export type DashboardMetrics = {
   totalLeads: number;
@@ -50,39 +54,21 @@ type ConversionFunnelResponse = {
 
 const formatDateParam = (date: Date) => date.toISOString().slice(0, 10);
 
-const getPeriodRange = (period: Period) => {
-  const today = new Date();
-
-  if (period === "week") {
-    return { startDate: today, endDate: today };
-  }
-
-  if (period === "month") {
-    return {
-      startDate: new Date(today.getFullYear(), today.getMonth(), 1),
-      endDate: today,
-    };
-  }
-
-  const quarterStartMonth = Math.floor(today.getMonth() / 3) * 3;
-
-  return {
-    startDate: new Date(today.getFullYear(), quarterStartMonth, 1),
-    endDate: today,
-  };
-};
-
 export async function getDashboardMetrics(
-  period: Period,
+  dateRange: DateRange,
 ): Promise<DashboardMetrics> {
-  const { startDate, endDate } = getPeriodRange(period);
+  // if no date range don't add
+  const params =
+    dateRange.startDate && dateRange.endDate
+      ? {
+        startDate: formatDateParam(dateRange.startDate),
+        endDate: formatDateParam(dateRange.endDate),
+      }
+      : {};
   const response = await apiClient.get<DashboardStatsResponse>(
     "/api/sales/dashboard/stats",
     {
-      params: {
-        startDate: formatDateParam(startDate),
-        endDate: formatDateParam(endDate),
-      },
+      params,
     },
   );
 
@@ -107,9 +93,9 @@ export async function getLeadsStats(): Promise<LeadsStats> {
 }
 
 export async function getConversionFunnelMetrics(
-  period: Period,
+  startDate: Date,
+  endDate: Date,
 ): Promise<ConversionFunnelMetrics> {
-  const { startDate, endDate } = getPeriodRange(period);
   const response = await apiClient.get<ConversionFunnelResponse>(
     "/api/sales/dashboard/conversion-funnel",
     {
@@ -123,10 +109,17 @@ export async function getConversionFunnelMetrics(
   return response.data.data;
 }
 
-export function useDashboardMetricsQuery(period: Period) {
+export function useDashboardMetricsQuery(period?: Period) {
+  const dateRange = getPeriodRange(period);
   return useQuery({
-    queryKey: ["sales", "dashboard", "stats", period],
-    queryFn: () => getDashboardMetrics(period),
+    queryKey: [
+      "sales",
+      "dashboard",
+      "stats",
+      dateRange.startDate,
+      dateRange.endDate,
+    ],
+    queryFn: () => getDashboardMetrics(dateRange),
     staleTime: 60 * 1000,
     placeholderData: keepPreviousData,
   });
@@ -171,10 +164,10 @@ export function useFollowUpStatsQuery() {
   });
 }
 
-export function useConversionFunnelQuery(period: Period) {
+export function useConversionFunnelQuery(startDate: Date, endDate: Date) {
   return useQuery({
-    queryKey: ["sales", "dashboard", "conversion-funnel", period],
-    queryFn: () => getConversionFunnelMetrics(period),
+    queryKey: ["sales", "dashboard", "conversion-funnel", startDate, endDate],
+    queryFn: () => getConversionFunnelMetrics(startDate, endDate),
     staleTime: 60 * 1000,
     placeholderData: keepPreviousData,
   });
@@ -193,25 +186,30 @@ type CustomerStatsResponse = {
   data: CustomerStats;
 };
 
-export async function getCustomerStats(period: Period): Promise<CustomerStats> {
-  const { startDate, endDate } = getPeriodRange(period);
+export async function getCustomerStats(
+  dateRange: DateRange,
+): Promise<CustomerStats> {
+  const params = dateRange.startDate && dateRange.endDate
+    ? {
+      startDate: formatDateParam(dateRange.startDate),
+      endDate: formatDateParam(dateRange.endDate),
+    }
+    : {};
   const response = await apiClient.get<CustomerStatsResponse>(
     "/api/sales/customers/stats",
     {
-      params: {
-        startDate: formatDateParam(startDate),
-        endDate: formatDateParam(endDate),
-      },
+      params
     },
   );
 
   return response.data.data;
 }
 
-export function useCustomerStatsQuery(period: Period) {
+export function useCustomerStatsQuery(period?: Period) {
+  const dateRange = getPeriodRange(period);
   return useQuery({
-    queryKey: ["sales", "customers", "stats", period],
-    queryFn: () => getCustomerStats(period),
+    queryKey: ["sales", "customers", "stats", dateRange.startDate, dateRange.endDate],
+    queryFn: () => getCustomerStats(dateRange),
     staleTime: 60 * 1000,
     placeholderData: keepPreviousData,
   });
