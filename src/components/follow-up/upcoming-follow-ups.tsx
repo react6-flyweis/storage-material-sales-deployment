@@ -19,12 +19,14 @@ import {
 import SuccessDialog from "@/components/success-dialog";
 import { useEffect } from "react";
 import type { UpcomingFollowUpItem } from "@/modules/followups/followups.api";
+import { LEAD_NO_NAME } from "@/modules/leads/leads.utils";
 
 type ViewMode = "schedule" | "calendar" | "list";
 
 interface FollowUp {
   id: string;
   date: string;
+  name: string;
   customer: string;
   type: string;
   time?: string;
@@ -74,7 +76,8 @@ export default function UpcomingFollowUps({ onScheduleFollowUp }: Props) {
       hour: "2-digit",
       minute: "2-digit",
     });
-    const customer = f.leadId?.projectName || "N/A";
+    const name = f.leadId?.projectName || LEAD_NO_NAME;
+    const customer = f.customerId?.firstName || "";
     const type =
       f.modeOfContact === "call"
         ? "Call"
@@ -93,6 +96,7 @@ export default function UpcomingFollowUps({ onScheduleFollowUp }: Props) {
       id: f._id || String(index),
       date: day,
       fullDate: f.followUpDate,
+      name,
       customer,
       type,
       time,
@@ -323,6 +327,9 @@ export default function UpcomingFollowUps({ onScheduleFollowUp }: Props) {
                     <div className="p-2 rounded-md bg-white/70">{Icon}</div>
                     <div>
                       <p className="font-semibold text-sm">
+                        {followUp.name}
+                      </p>
+                      <p className="text-sm">
                         {followUp.customer}
                       </p>
                       <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">

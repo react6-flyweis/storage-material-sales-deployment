@@ -18,10 +18,12 @@ import {
 } from "lucide-react";
 import { useCommunicationTimelineQuery } from "@/modules/followups/followups.hooks";
 import { Link } from "react-router";
+import { LEAD_NO_NAME } from "@/modules/leads/leads.utils";
 
 type TimelineItem = {
   id: number;
   name: string;
+  customer: string;
   note: string;
   time: string;
   type: "note" | "email" | "call" | "doc";
@@ -57,13 +59,15 @@ export default function LeadCommunicationTimeline() {
             : "bg-purple-50 text-purple-600";
 
     const name =
-      e.customerId?.firstName?.trim() || e.performedBy?.name || "Unknown";
+      e.leadId?.projectName?.trim() || LEAD_NO_NAME;
+    const customer = e.customerId?.firstName
     const note = e.metadata?.notes?.trim() || "No notes provided";
     const time = new Date(e.createdAt).toLocaleString();
 
     return {
       id: i,
       name,
+      customer,
       note,
       time,
       type: activity as TimelineItem["type"],
@@ -144,6 +148,7 @@ export default function LeadCommunicationTimeline() {
 
                   <div>
                     <div className="font-medium text-foreground">{it.name}</div>
+                    <div className="font-medium text-foreground">{it.customer}</div>
                     <div className="text-sm text-muted-foreground">
                       {it.note}
                     </div>

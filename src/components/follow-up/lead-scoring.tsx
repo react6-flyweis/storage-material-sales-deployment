@@ -11,6 +11,7 @@ import { Link } from "react-router";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { useScoredLeadsQuery } from "@/modules/leads/leads.hooks";
 import { Badge } from "@/components/ui/badge";
+import { LEAD_NO_NAME } from "@/modules/leads/leads.utils";
 
 interface LeadScore {
   id: string;
@@ -56,21 +57,23 @@ export default function LeadScoring() {
     isLoading,
     isError,
     refetch,
-  } = useScoredLeadsQuery(1, 4);
+  } = useScoredLeadsQuery(1, 10);
 
-  const leads: LeadScore[] = (scoredResp?.data?.leads || []).map((l) => {
-    const scoreNum = l.leadScoring?.score ?? 0;
-    const scoreLabel: LeadScore["scoreLabel"] =
-      scoreNum >= 70 ? "Hot" : scoreNum >= 40 ? "Warm" : "Cold";
+  const leads: LeadScore[] = (scoredResp?.data?.leads || [])
+    .map((l) => {
+      const scoreNum = l.leadScoring?.score ?? 0;
+      const scoreLabel: LeadScore["scoreLabel"] =
+        scoreNum >= 70 ? "Hot" : scoreNum >= 40 ? "Warm" : "Cold";
 
-    return {
-      id: l._id,
-      name: l.customerId?.firstName || "Unknown",
-      location: l.projectName || "N/A",
-      score: scoreNum,
-      scoreLabel,
-    };
-  });
+      return {
+        id: l._id,
+        name: l.projectName || LEAD_NO_NAME,
+        location: l.customerId.firstName || "N/A",
+        score: scoreNum,
+        scoreLabel,
+      };
+    })
+    .filter((lead) => lead.scoreLabel === "Hot");
 
   const getScoreBadgeClass = (score: string) => {
     switch (score) {
