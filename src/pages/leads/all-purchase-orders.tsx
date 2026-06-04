@@ -13,24 +13,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-type PurchaseOrderRow = {
-  id: string;
-  leadId?: string;
-  leadName: string;
-  quoteId: string;
-  location: string;
-  poNumber: string;
-  assignedToName: string;
-  assignedCount: string;
-  status: string;
-  rawStatus: string;
-  quoteValue: string;
-  paymentStatus: string;
-  chatCount: number;
-};
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(value);
+
 import { usePurchaseOrdersQuery } from "@/modules/purchase-orders/purchase-orders.hooks";
 import TitleSubtitle from "@/components/TitleSubtitle";
-import { formatLifecycleStatus } from "@/modules/leads/leads.utils";
 
 function PurchaseOrdersSkeleton() {
   return (
@@ -59,29 +50,8 @@ export default function AllPurchaseOrdersPage() {
   const limit = 20;
   const { data, isLoading } = usePurchaseOrdersQuery(page, limit);
 
-  const purchaseOrders: PurchaseOrderRow[] = useMemo(() => {
-    const items = data?.data.orders ?? [];
-
-    return items.map((o) => ({
-      id: o._id,
-      leadId: o.leadId?._id ?? undefined,
-      leadName: o.customerId?.firstName ?? o.leadId?.projectName ?? "Unknown",
-      quoteId: o.quotationId ?? "",
-      location: "",
-      poNumber: o.poNumber ?? "",
-      assignedToName: o.assignedTo?.firstName ?? "Unassigned",
-      assignedCount: o.assignedTo ? "1 person assigned" : "0 assigned",
-      rawStatus: o.status ?? "",
-      status: o.status
-        ? o.status === "approved"
-          ? "Purchase Order"
-          : formatLifecycleStatus(o.status)
-        : "Purchase Order",
-      quoteValue: "$0",
-      paymentStatus:
-        o.status === "approved" ? "Received" : (o.status ?? "Pending"),
-      chatCount: 0,
-    }));
+  const purchaseOrders = useMemo(() => {
+    return data?.data.orders ?? [];
   }, [data]);
 
   const totalCount = data?.data.total ?? purchaseOrders.length;
@@ -95,7 +65,7 @@ export default function AllPurchaseOrdersPage() {
 
   const handleToggleAll = (checked: boolean) => {
     if (checked) {
-      setSelectedOrderIds(purchaseOrders.map((order) => order.id));
+      setSelectedOrderIds(purchaseOrders.map((order) => order._id));
       return;
     }
     setSelectedOrderIds([]);
@@ -183,56 +153,63 @@ export default function AllPurchaseOrdersPage() {
             ) : (
               <TableBody>
                 {purchaseOrders.map((order) => {
-                  const selected = selectedOrderIds.includes(order.id);
+                  const selected = selectedOrderIds.includes(order._id);
+                  const leadName = order.leadId?.projectName || "Untitled Lead";
 
                   return (
                     <TableRow
-                      key={order.id}
+                      key={order._id}
                       data-state={selected ? "selected" : undefined}
                       className="border-slate-100/80 hover:bg-slate-50"
                     >
                       <TableCell className="px-4">
                         <input
-                          aria-label={`Select ${order.leadName}`}
+                          aria-label={`Select ${leadName}`}
                           className="h-3.5 w-3.5 rounded border-slate-300"
                           type="checkbox"
                           checked={selected}
                           onChange={(event) =>
-                            handleToggleOrder(order.id, event.target.checked)
+                            handleToggleOrder(order._id, event.target.checked)
                           }
                           onClick={(e) => e.stopPropagation()}
                         />
                       </TableCell>
 
                       <TableCell className="">
-                        <div>
-                          <p className="text-sm text-slate-900">
-                            {order.leadName}
-                          </p>
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            {order.quoteId}
-                          </p>
-                          <p className="text-[11px] text-slate-400 mt-0.5">
-                            {order.location}
-                          </p>
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-gray-900 uppercase">
+                            {leadName}
+                          </span>
+                          <span className="text-sm text-gray-500">
+                            {order.leadId?.jobId || "-"}
+                          </span>
+                          <span className="text-sm text-gray-500">
+                            {order.customerId
+                              ? `${order.customerId.firstName || ""} ${order.customerId.lastName || ""}`.trim()
+                              : "-"}
+                          </span>
                         </div>
                       </TableCell>
 
                       <TableCell className=" text-sm text-slate-800">
-                        {order.poNumber}
+                        {order.poNumber ?? ""}
                       </TableCell>
 
                       <TableCell className="">
-                        <ProgressDots rawStatus={order.rawStatus} />
+                        <ProgressDots rawStatus={"initial_contact"} />
                       </TableCell>
 
                       <TableCell className="">
-                        <Badge className="bg-violet-100 text-violet-700 hover:bg-violet-100 border-violet-100 ">
+                        <Badge className="capitalize bg-violet-100 text-violet-700 hover:bg-violet-100 border-violet-100 ">
                           {order.status}
                         </Badge>
                       </TableCell>
 
-                      <TableCell className="">{order.quoteValue}</TableCell>
+                      <TableCell className="">
+                        {order.leadId?.quoteValue !== undefined
+                          ? formatCurrency(order.leadId.quoteValue)
+                          : "$0"}
+                      </TableCell>
 
                       <TableCell className="">
                         <div className="relative inline-block">
@@ -240,16 +217,11 @@ export default function AllPurchaseOrdersPage() {
                             type="button"
                             onClick={(e) => e.stopPropagation()}
                             className="flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-600"
-                            aria-label={`Open chat for ${order.leadName}`}
+                            aria-label={`Open chat for ${leadName}`}
                           >
                             <MessageSquare className="h-4 w-4" />
                             <span className="text-sm">Chat</span>
                           </button>
-                          {order.chatCount > 0 && (
-                            <span className="absolute -top-2 -right-2 inline-flex items-center justify-center h-5 w-5 rounded-full bg-red-500 text-white text-xs">
-                              {order.chatCount}
-                            </span>
-                          )}
                         </div>
                       </TableCell>
 
@@ -257,11 +229,11 @@ export default function AllPurchaseOrdersPage() {
                         <div className="flex items-center gap-3">
                           <button
                             type="button"
-                            aria-label={`View ${order.leadName}`}
+                            aria-label={`View ${leadName}`}
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (order.leadId) {
-                                navigate(`/leads/${order.leadId}`);
+                              if (order.leadId?._id) {
+                                navigate(`/leads/${order.leadId._id}`);
                               }
                             }}
                             className="text-indigo-600"
