@@ -17,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { LEAD_NO_NAME } from "@/modules/leads/leads.utils";
 
 type EscalationStatus = "pending" | "assigned" | "resolved";
 
@@ -38,19 +39,6 @@ type EscalatedLeadItem = {
   };
 };
 
-interface EscalatedLead {
-  id: string;
-  name: string;
-  leadId: string;
-  quoteId: string;
-  type: string;
-  assignedTo?: string;
-  lifecycleStatus?: string;
-  escalatedDate: string;
-  escalationStatus: EscalationStatus;
-  note: string;
-}
-
 const statusClasses: Record<EscalationStatus, string> = {
   pending: "bg-violet-100 text-violet-700",
   assigned: "bg-blue-100 text-blue-700",
@@ -70,48 +58,8 @@ const formatDate = (value: string) =>
     year: "numeric",
   }).format(new Date(value));
 
-const formatLeadType = (lead?: EscalatedLeadItem | null) => {
-  if (!lead) return "Not available";
-  // buildingType and location not available in new API
-  return "Not available";
-};
-
-const getCustomerCode = (
-  customerId?: { _id: string; firstName: string; email: string } | null,
-) => {
-  if (!customerId) {
-    return null;
-  }
-
-  return customerId._id ?? null;
-};
-
-const getCustomerName = (
-  customerId?: { _id: string; firstName: string; email: string } | null,
-) => {
-  if (!customerId) {
-    return null;
-  }
-
-  return customerId.firstName?.trim() || null;
-};
-
 const getLeadName = (lead: EscalatedLeadItem) =>
-  getCustomerName(lead.customerId) || "Unknown";
-
-const getEscalationRows = (leads: EscalatedLeadItem[]): EscalatedLead[] =>
-  leads.map((lead) => ({
-    id: lead.escalation._id,
-    leadId: lead._id,
-    name: getLeadName(lead),
-    quoteId: getCustomerCode(lead.customerId) || "N/A",
-    type: formatLeadType(lead),
-    assignedTo: undefined,
-    lifecycleStatus: lead.lifecycleStatus as string | undefined,
-    escalatedDate: formatDate(lead.escalation.createdAt),
-    escalationStatus: lead.escalation.status || "pending",
-    note: lead.escalation.note?.trim() || "No note provided.",
-  }));
+  lead.projectName || LEAD_NO_NAME;
 
 export default function EscalatedLeadsPage() {
   const navigate = useNavigate();
@@ -124,7 +72,7 @@ export default function EscalatedLeadsPage() {
   } = useEscalatedLeadsQuery();
 
   const escalatedLeads = useMemo(
-    () => getEscalationRows(escalationsResponse?.data.leads ?? []),
+    () => escalationsResponse?.data.leads ?? [],
     [escalationsResponse],
   );
 
@@ -137,7 +85,7 @@ export default function EscalatedLeadsPage() {
 
   const handleToggleAll = (checked: boolean) => {
     if (checked) {
-      setSelectedLeadIds(escalatedLeads.map((lead) => lead.id));
+      setSelectedLeadIds(escalatedLeads.map((lead) => lead.escalation._id));
       return;
     }
     setSelectedLeadIds([]);
@@ -240,51 +188,42 @@ export default function EscalatedLeadsPage() {
                 </TableRow>
               ) : (
                 escalatedLeads.map((lead) => {
-                  const selected = selectedLeadIds.includes(lead.id);
-                  const status = lead.escalationStatus;
+                  const leadId = lead.escalation._id;
+                  const selected = selectedLeadIds.includes(leadId);
+                  const status = lead.escalation.status || "pending";
+                  const leadName = getLeadName(lead);
 
                   return (
                     <TableRow
-                      key={lead.id}
+                      key={leadId}
                       data-state={selected ? "selected" : undefined}
                       className="border-slate-100"
                     >
                       <TableCell className="px-4">
                         <input
-                          aria-label={`Select ${lead.name}`}
+                          aria-label={`Select ${leadName}`}
                           className="h-3.5 w-3.5 rounded border-slate-300"
                           type="checkbox"
                           checked={selected}
                           onChange={(event) =>
-                            handleToggleLead(lead.id, event.target.checked)
+                            handleToggleLead(leadId, event.target.checked)
                           }
                         />
                       </TableCell>
 
                       <TableCell className="px-3 py-3">
                         <div>
-                          <p className="text-sm text-slate-900">{lead.name}</p>
+                          <p className="text-sm text-slate-900">{leadName}</p>
                           <p className="text-xs text-slate-500 mt-0.5">
-                            {lead.quoteId}
+                            {lead.jobId}
                           </p>
-                          <p className="text-[11px] text-slate-400 mt-0.5">
-                            {lead.type}
+                          <p className="text-sm text-slate-400 mt-0.5">
+                            {lead.customerId?.firstName || "N/A"}
                           </p>
                         </div>
                       </TableCell>
 
-                      <TableCell className="px-3 py-3">
-                        {lead.assignedTo && (
-                          <div>
-                            <p className="text-sm text-slate-900">
-                              {lead.assignedTo}
-                            </p>
-                            <p className="text-xs text-slate-500 mt-0.5">
-                              1 person assigned
-                            </p>
-                          </div>
-                        )}
-                      </TableCell>
+                      <TableCell className="px-3 py-3" />
 
                       <TableCell className="px-3 py-3">
                         <Badge
@@ -298,7 +237,7 @@ export default function EscalatedLeadsPage() {
                       </TableCell>
 
                       <TableCell className="px-3 py-3 text-sm text-slate-700">
-                        {lead.escalatedDate}
+                        {formatDate(lead.escalation.createdAt)}
                       </TableCell>
 
                       <TableCell className="px-3 py-3">
@@ -310,7 +249,7 @@ export default function EscalatedLeadsPage() {
                       </TableCell>
 
                       <TableCell className="px-3 py-3 max-w-72 whitespace-normal text-xs text-slate-600 leading-5">
-                        {lead.note}
+                        {lead.escalation.note?.trim() || "No note provided."}
                       </TableCell>
 
                       <TableCell className="px-3 py-3">
@@ -318,8 +257,8 @@ export default function EscalatedLeadsPage() {
                           <button
                             type="button"
                             className="text-purple-600"
-                            aria-label={`View ${lead.name}`}
-                            onClick={() => navigate(`/leads/${lead.leadId}`)}
+                            aria-label={`View ${leadName}`}
+                            onClick={() => navigate(`/leads/${lead._id}`)}
                           >
                             <Eye className="h-4 w-4" />
                           </button>
