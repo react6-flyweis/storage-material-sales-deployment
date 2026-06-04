@@ -36,7 +36,9 @@ export const formatLeadDateTime = (value?: string | null) => {
 // Total number of progress steps for a lead lifecycle
 export const LEAD_TOTAL_STEPS = 8;
 
-const lifecycleStatusLabels: Record<string, string> = {
+export type LeadStatusType = "initial_contact" | "requirements_gathered" | "proposal_sent" | "negotiation" | "deal_closed" | "payment_done" | "converted_to_po" | "sent_to_admin";
+
+const lifecycleStatusLabels: Record<LeadStatusType, string> = {
   initial_contact: "Initial contact",
   requirements_gathered: "Requirements gathered",
   proposal_sent: "Proposal sent",
@@ -49,7 +51,7 @@ const lifecycleStatusLabels: Record<string, string> = {
 
 export const LEAD_LIFECYCLE_STEPS = Object.values(lifecycleStatusLabels);
 
-export const formatLifecycleStatus = (value: string) =>
+export const formatLifecycleStatus = (value: LeadStatusType) =>
   lifecycleStatusLabels[value] ??
   value
     .replace(/_/g, " ")
@@ -148,7 +150,7 @@ export const formatAuditAction = (
   }
 };
 
-export const getAuditTypeLabel = (type: string) => formatLifecycleStatus(type);
+export const getAuditTypeLabel = (type: LeadStatusType) => formatLifecycleStatus(type);
 
 export const getAuditPerformedBy = (entry: {
   performedBy?: string | null;
@@ -191,3 +193,11 @@ export const getAssignedEmployeeName = (
 
   return null;
 };
+
+
+export const LEAD_NO_NAME = "Untitled Lead"
+//  
+export function canCreatePO(leadStatus: LeadStatusType) {
+  const statusesNotEligible = ["initial_contact", "requirements_gathered"]
+  return !statusesNotEligible.includes(leadStatus)
+}
