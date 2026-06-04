@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { CheckIcon, Eye, Search, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 // import AddCustomerDialog from "@/components/customers/add-customer-dialog";
@@ -50,140 +50,63 @@ function getStatusClasses(status: string) {
 
 export default function CustomersPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [period, setPeriod] = useState<Period>("month");
+  const [period, setPeriod] = useState<Period>();
   const [page] = useState(1);
   const [limit] = useState(20);
 
-  // Helper to check if a date matches the selected period
-  const isInPeriod = useCallback(
-    (date: Date) => {
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const customerDate = new Date(
-        date.getFullYear(),
-        date.getMonth(),
-        date.getDate(),
-      );
-
-      // if (period === "today") {
-      //   return customerDate.getTime() === today.getTime();
-      // } else
-      if (period === "week") {
-        const weekAgo = new Date(today);
-        weekAgo.setDate(today.getDate() - 7);
-        return customerDate >= weekAgo && customerDate <= today;
-      } else if (period === "month") {
-        const monthAgo = new Date(today);
-        monthAgo.setDate(today.getDate() - 30);
-        return customerDate >= monthAgo && customerDate <= today;
-      }
-      return true;
-    },
-    [period],
-  );
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
   // Load customers from sales API and map to UI shape
   const { data: salesData, isLoading: customersLoading } =
-    useSalesCustomersQuery(page, limit);
+    useSalesCustomersQuery(page, limit, debouncedSearch);
 
-  const customers = useMemo(() => {
-    const apiCustomers = salesData?.data.customers ?? [];
-
-    return apiCustomers.map((c) => ({
-      id: c._id,
-      customerId: c.customerId,
-      customerName:
-        `${c.firstName ?? ""} ${c.lastName ?? ""}`.trim() || c.customerId,
-      phone: c.phone
-        ? `${c.phone.countryCode ?? ""} ${c.phone.number ?? ""}`.trim()
-        : "",
-      email: c.email ?? "",
-      inquiryFor: c.inquiryFor ?? "",
-      status: c.isActive ? "Active" : "Inactive",
-      createdAt: c.createdAt ? new Date(c.createdAt) : new Date(),
-      isReturning: (c as any).isReturning ?? false,
-    }));
-  }, [salesData]);
-
-  // Calculate period-filtered stats
-  const periodFilteredCustomers = useMemo(() => {
-    return customers.filter((c) => isInPeriod(c.createdAt));
-  }, [customers, isInPeriod]);
   const { data: customerStats, isLoading: statsLoading } =
     useCustomerStatsQuery(period);
 
-  const stats = useMemo(() => {
-    if (statsLoading) {
-      return { total: 0, active: 0, newCustomers: 0, returning: 0 };
-    }
-
-    return {
-      total: customerStats?.total ?? periodFilteredCustomers.length,
-      active:
-        customerStats?.active ??
-        periodFilteredCustomers.filter(
-          (c) => c.status.toLowerCase() === "active",
-        ).length,
-      newCustomers:
-        customerStats?.newThisMonth ??
-        periodFilteredCustomers.filter((c) => c.isReturning === false).length,
-      returning:
-        customerStats?.returning ??
-        periodFilteredCustomers.filter((c) => c.isReturning === true).length,
-    };
-  }, [customerStats, periodFilteredCustomers, statsLoading]);
-
   const filteredCustomers = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
+    const customers = salesData?.data?.customers || [];
 
-    return periodFilteredCustomers.filter((customer) => {
-      const matchesQuery =
-        query.length === 0 ||
-        [
-          customer.customerId,
-          customer.customerName,
-          customer.phone,
-          customer.email,
-          customer.inquiryFor,
-        ]
-          .join(" ")
-          .toLowerCase()
-          .includes(query);
-
+    return customers.filter((customer) => {
       const matchesStatus =
         statusFilter === "all" ||
-        customer.status.toLowerCase() === statusFilter.toLowerCase();
+        (customer.isActive ? "active" : "inactive") === statusFilter.toLowerCase();
 
-      return matchesQuery && matchesStatus;
+      return matchesStatus;
     });
-  }, [periodFilteredCustomers, searchQuery, statusFilter]);
+  }, [salesData, statusFilter]);
 
   const statCards = [
     {
       title: "Total Customers",
-      value: stats.total,
+      value: customerStats?.total ?? 0,
       icon: UserPlus,
       iconColor: "text-blue-700",
       iconBgClassName: "bg-blue-700",
     },
     {
       title: "Active Customers",
-      value: stats.active,
+      value: customerStats?.active ?? 0,
       icon: CheckIcon,
       iconColor: "text-green-500",
       iconBgClassName: "bg-green-500",
     },
     {
       title: "New Cust. (This Month)",
-      value: stats.newCustomers,
+      value: customerStats?.newThisMonth ?? 0,
       icon: UserPlus,
       iconColor: "text-yellow-400",
       iconBgClassName: "bg-yellow-400",
     },
     {
       title: "Returning Customers",
-      value: stats.returning,
+      value: customerStats?.returning ?? 0,
       icon: UserPlus,
       iconColor: "text-orange-400",
       iconBgClassName: "bg-orange-400",
@@ -316,30 +239,30 @@ export default function CustomersPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredCustomers.map((customer, index) => (
+                filteredCustomers.map((customer) => (
                   <TableRow
-                    key={`${customer.id}-${index}`}
+                    key={customer._id}
                     className="border-0"
                   >
                     <TableCell className="">{customer.customerId}</TableCell>
-                    <TableCell className="">{customer.customerName}</TableCell>
-                    <TableCell className="">{customer.phone}</TableCell>
+                    <TableCell className="">{`${customer.firstName ?? ""} ${customer.lastName ?? ""}`.trim()}</TableCell>
+                    <TableCell className="">{(customer.phone?.countryCode || "") + (customer.phone?.number || "N/A")}</TableCell>
                     <TableCell className="">{customer.email}</TableCell>
                     <TableCell className="">{customer.inquiryFor}</TableCell>
                     <TableCell className="">
                       <Badge
-                        className={cn("", getStatusClasses(customer.status))}
+                        className={cn("", getStatusClasses(customer.isActive ? "active" : "inactive"))}
                       >
-                        {customer.status}
+                        {customer.isActive ? "Active" : "Inactive"}
                       </Badge>
                     </TableCell>
                     <TableCell className="">
-                      <Link to={`/customers/${customer.id}`}>
+                      <Link to={`/customers/${customer._id}`}>
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          aria-label={`View ${customer.customerName}`}
+                          aria-label={`View ${customer.firstName}`}
                         >
                           <Eye className="text-purple-500" />
                         </Button>
