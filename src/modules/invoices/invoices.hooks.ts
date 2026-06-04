@@ -10,6 +10,7 @@ import {
   getInvoiceStatsProvider,
   getInvoicesProvider,
   sendInvoiceProvider,
+  markInvoicePaidProvider,
   type CreateInvoiceDraftPayload,
   type InvoiceListParams,
 } from "./invoices.api";
@@ -129,3 +130,18 @@ export function useSendInvoiceMutation() {
     },
   });
 }
+
+export function useMarkInvoicePaidMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (invoiceId: string) => markInvoicePaidProvider(invoiceId),
+    onSuccess: (response) => {
+      if (!response.success) return;
+
+      void queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      void queryClient.invalidateQueries({ queryKey: ["invoices", "detail"] });
+    },
+  });
+}
+

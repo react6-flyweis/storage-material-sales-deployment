@@ -1,6 +1,14 @@
 import { apiClient } from "@/modules/auth/auth.api";
 
-export type InvoiceStatus = "draft" | "sent" | "paid" | "overdue" | "cancelled";
+export const InvoiceStatus = {
+  DRAFT: "draft",
+  SENT: "sent",
+  PAID: "paid",
+  OVERDUE: "overdue",
+  CANCELLED: "cancelled",
+} as const;
+
+export type InvoiceStatus = typeof InvoiceStatus[keyof typeof InvoiceStatus];
 
 type InvoiceReferencePerson = {
   name?: string | null;
@@ -235,3 +243,17 @@ export async function sendInvoiceProvider(invoiceId: string) {
 
   return response.data;
 }
+
+export type MarkInvoicePaidResponse = {
+  success: boolean;
+  message: string;
+};
+
+export async function markInvoicePaidProvider(invoiceId: string) {
+  const response = await apiClient.post<MarkInvoicePaidResponse>(
+    `/api/invoices/${invoiceId}/mark-paid`,
+  );
+
+  return response.data;
+}
+
