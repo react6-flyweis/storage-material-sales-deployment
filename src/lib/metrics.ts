@@ -93,16 +93,19 @@ export async function getLeadsStats(): Promise<LeadsStats> {
 }
 
 export async function getConversionFunnelMetrics(
-  startDate: Date,
-  endDate: Date,
+  dateRange: DateRange,
 ): Promise<ConversionFunnelMetrics> {
+  const params =
+    dateRange.startDate && dateRange.endDate
+      ? {
+        startDate: formatDateParam(dateRange.startDate),
+        endDate: formatDateParam(dateRange.endDate),
+      }
+      : {};
   const response = await apiClient.get<ConversionFunnelResponse>(
     "/api/sales/dashboard/conversion-funnel",
     {
-      params: {
-        startDate: formatDateParam(startDate),
-        endDate: formatDateParam(endDate),
-      },
+      params,
     },
   );
 
@@ -164,10 +167,11 @@ export function useFollowUpStatsQuery() {
   });
 }
 
-export function useConversionFunnelQuery(startDate: Date, endDate: Date) {
+export function useConversionFunnelQuery(period?: Period) {
+  const dateRange = getPeriodRange(period);
   return useQuery({
-    queryKey: ["sales", "dashboard", "conversion-funnel", startDate, endDate],
-    queryFn: () => getConversionFunnelMetrics(startDate, endDate),
+    queryKey: ["sales", "dashboard", "conversion-funnel", dateRange.startDate, dateRange.endDate],
+    queryFn: () => getConversionFunnelMetrics(dateRange),
     staleTime: 60 * 1000,
     placeholderData: keepPreviousData,
   });

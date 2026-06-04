@@ -51,8 +51,8 @@ const lifecycleStatusLabels: Record<LeadStatusType, string> = {
 
 export const LEAD_LIFECYCLE_STEPS = Object.values(lifecycleStatusLabels);
 
-export const formatLifecycleStatus = (value: LeadStatusType) =>
-  lifecycleStatusLabels[value] ??
+export const formatLifecycleStatus = (value: string) =>
+  lifecycleStatusLabels[value as LeadStatusType] ??
   value
     .replace(/_/g, " ")
     .replace(/\b\w/g, (character) => character.toUpperCase());
@@ -150,7 +150,7 @@ export const formatAuditAction = (
   }
 };
 
-export const getAuditTypeLabel = (type: LeadStatusType) => formatLifecycleStatus(type);
+export const getAuditTypeLabel = (type: string) => formatLifecycleStatus(type);
 
 export const getAuditPerformedBy = (entry: {
   performedBy?: string | null;
