@@ -16,7 +16,10 @@ import {
   moveLeadToOrdersProvider,
   updateLeadTemperatureProvider,
   updateLeadLifecycleProvider,
+  lookupLeadsProvider,
+  getLeadAgreementProvider,
   type ImportLeadsPayload,
+  type GetLeadsParams,
 } from "./leads.api";
 
 type EscalationStatus = "pending" | "assigned" | "resolved";
@@ -37,6 +40,8 @@ type EscalatedLeadResponse = {
     status: EscalationStatus;
     createdAt: string;
   };
+  jobId: string;
+  projectId: string;
 };
 
 type EscalationsResponse = {
@@ -67,10 +72,19 @@ export function useEscalatedLeadsQuery() {
   });
 }
 
-export function useLeadsQuery(page: number, limit: number) {
+export function useLeadsQuery(params: GetLeadsParams) {
   return useQuery({
-    queryKey: ["sales", "leads", page, limit],
-    queryFn: () => getLeadsProvider(page, limit),
+    queryKey: ["sales", "leads", params],
+    queryFn: () => getLeadsProvider(params),
+    staleTime: 60 * 1000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useLeadsLookupQuery(search?: string, page = 1, limit = 20) {
+  return useQuery({
+    queryKey: ["leads", "lookup", search, page, limit],
+    queryFn: () => lookupLeadsProvider(search, page, limit),
     staleTime: 60 * 1000,
     placeholderData: keepPreviousData,
   });
@@ -245,3 +259,13 @@ export function useUpdateLeadTemperatureMutation() {
     },
   });
 }
+
+export function useLeadAgreementQuery(leadId: string | undefined) {
+  return useQuery({
+    queryKey: ["sales", "leads", "agreement", leadId],
+    queryFn: () => getLeadAgreementProvider(leadId!),
+    enabled: Boolean(leadId),
+    staleTime: 30 * 1000,
+  });
+}
+

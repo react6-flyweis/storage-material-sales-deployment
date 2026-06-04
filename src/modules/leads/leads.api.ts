@@ -1,5 +1,6 @@
 import { apiClient } from "@/modules/auth/auth.api";
 import type { AuthUser } from "../auth/auth.types";
+import type { LeadStatusType } from "./leads.utils";
 
 export type ImportLeadsPayload = {
   csv: string;
@@ -23,7 +24,7 @@ export type LeadListItem = {
   projectName: string;
   customerId: LeadCustomerSummary;
   jobId: string;
-  lifecycleStatus: string;
+  lifecycleStatus: LeadStatusType;
   quoteValue: number;
   leadScoring?: {
     score: number;
@@ -86,9 +87,19 @@ export type ImportLeadsResponse = {
   };
 };
 
-export async function getLeadsProvider(page: number, limit: number) {
+export type GetLeadsParams = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  buildingType?: string;
+  lifecycleStatus?: string;
+  startDate?: string;
+  endDate?: string;
+};
+
+export async function getLeadsProvider(params: GetLeadsParams) {
   const response = await apiClient.get<LeadsListResponse>("/api/sales/leads", {
-    params: { page, limit },
+    params,
   });
 
   return response.data;
@@ -147,10 +158,66 @@ export async function createLeadProvider(payload: CreateLeadPayload) {
   return response.data;
 }
 
-export async function exportLeadsProvider(page: number, limit: number) {
+export type ExportLeadsParams = {
+  search?: string;
+  buildingType?: string;
+  lifecycleStatus?: string;
+  startDate?: string;
+  endDate?: string;
+};
+
+export async function exportLeadsProvider(params?: ExportLeadsParams) {
   const response = await apiClient.get<string>("/api/sales/leads/export", {
-    params: { page, limit },
+    params,
     responseType: "text",
+  });
+
+  return response.data;
+}
+
+export type LeadLookupItem = {
+  _id: string;
+  customerId: {
+    _id: string;
+    customerId: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: {
+      number: string;
+      countryCode: string;
+    };
+  };
+  projectName: string;
+  jobId: string;
+  location: string;
+  buildingType: string;
+  lifecycleStatus: string;
+  quoteValue: number;
+  assignedSales?: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  isRaisedToPO?: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type LeadLookupResponse = {
+  success: boolean;
+  message: string;
+  data: {
+    leads: LeadLookupItem[];
+    total: number;
+    page: number;
+    limit: number;
+  };
+};
+
+export async function lookupLeadsProvider(search?: string, page?: number, limit?: number) {
+  const response = await apiClient.get<LeadLookupResponse>("/api/leads", {
+    params: { search, page, limit },
   });
 
   return response.data;
@@ -377,13 +444,13 @@ export type LeadDetailMessage = {
   content?: string;
   sender?: string | null;
   senderType?:
-    | "customer"
-    | "ai"
-    | "employee"
-    | "sales"
-    | "system"
-    | string
-    | null;
+  | "customer"
+  | "ai"
+  | "employee"
+  | "sales"
+  | "system"
+  | string
+  | null;
   senderId?: string | null;
   isRead?: boolean;
   createdAt?: string;
@@ -554,3 +621,43 @@ export async function updateLeadTemperatureProvider(
 
   return response.data;
 }
+
+export type LeadAgreement = {
+  _id: string;
+  url: string;
+  fileName: string;
+  name: string;
+  type: string;
+  uploadedAt: string;
+  uploadedBy: {
+    _id: string;
+    name: string;
+    email: string;
+    role: string;
+  };
+};
+
+export type LeadAgreementResponseData = {
+  leadId: string;
+  customerId: string;
+  projectName: string;
+  jobId: string;
+  projectId: string;
+  agreement: LeadAgreement | null;
+  agreementUploadedAt: string | null;
+};
+
+export type LeadAgreementResponse = {
+  success: boolean;
+  message: string;
+  data: LeadAgreementResponseData;
+};
+
+export async function getLeadAgreementProvider(leadId: string) {
+  const response = await apiClient.get<LeadAgreementResponse>(
+    `/api/sales/leads/${leadId}/agreement`,
+  );
+
+  return response.data;
+}
+
