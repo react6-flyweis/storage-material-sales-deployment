@@ -8,13 +8,15 @@ import {
   ComboboxEmpty,
 } from "@/components/ui/combobox";
 
-import { useLeadsQuery } from "@/modules/leads/leads.hooks";
+import { useLeadsLookupQuery } from "@/modules/leads/leads.hooks";
+import { formatLifecycleStatus, getStatusBadgeClassName } from "@/modules/leads/leads.utils";
 
 type Client = {
   id: string;
   name: string;
   customer: string;
   customerId: string;
+  lifecycleStatus?: string;
 };
 
 type Props = {
@@ -26,17 +28,20 @@ type Props = {
 export default function ClientSelector({
   value,
   onValueChange,
-  placeholder = "Search clients...",
+  placeholder = "Search leads/projects...",
 }: Props) {
-  const { data, isLoading } = useLeadsQuery(1, 100);
+  const { data, isLoading } = useLeadsLookupQuery(undefined, 1, 100);
   const lastEmittedLeadIdRef = useRef<string | null>(null);
 
   const clients =
     data?.data.leads.map((lead) => ({
       id: lead._id,
-      name: lead.projectName || "N/A",
-      customer: lead.customerId?.firstName || "N/A",
+      name: lead.projectName || "Untitled Lead",
+      customer:
+        `${lead.customerId?.firstName ?? ""} ${lead.customerId?.lastName ?? ""}`.trim() ||
+        "N/A",
       customerId: lead.customerId?._id || "",
+      lifecycleStatus: lead.lifecycleStatus,
     })) || [];
 
   const selectedClient = clients.find((client) => client.id === value) || null;
@@ -59,6 +64,13 @@ export default function ClientSelector({
     <Combobox
       items={clients}
       itemToStringLabel={(client: Client) => client.name}
+      filter={(client: Client, query: string) => {
+        const q = query.toLowerCase();
+        return (
+          client.name.toLowerCase().includes(q) ||
+          client.customer.toLowerCase().includes(q)
+        );
+      }}
       value={selectedClient}
       onValueChange={(val: Client | null | undefined) => {
         onValueChange(val);
@@ -67,7 +79,7 @@ export default function ClientSelector({
       <ComboboxInput placeholder={placeholder} />
       <ComboboxContent className="pointer-events-auto">
         <ComboboxEmpty>
-          {isLoading ? "Loading clients..." : "No client found"}
+          {isLoading ? "Loading leads/projects..." : "No leads/projects found"}
         </ComboboxEmpty>
         <ComboboxList>
           {(client: Client) => (
@@ -75,11 +87,17 @@ export default function ClientSelector({
               <div className="flex flex-col">
                 <span className="font-medium text-gray-900">{client.name}</span>
                 <span className="text-sm text-gray-500">{client.customer}</span>
+
+                {client.lifecycleStatus && (
+                  <span className={`text-xs px-2 py-0.5 rounded-sm w-fit font-medium whitespace-nowrap ${getStatusBadgeClassName(client.lifecycleStatus)}`}>
+                    {formatLifecycleStatus(client.lifecycleStatus)}
+                  </span>
+                )}
               </div>
             </ComboboxItem>
           )}
         </ComboboxList>
       </ComboboxContent>
-    </Combobox>
+    </Combobox >
   );
 }
