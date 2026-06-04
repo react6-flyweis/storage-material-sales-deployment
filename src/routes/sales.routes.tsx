@@ -150,7 +150,7 @@ export const salesRoutes: RouteObject[] = [
                 path: ":id",
                 children: [
                   { index: true, element: <CustomerInfo /> },
-                  { path: "contracts/:id", element: <ContractDetail /> },
+                  { path: "contracts", element: <ContractDetail /> },
                   { path: "project-invoices", element: <ProjectInvoices /> },
                   { path: "project-quotation", element: <ProjectQuotation /> },
                   { path: "project-payments", element: <ProjectPayments /> },

@@ -6,7 +6,7 @@ import BasicDetails from "@/components/leads/basic-details";
 
 const quickActionButtons = [
   { label: "View Quotation", path: "project-quotation" },
-  { label: "View Agreement", path: "contracts/1" },
+  { label: "View Agreement", path: "contracts" },
   { label: "View Invoices", path: "project-invoices" },
   { label: "View Payments", path: "project-payments" },
 ];
@@ -38,7 +38,7 @@ export default function ProjectDetailsPage() {
             Back
           </Button>
           <h1 className="text-xl font-semibold">
-            Project Details- {detail?.lead.projectName}
+            Project Details- {detail?.lead.projectName || "N/A"}
           </h1>
         </div>
       </div>
@@ -51,7 +51,11 @@ export default function ProjectDetailsPage() {
               key={btn.label}
               variant="default"
               className="bg-[#1D51A4] hover:bg-[#1D51A4]/90 text-white rounded-[6px] shadow-sm"
-              onClick={() => navigate(`${basePath}/${btn.path}`)}
+              onClick={() =>
+                navigate(`${basePath}/${btn.path}`, {
+                  state: { projectName: detail?.lead.projectName },
+                })
+              }
             >
               {btn.label}
             </Button>
