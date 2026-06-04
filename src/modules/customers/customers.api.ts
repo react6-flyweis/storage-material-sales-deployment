@@ -142,10 +142,10 @@ export type GetSalesCustomersResponse = {
   data: GetSalesCustomersData;
 };
 
-export async function getSalesCustomersProvider(page = 1, limit = 20) {
+export async function getSalesCustomersProvider(page = 1, limit = 20, search?: string) {
   const response = await apiClient.get<GetSalesCustomersResponse>(
     "/api/sales/customers",
-    { params: { page, limit } },
+    { params: { page, limit, search } },
   );
 
   return response.data;

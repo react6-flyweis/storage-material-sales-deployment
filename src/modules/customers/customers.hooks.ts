@@ -32,10 +32,10 @@ export function useCustomerDetailQuery(customerId: string) {
   });
 }
 
-export function useSalesCustomersQuery(page = 1, limit = 20) {
+export function useSalesCustomersQuery(page = 1, limit = 20, search?: string) {
   return useQuery({
-    queryKey: ["customers", "list", page, limit],
-    queryFn: () => getSalesCustomersProvider(page, limit),
+    queryKey: ["customers", "list", page, limit, search],
+    queryFn: () => getSalesCustomersProvider(page, limit, search),
     staleTime: 60 * 1000,
     placeholderData: keepPreviousData,
   });
