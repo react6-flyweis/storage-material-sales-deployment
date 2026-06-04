@@ -20,9 +20,11 @@ import {
   formatLeadDate,
   formatLifecycleStatus,
   getLeadProgress,
+  type LeadStatusType,
 } from "@/modules/leads/leads.utils";
 import { ArrowUpDown, Filter, Search } from "lucide-react";
 import { useNavigate } from "react-router";
+import { getLeadLifecycleBadgeClassName } from "@/modules/leads/lifecycle-statuses";
 
 export type ProjectRow = {
   id: string;
@@ -39,43 +41,6 @@ type Props = {
   customerId: string;
 };
 
-function getProjectStatusBadgeClassName(status: string) {
-  const normalized = status.toLowerCase();
-
-  if (normalized.includes("sent_to_admin")) {
-    return "bg-slate-100 text-slate-700";
-  }
-
-  if (normalized.includes("converted_to_po")) {
-    return "bg-violet-100 text-violet-700";
-  }
-
-  if (normalized.includes("payment")) {
-    return "bg-emerald-100 text-emerald-700";
-  }
-
-  if (normalized.includes("deal_closed") || normalized.includes("completed")) {
-    return "bg-green-100 text-green-700";
-  }
-
-  if (normalized.includes("proposal")) {
-    return "bg-purple-100 text-purple-700";
-  }
-
-  if (normalized.includes("quotation")) {
-    return "bg-orange-100 text-orange-700";
-  }
-
-  if (normalized.includes("negotiation")) {
-    return "bg-blue-100 text-blue-700";
-  }
-
-  if (normalized.includes("cancel")) {
-    return "bg-red-100 text-red-700";
-  }
-
-  return "bg-slate-100 text-slate-700";
-}
 
 function mapProjectToRow(project: {
   _id: string;
@@ -84,7 +49,7 @@ function mapProjectToRow(project: {
   numberOfBuildings?: number;
   createdAt?: string;
 }): ProjectRow {
-  const lifecycleStatus = project.lifecycleStatus ?? "";
+  const lifecycleStatus = (project.lifecycleStatus ?? "initial_contact") as LeadStatusType
   const status = lifecycleStatus ? formatLifecycleStatus(lifecycleStatus) : "-";
   const progressStep = lifecycleStatus
     ? Math.min(getLeadProgress(lifecycleStatus), 8)
@@ -92,19 +57,18 @@ function mapProjectToRow(project: {
 
   return {
     id: project._id,
-    name: project.projectName?.trim() || "-",
+    name: project.projectName?.trim() || "Untitled",
     building:
       typeof project.numberOfBuildings === "number"
-        ? `${project.numberOfBuildings} building${
-            project.numberOfBuildings === 1 ? "" : "s"
-          }`
+        ? `${project.numberOfBuildings} building${project.numberOfBuildings === 1 ? "" : "s"
+        }`
         : "-",
     startDate: formatLeadDate(project.createdAt),
     stage: status,
     progress: progressStep ? `Step ${progressStep}/8` : "-",
     status,
     statusClassName: lifecycleStatus
-      ? getProjectStatusBadgeClassName(lifecycleStatus)
+      ? getLeadLifecycleBadgeClassName(lifecycleStatus)
       : "bg-slate-100 text-slate-700",
   };
 }
