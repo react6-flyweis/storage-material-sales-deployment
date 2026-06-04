@@ -5,9 +5,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useLeadsQuery } from "@/modules/leads/leads.hooks";
+import { useLeadsLookupQuery } from "@/modules/leads/leads.hooks";
 import { formatLifecycleStatus } from "@/modules/leads/leads.utils";
-import type { LeadListItem } from "@/modules/leads/leads.api";
+import type { LeadLookupItem } from "@/modules/leads/leads.api";
 
 /**
  * TEMP PATCH — load all leads instead of per-customer projects; project select
@@ -19,7 +19,7 @@ const TEMP_USE_ALL_LEADS = true;
 type Props = {
   customerId: string;
   value: string;
-  onValueChange: (project: LeadListItem | null) => void;
+  onValueChange: (project: LeadLookupItem | null) => void;
   disabled?: boolean;
   placeholder?: string;
 };
@@ -31,7 +31,7 @@ export default function CustomerProjectSelector({
   disabled = false,
   placeholder = "Select a project",
 }: Props) {
-  const allLeadsQuery = useLeadsQuery(1, 100);
+  const allLeadsQuery = useLeadsLookupQuery(undefined, 1, 100);
 
 
   const { isLoading, isError } = allLeadsQuery
