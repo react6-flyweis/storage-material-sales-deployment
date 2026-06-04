@@ -115,6 +115,15 @@ export default function LeadDetails() {
     return <LeadDetailsSkeleton />;
   }
 
+  const documents = detail?.lead?.documents;
+  const hasContract = Array.isArray(documents) && documents.some(
+    (doc) =>
+      doc &&
+      typeof doc === "object" &&
+      "type" in doc &&
+      (doc as { type: unknown }).type === "contract"
+  );
+
   return (
     <div className="p-5">
       <div className=" rounded-b-lg">
@@ -145,18 +154,20 @@ export default function LeadDetails() {
               />
             )}
 
-            <Button
-              size="sm"
-              className="rounded-sm shadow-md"
-              onClick={() => {
-                if (!leadId) return;
-                navigate(`/leads/${leadId}/agreement`);
-              }}
-            >
-              <span>View Agreement</span>
-            </Button>
-
-            <UploadAgreementDialog leadId={leadId} />
+            {hasContract ? (
+              <Button
+                size="sm"
+                className="rounded-sm shadow-md"
+                onClick={() => {
+                  if (!leadId) return;
+                  navigate(`/leads/${leadId}/agreement`);
+                }}
+              >
+                <span>View Agreement</span>
+              </Button>
+            ) : (
+              <UploadAgreementDialog leadId={leadId} />
+            )}
           </div>
         </div>
 
