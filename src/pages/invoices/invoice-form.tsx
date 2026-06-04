@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useForm, Controller, useFieldArray, useWatch } from "react-hook-form";
-import { Calendar, Plus, UserPlus } from "lucide-react";
+import { Calendar, Plus } from "lucide-react";
 import { useNavigate } from "react-router";
 import InvoiceLineItem from "./invoice-line-item";
 import AddMarkupDialog from "@/components/invoice/add-markup-dialog";
 import AddDiscountDialog from "@/components/invoice/add-discount-dialog";
 import AddDepositDialog from "@/components/invoice/add-deposit-dialog";
 import PaymentScheduleDialog from "@/components/invoice/payment-schedule-dialog";
-import AddClientDialog from "@/components/invoice/add-client-dialog";
-import CustomerProjectSelector from "@/components/invoice/customer-project-selector";
+// import AddClientDialog from "@/components/invoice/add-client-dialog";
+// import CustomerProjectSelector from "@/components/invoice/customer-project-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import steelLogo from "@/assets/steel-building-depot-logo.png";
@@ -29,6 +29,7 @@ import type {
   PaymentScheduleDocument,
 } from "@/modules/invoices/invoices.api";
 import SuccessDialog from "@/components/success-dialog";
+import ClientSelector from "@/components/customers/client-selector";
 
 type LineItem = Omit<ApiInvoiceLineItem, "markup" | "tax"> & {
   id: string;
@@ -277,20 +278,20 @@ function invoiceToFormValues(
     lineItems:
       invoice?.lineItems?.length && invoice.lineItems.length > 0
         ? invoice.lineItems.map((item, index) => ({
-            id: item._id ?? item.id ?? `${invoice._id ?? "invoice"}-${index}`,
-            description: item.description ?? "",
-            notes: item.notes ?? "",
-            rate: item.rate ?? 0,
-            markup: lineItemMarkupLabel(item.markup),
-            quantity: item.quantity ?? 1,
-            tax: item.tax ?? 0,
-            total:
-              item.total ??
-              (item.rate ?? 0) * (item.quantity ?? 0) + (item.tax ?? 0),
-            selectedTax: "",
-            images: item.images ?? item.photos ?? [],
-            items: item.items ?? [],
-          }))
+          id: item._id ?? item.id ?? `${invoice._id ?? "invoice"}-${index}`,
+          description: item.description ?? "",
+          notes: item.notes ?? "",
+          rate: item.rate ?? 0,
+          markup: lineItemMarkupLabel(item.markup),
+          quantity: item.quantity ?? 1,
+          tax: item.tax ?? 0,
+          total:
+            item.total ??
+            (item.rate ?? 0) * (item.quantity ?? 0) + (item.tax ?? 0),
+          selectedTax: "",
+          images: item.images ?? item.photos ?? [],
+          items: item.items ?? [],
+        }))
         : defaultLineItems,
   };
 }
@@ -466,9 +467,9 @@ export default function InvoiceForm({
   const hasNonDepositSchedulePayments = schedulePaymentsWithDeposit.some(
     (payment) => !isDepositStageName(payment.name),
   );
-  const clientId = formValues?.clientId ?? defaultFormValues.clientId;
+  // const clientId = formValues?.clientId ?? defaultFormValues.clientId;
   const leadId = formValues?.leadId ?? defaultFormValues.leadId;
-  const clientName = formValues?.clientName ?? defaultFormValues.clientName;
+  // const clientName = formValues?.clientName ?? defaultFormValues.clientName;
   const taxes = (formValues.taxes ??
     defaultFormValues.taxes) as InvoiceFormValues["taxes"];
 
@@ -767,24 +768,20 @@ export default function InvoiceForm({
           {/* Right: Invoice Meta & Client Add */}
           <div className="flex-1 max-w-2xl flex flex-col gap-6">
             <div className="flex flex-col items-end gap-4">
-              <AddClientDialog
+              {/* <AddClientDialog
                 initialSelected={clientId || null}
                 onDone={(client) => {
                   if (!client) {
                     setValue("clientId", "");
                     setValue("clientName", "");
-                    setValue("leadId", "");
-                    setValue("clientAvatar", "");
                     return;
                   }
 
                   setValue("clientId", client.id);
                   setValue("clientName", client.name);
-                  setValue("leadId", "");
-                  setValue("clientAvatar", client.avatar || "");
                 }}
-              >
-                {clientName ? (
+              > */}
+              {/* {clientName ? (
                   <div className="flex items-center gap-3">
                     <div className="text-sm font-medium text-gray-900">
                       {clientName}
@@ -795,8 +792,6 @@ export default function InvoiceForm({
                         e.stopPropagation();
                         setValue("clientId", "");
                         setValue("clientName", "");
-                        setValue("leadId", "");
-                        setValue("clientAvatar", "");
                       }}
                       className="text-gray-500 hover:text-red-500 ml-2"
                     >
@@ -811,16 +806,23 @@ export default function InvoiceForm({
                     <UserPlus className="w-4 h-4" />
                     ADD CLIENT
                   </Button>
-                )}
-              </AddClientDialog>
+                )} */}
+              {/* </AddClientDialog> */}
 
-              <CustomerProjectSelector
+              {/* <CustomerProjectSelector
                 customerId={clientId}
                 value={leadId}
-                // disabled={!clientId || isSummaryReadOnly}
-                disabled={isSummaryReadOnly}
+                disabled={!clientId || isSummaryReadOnly}
                 onValueChange={(project) => {
                   setValue("leadId", project?._id ?? "");
+                }}
+              /> */}
+
+              <ClientSelector
+                placeholder="Select Project"
+                value={leadId}
+                onValueChange={(lead) => {
+                  setValue("leadId", lead?.id ?? "");
                 }}
               />
             </div>
@@ -896,14 +898,12 @@ export default function InvoiceForm({
               render={({ field }) => (
                 <div
                   onClick={() => field.onChange(!field.value)}
-                  className={`w-10 h-5 rounded-full relative cursor-pointer transition-colors ${
-                    field.value ? "bg-blue-600" : "bg-gray-200"
-                  }`}
+                  className={`w-10 h-5 rounded-full relative cursor-pointer transition-colors ${field.value ? "bg-blue-600" : "bg-gray-200"
+                    }`}
                 >
                   <div
-                    className={`w-5 h-5 bg-white rounded-full shadow-sm absolute border border-gray-300 transition-transform ${
-                      field.value ? "left-5" : "left-0"
-                    }`}
+                    className={`w-5 h-5 bg-white rounded-full shadow-sm absolute border border-gray-300 transition-transform ${field.value ? "left-5" : "left-0"
+                      }`}
                   ></div>
                 </div>
               )}
