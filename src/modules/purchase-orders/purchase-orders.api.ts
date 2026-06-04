@@ -2,8 +2,8 @@ import { apiClient } from "@/modules/auth/auth.api";
 
 export type PurchaseOrderItem = {
   _id: string;
-  leadId?: { _id: string; projectName?: string } | null;
-  customerId?: { _id: string; firstName?: string } | null;
+  leadId?: { _id: string; projectName?: string; jobId?: string; quoteValue?: number } | null;
+  customerId?: { _id: string; firstName?: string; lastName?: string } | null;
   raisedBy?: string;
   assignedTo?: { _id: string; firstName?: string } | null;
   invoiceId?: string | null;

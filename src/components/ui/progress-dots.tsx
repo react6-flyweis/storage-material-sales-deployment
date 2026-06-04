@@ -1,9 +1,9 @@
-import { getLeadProgress, LEAD_TOTAL_STEPS } from "@/modules/leads/leads.utils";
+import { getLeadProgress, LEAD_TOTAL_STEPS, type LeadStatusType } from "@/modules/leads/leads.utils";
 
 type ProgressDotsProps = {
   // either pass a numeric progress or the raw lifecycle status
   progress?: number;
-  rawStatus?: string;
+  rawStatus?: LeadStatusType;
 };
 
 const DOT_COUNT = Math.ceil(LEAD_TOTAL_STEPS / 2); // one dot represents two progress units
