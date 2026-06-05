@@ -721,12 +721,16 @@ export default function InvoiceForm({
           Invoice#{invoiceNumber}
         </h1>
         <div className="flex items-center gap-3 ml-auto">
-          <Button
-            variant="outline"
-            className="bg-white hover:bg-gray-50 text-gray-700 border-gray-200"
-          >
-            Cancel
-          </Button>
+          {isEdit && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate(-1)}
+              className="bg-white hover:bg-gray-50 text-gray-700 border-gray-200"
+            >
+              Cancel
+            </Button>
+          )}
           <Button
             onClick={handleSubmit(onSubmit)}
             disabled={
@@ -848,6 +852,7 @@ export default function InvoiceForm({
                     type="date"
                     placeholder="dd/mm/yyyy"
                     {...register("date")}
+                    min={new Date().toISOString().split("T")[0]}
                     className="bg-white border-gray-200 h-11"
                   />
                   <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
