@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Send, Menu, MessageCircle, Copy, AlertCircle } from "lucide-react";
+import { Send, Menu, MessageCircle, Copy, AlertCircle, Sparkles, Plus } from "lucide-react";
 import MessageItem from "@/components/message-item";
 import { cn } from "@/lib/utils";
 // import FollowUpDialog from "@/components/follow-up/follow-up-dialog";
@@ -16,6 +16,7 @@ import {
 import { type Socket } from "socket.io-client";
 import { createAdminSocket } from "@/lib/socket";
 import { useAuthStore } from "@/modules/auth/auth.store";
+import ClientSelector from "@/components/customers/client-selector";
 
 interface Message {
   id: string;
@@ -53,6 +54,7 @@ export default function AiScriptGeneratorPage() {
   const [isAiTyping, setIsAiTyping] = useState(false);
   const [socketError, setSocketError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [selectedLeadId, setSelectedLeadId] = useState<string>("");
 
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -176,6 +178,18 @@ export default function AiScriptGeneratorPage() {
   //   }
   // };
 
+  const handleStartSession = (leadId: string | null) => {
+    if (!socketRef.current?.connected) return;
+    setSocketError(null);
+    socketRef.current.emit("ai_script:start", { leadId });
+  };
+
+  const handleNewChat = () => {
+    setActiveSessionId(null);
+    setSelectedLeadId("");
+    setCurrentSessionMessages([]);
+  };
+
   const handleSendMessage = () => {
     if (!inputMessage.trim() || !socketRef.current?.connected) return;
 
@@ -243,11 +257,7 @@ export default function AiScriptGeneratorPage() {
     });
 
   // Do not auto-resolve to an existing session; default to starting a new chat
-  const resolvedActiveSessionId =
-    activeSessionId &&
-    sessionHistory.some((item) => item.id === activeSessionId)
-      ? activeSessionId
-      : null;
+  const resolvedActiveSessionId = activeSessionId;
 
   const mappedApiMessages = currentSessionMessages;
 
@@ -347,15 +357,17 @@ export default function AiScriptGeneratorPage() {
               </h2>
             </div>
 
-            {/* <FollowUpDialog
-              showClientSelector={true}
-              onFollowUp={() => setShowSuccess(true)}
-            >
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
-                <Sparkles className="h-4 w-4" />
-                Use Script
+            {resolvedActiveSessionId && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleNewChat}
+                className="gap-2 text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-900"
+              >
+                <Plus className="h-4 w-4" />
+                New Chat
               </Button>
-            </FollowUpDialog> */}
+            )}
           </div>
 
           <div className="p-6 space-y-4 min-h-[50vh] max-h-[100vh-160px] overflow-y-auto">
@@ -372,70 +384,119 @@ export default function AiScriptGeneratorPage() {
               </div>
             )}
 
-            {isConnected &&
-              mappedApiMessages.length === 0 &&
-              !isAiTyping &&
-              !socketError && (
-                <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-14 text-center">
-                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white text-slate-400 shadow-sm">
-                    <MessageCircle className="h-5 w-5" />
-                  </div>
-                  <div className="font-medium text-gray-700">
-                    No messages yet
-                  </div>
-                  <div className="text-xs text-gray-400">
-                    Start the conversation to generate a script.
-                  </div>
+            {isConnected && !resolvedActiveSessionId && !socketError && (
+              <div className="flex flex-col items-center justify-center max-w-xl mx-auto py-12 px-6">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-blue-600 shadow-sm">
+                  <Sparkles className="h-6 w-6" />
                 </div>
-              )}
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                  Start a New AI Script Session
+                </h3>
+                <p className="text-sm text-gray-500 text-center mb-8 max-w-sm">
+                  Select a lead/project to generate customized follow-up scripts.
+                </p>
 
-            {mappedApiMessages?.map((message) => (
-              <MessageItem key={message.id} message={message} />
-            ))}
+                <div className="w-full space-y-6 bg-slate-50 border border-slate-100 p-6 rounded-2xl">
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                      Select Lead / Project
+                    </label>
+                    <ClientSelector
+                      value={selectedLeadId}
+                      onValueChange={(client) => setSelectedLeadId(client?.id || "")}
+                      placeholder="Search and select a lead..."
+                    />
+                  </div>
 
-            {isAiTyping && (
-              <div className="flex justify-start">
-                <div className="max-w-[80%]">
-                  <div className="rounded-lg px-4 py-3 bg-gray-100 text-gray-900 min-h-11">
-                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                      {assistantBuffer}
-                      {isAiTyping && (
-                        <span className="inline-block w-1.5 h-4 ml-1 bg-gray-400 animate-pulse align-middle" />
-                      )}
-                    </p>
+                  <div className="flex flex-col gap-2 pt-2">
+                    <Button
+                      onClick={() => handleStartSession(selectedLeadId)}
+                      disabled={!selectedLeadId}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-xl transition duration-200"
+                    >
+                      Start Session
+                    </Button>
+                    {/* <Button
+                      variant="ghost"
+                      onClick={() => handleStartSession(null)}
+                      className="w-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 font-medium py-2 px-4 rounded-xl transition duration-200"
+                    >
+                      Start Generic Session (No Lead)
+                    </Button> */}
                   </div>
                 </div>
               </div>
             )}
 
+            {resolvedActiveSessionId && (
+              <>
+                {mappedApiMessages.length === 0 &&
+                  !isAiTyping &&
+                  !socketError && (
+                    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-14 text-center">
+                      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white text-slate-400 shadow-sm">
+                        <MessageCircle className="h-5 w-5" />
+                      </div>
+                      <div className="font-medium text-gray-700">
+                        No messages yet
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        Start the conversation to generate a script.
+                      </div>
+                    </div>
+                  )}
+
+                {mappedApiMessages?.map((message) => (
+                  <MessageItem key={message.id} message={message} />
+                ))}
+
+                {isAiTyping && (
+                  <div className="flex justify-start">
+                    <div className="max-w-[80%]">
+                      <div className="rounded-lg px-4 py-3 bg-gray-100 text-gray-900 min-h-11">
+                        <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                          {assistantBuffer}
+                          {isAiTyping && (
+                            <span className="inline-block w-1.5 h-4 ml-1 bg-gray-400 animate-pulse align-middle" />
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="px-4 py-3 border-t bg-gray-50">
-            <div className="flex items-center gap-2">
-              <Input
-                type="text"
-                placeholder={
-                  isComposerDisabled
-                    ? "Connecting to socket..."
-                    : "Type your message..."
-                }
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
-                className="flex-1 bg-white"
-                disabled={isComposerDisabled}
-              />
-              <Button
-                onClick={handleSendMessage}
-                className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
-                disabled={isComposerDisabled}
-              >
-                <Send className="h-4 w-4" />
-                Send
-              </Button>
+          {resolvedActiveSessionId && (
+            <div className="px-4 py-3 border-t bg-gray-50">
+              <div className="flex items-center gap-2">
+                <Input
+                  type="text"
+                  placeholder={
+                    isComposerDisabled
+                      ? "Connecting to socket..."
+                      : "Type your message..."
+                  }
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  className="flex-1 bg-white"
+                  disabled={isComposerDisabled}
+                />
+                <Button
+                  onClick={handleSendMessage}
+                  className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
+                  disabled={isComposerDisabled}
+                >
+                  <Send className="h-4 w-4" />
+                  Send
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </Card>
 
         <SuccessDialog

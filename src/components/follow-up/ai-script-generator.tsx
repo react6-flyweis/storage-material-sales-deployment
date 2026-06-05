@@ -93,6 +93,8 @@ export default function AiScriptGenerator() {
       session.leadId && typeof session.leadId === "object"
         ? (session.leadId.projectName ?? `Session ${session._id}`)
         : `Session ${session._id}`;
+
+    // console.log({ session, name })
     const timestamp =
       session.updatedAt ??
       session.createdAt ??
@@ -106,13 +108,19 @@ export default function AiScriptGenerator() {
         : "bg-purple-50 text-purple-600";
 
     return {
+      id: session._id,
       name,
       tone,
       snippet,
       time,
       icon,
       bg,
+      timestamp,
     };
+  });
+
+  const sortedItems = [...items].sort((a, b) => {
+    return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
   });
 
   return (
@@ -164,11 +172,11 @@ export default function AiScriptGenerator() {
             ))}
           </>
         ) : (
-          items.slice(-3).map((it) => {
+          sortedItems.slice(0, 3).map((it) => {
             const Icon = it.icon;
             return (
               <div
-                key={it.name}
+                key={it.id}
                 className="flex items-center justify-between border rounded-md p-4"
               >
                 <div className="flex items-start space-x-3">
@@ -191,11 +199,10 @@ export default function AiScriptGenerator() {
 
                 <div className="flex flex-col items-end space-y-2">
                   <span
-                    className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                      it.tone === "professional"
-                        ? "bg-blue-100 text-blue-700"
-                        : "bg-purple-100 text-purple-700"
-                    }`}
+                    className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${it.tone === "professional"
+                      ? "bg-blue-100 text-blue-700"
+                      : "bg-purple-100 text-purple-700"
+                      }`}
                   >
                     {it.tone}
                   </span>
