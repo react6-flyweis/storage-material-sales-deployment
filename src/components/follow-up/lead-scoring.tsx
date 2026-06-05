@@ -12,6 +12,7 @@ import { ArrowRight, Loader2 } from "lucide-react";
 import { useScoredLeadsQuery } from "@/modules/leads/leads.hooks";
 import { Badge } from "@/components/ui/badge";
 import { LEAD_NO_NAME } from "@/modules/leads/leads.utils";
+import { cn } from "@/lib/utils";
 
 interface LeadScore {
   id: string;
@@ -61,14 +62,14 @@ export default function LeadScoring() {
 
   const leads: LeadScore[] = (scoredResp?.data?.leads || [])
     .map((l) => {
-      const scoreNum = l.leadScoring?.score ?? 0;
+      const scoreNum = l.score ?? 0;
       const scoreLabel: LeadScore["scoreLabel"] =
         scoreNum >= 70 ? "Hot" : scoreNum >= 40 ? "Warm" : "Cold";
 
       return {
-        id: l._id,
+        id: l.leadId,
         name: l.projectName || LEAD_NO_NAME,
-        location: l.customerId.firstName || "N/A",
+        location: l.customerName || "N/A",
         score: scoreNum,
         scoreLabel,
       };
@@ -128,15 +129,15 @@ export default function LeadScoring() {
               key={lead.id}
               className="flex items-center justify-between bg-gray-50 rounded-md p-4"
             >
-              <div>
-                <div className="flex items-center space-x-3">
-                  <Badge className={getScoreBadgeClass(lead.scoreLabel)}>
-                    {lead.scoreLabel.toLowerCase()}
-                  </Badge>
+              <div className="flex space-x-3">
+                <Badge className={cn("capitalize", getScoreBadgeClass(lead.scoreLabel))}>
+                  {lead.scoreLabel.toLowerCase()}
+                </Badge>
+                <div>
                   <div className="font-medium text-gray-900">{lead.name}</div>
-                </div>
-                <div className="text-sm text-gray-500 mt-1">
-                  {lead.location}
+                  <div className="text-sm text-gray-500 mt-1">
+                    {lead.location}
+                  </div>
                 </div>
               </div>
               <div className="text-right">

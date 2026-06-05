@@ -144,6 +144,15 @@ export default function LeadScoring() {
   const [client, setClient] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
 
+  const isFilterApplied = dateFrom !== "" || dateTo !== "" || status !== "all" || client !== "";
+
+  const handleClearFilters = () => {
+    setDateFrom("");
+    setDateTo("");
+    setStatus("all");
+    setClient("");
+  };
+
   const [overrides, setOverrides] = useState<
     Record<string, LeadScore["temperature"]>
   >({});
@@ -179,23 +188,21 @@ export default function LeadScoring() {
     isLoading,
     isError,
     refetch,
-  } = useScoredLeadsQuery(1, 20);
+  } = useScoredLeadsQuery(1, 20, dateFrom, dateTo);
 
   const apiLeads: LeadScore[] = (scoredResp?.data?.leads || []).map((l) => {
-    const scoreNum = l.leadScoring?.score ?? 0;
-    const temperatureValue: LeadScore["temperature"] =
-      l.leadScoring?.temperature ??
-      (scoreNum >= 70 ? "hot" : scoreNum >= 40 ? "warm" : "cold");
+    const scoreNum = l.score ?? 0;
+    const temperatureValue: LeadScore["temperature"] = l.temperature ?? "cold";
 
     const lifecycle = l.lifecycleStatus || "initial_contact";
     const progress = getLeadProgress(lifecycle);
 
     return {
-      id: l._id,
+      id: l.leadId,
       name: l.projectName || "Untitled Lead",
-      leadId: l._id,
-      jobId:l.jobId,
-      location: l.customerId.firstName || "",
+      leadId: l.leadId,
+      jobId: l.jobId,
+      location: l.customerName || "",
       progress,
       lifecycleStatus: lifecycle,
       quoteValue: l.quoteValue || 0,
@@ -241,9 +248,8 @@ export default function LeadScoring() {
         {[...Array(4)].map((_, i) => (
           <div
             key={i}
-            className={`w-2 h-2 rounded-full ${
-              i < normalizedProgress ? "bg-green-500" : "bg-gray-300"
-            }`}
+            className={`w-2 h-2 rounded-full ${i < normalizedProgress ? "bg-green-500" : "bg-gray-300"
+              }`}
           />
         ))}
       </div>
@@ -317,6 +323,17 @@ export default function LeadScoring() {
               />
             </div>
           </div>
+          {isFilterApplied && (
+            <div className="flex justify-end pt-2">
+              <Button
+                variant="ghost"
+                onClick={handleClearFilters}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50 border border-red-200"
+              >
+                Clear Filters
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Table */}
@@ -437,7 +454,7 @@ export default function LeadScoring() {
       <SuccessDialog
         open={showSuccess}
         onClose={() => setShowSuccess(false)}
-        title="Lead temperature updated"
+        title="Lead scores updated"
       />
     </div>
   );
