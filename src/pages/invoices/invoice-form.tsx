@@ -718,7 +718,7 @@ export default function InvoiceForm({
       {/* Header */}
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-          Invoice#{invoiceNumber}
+          {isEdit ? `Invoice#${invoiceNumber}` : "New Invoice"}
         </h1>
         <div className="flex items-center gap-3 ml-auto">
           {isEdit && (
@@ -838,6 +838,7 @@ export default function InvoiceForm({
                 </label>
                 <Input
                   id="invoiceNumber"
+                  disabled={!isEdit}
                   {...register("invoiceNumber")}
                   className="bg-white border-gray-200 h-11"
                 />
