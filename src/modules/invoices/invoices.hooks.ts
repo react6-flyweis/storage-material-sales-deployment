@@ -127,6 +127,7 @@ export function useSendInvoiceMutation() {
 
       void queryClient.invalidateQueries({ queryKey: ["invoices"] });
       void queryClient.invalidateQueries({ queryKey: ["invoices", "detail"] });
+      void queryClient.invalidateQueries({ queryKey: ["sales", "leads", "detail"] });
     },
   });
 }
@@ -141,6 +142,7 @@ export function useMarkInvoicePaidMutation() {
 
       void queryClient.invalidateQueries({ queryKey: ["invoices"] });
       void queryClient.invalidateQueries({ queryKey: ["invoices", "detail"] });
+      void queryClient.invalidateQueries({ queryKey: ["sales", "leads", "detail"] });
     },
   });
 }
