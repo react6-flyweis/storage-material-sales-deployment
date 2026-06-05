@@ -19,6 +19,10 @@ import { getApiErrorMessage } from "@/lib/api-error";
 
 const REQUIRED_HEADERS = ["name", "email", "phone", "projectType"] as const;
 
+// Feature flags for development
+const DISABLE_VALIDATION = true; // Set to true to bypass required headers validation and import original structure
+const DISABLE_PREVIEW = true;    // Set to true to disable rendering the preview table in the UI
+
 type ParsedLeadFile = {
   csv: string;
   previewHeaders: string[];
@@ -32,7 +36,11 @@ function normalizeHeader(header: string) {
     .replace(/[^a-z0-9]/g, "");
 }
 
-async function parseLeadFile(file: File): Promise<ParsedLeadFile> {
+async function parseLeadFile(
+  file: File,
+  disableValidation = false,
+  disablePreview = false,
+): Promise<ParsedLeadFile> {
   const arrayBuffer = await file.arrayBuffer();
   const workbook = XLSX.read(arrayBuffer, { type: "array" });
   const firstSheetName = workbook.SheetNames[0];
@@ -42,6 +50,40 @@ async function parseLeadFile(file: File): Promise<ParsedLeadFile> {
   }
 
   const firstSheet = workbook.Sheets[firstSheetName];
+
+  if (disableValidation) {
+    const csv = XLSX.utils.sheet_to_csv(firstSheet, { blankrows: false });
+    if (!csv.trim()) {
+      throw new Error("The selected file is empty.");
+    }
+
+    let previewHeaders: string[] = [];
+    let previewRows: string[][] = [];
+
+    if (!disablePreview) {
+      const rows = XLSX.utils.sheet_to_json<(string | number | boolean | null)[]>(
+        firstSheet,
+        {
+          header: 1,
+          raw: false,
+          defval: "",
+          blankrows: false,
+        },
+      );
+      if (rows.length > 0) {
+        const [headers = [], ...dataRows] = rows;
+        previewHeaders = headers.map(String);
+        previewRows = dataRows.slice(0, 5).map((row) => row.map(String));
+      }
+    }
+
+    return {
+      csv,
+      previewHeaders,
+      previewRows,
+    };
+  }
+
   const rows = XLSX.utils.sheet_to_json<(string | number | boolean | null)[]>(
     firstSheet,
     {
@@ -127,12 +169,12 @@ export default function ImportLeadsDialog() {
     if (!files || files.length === 0) return;
 
     const file = files[0];
+    setSelectedFile(file);
     setErrorMessage(null);
     setIsParsingFile(true);
 
     try {
-      const parsedFile = await parseLeadFile(file);
-      setSelectedFile(file);
+      const parsedFile = await parseLeadFile(file, DISABLE_VALIDATION, DISABLE_PREVIEW);
       setParsedCsv(parsedFile.csv);
       setPreviewHeaders(parsedFile.previewHeaders);
       setPreviewRows(parsedFile.previewRows);
@@ -166,7 +208,7 @@ export default function ImportLeadsDialog() {
     setErrorMessage(null);
 
     try {
-      const csv = parsedCsv || (await parseLeadFile(selectedFile)).csv;
+      const csv = parsedCsv || (await parseLeadFile(selectedFile, DISABLE_VALIDATION, DISABLE_PREVIEW)).csv;
 
       await importLeadsMutation.mutateAsync({ csv });
 
@@ -213,11 +255,10 @@ export default function ImportLeadsDialog() {
             onDrop={onDrop}
             onDragOver={onDragOver}
             onDragLeave={() => setIsDragging(false)}
-            className={`border-2 rounded-lg p-5  flex flex-col items-center justify-center text-center gap-4 cursor-pointer transition-colors ${
-              isDragging
-                ? "border-blue-300 bg-blue-50"
-                : "border-dashed border-gray-300 bg-transparent"
-            }`}
+            className={`border-2 rounded-lg p-5  flex flex-col items-center justify-center text-center gap-4 cursor-pointer transition-colors ${isDragging
+              ? "border-blue-300 bg-blue-50"
+              : "border-dashed border-gray-300 bg-transparent"
+              }`}
             onClick={onChoose}
             role="button"
           >
@@ -319,7 +360,6 @@ export default function ImportLeadsDialog() {
             onClick={handleImport}
             disabled={
               !selectedFile ||
-              !parsedCsv ||
               isParsingFile ||
               importLeadsMutation.isPending
             }
