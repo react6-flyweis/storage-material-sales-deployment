@@ -47,12 +47,13 @@ import {
 } from "@/modules/leads/leads.api";
 import { useLeadsStatsQuery } from "@/lib/metrics";
 import {
+  canCreatePO,
   formatLifecycleStatus,
   getStatusBadgeClassName,
   LEAD_NO_NAME,
   type LeadStatusType,
 } from "@/modules/leads/leads.utils";
-import FilterTabs from "@/components/FilterTabs";
+import FilterTabs, { type Period } from "@/components/FilterTabs";
 import { Input } from "@/components/ui/input";
 
 const PAGE_SIZE = 10;
@@ -82,12 +83,32 @@ const formatFollowUpDate = (value?: string | null) => {
 
 export default function LeadsPage() {
 
+  const [period, setPeriod] = useState<Period>();
   const [startDate, setStartDate] = useState<string | undefined>(undefined);
   const [endDate, setEndDate] = useState<string | undefined>(undefined);
   const [buildingType, setBuildingType] = useState("all");
   const [projectValue, setProjectValue] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+
+  const isFilterApplied =
+    searchQuery !== "" ||
+    buildingType !== "all" ||
+    projectValue !== "all" ||
+    statusFilter !== "all" ||
+    startDate !== undefined ||
+    endDate !== undefined;
+
+  const handleClearFilters = () => {
+    setSearchQuery("");
+    setBuildingType("all");
+    setProjectValue("all");
+    setStatusFilter("all");
+    setPeriod(undefined);
+    setStartDate(undefined);
+    setEndDate(undefined);
+    setCurrentPage(1);
+  };
 
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
 
@@ -178,7 +199,9 @@ export default function LeadsPage() {
   return (
     <div>
       <FilterTabs
-        onPeriodChange={(_, range) => {
+        initialPeriod={period}
+        onPeriodChange={(newPeriod, range) => {
+          setPeriod(newPeriod);
           setStartDate(range.startDate?.toISOString());
           setEndDate(range.endDate?.toISOString());
           setCurrentPage(1);
@@ -304,6 +327,16 @@ export default function LeadsPage() {
               placeholder="All Status"
               allLabel="All Status"
             />
+
+            {isFilterApplied && (
+              <Button
+                variant="ghost"
+                onClick={handleClearFilters}
+                className="w-full sm:w-auto text-red-600 hover:text-red-700 hover:bg-red-50 border border-red-200"
+              >
+                Clear Filters
+              </Button>
+            )}
           </div>
         </div>
 
@@ -445,7 +478,7 @@ export default function LeadsPage() {
                             }
                           /> */}
 
-                          {!lead.isRaisedToPO && (
+                          {!lead.isRaisedToPO && canCreatePO(lead.lifecycleStatus as LeadStatusType) && (
                             <MoveToOrdersDialog
                               leadId={lead._id}
                               trigger={
