@@ -12,7 +12,7 @@ const periodLabels: Record<Exclude<Period, undefined>, string> = {
   quarter: "This Quarter",
 };
 
-const getPeriodLabel = (period: Period) => (period ? periodLabels[period] : "All");
+const getPeriodLabel = (period: Period) => (period ? periodLabels[period] : "All Time");
 
 type Props = {
   initialPeriod?: Period;
@@ -48,19 +48,13 @@ export const getPeriodRange = (period?: Period) => {
 };
 
 export default function FilterTabs({ initialPeriod, onPeriodChange }: Props) {
-  const [period, setPeriod] = useState<Period | null>(initialPeriod || null);
+  const [period, setPeriod] = useState<Period>(initialPeriod);
 
   const handleChange = (p: Period) => {
-    let newPeriod: Period = undefined;
-
-    if (period !== p) {
-      newPeriod = p;
-    }
-
-    setPeriod(newPeriod);
+    setPeriod(p);
     if (onPeriodChange) {
-      onPeriodChange(newPeriod || undefined, {
-        ...getPeriodRange(newPeriod),
+      onPeriodChange(p, {
+        ...getPeriodRange(p),
       });
     }
   };
@@ -84,7 +78,7 @@ export default function FilterTabs({ initialPeriod, onPeriodChange }: Props) {
     <div className="relative flex h-10 bg-[#89D5DC] overflow-hidden">
       <button
         onClick={() => handleChange("week")}
-        className={`relative w-64 px-8 font-medium z-30 bg-[#89D5DC] ${period === "week"
+        className={`relative w-64 px-8 font-medium z-40 bg-[#89D5DC] ${period === "week"
           ? "ring-2 ring-white/40 text-black"
           : "text-white opacity-60"
           }`}
@@ -95,9 +89,11 @@ export default function FilterTabs({ initialPeriod, onPeriodChange }: Props) {
         Today
       </button>
 
-      {button("month", "bg-[#6B93CE]", "z-20")}
+      {button("month", "bg-[#6B93CE]", "z-30")}
 
-      {button("quarter", "bg-[#4A72B7]", "z-10")}
+      {button("quarter", "bg-[#4A72B7]", "z-20")}
+
+      {button(undefined, "bg-[#3B5E9E]", "z-10")}
     </div>
   );
 }
