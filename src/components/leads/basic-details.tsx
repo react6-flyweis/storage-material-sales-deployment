@@ -112,6 +112,19 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
     : "No signed agreement uploaded";
   const activeStatus =
     selectedStatus ?? leadData?.lifecycleStatus ?? "initial_contact";
+  const currentStepId = getLeadLifecycleStepId(activeStatus);
+  const allowedManualStatuses = [
+    "proposal_sent",
+    "negotiation",
+    "deal_closed",
+    "payment_done",
+    ...(currentStepId < 2 ? ["requirements_gathered"] : []),
+  ];
+  const hasSelectableNextStep = LEAD_LIFECYCLE_STEPS.some(
+    (step) =>
+      allowedManualStatuses.includes(step.value) &&
+      step.id > currentStepId
+  );
   const signedAgreementDate = nextFollowUp?.followUpDate
     ? `Next follow-up: ${formatLeadDate(nextFollowUp.followUpDate)}`
     : "No follow-up scheduled";
@@ -444,7 +457,9 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
               className="bg-[#1D51A4] hover:bg-[#1D51A4]/90 text-white rounded-[6px]"
               onClick={handleOpenStatusDialog}
               disabled={
-                updateLifecycleStatusMutation.isPending || !leadData?._id
+                updateLifecycleStatusMutation.isPending ||
+                !leadData?._id ||
+                !hasSelectableNextStep
               }
             >
               Update Step Status
@@ -459,6 +474,7 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
           </div>
 
           <UpdateStatusDialog
+            key={statusDialogOpen ? `open-${activeStatus}` : "closed"}
             open={statusDialogOpen}
             currentStatus={activeStatus}
             steps={LEAD_LIFECYCLE_STEPS}

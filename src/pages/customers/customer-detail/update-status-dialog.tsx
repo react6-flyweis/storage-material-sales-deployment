@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -40,18 +40,22 @@ export default function UpdateStatusDialog({
   onOpenChange,
   onSave,
 }: UpdateStatusDialogProps) {
-  const [draftStatus, setDraftStatus] = useState(currentStatus);
-
-  useEffect(() => {
-    if (open) {
-      setDraftStatus(currentStatus);
-    }
-  }, [open, currentStatus]);
+  const [draftStatus, setDraftStatus] = useState("");
 
   const currentStep = steps.find((step) => step.value === currentStatus);
+  const currentStepId = currentStep ? currentStep.id : 0;
+
+  const allowedManualStatuses = [
+    "proposal_sent",
+    "negotiation",
+    "deal_closed",
+    "payment_done",
+    ...(currentStepId < 2 ? ["requirements_gathered"] : []),
+  ];
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!draftStatus) return;
 
     await Promise.resolve(onSave(draftStatus));
     onOpenChange(false);
@@ -69,24 +73,25 @@ export default function UpdateStatusDialog({
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="status-step">Select Current Status</Label>
+              <Label htmlFor="status-step">Select Next Status</Label>
               <Select
                 value={draftStatus}
                 onValueChange={(value) => setDraftStatus(value)}
               >
                 <SelectTrigger id="status-step" className="w-full">
-                  <SelectValue
-                    placeholder={formatLabel(
-                      currentStep?.label ?? "Initial contact",
-                    )}
-                  />
+                  <SelectValue placeholder="Select next status..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {steps.map((step) => (
-                    <SelectItem key={step.id} value={step.value}>
-                      {formatLabel(step.label)}
-                    </SelectItem>
-                  ))}
+                  {steps.map((step) => {
+                    const isAllowedManual = allowedManualStatuses.includes(step.value);
+                    const isForward = step.id > currentStepId;
+                    const isSelectable = isAllowedManual && isForward;
+                    return (
+                      <SelectItem key={step.id} value={step.value} disabled={!isSelectable}>
+                        {formatLabel(step.label)}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -98,7 +103,7 @@ export default function UpdateStatusDialog({
                 Cancel
               </Button>
             </DialogClose>
-            <Button type="submit" size="lg">
+            <Button type="submit" size="lg" disabled={!draftStatus}>
               Submit
             </Button>
           </DialogFooter>
