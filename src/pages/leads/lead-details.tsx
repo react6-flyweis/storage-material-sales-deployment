@@ -11,6 +11,7 @@ import PaymentsCard from "@/components/leads/payments-card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLeadDetailQuery } from "@/modules/leads/leads.hooks";
+import { canCreatePO, type LeadStatusType } from "@/modules/leads/leads.utils";
 
 const TABS = [
   { value: "basic-info", label: "Basic info" },
@@ -91,7 +92,9 @@ export default function LeadDetails() {
   const { data: response, isLoading } = useLeadDetailQuery(leadId);
 
   const detail = response?.success ? response.data : undefined;
-  const canMoveToOrders = !detail?.lead.isRaisedToPO;
+  const canMoveToOrders =
+    !detail?.lead.isRaisedToPO &&
+    canCreatePO(detail?.lead.lifecycleStatus as LeadStatusType);
   const searchParams = new URLSearchParams(location.search);
   const activeTabFromSearch = searchParams.get("tab") as LeadTab | null;
   const activeTab: LeadTab =
@@ -217,6 +220,7 @@ export default function LeadDetails() {
             <TabsContent value="payments" className="mt-6">
               <PaymentsCard
                 leadId={detail?.lead.jobId}
+                leadDbId={detail?.lead._id}
                 paymentsData={detail?.payments}
               />
             </TabsContent>
