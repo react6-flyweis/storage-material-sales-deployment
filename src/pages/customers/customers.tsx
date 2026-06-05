@@ -56,6 +56,14 @@ export default function CustomersPage() {
   const [page] = useState(1);
   const [limit] = useState(20);
 
+  const isFilterApplied = searchQuery !== "" || statusFilter !== "all" || period !== undefined;
+
+  const handleClearFilters = () => {
+    setSearchQuery("");
+    setStatusFilter("all");
+    setPeriod(undefined);
+  };
+
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(searchQuery);
@@ -160,30 +168,43 @@ export default function CustomersPage() {
         </div>
 
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <InputGroup className="bg-white max-w-xs">
-            <InputGroupAddon>
-              <Search className="size-4" />
-            </InputGroupAddon>
-            <InputGroupInput
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search customer, ID"
-            />
-          </InputGroup>
+          <div className="flex justify-between gap-4 items-center flex-1">
+            <InputGroup className="bg-white max-w-xs">
+              <InputGroupAddon>
+                <Search className="size-4" />
+              </InputGroupAddon>
+              <InputGroupInput
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search customer, ID"
+              />
+            </InputGroup>
 
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full bg-white lg:w-48">
-              <SelectValue placeholder="All Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="in transaction">In Transaction</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-            </SelectContent>
-          </Select>
+            <div className="flex gap-4">
+
+
+              {isFilterApplied && (
+                <Button
+                  variant="ghost"
+                  onClick={handleClearFilters}
+                  className="w-full lg:w-auto text-red-600 hover:text-red-700 hover:bg-red-50 border border-red-200"
+                >
+                  Clear Filters
+                </Button>
+              )}
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full bg-white lg:w-48">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+
+            </div>
+          </div>
         </div>
 
         <div className="overflow-hidden rounded bg-white">
