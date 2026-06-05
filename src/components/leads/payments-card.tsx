@@ -9,19 +9,25 @@ import {
   formatLeadDate,
   formatLeadDateTime,
 } from "@/modules/leads/leads.utils";
-import { useSendInvoiceMutation } from "@/modules/invoices/invoices.hooks";
+import { useSendInvoiceMutation, useInvoicesQuery } from "@/modules/invoices/invoices.hooks";
 
 type Props = {
   leadId?: string;
+  leadDbId?: string;
   paymentsData?: LeadDetailPayments;
 };
 
-export default function PaymentsCard({ leadId, paymentsData }: Props) {
+export default function PaymentsCard({ leadId, leadDbId, paymentsData }: Props) {
   const [showSuccess, setShowSuccess] = useState(false);
   const [sendFailedInvoiceId, setSendFailedInvoiceId] = useState<string | null>(
     null,
   );
   const sendInvoiceMutation = useSendInvoiceMutation();
+
+  const { data: invoicesResponse } = useInvoicesQuery({
+    leadId: leadDbId,
+    limit: 100,
+  });
 
   const handleSendEmail = async (invoiceId: string) => {
     if (sendInvoiceMutation.isPending) {
@@ -45,16 +51,38 @@ export default function PaymentsCard({ leadId, paymentsData }: Props) {
     }
   };
 
-  const total = paymentsData
-    ? formatLeadCurrency(paymentsData.totalPaid + paymentsData.totalPending)
-    : formatLeadCurrency(0);
-  const paid = paymentsData
-    ? formatLeadCurrency(paymentsData.totalPaid)
-    : formatLeadCurrency(0);
-  const outstanding = paymentsData
-    ? formatLeadCurrency(paymentsData.totalPending)
-    : formatLeadCurrency(0);
-  const invoices = paymentsData?.invoices ?? [];
+  const invoices = invoicesResponse?.data
+    ? invoicesResponse.data.invoices.map((item) => ({
+        _id: item.invoice?._id ?? "",
+        invoiceNumber: item.invoiceNumber ?? item.invoice?.invoiceNumber ?? "",
+        date: item.invoice?.date ?? item.invoice?.createdAt ?? undefined,
+        createdAt: item.invoice?.createdAt ?? "",
+        totalAmount: item.amount ?? item.invoice?.totalAmount ?? 0,
+        status: item.status ?? item.invoice?.status ?? "",
+        sentAt: (item.invoice as { sentAt?: string | null })?.sentAt ?? null,
+        paidAt: (item.invoice as { paidAt?: string | null })?.paidAt ?? null,
+      }))
+    : (paymentsData?.invoices ?? []);
+
+  const summarySource = invoicesResponse?.data
+    ? {
+        totalPaid: invoices
+          .filter((inv) => inv.status === "paid")
+          .reduce((sum, inv) => sum + inv.totalAmount, 0),
+        totalPending: invoices
+          .filter((inv) => inv.status !== "paid" && inv.status !== "cancelled")
+          .reduce((sum, inv) => sum + inv.totalAmount, 0),
+      }
+    : {
+        totalPaid: paymentsData?.totalPaid ?? 0,
+        totalPending: paymentsData?.totalPending ?? 0,
+      };
+
+  const total = formatLeadCurrency(
+    summarySource.totalPaid + summarySource.totalPending,
+  );
+  const paid = formatLeadCurrency(summarySource.totalPaid);
+  const outstanding = formatLeadCurrency(summarySource.totalPending);
 
   return (
     <>
