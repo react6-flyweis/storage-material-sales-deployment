@@ -22,7 +22,7 @@ import {
   getLeadProgress,
   type LeadStatusType,
 } from "@/modules/leads/leads.utils";
-import { ArrowUpDown, Filter, Search } from "lucide-react";
+import { ArrowUpDown, Search } from "lucide-react";
 import { useNavigate } from "react-router";
 import { getLeadLifecycleBadgeClassName } from "@/modules/leads/lifecycle-statuses";
 
@@ -139,10 +139,23 @@ export default function ProjectsTable({ customerId }: Props) {
             placeholder="Search"
           />
         </InputGroup>
-        <Button type="button" variant="outline">
+        {/* <Button type="button" variant="outline">
           <Filter className="h-4 w-4" />
           Filter
-        </Button>
+        </Button> */}
+        {searchTerm !== "" && (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              setSearchTerm("");
+              setCurrentPage(1);
+            }}
+            className="text-red-600 hover:text-red-700 hover:bg-red-50 border border-red-200"
+          >
+            Clear Filter
+          </Button>
+        )}
       </div>
 
       <Card className="overflow-hidden p-0">

@@ -243,13 +243,22 @@ export default function FollowUpsCard({
             </div>
 
             <div className="flex items-center gap-4">
-              <div className="relative">
+              <div className="relative flex items-center gap-2">
                 <input
                   placeholder="Search by Lead, Client or Project"
                   className="h-9 w-80 rounded-md border px-3 text-sm placeholder-gray-400"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
+                {searchQuery !== "" && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => setSearchQuery("")}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 border border-red-200 h-9"
+                  >
+                    Clear Filter
+                  </Button>
+                )}
               </div>
               <Button variant="ghost">Export</Button>
             </div>
