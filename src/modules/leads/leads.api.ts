@@ -47,25 +47,24 @@ export type LeadsListResponse = {
 };
 
 export type ScoredLeadItem = {
-  _id: string;
+  leadId: string;
+  jobId: string;
+  projectId: string;
+  customerName: string;
   projectName?: string;
-  jobId: string,
-  customerId: {
-    _id: string;
-    firstName: string;
-  };
+  location: string;
   lifecycleStatus: string;
+  lifecycleHistory?: Array<{
+    stage: string;
+    changedAt: string;
+    changedBy: string | null;
+    _id: string;
+  }>;
+  status: string;
+  score: number;
   quoteValue: number;
-  leadScoring: {
-    score?: number;
-    temperature?: "hot" | "warm" | "cold";
-    temperatureManual?: boolean;
-    projectSize: { points: number; reason: string };
-    budgetSignals: { points: number; reason: string };
-    timeline: { points: number; reason: string };
-    decisionMaker: { points: number; reason: string };
-    projectClarity: { points: number; reason: string };
-  };
+  temperature: "hot" | "warm" | "cold";
+  updatedAt: string;
 };
 
 export type ScoredLeadsResponse = {
@@ -114,12 +113,18 @@ export async function importLeadsProvider(payload: ImportLeadsPayload) {
   return response.data;
 }
 
-export async function getScoredLeadsProvider(page: number, limit: number) {
+export async function getScoredLeadsProvider(page: number, limit: number, startDate?: string, endDate?: string) {
+  const params: { page: number; limit: number; startDate?: string; endDate?: string } = { page, limit };
+  if (startDate) {
+    params.startDate = startDate;
+  }
+  if (endDate) {
+    params.endDate = endDate;
+  }
+
   const response = await apiClient.get<ScoredLeadsResponse>(
-    "/api/sales/leads/scored",
-    {
-      params: { page, limit },
-    },
+    "/api/sales/leads/by-score",
+    { params },
   );
 
   return response.data;

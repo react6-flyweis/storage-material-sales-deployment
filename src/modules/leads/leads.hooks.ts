@@ -99,10 +99,10 @@ export function useLeadDetailQuery(leadId: string | undefined, enabled = true) {
   });
 }
 
-export function useScoredLeadsQuery(page: number, limit: number) {
+export function useScoredLeadsQuery(page: number, limit: number, startDate?: string, endDate?: string) {
   return useQuery({
-    queryKey: ["sales", "leads", "scored", page, limit],
-    queryFn: () => getScoredLeadsProvider(page, limit),
+    queryKey: ["sales", "leads", "scored", page, limit, startDate, endDate],
+    queryFn: () => getScoredLeadsProvider(page, limit, startDate, endDate),
     staleTime: 60 * 1000,
   });
 }
