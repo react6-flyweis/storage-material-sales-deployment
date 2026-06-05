@@ -253,3 +253,56 @@ export function usePerformanceTrendQuery(tab: string, range: string) {
     placeholderData: keepPreviousData,
   });
 }
+
+export type DashboardTodayTaskLead = {
+  _id: string;
+  projectName?: string;
+};
+
+export type DashboardTodayTaskCustomer = {
+  _id: string;
+  firstName?: string;
+};
+
+export type DashboardTodayTaskFollowUp = {
+  _id: string;
+  leadId?: DashboardTodayTaskLead;
+  customerId?: DashboardTodayTaskCustomer;
+  followUpDate: string;
+  notes?: string;
+  priority: "low" | "medium" | "high";
+  modeOfContact?: string;
+};
+
+export type DashboardTodayTasksResponse = {
+  success: boolean;
+  message: string;
+  data: {
+    followUpsToday: DashboardTodayTaskFollowUp[];
+    newLeadsToday: unknown[];
+    pendingEscalations: unknown[];
+    summary: {
+      totalTasks: number;
+      followUpsCount: number;
+      newLeadsCount: number;
+      escalationsCount: number;
+    };
+  };
+};
+
+export async function getDashboardTodayTasks(): Promise<DashboardTodayTasksResponse["data"]> {
+  const response = await apiClient.get<DashboardTodayTasksResponse>(
+    "/api/sales/dashboard/today-tasks",
+  );
+  return response.data.data;
+}
+
+export function useDashboardTodayTasksQuery() {
+  return useQuery({
+    queryKey: ["sales", "dashboard", "today-tasks"],
+    queryFn: getDashboardTodayTasks,
+    staleTime: 60 * 1000,
+    placeholderData: keepPreviousData,
+  });
+}
+
