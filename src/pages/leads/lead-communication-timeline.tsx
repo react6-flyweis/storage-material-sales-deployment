@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { Loader2, Mail, User } from "lucide-react";
+import { ArrowLeft, Loader2, Mail, User } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -152,7 +152,11 @@ export default function LeadCommunicationTimeline() {
   return (
     <div className="w-full">
       {/* Header */}
-      <div className="bg-[#4ECDC4] text-white px-6 py-3 flex items-center justify-between gap-4">
+      <div className="bg-[#4ECDC4] text-white px-6 py-3 flex items-center gap-4">
+        <Button onClick={() => navigate(-1)}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
         <h2 className="text-lg font-semibold">Lead Communication Timeline</h2>
         {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
       </div>
@@ -264,7 +268,7 @@ export default function LeadCommunicationTimeline() {
               <Card
                 key={item.id}
                 className="py-0 rounded-md ring-0 border-none cursor-pointer hover:shadow-lg transition-shadow"
-                onClick={() => navigate(`/leads/${item.leadId}/timeline`)}
+              // onClick={() => navigate(`/leads/${item.leadId}/timeline`)}
               >
                 <CardContent className="p-4">
                   {/* Client Name */}

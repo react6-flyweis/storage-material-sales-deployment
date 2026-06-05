@@ -4,7 +4,7 @@ import {
   CardHeader,
   CardTitle,
   CardContent,
-  CardFooter,
+  // CardFooter,
   CardDescription,
 } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -14,10 +14,10 @@ import {
   Mail,
   Phone,
   type LucideIcon,
-  ArrowRight,
+  // ArrowRight,
 } from "lucide-react";
 import { useCommunicationTimelineQuery } from "@/modules/followups/followups.hooks";
-import { Link } from "react-router";
+// import { Link } from "react-router";
 import { LEAD_NO_NAME } from "@/modules/leads/leads.utils";
 
 type TimelineItem = {
@@ -171,14 +171,14 @@ export default function LeadCommunicationTimeline() {
         )}
       </CardContent>
 
-      <CardFooter className="justify-center">
+      {/* <CardFooter className="justify-center">
         <Link to="/leads/follow-up/communication-timeline">
           <Button variant="link">
             View Full Timeline
             <ArrowRight />
           </Button>
         </Link>
-      </CardFooter>
+      </CardFooter> */}
     </Card>
   );
 }
