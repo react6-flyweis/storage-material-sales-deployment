@@ -59,6 +59,11 @@ const CustomerCommunication = lazy(
 );
 const ContractDetail = lazy(() => import("@/pages/customers/contract-detail"));
 
+const Meetings = lazy(() => import("@/pages/meetings/meetings"));
+const ScheduleMeeting = lazy(
+  () => import("@/pages/meetings/schedule-meeting"),
+);
+
 // leads section
 const Leads = lazy(() => import("@/pages/leads/leads"));
 const AddNewLead = lazy(() => import("@/pages/leads/add-new-lead"));
@@ -157,6 +162,18 @@ export const salesRoutes: RouteObject[] = [
                 ],
               },
               { path: ":id/projects/new", element: <AddNewProjectPage /> },
+            ],
+          },
+
+          {
+            path: "meetings",
+            children: [
+              { index: true, element: <Meetings /> },
+              { path: "schedule", element: <ScheduleMeeting /> },
+              {
+                path: "reschedule/:id",
+                element: <ScheduleMeeting />,
+              },
             ],
           },
 

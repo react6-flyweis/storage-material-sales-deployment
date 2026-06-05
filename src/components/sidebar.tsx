@@ -17,6 +17,9 @@ import leadsIcon from "@/assets/icons/sidebar/leads.svg";
 import notificationIcon from "@/assets/icons/sidebar/notifications.svg";
 import invoices from "@/assets/icons/sidebar/invoices.svg";
 
+import meetingsIcon from "@/assets/icons/sidebar/meetings.svg";
+
+
 // import deliveryIcon from "@/assets/icons/sidebar/delivery.svg";
 // import freightIcon from "@/assets/icons/sidebar/freights.svg";
 // import salesIcon from "@/assets/icons/sidebar/sales.svg";
@@ -99,7 +102,9 @@ const navigationGroups: NavigationGroup[] = [
     label: "Customer",
     color: "bg-[#EAB308]",
     link: "/customers",
-    items: [],
+    items: [
+      { path: "/meetings", label: "Meetings", icon: meetingsIcon },
+    ],
   },
   {
     id: "links" as NavGroup,
@@ -382,7 +387,7 @@ export function Sidebar({
   // Determine final padding: use calculated padding if content fits, otherwise use 5
   const menuPaddingTop =
     activeGroupItemsHeight + calculatedPadding + topSectionHeight + 20 <
-    window.innerHeight
+      window.innerHeight
       ? calculatedPadding
       : 10;
 
@@ -416,9 +421,8 @@ export function Sidebar({
       )}
 
       <div
-        className={`flex fixed inset-y-0 left-0 lg:left-0 lg:top-0 z-50 transition-transform duration-300 lg:translate-x-0 h-screen ${
-          isOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`flex fixed inset-y-0 left-0 lg:left-0 lg:top-0 z-50 transition-transform duration-300 lg:translate-x-0 h-screen ${isOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
         {/* Icon Sidebar */}
         <aside
@@ -454,9 +458,8 @@ export function Sidebar({
                       />
                     )}
                     <div
-                      className={`z-50 relative size-10 flex items-center justify-center rounded-full ${
-                        group.color
-                      } ${isActive ? "" : ""} group-hover:scale-105`}
+                      className={`z-50 relative size-10 flex items-center justify-center rounded-full ${group.color
+                        } ${isActive ? "" : ""} group-hover:scale-105`}
                     >
                       <img
                         src={iconSrc}
