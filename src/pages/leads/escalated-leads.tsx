@@ -143,9 +143,6 @@ export default function EscalatedLeadsPage() {
                   Lead Info
                 </TableHead>
                 <TableHead className="text-[11px] uppercase tracking-wide text-slate-500 px-3">
-                  Assigned To
-                </TableHead>
-                <TableHead className="text-[11px] uppercase tracking-wide text-slate-500 px-3">
                   Status
                 </TableHead>
                 <TableHead className="text-[11px] uppercase tracking-wide text-slate-500 px-3">
@@ -173,14 +170,14 @@ export default function EscalatedLeadsPage() {
                     <TableCell className="px-4">
                       <div className="h-3.5 w-3.5 rounded border border-slate-200 bg-slate-100 animate-pulse" />
                     </TableCell>
-                    <TableCell className="px-3 py-4" colSpan={7}>
+                    <TableCell className="px-3 py-4" colSpan={6}>
                       <div className="h-4 rounded bg-slate-100 animate-pulse" />
                     </TableCell>
                   </TableRow>
                 ))
               ) : escalatedLeads.length === 0 ? (
                 <TableRow className="border-slate-100">
-                  <TableCell colSpan={8} className="px-6 py-10 text-center">
+                  <TableCell colSpan={7} className="px-6 py-10 text-center">
                     <p className="text-sm text-slate-600">
                       No escalated leads found.
                     </p>
@@ -206,7 +203,7 @@ export default function EscalatedLeadsPage() {
                           type="checkbox"
                           checked={selected}
                           onChange={(event) =>
-                            handleToggleLead(leadId, event.target.checked)
+                              handleToggleLead(leadId, event.target.checked)
                           }
                         />
                       </TableCell>
@@ -222,8 +219,6 @@ export default function EscalatedLeadsPage() {
                           </p>
                         </div>
                       </TableCell>
-
-                      <TableCell className="px-3 py-3" />
 
                       <TableCell className="px-3 py-3">
                         <Badge
