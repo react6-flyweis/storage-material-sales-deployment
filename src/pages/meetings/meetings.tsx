@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { getApiErrorMessage } from "@/lib/api-error";
+// import { getApiErrorMessage } from "@/lib/api-error";
 import { useMeetingsQuery } from "@/modules/meetings/meetings.hooks";
 import type { Meeting as ApiMeeting } from "@/modules/meetings/meetings.api";
 import {
@@ -81,9 +81,8 @@ export default function Meetings() {
   const {
     data: meetingsResponse,
     isLoading,
-    isError,
-    error,
-    refetch,
+    // error,
+    // refetch,
   } = useMeetingsQuery();
 
   const meetings = useMemo(() => {
@@ -174,7 +173,7 @@ export default function Meetings() {
         </Button>
       </div>
 
-      {isError ? (
+      {/* {isError ? (
         <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3">
           <p className="text-sm text-red-700">
             {getApiErrorMessage(error, "Unable to load meetings.")}
@@ -183,7 +182,7 @@ export default function Meetings() {
             Try again
           </Button>
         </div>
-      ) : null}
+      ) : null} */}
 
       {/* Meetings Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -263,7 +262,8 @@ export default function Meetings() {
       </div>
 
       {/* Empty State */}
-      {!isLoading && !isError && filteredMeetings.length === 0 && (
+      {/* {!isLoading && !isError && filteredMeetings.length === 0 && ( */}
+      {!isLoading && filteredMeetings.length === 0 && (
         <div className="text-center py-12">
           <p className="text-gray-500">No meetings found</p>
         </div>
