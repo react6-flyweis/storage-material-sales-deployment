@@ -15,10 +15,10 @@ import {
   type InvoiceListParams,
 } from "./invoices.api";
 
-export function useInvoiceStatsQuery() {
+export function useInvoiceStatsQuery(params?: { leadId?: string }) {
   return useQuery({
-    queryKey: ["invoices", "stats"],
-    queryFn: getInvoiceStatsProvider,
+    queryKey: ["invoices", "stats", params?.leadId],
+    queryFn: () => getInvoiceStatsProvider(params),
     staleTime: 60 * 1000,
   });
 }

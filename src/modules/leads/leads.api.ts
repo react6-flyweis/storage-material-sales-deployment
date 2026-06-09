@@ -259,7 +259,13 @@ export type LeadDetailLead = {
   buildingType: string;
   location: string;
   source: string;
-  assignedSales?: string | null;
+  assignedSales?: {
+    _id: string;
+    email: string;
+    phone: string;
+    role: string;
+    assignedAt: string;
+  } | null;
   quoteValue: number;
   lifecycleStatus: string;
   isQuoteReady?: boolean;
@@ -415,6 +421,7 @@ export type LeadDetailFollowUp = {
   priority?: string;
   status?: string;
   type?: string;
+  modeOfContact?: string;
   createdAt?: string;
 };
 

@@ -148,11 +148,11 @@ const navigationGroups: NavigationGroup[] = [
             label: "Lead Scoring",
             icon: leadScoringIcon,
           },
-          {
-            path: "/leads/payment-follow-up",
-            label: "Payment Follow-Up",
-            icon: leadScoringIcon,
-          },
+          // {
+          //   path: "/leads/payment-follow-up",
+          //   label: "Payment Follow-Up",
+          //   icon: leadScoringIcon,
+          // },
           // {
           //   path: "/leads/follow-up/kpis",
           //   label: "Follow-Up KPIs",
