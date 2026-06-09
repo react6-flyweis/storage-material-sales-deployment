@@ -19,8 +19,11 @@ import {
   PlusIcon,
   ChevronLeft,
   ChevronRight,
+  Check,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { useCompleteFollowUpMutation } from "@/modules/followups/followups.hooks";
+import SuccessDialog from "@/components/success-dialog";
 import { useParams, Link } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import AddFollowUpDialog from "@/components/follow-up/add-follow-up-dialog";
@@ -37,6 +40,9 @@ type FollowUp = {
   note: string;
   timeAgo: string;
   icon: "camera" | "mail" | "phone" | "doc";
+  followUpDate?: string;
+  status?: string;
+  modeOfContact?: string;
 };
 
 type Meeting = {
@@ -65,13 +71,24 @@ function mapLeadFollowUpsToDisplay(items?: LeadDetailFollowUp[]): FollowUp[] {
     }).format(d);
   };
 
-  return items.map((f) => ({
-    id: f._id,
-    name: f.type ?? "Follow Up",
-    note: f.notes ?? "",
-    timeAgo: formatFollowUpDate(f.followUpDate ?? f.createdAt ?? ""),
-    icon: "mail",
-  }));
+  return items.map((f) => {
+    const contactMode = f.modeOfContact || f.type || "email";
+    let icon: "phone" | "mail" | "camera" | "doc" = "mail";
+    if (contactMode === "call") icon = "phone";
+    else if (contactMode === "email") icon = "mail";
+    else if (contactMode === "meeting") icon = "camera";
+
+    return {
+      id: f._id,
+      name: contactMode.charAt(0).toUpperCase() + contactMode.slice(1),
+      note: f.notes ?? "",
+      timeAgo: formatFollowUpDate(f.followUpDate ?? f.createdAt ?? ""),
+      icon,
+      followUpDate: f.followUpDate,
+      status: f.status,
+      modeOfContact: contactMode,
+    };
+  });
 }
 
 const meetings: Meeting[] = [];
@@ -103,6 +120,21 @@ export default function FollowUpsCard({
   const [initialDate] = useState<string | null>(null);
   const { leadId } = useParams<{ leadId?: string }>();
   const queryClient = useQueryClient();
+
+  const completeFollowUp = useCompleteFollowUpMutation();
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  useEffect(() => {
+    if (completeFollowUp.isSuccess) {
+      setShowSuccess(true);
+      if (leadId) {
+        void queryClient.invalidateQueries({
+          queryKey: ["sales", "leads", "detail", leadId],
+        });
+      }
+      completeFollowUp.reset();
+    }
+  }, [completeFollowUp, completeFollowUp.isSuccess, leadId, queryClient]);
 
   const activityEntries = useMemo(() => {
     const entries = [...auditLog].sort(
@@ -160,26 +192,57 @@ export default function FollowUpsCard({
                   );
                 }
 
-                return displayedFollowUps.map((f) => (
-                  <div
-                    key={f.id}
-                    className="flex items-center gap-4 bg-gray-100 p-4 rounded-md"
-                  >
-                    <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center text-sm text-gray-700">
-                      {f.icon === "camera" && <Calendar className="h-4 w-4" />}
-                      {f.icon === "mail" && <Mail className="h-4 w-4" />}
-                      {f.icon === "phone" && <Phone className="h-4 w-4" />}
-                      {f.icon === "doc" && <Clock className="h-4 w-4" />}
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-medium text-sm text-gray-900">
-                        {f.name}
+                return displayedFollowUps.map((f) => {
+                  const isOverdue =
+                    f.status !== "completed" &&
+                    f.followUpDate &&
+                    new Date(f.followUpDate) < new Date();
+
+                  return (
+                    <div
+                      key={f.id}
+                      className="flex items-center gap-4 bg-gray-100 p-4 rounded-md"
+                    >
+                      <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center text-sm text-gray-700">
+                        {f.icon === "camera" && <Calendar className="h-4 w-4" />}
+                        {f.icon === "mail" && <Mail className="h-4 w-4" />}
+                        {f.icon === "phone" && <Phone className="h-4 w-4" />}
+                        {f.icon === "doc" && <Clock className="h-4 w-4" />}
                       </div>
-                      <div className="text-xs text-gray-500">{f.note}</div>
+                      <div className="flex-1">
+                        <div className="font-medium text-sm text-gray-900 flex items-center gap-2">
+                          {f.name}
+                          {f.status === "completed" && (
+                            <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-normal">
+                              Completed
+                            </span>
+                          )}
+                          {isOverdue && (
+                            <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-normal">
+                              Overdue
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500">{f.note}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-xs text-gray-400">{f.timeAgo}</div>
+                        {isOverdue && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                            onClick={() => completeFollowUp.mutate(String(f.id))}
+                            disabled={completeFollowUp.isPending}
+                            title="Mark as Done"
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-400">{f.timeAgo}</div>
-                  </div>
-                ));
+                  );
+                });
               })()}
             </CardContent>
           </Card>
@@ -416,6 +479,12 @@ export default function FollowUpsCard({
             });
           }
         }}
+      />
+      <SuccessDialog
+        open={showSuccess}
+        onClose={() => setShowSuccess(false)}
+        title="Follow-up marked completed"
+        okLabel="Great"
       />
     </>
   );
