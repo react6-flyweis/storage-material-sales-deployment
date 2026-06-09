@@ -36,7 +36,7 @@ import {
   useInvoiceStatsQuery,
   useInvoicesQuery,
 } from "@/modules/invoices/invoices.hooks";
-import { InvoiceStatus } from "@/modules/invoices/invoices.api";
+import { InvoiceStatus, exportInvoicesProvider } from "@/modules/invoices/invoices.api";
 import type { DateRange } from "react-day-picker";
 
 type SelectedClient = {
@@ -156,6 +156,8 @@ export default function InvoiceListPage() {
     "All",
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const { data: stats, isPending } = useInvoiceStatsQuery();
   const loadingStats = isPending && !stats;
 
@@ -166,6 +168,50 @@ export default function InvoiceListPage() {
 
   const startDate = dateRange?.from ? formatDateParam(dateRange.from) : "";
   const endDate = dateRange?.to ? formatDateParam(dateRange.to) : "";
+
+  const handleExport = async (format: "pdf" | "excel", isPrint = false) => {
+    setIsExporting(true);
+    setExportError(null);
+    try {
+      const blob = await exportInvoicesProvider({
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        status: statusFilter === "All" ? undefined : statusFilter,
+        leadId: selectedClient?.id || undefined,
+        search: searchQuery.trim() || undefined,
+        format,
+      });
+
+      const url = window.URL.createObjectURL(blob);
+
+      if (isPrint) {
+        const printWindow = window.open(url, "_blank");
+        if (printWindow) {
+          printWindow.focus();
+        } else {
+          setExportError("Could not open print window. Please allow popups.");
+        }
+      } else {
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute(
+          "download",
+          `invoices-${new Date().toISOString().slice(0, 10)}.${format === "excel" ? "xlsx" : "pdf"}`,
+        );
+        document.body.appendChild(link);
+        link.click();
+        link.parentNode?.removeChild(link);
+      }
+
+      // Revoke the Object URL
+      setTimeout(() => window.URL.revokeObjectURL(url), 100);
+    } catch (error) {
+      console.error("Export failed:", error);
+      setExportError("Export failed. Please try again.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const {
     data: invoicesResponse,
@@ -364,21 +410,39 @@ export default function InvoiceListPage() {
           <div className="p-4 flex items-center justify-between">
             <h3 className="text-lg font-medium">Invoice List</h3>
             <div className="bg-white rounded-md px-2 py-1 flex items-center gap-2 ">
+              {isExporting ? (
+                <span className="text-xs text-slate-500 animate-pulse mr-2">Exporting...</span>
+              ) : null}
+              {exportError ? (
+                <span className="text-xs text-red-500 mr-2">{exportError}</span>
+              ) : null}
               <button
                 title="Export PDF"
-                className="w-9 h-9 rounded bg-white flex items-center justify-center text-red-600 border"
+                disabled={isExporting}
+                onClick={() => handleExport("pdf")}
+                className={`w-9 h-9 rounded bg-white flex items-center justify-center text-red-600 border ${
+                  isExporting ? "opacity-50 cursor-not-allowed" : "hover:bg-slate-50 cursor-pointer"
+                }`}
               >
                 <FileText className="size-4" />
               </button>
               <button
                 title="Export Excel"
-                className="w-9 h-9 rounded bg-white flex items-center justify-center text-green-600 border"
+                disabled={isExporting}
+                onClick={() => handleExport("excel")}
+                className={`w-9 h-9 rounded bg-white flex items-center justify-center text-green-600 border ${
+                  isExporting ? "opacity-50 cursor-not-allowed" : "hover:bg-slate-50 cursor-pointer"
+                }`}
               >
                 <Download className="size-4" />
               </button>
               <button
                 title="Print"
-                className="w-9 h-9 rounded bg-white flex items-center justify-center text-gray-600 border"
+                disabled={isExporting}
+                onClick={() => handleExport("pdf", true)}
+                className={`w-9 h-9 rounded bg-white flex items-center justify-center text-gray-600 border ${
+                  isExporting ? "opacity-50 cursor-not-allowed" : "hover:bg-slate-50 cursor-pointer"
+                }`}
               >
                 <Printer className="size-4" />
               </button>

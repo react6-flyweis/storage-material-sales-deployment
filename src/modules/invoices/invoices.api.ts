@@ -260,3 +260,21 @@ export async function markInvoicePaidProvider(invoiceId: string) {
   return response.data;
 }
 
+export type InvoiceExportParams = {
+  startDate?: string;
+  endDate?: string;
+  status?: InvoiceStatus | "";
+  leadId?: string;
+  search?: string;
+  format: "pdf" | "excel";
+};
+
+export async function exportInvoicesProvider(params: InvoiceExportParams) {
+  const response = await apiClient.get<Blob>("/api/invoices/export", {
+    params,
+    responseType: "blob",
+  });
+
+  return response.data;
+}
+
