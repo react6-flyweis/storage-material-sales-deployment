@@ -9,8 +9,6 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { useMoveLeadToOrdersMutation } from "@/modules/leads/leads.hooks";
 
@@ -24,29 +22,11 @@ export default function MoveToOrdersDialog({
   leadId,
 }: MoveToOrdersDialogProps) {
   const [open, setOpen] = useState(false);
-  const [poNumber, setPoNumber] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const moveLeadToOrdersMutation = useMoveLeadToOrdersMutation();
-  // const { data: leadResponse } = useLeadDetailQuery(leadId, open);
-
-  // const leadDetail = leadResponse?.success ? leadResponse.data : undefined;
-  // const latestQuotation =
-  //   leadDetail?.quotations.find((quotation) => quotation.isLatest) ??
-  //   leadDetail?.quotations[0];
-  // const latestInvoice = [...(leadDetail?.payments.invoices ?? [])].sort(
-  //   (left, right) => {
-  //     const leftTime = new Date(left.createdAt).getTime();
-  //     const rightTime = new Date(right.createdAt).getTime();
-
-  //     return rightTime - leftTime;
-  //   },
-  // )[0];
-
-  // const quotationId = latestQuotation?._id;
-  // const invoiceId = latestInvoice?._id;
 
   const handleMove = async () => {
-    if (!leadId || !poNumber.trim() || moveLeadToOrdersMutation.isPending) {
+    if (!leadId || moveLeadToOrdersMutation.isPending) {
       return;
     }
 
@@ -55,7 +35,7 @@ export default function MoveToOrdersDialog({
     try {
       await moveLeadToOrdersMutation.mutateAsync({
         leadId,
-        poNumber: poNumber.trim(),
+        poNumber: "",
       });
 
       setOpen(false);
@@ -79,17 +59,9 @@ export default function MoveToOrdersDialog({
         </DialogHeader>
 
         <div className="p-6">
-          <div className="space-y-3">
-            <Label className="text-sm">Enter PO number</Label>
-            <Input
-              value={poNumber}
-              onChange={(e) =>
-                setPoNumber((e.target as HTMLInputElement).value)
-              }
-              className="text-lg h-12 rounded-lg"
-              placeholder="Enter PO number"
-            />
-          </div>
+          <p className="text-sm text-gray-600">
+            Are you sure you want to move this lead to orders?
+          </p>
 
           {errorMessage && (
             <p className="mt-3 text-sm text-destructive">{errorMessage}</p>
@@ -110,7 +82,7 @@ export default function MoveToOrdersDialog({
             size="lg"
             onClick={handleMove}
             disabled={
-              moveLeadToOrdersMutation.isPending || !leadId || !poNumber.trim()
+              moveLeadToOrdersMutation.isPending || !leadId
             }
             className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-8 py-3"
           >
@@ -121,3 +93,4 @@ export default function MoveToOrdersDialog({
     </Dialog>
   );
 }
+
