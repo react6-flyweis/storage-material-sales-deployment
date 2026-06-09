@@ -21,7 +21,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useParams } from "react-router";
+import { useParams, Link } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import AddFollowUpDialog from "@/components/follow-up/add-follow-up-dialog";
 import {
@@ -185,8 +185,20 @@ export default function FollowUpsCard({
           </Card>
 
           <Card className="rounded-md">
-            <CardHeader className="border-b">
-              <CardTitle className="text-lg font-semibold">Meetings</CardTitle>
+            <CardHeader className="flex items-start justify-between border-b">
+              <div>
+                <CardTitle className="text-lg font-semibold">Meetings</CardTitle>
+                {/* <CardDescription className="text-sm text-gray-500">
+                  Scheduled meetings
+                </CardDescription> */}
+              </div>
+
+              <Link to="/meetings/schedule">
+                <Button className="">
+                  <PlusIcon />
+                  Schedule Meeting
+                </Button>
+              </Link>
             </CardHeader>
             <CardContent className="space-y-4">
               {meetings.map((m) => (
