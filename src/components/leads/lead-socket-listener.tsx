@@ -5,6 +5,7 @@ import { useAuthStore } from "@/modules/auth/auth.store";
 import { createAdminSocket, type Socket } from "@/lib/socket";
 import { LEAD_NO_NAME } from "@/modules/leads/leads.utils";
 import LeadAssignedDialog from "./lead-assigned-dialog";
+import FollowUpReminderDialog from "./follow-up-reminder-dialog";
 
 interface CustomerId {
   _id: string;
@@ -42,6 +43,16 @@ interface LeadListSocketPayload {
   };
 }
 
+interface FollowUpReminderPayload {
+  _id: string;
+  type: string;
+  followUpId: string;
+  leadId: string;
+  followUpDate: string;
+  modeOfContact: string;
+  message: string;
+}
+
 export function LeadSocketListener() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -50,6 +61,9 @@ export function LeadSocketListener() {
 
   // State for creation / assignment dialog
   const [assignedLead, setAssignedLead] = useState<LeadListSocketPayload | null>(null);
+
+  // State for follow-up reminder dialog
+  const [activeReminder, setActiveReminder] = useState<FollowUpReminderPayload | null>(null);
 
   // Request notification permission initially
   useEffect(() => {
@@ -70,6 +84,7 @@ export function LeadSocketListener() {
 
     socket.on("connect", () => {
       console.log("Connected to /admin socket namespace for Lead List events");
+      socket.emit("join_user_room");
     });
 
     const handleLeadCreated = (payload: LeadListSocketPayload) => {
@@ -141,12 +156,51 @@ export function LeadSocketListener() {
       }
     };
 
+    const handleFollowUpReminder = (data: FollowUpReminderPayload) => {
+      console.log("Reminder:", data);
+
+      const contactMode = data.modeOfContact
+        ? ` (${data.modeOfContact.charAt(0).toUpperCase() + data.modeOfContact.slice(1)})`
+        : "";
+      const title = `Follow-up Reminder${contactMode}`;
+      const message = data.message || "You have a scheduled follow-up task now.";
+      const leadId = data.leadId;
+
+      // Invalidate queries
+      queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
+      if (leadId) {
+        queryClient.invalidateQueries({ queryKey: ["sales", "leads", "detail", leadId] });
+      }
+
+      if (document.visibilityState !== "visible") {
+        // Tab is inactive - fire browser notification
+        if ("Notification" in window && Notification.permission === "granted") {
+          const notification = new Notification(title, {
+            body: message,
+            icon: "/favicon.ico"
+          });
+          notification.onclick = () => {
+            window.focus();
+            if (leadId) {
+              navigate(`/leads/${leadId}`);
+            }
+            notification.close();
+          };
+        }
+      } else {
+        // Tab is active - show dialog
+        setActiveReminder(data);
+      }
+    };
+
     socket.on("lead_list_created", handleLeadCreated);
     socket.on("lead_list_updated", handleLeadUpdated);
+    socket.on("followup:reminder", handleFollowUpReminder);
 
     return () => {
       socket.off("lead_list_created", handleLeadCreated);
       socket.off("lead_list_updated", handleLeadUpdated);
+      socket.off("followup:reminder", handleFollowUpReminder);
       socket.disconnect();
       socketRef.current = null;
     };
@@ -157,19 +211,35 @@ export function LeadSocketListener() {
 
 
 
-  if (!assignedLead) return null;
-
   return (
-    <LeadAssignedDialog
-      open={!!assignedLead}
-      onClose={() => setAssignedLead(null)}
-      leadPayload={assignedLead}
-      onViewDetails={() => {
-        if (assignedLead.leadId) {
-          navigate(`/leads/${assignedLead.leadId}`);
-        }
-        setAssignedLead(null);
-      }}
-    />
+    <>
+      {assignedLead && (
+        <LeadAssignedDialog
+          open={!!assignedLead}
+          onClose={() => setAssignedLead(null)}
+          leadPayload={assignedLead}
+          onViewDetails={() => {
+            if (assignedLead.leadId) {
+              navigate(`/leads/${assignedLead.leadId}`);
+            }
+            setAssignedLead(null);
+          }}
+        />
+      )}
+
+      {activeReminder && (
+        <FollowUpReminderDialog
+          open={!!activeReminder}
+          onClose={() => setActiveReminder(null)}
+          reminderData={activeReminder}
+          onViewDetails={() => {
+            if (activeReminder.leadId) {
+              navigate(`/leads/${activeReminder.leadId}`);
+            }
+            setActiveReminder(null);
+          }}
+        />
+      )}
+    </>
   );
 }
