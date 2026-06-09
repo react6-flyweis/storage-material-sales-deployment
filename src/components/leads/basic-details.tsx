@@ -128,7 +128,7 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
   const signedAgreementDate = nextFollowUp?.followUpDate
     ? `Next follow-up: ${formatLeadDate(nextFollowUp.followUpDate)}`
     : "No follow-up scheduled";
-  const leadStartDate = formatLeadDate(leadData?.createdAt);
+  // const leadStartDate = formatLeadDate(leadData?.createdAt);
   const targetCompletionDate = latestQuotation?.validTill
     ? formatLeadDate(latestQuotation.validTill)
     : "—";
@@ -414,9 +414,11 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
               <div className="flex items-start gap-3 mb-4">
                 <Calendar className="h-5 w-5 text-slate-400 mt-0.5" />
                 <div>
-                  <p className="font-semibold">Lead Generated</p>
+                  <p className="font-semibold">Lead Assigned</p>
                   <p className="text-sm text-muted-foreground">
-                    {leadStartDate}
+                    {leadData?.assignedSales?.assignedAt
+                      ? formatLeadDate(leadData.assignedSales.assignedAt)
+                      : "—"}
                   </p>
                 </div>
               </div>
