@@ -9,7 +9,7 @@ import {
   formatLeadDate,
   formatLeadDateTime,
 } from "@/modules/leads/leads.utils";
-import { useSendInvoiceMutation, useInvoicesQuery } from "@/modules/invoices/invoices.hooks";
+import { useSendInvoiceMutation, useInvoicesQuery, useInvoiceStatsQuery } from "@/modules/invoices/invoices.hooks";
 
 type Props = {
   leadId?: string;
@@ -28,6 +28,8 @@ export default function PaymentsCard({ leadId, leadDbId, paymentsData }: Props) 
     leadId: leadDbId,
     limit: 100,
   });
+
+  const { data: stats } = useInvoiceStatsQuery({ leadId: leadDbId });
 
   const handleSendEmail = async (invoiceId: string) => {
     if (sendInvoiceMutation.isPending) {
@@ -64,25 +66,9 @@ export default function PaymentsCard({ leadId, leadDbId, paymentsData }: Props) 
       }))
     : (paymentsData?.invoices ?? []);
 
-  const summarySource = invoicesResponse?.data
-    ? {
-        totalPaid: invoices
-          .filter((inv) => inv.status === "paid")
-          .reduce((sum, inv) => sum + inv.totalAmount, 0),
-        totalPending: invoices
-          .filter((inv) => inv.status !== "paid" && inv.status !== "cancelled")
-          .reduce((sum, inv) => sum + inv.totalAmount, 0),
-      }
-    : {
-        totalPaid: paymentsData?.totalPaid ?? 0,
-        totalPending: paymentsData?.totalPending ?? 0,
-      };
-
-  const total = formatLeadCurrency(
-    summarySource.totalPaid + summarySource.totalPending,
-  );
-  const paid = formatLeadCurrency(summarySource.totalPaid);
-  const outstanding = formatLeadCurrency(summarySource.totalPending);
+  const total = formatLeadCurrency(stats?.totalAmount ?? 0);
+  const paid = formatLeadCurrency(stats?.totalPaid ?? 0);
+  const outstanding = formatLeadCurrency(stats?.totalUnpaid ?? 0);
 
   return (
     <>

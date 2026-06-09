@@ -175,9 +175,12 @@ export type CreateInvoiceDraftResponse = {
   };
 };
 
-export async function getInvoiceStatsProvider(): Promise<InvoiceStats> {
+export async function getInvoiceStatsProvider(params?: {
+  leadId?: string;
+}): Promise<InvoiceStats> {
   const response = await apiClient.get<InvoiceStatsResponse>(
     "/api/invoices/stats",
+    { params },
   );
 
   return response.data.data;
