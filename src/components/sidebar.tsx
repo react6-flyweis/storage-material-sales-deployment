@@ -96,16 +96,7 @@ const navigationGroups: NavigationGroup[] = [
     items: [],
   },
 
-  {
-    id: "users" as NavGroup,
-    icon: customerIcon,
-    label: "Customer",
-    color: "bg-[#EAB308]",
-    link: "/customers",
-    items: [
-      { path: "/meetings", label: "Meetings", icon: meetingsIcon },
-    ],
-  },
+
   {
     id: "links" as NavGroup,
     icon: leadsIcon,
@@ -183,6 +174,17 @@ const navigationGroups: NavigationGroup[] = [
       //   label: "New Quotation List",
       //   icon: invoiceListIcon,
       // },
+    ],
+  },
+
+  {
+    id: "users" as NavGroup,
+    icon: customerIcon,
+    label: "Customer",
+    color: "bg-[#EAB308]",
+    link: "/customers",
+    items: [
+      { path: "/meetings", label: "Meetings", icon: meetingsIcon },
     ],
   },
 
