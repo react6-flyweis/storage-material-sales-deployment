@@ -65,21 +65,32 @@ export default function InvoiceLineItem({
 
   useEffect(() => {
     const currentItem = watchedLineItem ?? item;
-    const rate = Number(currentItem?.rate ?? 0);
-    const quantity = Number(currentItem?.quantity ?? 0);
+    const rawRate = currentItem?.rate;
+    const rawQuantity = currentItem?.quantity;
+    
+    const rate = typeof rawRate === "number" && !Number.isNaN(rawRate) ? rawRate : 0;
+    const quantity = typeof rawQuantity === "number" && !Number.isNaN(rawQuantity) ? rawQuantity : 1;
+    
     const subtotal = rate * quantity;
     const selectedTax = currentItem?.selectedTax;
     const matchingTax = taxes.find((tax) => tax.name === selectedTax);
+    
+    const rawTax = currentItem?.tax;
+    const currentTax = typeof rawTax === "number" && !Number.isNaN(rawTax) ? rawTax : 0;
+    
     const derivedTax = matchingTax
       ? subtotal * (Number(matchingTax.rate || 0) / 100)
-      : Number(currentItem?.tax ?? 0);
+      : currentTax;
     const nextTotal = subtotal + derivedTax;
 
-    if ((currentItem?.tax ?? 0) !== derivedTax) {
+    if (currentTax !== derivedTax) {
       setValue(`lineItems.${index}.tax`, derivedTax);
     }
 
-    if ((currentItem?.total ?? 0) !== nextTotal) {
+    const rawTotal = currentItem?.total;
+    const currentTotal = typeof rawTotal === "number" && !Number.isNaN(rawTotal) ? rawTotal : 0;
+
+    if (currentTotal !== nextTotal) {
       setValue(`lineItems.${index}.total`, nextTotal);
     }
   }, [index, item, setValue, taxes, watchedLineItem]);
