@@ -24,6 +24,7 @@ interface Meeting {
   time: string;
   type: "Online" | "In-person";
   status: "Scheduled" | "Cancelled" | "Completed";
+  rawMeeting?: ApiMeeting;
 }
 
 function getMeetingUserDisplayName(
@@ -56,8 +57,7 @@ function mapApiMeetingToUI(apiMeeting: ApiMeeting): Meeting {
     id: apiMeeting._id,
     title: apiMeeting.title || "Untitled meeting",
     organizer:
-      getMeetingUserDisplayName(apiMeeting.assignedTo) ||
-      getMeetingUserDisplayName(apiMeeting.createdBy) ||
+      getMeetingUserDisplayName(apiMeeting.leadId) ||
       "Unassigned",
     date: hasValidDate
       ? dateObject.toLocaleDateString("en-CA")
@@ -71,6 +71,7 @@ function mapApiMeetingToUI(apiMeeting: ApiMeeting): Meeting {
       : "",
     type: apiMeeting.mode === "online" ? "Online" : "In-person",
     status: formattedStatus,
+    rawMeeting: apiMeeting,
   };
 }
 
@@ -241,7 +242,9 @@ export default function Meetings() {
                     size="sm"
                     className="w-full sm:flex-1 bg-blue-200 text-blue-600 hover:bg-blue-100 hover:text-blue-700"
                     onClick={() =>
-                      navigate(`/customers/meetings/reschedule/${meeting.id}`)
+                      navigate(`/meetings/reschedule/${meeting.id}`, {
+                        state: { meeting },
+                      })
                     }
                   >
                     Edit
@@ -251,7 +254,9 @@ export default function Meetings() {
                   size="sm"
                   className="w-full sm:flex-1 bg-orange-200 text-orange-600 hover:bg-orange-100 hover:text-orange-700"
                   onClick={() =>
-                    navigate(`/customers/meetings/reschedule/${meeting.id}`)
+                    navigate(`/meetings/reschedule/${meeting.id}`, {
+                      state: { meeting },
+                    })
                   }
                 >
                   Reschedule meeting
