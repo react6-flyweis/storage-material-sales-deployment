@@ -9,7 +9,7 @@ export type CreateMeetingPayload = {
   mode: "online" | "in-person";
   meetingLink: string;
   notes?: string;
-  assignedTo: string;
+
 };
 
 export type CreateMeetingResponse = {
@@ -65,7 +65,19 @@ export type GetMeetingsResponse = {
 
 export async function createMeetingProvider(payload: CreateMeetingPayload) {
   const response = await apiClient.post<CreateMeetingResponse>(
-    "/api/sales/meetings",
+    "/api/sales/meeting",
+    payload,
+  );
+
+  return response.data;
+}
+
+export async function editMeetingProvider(
+  meetingId: string,
+  payload: CreateMeetingPayload,
+) {
+  const response = await apiClient.put<CreateMeetingResponse>(
+    `/api/sales/meeting/${meetingId}`,
     payload,
   );
 
@@ -74,7 +86,7 @@ export async function createMeetingProvider(payload: CreateMeetingPayload) {
 
 export async function getAdminMeetingsProvider() {
   const response = await apiClient.get<GetMeetingsResponse>(
-    "/api/sales/meetings",
+    "/api/sales/meeting",
   );
 
   return response.data;
