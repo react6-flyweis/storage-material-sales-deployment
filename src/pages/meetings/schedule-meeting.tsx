@@ -1,8 +1,8 @@
-import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useState, useEffect, useMemo } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useLocation, useNavigate } from "react-router";
+import { useNavigate, useParams, useLocation } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,52 +17,124 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft } from "lucide-react";
 import ClientSelector from "@/components/customers/client-selector";
 import { getApiErrorMessage } from "@/lib/api-error";
-import { useAuthStore } from "@/modules/auth/auth.store";
-import { useCreateMeetingMutation } from "@/modules/meetings/meetings.hooks";
+import { useCreateMeetingMutation, useUpdateMeetingMutation } from "@/modules/meetings/meetings.hooks";
 import SuccessDialog from "@/components/success-dialog";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 
-const meetingSchema = z.object({
-  client: z.string().min(1, "Please select a client"),
-  title: z.string().min(1, "Please select a meeting title"),
-  date: z.string().min(1, "Meeting date is required"),
-  time: z.string().min(1, "Meeting time is required"),
-  duration: z
-    .string()
-    .min(1, "Duration is required")
-    .regex(/^[0-9]+$/, "Duration must be a number of minutes"),
-  mode: z.enum(["online", "in-person"]),
-  link: z.string().min(1, "Meeting link is required"),
-  notes: z.string().optional(),
-});
+const meetingSchema = z
+  .object({
+    client: z.string().min(1, "Please select a client"),
+    title: z.string().min(1, "Please select a meeting title"),
+    date: z.string().min(1, "Meeting date is required"),
+    time: z.string().min(1, "Meeting time is required"),
+    duration: z
+      .string()
+      .min(1, "Duration is required")
+      .regex(/^[0-9]+$/, "Duration must be a number of minutes"),
+    mode: z.enum(["online", "in-person"]),
+    link: z.string().optional(),
+    notes: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const checkUrl = (val: string) => {
+      let urlStr = val.trim();
+      if (!/^https?:\/\//i.test(urlStr)) {
+        urlStr = `https://${urlStr}`;
+      }
+      try {
+        new URL(urlStr);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    if (data.mode === "online") {
+      if (!data.link || data.link.trim() === "") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Meeting link is required for online meetings",
+          path: ["link"],
+        });
+      } else if (!checkUrl(data.link)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Please enter a valid meeting URL (e.g., https://zoom.us)",
+          path: ["link"],
+        });
+      }
+    } else if (data.mode === "in-person") {
+      if (data.link && data.link.trim() !== "" && !checkUrl(data.link)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Please enter a valid meeting URL (e.g., https://zoom.us)",
+          path: ["link"],
+        });
+      }
+    }
+  });
 
 type MeetingFormData = z.infer<typeof meetingSchema>;
 
-type MeetingRouteState = {
-  customerId?: string;
-  leadId?: string;
-  assignedTo?: string;
-};
+
 
 export default function ScheduleMeeting() {
   const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
   const location = useLocation();
-  const [selectedClient, setSelectedClient] = useState("");
-  const [successOpen, setSuccessOpen] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const createMeetingMutation = useCreateMeetingMutation();
-  const authUserId = useAuthStore((state) => state.user?._id ?? "");
-  const routeState = (location.state ?? {}) as MeetingRouteState;
+  const isEditMode = !!id;
+  const passedMeeting = location.state?.meeting;
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    setValue,
-    // watch,
-  } = useForm<MeetingFormData>({
-    resolver: zodResolver(meetingSchema),
-    defaultValues: {
-      mode: "online",
+  const [selectedClient, setSelectedClient] = useState(() => {
+    if (isEditMode && passedMeeting?.rawMeeting) {
+      const raw = passedMeeting.rawMeeting;
+      return typeof raw.leadId === "string" ? raw.leadId : (raw.leadId?._id || "");
+    }
+    return "";
+  });
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [customerId, setCustomerId] = useState(() => {
+    if (isEditMode && passedMeeting?.rawMeeting) {
+      const raw = passedMeeting.rawMeeting;
+      if (raw.customerId) {
+        return typeof raw.customerId === "string" ? raw.customerId : (raw.customerId._id || "");
+      }
+    }
+    return "";
+  });
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const createMeetingMutation = useCreateMeetingMutation();
+  const updateMeetingMutation = useUpdateMeetingMutation();
+
+  const defaultValues = useMemo(() => {
+    if (isEditMode && passedMeeting?.rawMeeting) {
+      const raw = passedMeeting.rawMeeting;
+      let dateStr = "";
+      let timeStr = "";
+      const dateObject = new Date(raw.meetingTime);
+      if (!Number.isNaN(dateObject.getTime())) {
+        dateStr = dateObject.toLocaleDateString("en-CA");
+        const hours = String(dateObject.getHours()).padStart(2, "0");
+        const minutes = String(dateObject.getMinutes()).padStart(2, "0");
+        timeStr = `${hours}:${minutes}`;
+      }
+
+      const leadIdStr = typeof raw.leadId === "string" ? raw.leadId : (raw.leadId?._id || "");
+
+      return {
+        mode: raw.mode || "online",
+        title: raw.title || "",
+        date: dateStr,
+        time: timeStr,
+        duration: String(raw.duration || ""),
+        link: raw.meetingLink || "",
+        notes: raw.notes || "",
+        client: leadIdStr,
+      };
+    }
+    return {
+      mode: "online" as const,
       title: "",
       date: "",
       time: "",
@@ -70,65 +142,82 @@ export default function ScheduleMeeting() {
       link: "",
       notes: "",
       client: "",
-    },
+    };
+  }, [isEditMode, passedMeeting]);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    setValue,
+    reset,
+    control,
+  } = useForm<MeetingFormData>({
+    resolver: zodResolver(meetingSchema),
+    mode: "onChange",
+    defaultValues,
   });
 
-  // clients list available for the selector
+  const mode = useWatch({
+    control,
+    name: "mode",
+    defaultValue: "online",
+  });
+
+  useEffect(() => {
+    reset(defaultValues);
+  }, [defaultValues, reset]);
 
   const onSubmit = async (data: MeetingFormData) => {
     setErrorMessage(null);
-
-    const customerId = routeState.customerId ?? selectedClient.trim();
-    const leadId = routeState.leadId?.trim() ?? "";
-    const assignedTo = routeState.assignedTo?.trim() ?? authUserId.trim();
-
-    if (!customerId) {
-      setErrorMessage(
-        "Customer ID is missing. Select a customer before scheduling.",
-      );
-      return;
-    }
-
-    if (!leadId) {
-      setErrorMessage(
-        "leadId is not available on this screen yet. Pass it from the customer or lead context before submitting.",
-      );
-      return;
-    }
-
-    if (!assignedTo) {
-      setErrorMessage(
-        "assignedTo is not available. Select or pass the sales user id before submitting.",
-      );
-      return;
-    }
 
     const meetingTime = new Date(
       `${data.date}T${data.time}:00.000Z`,
     ).toISOString();
 
+    let meetingLink = data.link?.trim() ?? "";
+    if (meetingLink && !/^https?:\/\//i.test(meetingLink)) {
+      meetingLink = `https://${meetingLink}`;
+    }
+
     try {
-      const response = await createMeetingMutation.mutateAsync({
-        customerId,
-        leadId,
-        title: data.title,
-        meetingTime,
-        duration: Number.parseInt(data.duration, 10),
-        mode: data.mode,
-        meetingLink: data.link?.trim() ?? "",
-        notes: data.notes?.trim() || undefined,
-        assignedTo,
-      });
+      let response;
+      if (isEditMode && id) {
+        response = await updateMeetingMutation.mutateAsync({
+          meetingId: id,
+          payload: {
+            leadId: data.client,
+            customerId,
+            title: data.title,
+            meetingTime,
+            duration: Number.parseInt(data.duration, 10),
+            mode: data.mode,
+            meetingLink,
+            notes: data.notes?.trim() || undefined,
+          },
+        });
+      } else {
+        response = await createMeetingMutation.mutateAsync({
+          leadId: data.client,
+          customerId,
+          title: data.title,
+          meetingTime,
+          duration: Number.parseInt(data.duration, 10),
+          mode: data.mode,
+          meetingLink,
+          notes: data.notes?.trim() || undefined,
+        });
+      }
 
       if (!response.success) {
-        setErrorMessage(response.message || "Unable to schedule meeting.");
+        setErrorMessage(response.message || `Unable to ${isEditMode ? "update" : "schedule"} meeting.`);
         return;
       }
 
       setSuccessOpen(true);
-      setTimeout(() => navigate("/customers/meetings"), 500);
+      setTimeout(() => navigate("/meetings"), 500);
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, "Unable to schedule meeting."));
+      setErrorMessage(getApiErrorMessage(error, `Unable to ${isEditMode ? "update" : "schedule"} meeting.`));
     }
   };
 
@@ -146,7 +235,7 @@ export default function ScheduleMeeting() {
           Back
         </Button>
         <h1 className="text-xl font-semibold text-gray-900">
-          Schedule meeting
+          {isEditMode ? "Edit/Reschedule meeting" : "Schedule meeting"}
         </h1>
       </div>
 
@@ -174,6 +263,7 @@ export default function ScheduleMeeting() {
                 onValueChange={(client) => {
                   const val = client?.id ?? "";
                   setSelectedClient(val);
+                  setCustomerId(client?.customerId ?? "");
                   setValue("client", val);
                 }}
               />
@@ -235,14 +325,19 @@ export default function ScheduleMeeting() {
             {/* Duration */}
             <div className="space-y-2">
               <Label htmlFor="duration">Duration</Label>
-              <Input
-                id="duration"
-                type="number"
-                min={1}
-                step={1}
-                placeholder="60"
-                {...register("duration")}
-              />
+              <InputGroup>
+                <InputGroupInput
+
+                  id="duration"
+                  type="number"
+                  min={1}
+                  step={1}
+                  placeholder="60"
+                  {...register("duration")}
+                />
+                <InputGroupAddon align="inline-end">
+                  Min</InputGroupAddon>
+              </InputGroup>
               {errors.duration && (
                 <p className="text-sm text-red-500">
                   {errors.duration.message}
@@ -282,7 +377,7 @@ export default function ScheduleMeeting() {
           {/* Meeting Link */}
           <div className="space-y-2">
             <Label htmlFor="link">
-              Meeting Link <span className="text-red-500">*</span>
+              Meeting Link {mode === "online" && <span className="text-red-500">*</span>}
             </Label>
             <Input id="link" placeholder="Zoom Meeting" {...register("link")} />
             {errors.link && (
@@ -317,12 +412,12 @@ export default function ScheduleMeeting() {
           </Button>
           <Button
             type="submit"
-            disabled={createMeetingMutation.isPending}
+            disabled={createMeetingMutation.isPending || updateMeetingMutation.isPending}
             className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto px-6"
           >
-            {createMeetingMutation.isPending
-              ? "Scheduling..."
-              : "Schedule meeting"}
+            {createMeetingMutation.isPending || updateMeetingMutation.isPending
+              ? isEditMode ? "Updating..." : "Scheduling..."
+              : isEditMode ? "Update meeting" : "Schedule meeting"}
           </Button>
         </div>
       </form>
@@ -333,7 +428,7 @@ export default function ScheduleMeeting() {
           setSuccessOpen(false);
           navigate("/customers/meetings");
         }}
-        title="Meeting scheduled"
+        title={isEditMode ? "Meeting updated" : "Meeting scheduled"}
         okLabel="Go to meetings"
       />
     </div>
