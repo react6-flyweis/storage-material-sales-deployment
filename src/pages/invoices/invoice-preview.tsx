@@ -95,6 +95,7 @@ export default function InvoicePreview() {
       total: item.total ?? (item.rate ?? 0) * (item.quantity ?? 0),
       images: item.images ?? item.photos ?? [],
       tax: item.tax ?? 0,
+      items: item.items ?? [],
     })) ?? [];
 
   const invoiceNumber = invoice?.invoiceNumber ?? "-";
@@ -154,28 +155,28 @@ export default function InvoicePreview() {
           </div>
           <div className="flex flex-col items-end gap-2">
             <div className="flex gap-4">
-            <Button
-              variant="outline"
-              className="bg-white hover:bg-gray-50 text-gray-700 border-gray-200 min-w-25"
-              onClick={() => navigate("edit")}
-            >
-              Edit
-            </Button>
-            <Button
-              className="bg-[#2563EB] hover:bg-blue-700 text-white min-w-25 gap-2"
-              onClick={handleSendEmail}
-              disabled={sendInvoiceMutation.isPending}
-            >
-              <Mail className="w-4 h-4" />
-              {sendInvoiceMutation.isPending ? "Sending..." : "Email"}
-            </Button>
-            <Button
-              variant="outline"
-              className="bg-white hover:bg-gray-50 text-gray-700 border-gray-200 min-w-25"
-            >
-              <Wallet />
-              Payments
-            </Button>
+              <Button
+                variant="outline"
+                className="bg-white hover:bg-gray-50 text-gray-700 border-gray-200 min-w-25"
+                onClick={() => navigate("edit")}
+              >
+                Edit
+              </Button>
+              <Button
+                className="bg-[#2563EB] hover:bg-blue-700 text-white min-w-25 gap-2"
+                onClick={handleSendEmail}
+                disabled={sendInvoiceMutation.isPending}
+              >
+                <Mail className="w-4 h-4" />
+                {sendInvoiceMutation.isPending ? "Sending..." : "Email"}
+              </Button>
+              <Button
+                variant="outline"
+                className="bg-white hover:bg-gray-50 text-gray-700 border-gray-200 min-w-25"
+              >
+                <Wallet />
+                Payments
+              </Button>
             </div>
             {sendFailed && (
               <p className="text-[10px] text-destructive">Send failed</p>
@@ -227,12 +228,12 @@ export default function InvoicePreview() {
                 <span className="text-gray-500 font-medium">Date</span>
                 <span className="text-gray-900">{date}</span>
               </div>
-              <div className="flex justify-between text-xs">
+              {/* <div className="flex justify-between text-xs">
                 <span className="text-gray-500 font-medium">
                   Business/Tax #
                 </span>
                 <span className="text-gray-900">99- 4515145</span>
-              </div>
+              </div> */}
             </div>
           </div>
 
@@ -270,6 +271,19 @@ export default function InvoicePreview() {
                     </div>
                   )}
 
+                  {item.items && item.items.length > 0 && (
+                    <div className="mt-2 flex items-center gap-1.5 flex-wrap mb-3">
+                      {item.items.map((it: string, i: number) => (
+                        <div
+                          key={i}
+                          className="bg-gray-50 border border-gray-100 text-gray-500 rounded px-2 py-0.5 text-[10px]"
+                        >
+                          {it}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   {/* Display Photos if any */}
                   {item.images && item.images.length > 0 && (
                     <div className="flex flex-wrap gap-4 mt-3 mb-4">
@@ -282,7 +296,7 @@ export default function InvoicePreview() {
                           <img
                             src={
                               photo.startsWith("blob:") ||
-                              photo.startsWith("http")
+                                photo.startsWith("http")
                                 ? photo
                                 : "https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=2670&auto=format&fit=crop"
                             }
