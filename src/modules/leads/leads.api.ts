@@ -673,3 +673,27 @@ export async function getLeadAgreementProvider(leadId: string) {
   return response.data;
 }
 
+export type UpdateLeadBuildingsPayload = {
+  numberOfBuildings: number;
+};
+
+export type UpdateLeadBuildingsResponse = {
+  success: boolean;
+  message: string;
+  data?: unknown;
+};
+
+export async function updateLeadBuildingsProvider(
+  leadId: string,
+  payload: UpdateLeadBuildingsPayload,
+) {
+  const response = await apiClient.post<UpdateLeadBuildingsResponse>(
+    `/api/sales/leads/${leadId}/buildings`,
+    payload,
+  );
+
+  return response.data;
+}
+
+
+
