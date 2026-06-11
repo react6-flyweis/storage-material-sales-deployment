@@ -33,6 +33,7 @@ import {
   // getAssignedEmployeeName,
 } from "@/modules/leads/leads.utils";
 import { useUpdateLeadLifecycleMutation } from "@/modules/leads/leads.hooks";
+import AddBuildingDialog from "@/components/leads/add-building-dialog";
 import {
   LEAD_LIFECYCLE_STEPS,
   getLeadLifecycleBadgeClassName,
@@ -161,6 +162,7 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
   const currentLifecycleLabel = currentLifecycleStep
     ? getLeadLifecycleStatusLabel(currentLifecycleStep.value)
     : "—";
+  const noOfBuildings = lead.lead.numberOfBuildings
 
   const handleOpenStatusDialog = () => {
     setStatusDialogOpen(true);
@@ -207,10 +209,15 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
               </p>
             </div>
           </div>
+
+          <AddBuildingDialog
+            leadId={leadData?._id}
+            currentNoOfBuildings={noOfBuildings}
+          />
         </CardHeader>
 
         <CardContent className="pb-4 border-b">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="flex items-center gap-3">
               <div>
                 <Building2 className="h-5 w-5" />
@@ -218,6 +225,15 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
               <div>
                 <p className="">Building Type</p>
                 <p className="text-sm text-muted-foreground">{buildingType}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div>
+                <Building2 className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="">No. of Buildings</p>
+                <p className="text-sm text-muted-foreground">{noOfBuildings}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
