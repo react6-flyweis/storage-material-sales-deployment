@@ -90,7 +90,8 @@ export default function ScheduleMeeting() {
       const raw = passedMeeting.rawMeeting;
       return typeof raw.leadId === "string" ? raw.leadId : (raw.leadId?._id || "");
     }
-    return "";
+    const queryParams = new URLSearchParams(location.search);
+    return queryParams.get("lead") || "";
   });
   const [successOpen, setSuccessOpen] = useState(false);
   const [customerId, setCustomerId] = useState(() => {
@@ -133,6 +134,8 @@ export default function ScheduleMeeting() {
         client: leadIdStr,
       };
     }
+    const queryParams = new URLSearchParams(location.search);
+    const leadIdParam = queryParams.get("lead") || "";
     return {
       mode: "online" as const,
       title: "",
@@ -141,9 +144,9 @@ export default function ScheduleMeeting() {
       duration: "",
       link: "",
       notes: "",
-      client: "",
+      client: leadIdParam,
     };
-  }, [isEditMode, passedMeeting]);
+  }, [isEditMode, passedMeeting, location.search]);
 
   const {
     register,

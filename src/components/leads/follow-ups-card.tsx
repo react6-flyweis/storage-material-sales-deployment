@@ -256,7 +256,7 @@ export default function FollowUpsCard({
                 </CardDescription> */}
               </div>
 
-              <Link to="/meetings/schedule">
+              <Link to={`/meetings/schedule?lead=${leadId}`} >
                 <Button className="">
                   <PlusIcon />
                   Schedule Meeting
