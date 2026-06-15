@@ -110,7 +110,9 @@ export default function PaymentScheduleDialog({
   const [isFormReady, setIsFormReady] = React.useState(false);
   const initializedForOpenRef = React.useRef(false);
   const onScheduleLoadedRef = React.useRef(onScheduleLoaded);
-  onScheduleLoadedRef.current = onScheduleLoaded;
+  React.useEffect(() => {
+    onScheduleLoadedRef.current = onScheduleLoaded;
+  }, [onScheduleLoaded]);
   const createPaymentScheduleMutation = useCreatePaymentScheduleMutation();
 
   const leadScheduleQuery = usePaymentScheduleByLeadQuery(
@@ -179,8 +181,8 @@ export default function PaymentScheduleDialog({
       const payments = scheduleValues.payments.length
         ? scheduleValues.payments
         : buildDefaultSchedulePayments(
-            depositFromSchedule?.depositValue ?? depositValue,
-          );
+          depositFromSchedule?.depositValue ?? depositValue,
+        );
 
       reset({ type: scheduleValues.type, payments });
       setActiveScheduleId(schedule._id);
@@ -237,10 +239,10 @@ export default function PaymentScheduleDialog({
 
   const maxSchedulePercent = hasMaxAmount
     ? getRemainingPercentAfterAdjustment(
-        invoiceTotal,
-        depositValue,
-        depositType,
-      )
+      invoiceTotal,
+      depositValue,
+      depositType,
+    )
     : 100;
 
   const maxScheduleDollars = hasMaxAmount
@@ -481,7 +483,7 @@ export default function PaymentScheduleDialog({
                           <button
                             type="button"
                             onClick={() => remove(i)}
-                            className="absolute right-3 top-3 text-gray-400 hover:text-red-500"
+                            className="absolute right-5 top-9 text-gray-400 hover:text-red-500"
                             aria-label={`remove-payment-${i}`}
                           >
                             <X className="w-4 h-4" />
