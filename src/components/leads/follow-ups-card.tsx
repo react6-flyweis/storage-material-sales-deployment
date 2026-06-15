@@ -350,7 +350,7 @@ export default function FollowUpsCard({
                     <th className="px-6 py-4">Status</th>
                     <th className="px-6 py-4">Outcome</th>
                     <th className="px-6 py-4">Next Follow up</th>
-                    <th className="px-6 py-4">Actions</th>
+                    {/* <th className="px-6 py-4">Actions</th> */}
                   </tr>
                 </thead>
                 <tbody>
@@ -402,11 +402,11 @@ export default function FollowUpsCard({
                             <div className="text-sm">—</div>
                           </td>
 
-                          <td className="px-6 py-4 align-top">
+                          {/* <td className="px-6 py-4 align-top">
                             <Button variant="outline" className="h-8 px-3">
                               View
                             </Button>
-                          </td>
+                          </td> */}
                         </tr>
                       );
                     })
