@@ -10,7 +10,7 @@ import {
 
 import { useLeadsLookupQuery } from "@/modules/leads/leads.hooks";
 import { formatLifecycleStatus, getStatusBadgeClassName } from "@/modules/leads/leads.utils";
-import { isLeadInLifecycleRange, LeadLifecycleStatusValue } from "@/modules/leads/lifecycle-statuses";
+import { isLeadInLifecycleRange, type LeadLifecycleStatusValue } from "@/modules/leads/lifecycle-statuses";
 
 type Client = {
   id: string;
@@ -18,6 +18,7 @@ type Client = {
   customer: string;
   customerId: string;
   lifecycleStatus?: string;
+  jobId?: string;
 };
 
 type Props = {
@@ -51,6 +52,7 @@ export default function ClientSelector({
           "N/A",
         customerId: lead.customerId?._id || "",
         lifecycleStatus: lead.lifecycleStatus,
+        jobId: lead.jobId,
       })) || [];
 
 
@@ -78,7 +80,8 @@ export default function ClientSelector({
         const q = query.toLowerCase();
         return (
           client.name.toLowerCase().includes(q) ||
-          client.customer.toLowerCase().includes(q)
+          client.customer.toLowerCase().includes(q) ||
+          (client.jobId?.toLowerCase().includes(q) ?? false)
         );
       }}
       value={selectedClient}
@@ -96,10 +99,18 @@ export default function ClientSelector({
             <ComboboxItem key={client.id} value={client}>
               <div className="flex flex-col">
                 <span className="font-medium text-gray-900">{client.name}</span>
-                <span className="text-sm text-gray-500">{client.customer}</span>
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <span>{client.customer}</span>
+                  {client.jobId && (
+                    <>
+                      <span>•</span>
+                      <span>{client.jobId}</span>
+                    </>
+                  )}
+                </div>
 
                 {client.lifecycleStatus && (
-                  <span className={`text-xs px-2 py-0.5 rounded-sm w-fit font-medium whitespace-nowrap ${getStatusBadgeClassName(client.lifecycleStatus)}`}>
+                  <span className={`text-xs px-2 py-0.5 rounded-sm w-fit font-medium whitespace-nowrap mt-1 ${getStatusBadgeClassName(client.lifecycleStatus)}`}>
                     {formatLifecycleStatus(client.lifecycleStatus)}
                   </span>
                 )}
