@@ -301,6 +301,7 @@ export default function ScheduleMeeting() {
                 id="date"
                 type="date"
                 placeholder="dd-mm-yyyy"
+                min={new Date().toLocaleDateString("en-CA")}
                 {...register("date")}
               />
               {errors.date && (
@@ -324,7 +325,7 @@ export default function ScheduleMeeting() {
 
             {/* Duration */}
             <div className="space-y-2">
-              <Label htmlFor="duration">Duration</Label>
+              <Label htmlFor="duration">Duration (In Min)</Label>
               <InputGroup>
                 <InputGroupInput
 
