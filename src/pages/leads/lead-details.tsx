@@ -18,7 +18,7 @@ const TABS = [
   // { value: "quotation", label: "Quotation" },
   { value: "chat", label: "Open Chat" },
   { value: "timeline", label: "Timeline" },
-  // { value: "follow-ups", label: "Follow Ups" },
+  { value: "follow-ups", label: "Follow Ups" },
   { value: "payments", label: "Payments" },
 ] as const;
 
