@@ -132,7 +132,7 @@ export default function LeadDetails() {
       <div className=" rounded-b-lg">
         <div className="flex items-start justify-between">
           <div className="flex items-start gap-4">
-            <Button onClick={() => navigate(-1)} aria-label="Back">
+            <Button onClick={() => navigate("/leads")} aria-label="Back">
               <ArrowLeft />
               <span>Back</span>
             </Button>
