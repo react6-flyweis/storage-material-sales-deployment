@@ -824,6 +824,8 @@ export default function InvoiceForm({
 
               <ClientSelector
                 placeholder="Select Project"
+                minLifecycleStatus="proposal_sent"
+                maxLifecycleStatus="deal_closed"
                 value={leadId}
                 onValueChange={(lead) => {
                   setValue("leadId", lead?.id ?? "");
