@@ -155,13 +155,15 @@ export default function InvoicePreview() {
           </div>
           <div className="flex flex-col items-end gap-2">
             <div className="flex gap-4">
-              <Button
-                variant="outline"
-                className="bg-white hover:bg-gray-50 text-gray-700 border-gray-200 min-w-25"
-                onClick={() => navigate("edit")}
-              >
-                Edit
-              </Button>
+              {invoice?.status === "draft" && (
+                <Button
+                  variant="outline"
+                  className="bg-white hover:bg-gray-50 text-gray-700 border-gray-200 min-w-25"
+                  onClick={() => navigate("edit")}
+                >
+                  Edit
+                </Button>
+              )}
               <Button
                 className="bg-[#2563EB] hover:bg-blue-700 text-white min-w-25 gap-2"
                 onClick={handleSendEmail}
@@ -214,21 +216,21 @@ export default function InvoicePreview() {
             </div>
 
             <div className="min-w-50 space-y-2">
-              <div className="flex justify-between text-xs">
+              <div className="flex justify-between text-sm">
                 <span className="text-gray-500 font-medium">Payment terms</span>
                 <span className="text-gray-900">
                   {daysToPay === "-" ? "-" : `${daysToPay} days`}
                 </span>
               </div>
-              <div className="flex justify-between text-xs">
+              <div className="flex justify-between text-sm">
                 <span className="text-gray-500 font-medium">Invoice #</span>
                 <span className="text-gray-900">{invoiceNumber}</span>
               </div>
-              <div className="flex justify-between text-xs">
+              <div className="flex justify-between text-sm">
                 <span className="text-gray-500 font-medium">Date</span>
                 <span className="text-gray-900">{date}</span>
               </div>
-              {/* <div className="flex justify-between text-xs">
+              {/* <div className="flex justify-between text-sm">
                 <span className="text-gray-500 font-medium">
                   Business/Tax #
                 </span>
@@ -240,10 +242,15 @@ export default function InvoicePreview() {
           {/* Line Items */}
           <div className="mb-12">
             <div className="flex justify-between border-b border-gray-800 pb-2 mb-6">
-              <span className="text-xs font-bold text-gray-700">
+              <span className="text-sm font-bold text-gray-700">
                 Description
               </span>
-              <span className="text-xs font-bold text-gray-700">Total</span>
+              <div className="flex gap-8">
+                <span className="text-sm font-bold text-gray-700 w-20 text-right">Rate</span>
+                <span className="text-sm font-bold text-gray-700 w-12 text-right">Qty</span>
+                <span className="text-sm font-bold text-gray-700 w-16 text-right">Tax</span>
+                <span className="text-sm font-bold text-gray-700 w-24 text-right">Total</span>
+              </div>
             </div>
 
             <div className="space-y-8">
@@ -253,16 +260,26 @@ export default function InvoicePreview() {
                   className={index > 0 ? "border-t border-gray-100 pt-4" : ""}
                 >
                   <div className="flex justify-between mb-2">
-                    <span className="text-xs text-gray-600 font-medium">
+                    <span className="text-sm text-gray-600 font-medium">
                       {item.description || "Item Description"}
                     </span>
-                    {/* Calculate item total */}
-                    <span className="text-xs text-gray-600">
-                      $
-                      {formatCurrency(
-                        item.total ?? (item.rate ?? 0) * (item.quantity ?? 0),
-                      )}
-                    </span>
+                    <div className="flex gap-8">
+                      <span className="text-sm text-gray-500 w-20 text-right">
+                        ${formatCurrency(item.rate)}
+                      </span>
+                      <span className="text-sm text-gray-500 w-12 text-right">
+                        {item.quantity}
+                      </span>
+                      <span className="text-sm text-gray-500 w-16 text-right">
+                        ${formatCurrency(item.tax)}
+                      </span>
+                      <span className="text-sm text-gray-600 w-24 text-right">
+                        $
+                        {formatCurrency(
+                          item.total ?? (item.rate ?? 0) * (item.quantity ?? 0),
+                        )}
+                      </span>
+                    </div>
                   </div>
 
                   {item.notes && (
@@ -321,41 +338,41 @@ export default function InvoicePreview() {
           {/* Summary Section */}
           <div className="flex justify-end mb-12">
             <div className="w-64 space-y-3">
-              <div className="flex justify-between text-xs">
+              <div className="flex justify-between text-sm">
                 <span className="text-gray-900 font-bold">Subtotal</span>
                 <span className="text-gray-500">
                   ${formatCurrency(Number(subtotal))}
                 </span>
               </div>
               {markup > 0 && (
-                <div className="flex justify-between text-xs">
-                  <span className="text-gray-500">Markup</span>
-                  <span className="text-gray-500">
+                <div className="flex justify-between text-sm">
+                  <span className="text-emerald-600">Markup</span>
+                  <span className="text-emerald-600 font-medium">
                     ${formatCurrency(Number(markup))}
                   </span>
                 </div>
               )}
               {discount > 0 && (
-                <div className="flex justify-between text-xs">
-                  <span className="text-gray-500">Discount</span>
-                  <span className="text-gray-500">
+                <div className="flex justify-between text-sm">
+                  <span className="text-red-600">Discount</span>
+                  <span className="text-red-600 font-medium">
                     -${formatCurrency(Number(discount))}
                   </span>
                 </div>
               )}
-              <div className="flex justify-between text-xs border-b border-gray-100 pb-3">
+              <div className="flex justify-between text-sm border-b border-gray-100 pb-3">
                 <span className="text-gray-500">Tax</span>
                 <span className="text-gray-500">
                   ${formatCurrency(Number(taxAmount))}
                 </span>
               </div>
-              <div className="flex justify-between text-xs pt-1">
+              <div className="flex justify-between text-sm pt-1">
                 <span className="text-gray-900 font-bold">Total</span>
                 <span className="text-gray-900 font-bold">
                   ${formatCurrency(Number(total))}
                 </span>
               </div>
-              <div className="flex justify-between text-xs pt-2 border-t border-gray-100">
+              <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
                 <span className="text-gray-900 font-medium">Deposit Due</span>
                 <span className="text-gray-900 font-bold">
                   ${formatCurrency(Number(deposit))}
@@ -366,34 +383,36 @@ export default function InvoicePreview() {
 
           {/* Payment Schedule Section */}
           {stages.length > 0 && (
-            <div className="mt-12 pt-6 border-t border-gray-800">
-              <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">
-                Payment Schedule
-              </h2>
-              <div className="border-t border-b border-gray-200 divide-y divide-gray-100">
-                {stages.map((stage) => {
-                  const label = formatStageName(
-                    stage.stageName,
-                    stage.amount,
-                    stage.amountType,
-                  );
-                  const amount =
-                    stage.amountType === "percentage"
-                      ? (total * (stage.amount ?? 0)) / 100
-                      : (stage.amount ?? 0);
+            <div className="mt-12 pt-6 border-t border-gray-800 flex justify-end">
+              <div className="w-full lg:w-3/4">
+                <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">
+                  Payment Schedule
+                </h2>
+                <div className="border-t border-b border-gray-200 divide-y divide-gray-100">
+                  {stages.map((stage) => {
+                    const label = formatStageName(
+                      stage.stageName,
+                      stage.amount,
+                      stage.amountType,
+                    );
+                    const amount =
+                      stage.amountType === "percentage"
+                        ? (total * (stage.amount ?? 0)) / 100
+                        : (stage.amount ?? 0);
 
-                  return (
-                    <div
-                      key={stage._id}
-                      className="flex justify-between py-3 text-xs"
-                    >
-                      <span className="text-gray-600 font-medium">{label}</span>
-                      <span className="text-gray-900 font-bold">
-                        ${formatCurrency(amount)}
-                      </span>
-                    </div>
-                  );
-                })}
+                    return (
+                      <div
+                        key={stage._id}
+                        className="flex justify-between py-3 text-sm"
+                      >
+                        <span className="text-gray-600 font-medium">{label}</span>
+                        <span className="text-gray-900 font-bold">
+                          ${formatCurrency(amount)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}
