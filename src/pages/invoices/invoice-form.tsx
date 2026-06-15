@@ -98,7 +98,7 @@ const defaultFormValues: InvoiceFormValues = {
   leadId: "",
   clientName: "",
   clientAvatar: "",
-  taxes: [{ name: "Argyle", rate: "8.25" }],
+  taxes: [],
   lineItems: defaultLineItems,
 };
 
@@ -838,7 +838,7 @@ export default function InvoiceForm({
                 </label>
                 <Input
                   id="invoiceNumber"
-                  disabled={!isEdit}
+                  disabled
                   {...register("invoiceNumber")}
                   className="bg-white border-gray-200 h-11"
                 />
