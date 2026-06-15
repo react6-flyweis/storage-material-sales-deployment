@@ -65,7 +65,7 @@ export type GetMeetingsResponse = {
 
 export async function createMeetingProvider(payload: CreateMeetingPayload) {
   const response = await apiClient.post<CreateMeetingResponse>(
-    "/api/sales/meeting",
+    "/api/sales/meetings",
     payload,
   );
 
@@ -77,7 +77,7 @@ export async function editMeetingProvider(
   payload: CreateMeetingPayload,
 ) {
   const response = await apiClient.put<CreateMeetingResponse>(
-    `/api/sales/meeting/${meetingId}`,
+    `/api/sales/meetings/${meetingId}`,
     payload,
   );
 
@@ -86,7 +86,7 @@ export async function editMeetingProvider(
 
 export async function getAdminMeetingsProvider() {
   const response = await apiClient.get<GetMeetingsResponse>(
-    "/api/sales/meeting",
+    "/api/sales/meetings",
   );
 
   return response.data;
