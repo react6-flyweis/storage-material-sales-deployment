@@ -7,6 +7,10 @@ export const LEAD_LIFECYCLE_STATUSES = [
   { value: "payment_done", label: "Payment done" },
   { value: "converted_to_po", label: "Converted to PO" },
   { value: "sent_to_admin", label: "Sent to admin" },
+  {
+    value: "released_to_plant", label: "Released to plant"
+  }
+
 ] as const;
 
 export type LeadLifecycleStatusValue =
@@ -113,3 +117,42 @@ export const getLeadLifecycleBadgeDotClassName = (status?: string | null) => {
 
   return "bg-[#475569]";
 };
+
+export interface LeadLike {
+  lifecycleStatus?: string | null;
+}
+
+/**
+ * Filter/helper to check if a lead's lifecycle status is within a given range (inclusive).
+ *
+ * @param leadOrStatus - The lead object containing lifecycleStatus, or the lifecycle status string itself.
+ * @param minStatus - Optional minimum lifecycle status value required.
+ * @param maxStatus - Optional maximum lifecycle status value allowed.
+ * @returns true if the status is within the specified range, false otherwise.
+ */
+export function isLeadInLifecycleRange(
+  leadOrStatus: LeadLike | string | null | undefined,
+  minStatus?: LeadLifecycleStatusValue | null,
+  maxStatus?: LeadLifecycleStatusValue | null
+): boolean {
+  if (!leadOrStatus) return false;
+
+  const status = typeof leadOrStatus === "string"
+    ? leadOrStatus
+    : leadOrStatus.lifecycleStatus || "initial_contact";
+
+  const currentStep = getLeadLifecycleStepId(status);
+
+  if (minStatus) {
+    const minStep = getLeadLifecycleStepId(minStatus);
+    if (currentStep < minStep) return false;
+  }
+
+  if (maxStatus) {
+    const maxStep = getLeadLifecycleStepId(maxStatus);
+    if (currentStep > maxStep) return false;
+  }
+
+  return true;
+}
+

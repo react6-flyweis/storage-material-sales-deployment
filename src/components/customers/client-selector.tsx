@@ -10,6 +10,7 @@ import {
 
 import { useLeadsLookupQuery } from "@/modules/leads/leads.hooks";
 import { formatLifecycleStatus, getStatusBadgeClassName } from "@/modules/leads/leads.utils";
+import { isLeadInLifecycleRange, LeadLifecycleStatusValue } from "@/modules/leads/lifecycle-statuses";
 
 type Client = {
   id: string;
@@ -23,26 +24,35 @@ type Props = {
   value: string;
   onValueChange: (value: Client | null | undefined) => void;
   placeholder?: string;
+  minLifecycleStatus?: LeadLifecycleStatusValue;
+  maxLifecycleStatus?: LeadLifecycleStatusValue;
 };
 
 export default function ClientSelector({
   value,
   onValueChange,
   placeholder = "Search leads/projects...",
+  minLifecycleStatus,
+  maxLifecycleStatus = "payment_done",
 }: Props) {
   const { data, isLoading } = useLeadsLookupQuery(undefined, 1, 100);
   const lastEmittedLeadIdRef = useRef<string | null>(null);
 
   const clients =
-    data?.data.leads.map((lead) => ({
-      id: lead._id,
-      name: lead.projectName || "Untitled Lead",
-      customer:
-        `${lead.customerId?.firstName ?? ""} ${lead.customerId?.lastName ?? ""}`.trim() ||
-        "N/A",
-      customerId: lead.customerId?._id || "",
-      lifecycleStatus: lead.lifecycleStatus,
-    })) || [];
+    data?.data.leads
+      .filter((lead) =>
+        isLeadInLifecycleRange(lead, minLifecycleStatus, maxLifecycleStatus)
+      )
+      .map((lead) => ({
+        id: lead._id,
+        name: lead.projectName || "Untitled Lead",
+        customer:
+          `${lead.customerId?.firstName ?? ""} ${lead.customerId?.lastName ?? ""}`.trim() ||
+          "N/A",
+        customerId: lead.customerId?._id || "",
+        lifecycleStatus: lead.lifecycleStatus,
+      })) || [];
+
 
   const selectedClient = clients.find((client) => client.id === value) || null;
 
