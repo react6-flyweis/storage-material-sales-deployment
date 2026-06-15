@@ -116,11 +116,15 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const mappedRecentMessages = (recentMessages ?? [])
+    if (!recentMessages || recentMessages.length === 0) {
+      return;
+    }
+
+    const mappedRecentMessages = recentMessages
       .map(toChatMessage)
       .filter((message): message is ChatMessage => message !== null);
 
-    setMessages(mappedRecentMessages);
+    setMessages((current) => mergeMessages(current, mappedRecentMessages));
   }, [recentMessages]);
 
   useEffect(() => {
@@ -230,11 +234,9 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
   }, [messages, markMessagesRead]);
 
   useEffect(() => {
-    if (!isHydrated || !lead._id || !accessToken || messages.length === 0) {
+    if (!isHydrated || !lead._id || !accessToken) {
       return;
     }
-
-    console.log({ accessToken });
 
     const socket = createAdminSocket(accessToken);
 
@@ -296,7 +298,9 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [accessToken, isHydrated, lead._id, stopTyping, messages.length]);
+  }, [accessToken, isHydrated, lead._id, stopTyping]);
+
+
 
   useEffect(() => {
     return () => {
@@ -331,10 +335,9 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
     stopTyping();
   };
 
-  // const currentUserName = currentUser?.name ?? "Support";
-  // const canSend = Boolean(
-  //   isHydrated && lead._id && lead.customerId && isConnected && input.trim(),
-  // );
+  const canSend = Boolean(
+    isHydrated && lead._id && lead.customerId && input.trim(),
+  );
 
   return (
     <div className="flex-1 flex flex-col p-0 rounded-lg bg-white shadow">
@@ -501,7 +504,7 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
             variant="ghost"
             size="icon"
             className="h-10 w-10 text-gray-500 hover:text-gray-700"
-            disabled={true}
+            disabled={messages.length === 0 || !lead.customerId}
           >
             <Paperclip className="h-5 w-5" />
           </Button>
@@ -518,15 +521,19 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
                 sendMessage();
               }
             }}
-            placeholder="Chat cannot be initiated from here..."
+            placeholder={
+              messages.length > 0
+                ? "Type a message..."
+                : "Chat cannot be initiated from here..."
+            }
             className="flex-1 bg-white"
-            disabled={true}
+            disabled={messages.length === 0 || !lead.customerId}
           />
           <Button
             onClick={sendMessage}
             size="icon"
             className="h-10 w-10 bg-blue-600 hover:bg-blue-700"
-            disabled={true}
+            disabled={!canSend}
           >
             <Send className="h-5 w-5" />
           </Button>
