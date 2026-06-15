@@ -15,10 +15,10 @@ import { canCreatePO, type LeadStatusType } from "@/modules/leads/leads.utils";
 
 const TABS = [
   { value: "basic-info", label: "Basic info" },
-  { value: "quotation", label: "Quotation" },
+  // { value: "quotation", label: "Quotation" },
   { value: "chat", label: "Open Chat" },
   { value: "timeline", label: "Timeline" },
-  { value: "follow-ups", label: "Follow Ups" },
+  // { value: "follow-ups", label: "Follow Ups" },
   { value: "payments", label: "Payments" },
 ] as const;
 
