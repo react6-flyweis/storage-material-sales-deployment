@@ -638,14 +638,14 @@ export default function InvoiceForm({
       data.discountType,
       lineItemsSubtotal,
     );
-    const depositAmount = getAdjustmentAmount(
-      data.depositValue,
-      data.depositType,
-      lineItemsSubtotal,
-    );
     const totalAmount = Math.max(
       0,
       lineItemsSubtotal + markupTotal - discount,
+    );
+    const depositAmount = getAdjustmentAmount(
+      data.depositValue,
+      data.depositType,
+      totalAmount,
     );
 
     const parsedDaysToPay = Number.parseInt(data.daysToPay, 10);
@@ -1094,7 +1094,7 @@ export default function InvoiceForm({
                     {formatAdjustmentDisplay(
                       depositValue,
                       depositType,
-                      calculateSubtotal(),
+                      invoiceTotal,
                     )}
                   </span>
                   {!isSummaryReadOnly && (
