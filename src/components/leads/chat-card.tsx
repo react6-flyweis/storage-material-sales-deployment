@@ -230,7 +230,7 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
   }, [messages, markMessagesRead]);
 
   useEffect(() => {
-    if (!isHydrated || !lead._id || !accessToken) {
+    if (!isHydrated || !lead._id || !accessToken || messages.length === 0) {
       return;
     }
 
@@ -296,7 +296,7 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [accessToken, isHydrated, lead._id, stopTyping]);
+  }, [accessToken, isHydrated, lead._id, stopTyping, messages.length]);
 
   useEffect(() => {
     return () => {
@@ -332,9 +332,9 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
   };
 
   // const currentUserName = currentUser?.name ?? "Support";
-  const canSend = Boolean(
-    isHydrated && lead._id && lead.customerId && isConnected && input.trim(),
-  );
+  // const canSend = Boolean(
+  //   isHydrated && lead._id && lead.customerId && isConnected && input.trim(),
+  // );
 
   return (
     <div className="flex-1 flex flex-col p-0 rounded-lg bg-white shadow">
@@ -345,7 +345,12 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
             <span className="font-semibold">{lead.jobId}</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-500">
-            {isConnected ? (
+            {messages.length === 0 ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 px-3 py-1 text-gray-500">
+                <span className="h-2 w-2 rounded-full bg-gray-300" />
+                Offline
+              </span>
+            ) : isConnected ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 Live
@@ -397,9 +402,7 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
             </div>
             <div className="font-medium text-gray-700">No messages yet</div>
             <div className="text-xs text-gray-400">
-              {isConnected
-                ? "Send the first message to start the conversation."
-                : "Waiting for the chat room to connect."}
+              The chat cannot be initiated from here. The customer must start the conversation first.
             </div>
           </div>
         ) : (
@@ -410,7 +413,7 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
               const senderLabel = isAiMessage
                 ? "Assistant"
                 : isSalesMessage
-                  ? message.senderId === currentUser?._id
+                   ? message.senderId === currentUser?._id
                     ? "You"
                     : (message.senderName ?? "Another Sales")
                   : message.senderType === "customer"
@@ -498,6 +501,7 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
             variant="ghost"
             size="icon"
             className="h-10 w-10 text-gray-500 hover:text-gray-700"
+            disabled={true}
           >
             <Paperclip className="h-5 w-5" />
           </Button>
@@ -514,15 +518,15 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
                 sendMessage();
               }
             }}
-            placeholder="Type a message..."
+            placeholder="Chat cannot be initiated from here..."
             className="flex-1 bg-white"
-            disabled={!isConnected || !lead.customerId}
+            disabled={true}
           />
           <Button
             onClick={sendMessage}
             size="icon"
             className="h-10 w-10 bg-blue-600 hover:bg-blue-700"
-            disabled={!canSend}
+            disabled={true}
           >
             <Send className="h-5 w-5" />
           </Button>
