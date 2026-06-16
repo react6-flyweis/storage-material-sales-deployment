@@ -1,6 +1,7 @@
 import type { RouteObject } from "react-router";
 import { lazy } from "react";
 import { NotFound } from "@/pages/not-found";
+import { ErrorPage } from "@/pages/error-page";
 import { AdminLayout } from "@/components/admin-layout";
 import { ProtectedRoute, PublicOnlyRoute } from "@/modules/auth/auth.guards";
 
@@ -122,6 +123,7 @@ const InvoicePreviewPage = lazy(
 export const salesRoutes: RouteObject[] = [
   {
     element: <PublicOnlyRoute />,
+    errorElement: <ErrorPage />,
     children: [
       {
         path: "/sign-in",
@@ -131,6 +133,7 @@ export const salesRoutes: RouteObject[] = [
   },
   {
     element: <ProtectedRoute />,
+    errorElement: <ErrorPage />,
     children: [
       {
         path: "/",
