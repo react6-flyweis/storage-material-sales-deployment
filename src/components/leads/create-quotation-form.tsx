@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Controller, useForm, useWatch, type Resolver } from "react-hook-form";
+import { getLeadProjectName } from "@/modules/leads/leads.utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router";
@@ -544,7 +545,7 @@ export default function CreateQuotationForm({
         <div className="flex items-center justify-between">
           <div className="text-lg font-semibold">
             {mode === "edit" ? "Edit" : "Create Manual"} Quotation -
-            {leadData?.projectName || "Untitled Lead"}
+            {getLeadProjectName(leadData as Record<string, unknown>)}
           </div>
         </div>
       </div>

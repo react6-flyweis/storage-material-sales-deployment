@@ -153,7 +153,7 @@ export default function CustomerDetailLayout() {
         ))}
       </div>
 
-      <ProjectsTable customerId={id} />
+      <ProjectsTable customerId={id} customerFirstName={customerData?.firstName} />
     </div>
   );
 }

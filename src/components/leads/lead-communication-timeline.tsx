@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useCommunicationTimelineQuery } from "@/modules/followups/followups.hooks";
 // import { Link } from "react-router";
-import { LEAD_NO_NAME } from "@/modules/leads/leads.utils";
+import { getLeadProjectName } from "@/modules/leads/leads.utils";
 
 type TimelineItem = {
   id: number;
@@ -58,8 +58,7 @@ export default function LeadCommunicationTimeline() {
             ? "bg-gray-50 text-gray-600"
             : "bg-purple-50 text-purple-600";
 
-    const name =
-      e.leadId?.projectName?.trim() || LEAD_NO_NAME;
+    const name = getLeadProjectName(e.leadId as Record<string, unknown>, e.customerId as Record<string, unknown>);
     const customer = e.customerId?.firstName
     const note = e.metadata?.notes?.trim() || "No notes provided";
     const time = new Date(e.createdAt).toLocaleString();

@@ -24,7 +24,7 @@ import {
   useScoredLeadsQuery,
   useUpdateLeadTemperatureMutation,
 } from "@/modules/leads/leads.hooks";
-import { getLeadProgress } from "@/modules/leads/leads.utils";
+import { getLeadProgress, getLeadProjectName } from "@/modules/leads/leads.utils";
 import {
   getLeadLifecycleBadgeClassName,
   getLeadLifecycleStatusLabel,
@@ -199,7 +199,7 @@ export default function LeadScoring() {
 
     return {
       id: l.leadId,
-      name: l.projectName || "Untitled Lead",
+      name: getLeadProjectName(l),
       leadId: l.leadId,
       jobId: l.jobId,
       location: l.customerName || "",

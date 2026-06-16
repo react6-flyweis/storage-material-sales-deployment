@@ -50,7 +50,7 @@ import {
   canCreatePO,
   formatLifecycleStatus,
   getStatusBadgeClassName,
-  LEAD_NO_NAME,
+  getLeadProjectName,
   type LeadStatusType,
 } from "@/modules/leads/leads.utils";
 import FilterTabs, { type Period } from "@/components/FilterTabs";
@@ -407,7 +407,7 @@ export default function LeadsPage() {
                       <TableCell className="">
                         <div className="flex flex-col">
                           <span className="font-semibold text-gray-900 uppercase">
-                            {lead.projectName || LEAD_NO_NAME}
+                            {getLeadProjectName(lead)}
                           </span>
                           <span className="text-sm text-gray-500">
                             {lead.jobId}
@@ -491,7 +491,7 @@ export default function LeadsPage() {
 
                           <EscalateLeadDialog
                             leadId={lead._id}
-                            leadName={lead.projectName || "Untitled Lead"}
+                            leadName={getLeadProjectName(lead)}
                             trigger={
                               <Button variant="ghost" size="icon">
                                 <AlertCircle className=" text-gray-500" />

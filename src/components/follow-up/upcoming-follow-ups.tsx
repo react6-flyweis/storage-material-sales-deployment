@@ -19,7 +19,7 @@ import {
 import SuccessDialog from "@/components/success-dialog";
 import { useEffect } from "react";
 import type { UpcomingFollowUpItem } from "@/modules/followups/followups.api";
-import { LEAD_NO_NAME } from "@/modules/leads/leads.utils";
+import { getLeadProjectName } from "@/modules/leads/leads.utils";
 
 type ViewMode = "schedule" | "calendar" | "list";
 
@@ -76,7 +76,7 @@ export default function UpcomingFollowUps({ onScheduleFollowUp }: Props) {
       hour: "2-digit",
       minute: "2-digit",
     });
-    const name = f.leadId?.projectName || LEAD_NO_NAME;
+    const name = getLeadProjectName(f.leadId as Record<string, unknown>, f.customerId as Record<string, unknown>);
     const customer = f.customerId?.firstName || "";
     const type =
       f.modeOfContact === "call"

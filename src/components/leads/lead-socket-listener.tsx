@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/modules/auth/auth.store";
 import { createAdminSocket, type Socket } from "@/lib/socket";
-import { LEAD_NO_NAME } from "@/modules/leads/leads.utils";
+import { getLeadProjectName } from "@/modules/leads/leads.utils";
 import LeadAssignedDialog from "./lead-assigned-dialog";
 import FollowUpReminderDialog from "./follow-up-reminder-dialog";
 
@@ -97,7 +97,7 @@ export function LeadSocketListener() {
       }
 
       // Extract project name as lead name
-      const projectName = payload.lead?.projectName || LEAD_NO_NAME;
+      const projectName = getLeadProjectName(payload.lead);
       const triggerInfo = payload.meta.trigger ? ` (via ${payload.meta.trigger})` : "";
 
       if (document.visibilityState !== "visible") {
@@ -132,7 +132,7 @@ export function LeadSocketListener() {
 
       // If meta action is updated and trigger is assigned, treat it as a new lead assignment
       if (payload.meta.trigger === "assigned") {
-        const projectName = payload.lead?.projectName || "New Lead";
+        const projectName = getLeadProjectName(payload.lead);
 
         if (document.visibilityState !== "visible") {
           // Tab is inactive - fire browser notification

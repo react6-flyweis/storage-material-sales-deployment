@@ -22,6 +22,7 @@ const formatCurrency = (value: number) =>
 
 import { usePurchaseOrdersQuery } from "@/modules/purchase-orders/purchase-orders.hooks";
 import TitleSubtitle from "@/components/TitleSubtitle";
+import { getLeadProjectName } from "@/modules/leads/leads.utils";
 
 function PurchaseOrdersSkeleton() {
   return (
@@ -154,7 +155,7 @@ export default function AllPurchaseOrdersPage() {
               <TableBody>
                 {purchaseOrders.map((order) => {
                   const selected = selectedOrderIds.includes(order._id);
-                  const leadName = order.leadId?.projectName || "Untitled Lead";
+                  const leadName = getLeadProjectName(order.leadId, order.customerId);
 
                   return (
                     <TableRow
@@ -208,7 +209,7 @@ export default function AllPurchaseOrdersPage() {
                       <TableCell className="">
                         {order.leadId?.quoteValue !== undefined
                           ? formatCurrency(order.leadId.quoteValue)
-                          : "$0"}
+                          : "-"}
                       </TableCell>
 
                       <TableCell className="">

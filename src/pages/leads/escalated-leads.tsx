@@ -17,27 +17,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { LEAD_NO_NAME } from "@/modules/leads/leads.utils";
+import { getLeadProjectName } from "@/modules/leads/leads.utils";
 
 type EscalationStatus = "pending" | "assigned" | "resolved";
 
-type EscalatedLeadItem = {
-  _id: string;
-  projectName?: string;
-  lifecycleStatus?: string;
-  quoteValue?: number;
-  customerId: {
-    _id: string;
-    firstName: string;
-    email: string;
-  };
-  escalation: {
-    _id: string;
-    note: string;
-    status: EscalationStatus;
-    createdAt: string;
-  };
-};
 
 const statusClasses: Record<EscalationStatus, string> = {
   pending: "bg-violet-100 text-violet-700",
@@ -57,9 +40,6 @@ const formatDate = (value: string) =>
     month: "long",
     year: "numeric",
   }).format(new Date(value));
-
-const getLeadName = (lead: EscalatedLeadItem) =>
-  lead.projectName || LEAD_NO_NAME;
 
 export default function EscalatedLeadsPage() {
   const navigate = useNavigate();
@@ -188,7 +168,7 @@ export default function EscalatedLeadsPage() {
                   const leadId = lead.escalation._id;
                   const selected = selectedLeadIds.includes(leadId);
                   const status = lead.escalation.status || "pending";
-                  const leadName = getLeadName(lead);
+                  const leadName = getLeadProjectName(lead);
 
                   return (
                     <TableRow
@@ -203,7 +183,7 @@ export default function EscalatedLeadsPage() {
                           type="checkbox"
                           checked={selected}
                           onChange={(event) =>
-                              handleToggleLead(leadId, event.target.checked)
+                            handleToggleLead(leadId, event.target.checked)
                           }
                         />
                       </TableCell>

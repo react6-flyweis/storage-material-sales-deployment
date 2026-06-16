@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UserCheck, MapPin, Building, DollarSign, Award, Mail, User } from "lucide-react";
-import { LEAD_NO_NAME } from "@/modules/leads/leads.utils";
+import { getLeadProjectName } from "@/modules/leads/leads.utils";
 import {
   getLeadLifecycleBadgeClassName,
   getLeadLifecycleBadgeDotClassName,
@@ -68,7 +68,7 @@ export default function LeadAssignedDialog({
   const lead = leadPayload?.lead;
   if (!lead) return null;
 
-  const projectName = lead.projectName || LEAD_NO_NAME;
+  const projectName = getLeadProjectName(lead);
   const customerName = lead.customerId?.name || lead.customerId?.firstName || "Unknown Customer";
   const customerEmail = lead.customerId?.email || "No email available";
 

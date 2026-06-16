@@ -30,6 +30,7 @@ import {
   formatLeadDateTime,
   formatLifecycleStatus,
   formatPhone,
+  getLeadProjectName,
   // getAssignedEmployeeName,
 } from "@/modules/leads/leads.utils";
 import { useUpdateLeadLifecycleMutation } from "@/modules/leads/leads.hooks";
@@ -80,7 +81,7 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
   const normalizedScore = lead?.lead.leadScoring?.score ?? 0;
   const scoreBreakdown = buildLeadScoreBreakdown(apiScoreBreakdown);
 
-  const projectTitle = leadData?.projectName || "Untitled Lead";
+  const projectTitle = getLeadProjectName(leadData as Record<string, unknown>, customer);
   const projectReference = leadData?.jobId || "—";
   const statusLabel = leadData?.lifecycleStatus
     ? formatLifecycleStatus(leadData.lifecycleStatus)

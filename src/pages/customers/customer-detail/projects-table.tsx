@@ -20,6 +20,7 @@ import {
   formatLeadDate,
   formatLifecycleStatus,
   getLeadProgress,
+  getLeadProjectName,
   type LeadStatusType,
 } from "@/modules/leads/leads.utils";
 import { ArrowUpDown, Search } from "lucide-react";
@@ -39,16 +40,22 @@ export type ProjectRow = {
 
 type Props = {
   customerId: string;
+  customerFirstName?: string;
 };
 
 
-function mapProjectToRow(project: {
-  _id: string;
-  projectName?: string;
-  lifecycleStatus?: string;
-  numberOfBuildings?: number;
-  createdAt?: string;
-}): ProjectRow {
+function mapProjectToRow(
+  project: {
+    _id: string;
+    projectName?: string;
+    lifecycleStatus?: string;
+    numberOfBuildings?: number;
+    createdAt?: string;
+    location?: string;
+    buildingType?: string;
+  },
+  customerFirstName?: string
+): ProjectRow {
   const lifecycleStatus = (project.lifecycleStatus ?? "initial_contact") as LeadStatusType
   const status = lifecycleStatus ? formatLifecycleStatus(lifecycleStatus) : "-";
   const progressStep = lifecycleStatus
@@ -57,7 +64,7 @@ function mapProjectToRow(project: {
 
   return {
     id: project._id,
-    name: project.projectName?.trim() || "Untitled",
+    name: getLeadProjectName(project, { firstName: customerFirstName }),
     building:
       typeof project.numberOfBuildings === "number"
         ? `${project.numberOfBuildings} building${project.numberOfBuildings === 1 ? "" : "s"
@@ -73,7 +80,7 @@ function mapProjectToRow(project: {
   };
 }
 
-export default function ProjectsTable({ customerId }: Props) {
+export default function ProjectsTable({ customerId, customerFirstName }: Props) {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -87,8 +94,8 @@ export default function ProjectsTable({ customerId }: Props) {
 
   const projectRows = useMemo(() => {
     const apiProjects = projectsResponse?.data.projects ?? [];
-    return apiProjects.map(mapProjectToRow);
-  }, [projectsResponse]);
+    return apiProjects.map((p) => mapProjectToRow(p, customerFirstName));
+  }, [projectsResponse, customerFirstName]);
 
   const filteredProjects = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();

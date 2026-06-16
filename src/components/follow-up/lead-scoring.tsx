@@ -11,7 +11,7 @@ import { Link } from "react-router";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { useScoredLeadsQuery } from "@/modules/leads/leads.hooks";
 import { Badge } from "@/components/ui/badge";
-import { LEAD_NO_NAME } from "@/modules/leads/leads.utils";
+import { getLeadProjectName } from "@/modules/leads/leads.utils";
 import { cn } from "@/lib/utils";
 
 interface LeadScore {
@@ -68,7 +68,7 @@ export default function LeadScoring() {
 
       return {
         id: l.leadId,
-        name: l.projectName || LEAD_NO_NAME,
+        name: getLeadProjectName(l),
         location: l.customerName || "N/A",
         score: scoreNum,
         scoreLabel,

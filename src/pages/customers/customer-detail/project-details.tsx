@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useLeadDetailQuery } from "@/modules/leads/leads.hooks";
 import { ArrowLeft } from "lucide-react";
 import BasicDetails from "@/components/leads/basic-details";
+import { getLeadProjectName } from "@/modules/leads/leads.utils";
 
 const quickActionButtons = [
   { label: "View Quotation", path: "project-quotation" },
@@ -38,7 +39,7 @@ export default function ProjectDetailsPage() {
             Back
           </Button>
           <h1 className="text-xl font-semibold">
-            Project Details- {detail?.lead.projectName || "N/A"}
+            Project Details- {getLeadProjectName(detail?.lead as Record<string, unknown>, detail?.customer)}
           </h1>
         </div>
       </div>
