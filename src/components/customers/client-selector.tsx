@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/combobox";
 
 import { useLeadsLookupQuery } from "@/modules/leads/leads.hooks";
-import { formatLifecycleStatus, getStatusBadgeClassName } from "@/modules/leads/leads.utils";
+import { formatLifecycleStatus, getStatusBadgeClassName, getLeadProjectName } from "@/modules/leads/leads.utils";
 import { isLeadInLifecycleRange, type LeadLifecycleStatusValue } from "@/modules/leads/lifecycle-statuses";
 
 type Client = {
@@ -34,7 +34,7 @@ export default function ClientSelector({
   onValueChange,
   placeholder = "Search leads/projects...",
   minLifecycleStatus,
-  maxLifecycleStatus = "payment_done",
+  maxLifecycleStatus,
 }: Props) {
   const { data, isLoading } = useLeadsLookupQuery(undefined, 1, 100);
   const lastEmittedLeadIdRef = useRef<string | null>(null);
@@ -46,7 +46,7 @@ export default function ClientSelector({
       )
       .map((lead) => ({
         id: lead._id,
-        name: lead.projectName || "Untitled Lead",
+        name: getLeadProjectName(lead),
         customer:
           `${lead.customerId?.firstName ?? ""} ${lead.customerId?.lastName ?? ""}`.trim() ||
           "N/A",
