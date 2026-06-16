@@ -193,14 +193,29 @@ export function LeadSocketListener() {
       }
     };
 
+    const handleCustomerOnlineStatus = (payload: {
+      customerId: string;
+      leadId: string;
+      isOnline: boolean;
+      scope: "lead" | "customer";
+      lastSeenAt: string;
+      customerIsOnline: boolean;
+      leadIsOnline: boolean;
+    }) => {
+      console.log("Socket: customer_online_status event received", payload);
+      queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
+    };
+
     socket.on("lead_list_created", handleLeadCreated);
     socket.on("lead_list_updated", handleLeadUpdated);
     socket.on("followup:reminder", handleFollowUpReminder);
+    socket.on("customer_online_status", handleCustomerOnlineStatus);
 
     return () => {
       socket.off("lead_list_created", handleLeadCreated);
       socket.off("lead_list_updated", handleLeadUpdated);
       socket.off("followup:reminder", handleFollowUpReminder);
+      socket.off("customer_online_status", handleCustomerOnlineStatus);
       socket.disconnect();
       socketRef.current = null;
     };

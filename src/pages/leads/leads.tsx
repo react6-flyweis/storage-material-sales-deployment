@@ -443,9 +443,14 @@ export default function LeadsPage() {
 
                       <TableCell className="">
                         <Link to={`/leads/${lead._id}?tab=chat`}>
-                          <button className="flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-600">
+                          <button className="relative flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
                             <MessageSquare className="h-4 w-4" />
                             <span className="text-sm">Chat</span>
+                            {lead.isOnline ? (
+                              <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-white animate-pulse" title="Customer active in chat" />
+                            ) : lead.customerId?.isOnline ? (
+                              <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 border-2 border-white" title="Customer online on site" />
+                            ) : null}
                           </button>
                         </Link>
                       </TableCell>

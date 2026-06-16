@@ -11,7 +11,27 @@ import type {
   LeadDetailCustomer,
   LeadDetailLead,
   LeadDetailMessage,
+  ChatStatusResponse,
 } from "@/modules/leads/leads.api";
+import { getLeadProjectName } from "@/modules/leads/leads.utils";
+
+function formatLastSeen(timestamp?: string | null) {
+  if (!timestamp) return "";
+  try {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    if (diffMs < 0) return "just now";
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return "just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  } catch {
+    return "";
+  }
+}
 
 type ChatMessage = {
   id: string;
@@ -105,15 +125,59 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
   const isHydrated = useAuthStore((state) => state.isHydrated);
   const accessToken = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.user);
+  const role = useAuthStore((state) => state.role);
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isConnected, setIsConnected] = useState(false);
   const [customerTyping, setCustomerTyping] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+
+  const [customerOnline, setCustomerOnline] = useState<boolean>(
+    customer.isOnline ?? false
+  );
+  const [leadOnline, setLeadOnline] = useState<boolean>(
+    lead.isOnline ?? false
+  );
+  const [lastSeenAt, setLastSeenAt] = useState<string | null>(
+    lead.lastSeenAt ?? customer.lastSeenAt ?? null
+  );
+
   const socketRef = useRef<Socket | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!lead._id || !accessToken) return;
+
+    let isMounted = true;
+
+    async function fetchChatStatus() {
+      try {
+        const path = role === "admin"
+          ? `/api/admin/leads/${lead._id}/chat-status`
+          : `/api/sales/leads/${lead._id}/chat-status`;
+        const response = await apiClient.get<ChatStatusResponse>(path);
+        if (isMounted && response.data.success) {
+          const status = response.data.data;
+          setLeadOnline(status.isCustomerOnline);
+          if (status.customerOnline) {
+            setCustomerOnline(status.customerOnline.isOnline);
+          }
+          setLastSeenAt(status.leadLastSeenAt ?? status.customerOnline?.lastSeenAt ?? null);
+        }
+      } catch (err) {
+        console.error("Failed to fetch chat status", err);
+      }
+    }
+
+    void fetchChatStatus();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [lead._id, accessToken, role]);
 
   useEffect(() => {
     if (!recentMessages || recentMessages.length === 0) {
@@ -278,10 +342,44 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
       setStatusMessage(payload.message ?? "An unexpected chat error occurred.");
     };
 
+    const handleChatStatus = (payload: {
+      isCustomerOnline: boolean;
+      leadLastSeenAt?: string | null;
+      customerOnline?: {
+        isOnline: boolean;
+        lastSeenAt?: string | null;
+      } | null;
+    }) => {
+      setLeadOnline(payload.isCustomerOnline);
+      if (payload.customerOnline) {
+        setCustomerOnline(payload.customerOnline.isOnline);
+      }
+      setLastSeenAt(payload.leadLastSeenAt ?? payload.customerOnline?.lastSeenAt ?? null);
+    };
+
+    const handleCustomerOnlineStatus = (payload: {
+      customerId: string;
+      leadId: string;
+      isOnline: boolean;
+      scope: "lead" | "customer";
+      lastSeenAt: string;
+      customerIsOnline: boolean;
+      leadIsOnline: boolean;
+    }) => {
+      if (payload.leadId !== lead._id) {
+        return;
+      }
+      setLeadOnline(payload.leadIsOnline);
+      setCustomerOnline(payload.customerIsOnline);
+      setLastSeenAt(payload.lastSeenAt);
+    };
+
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
     socket.on("new_message", handleNewMessage);
     socket.on("customer_typing", handleCustomerTyping);
+    socket.on("chat_status", handleChatStatus);
+    socket.on("customer_online_status", handleCustomerOnlineStatus);
     socket.on("error", handleError);
     socket.on("connect_error", (error) => {
       setStatusMessage(error.message);
@@ -294,11 +392,13 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
       socket.off("disconnect", handleDisconnect);
       socket.off("new_message", handleNewMessage);
       socket.off("customer_typing", handleCustomerTyping);
+      socket.off("chat_status", handleChatStatus);
+      socket.off("customer_online_status", handleCustomerOnlineStatus);
       socket.off("error", handleError);
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [accessToken, isHydrated, lead._id, stopTyping]);
+  }, [accessToken, isHydrated, lead._id, stopTyping, role]);
 
 
 
@@ -350,13 +450,13 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
           <div className="flex items-center gap-2 text-xs text-gray-500">
             {messages.length === 0 ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 px-3 py-1 text-gray-500">
-                <span className="h-2 w-2 rounded-full bg-gray-300" />
-                Offline
+
+                Not connected
               </span>
             ) : isConnected ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                Live
+
+                Connected
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-amber-700">
@@ -370,20 +470,37 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Avatar className="h-10 w-10 bg-gray-100">
-            <AvatarFallback className="text-sm text-gray-600 font-medium">
-              {customer.firstName
-                .split(" ")
-                .map((n) => n[0])
-                .join("")}
-            </AvatarFallback>
-          </Avatar>
+          <div className="relative">
+            <Avatar className="h-10 w-10 bg-gray-100">
+              <AvatarFallback className="text-sm text-gray-600 font-medium">
+                {customer.firstName
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")}
+              </AvatarFallback>
+            </Avatar>
+            {leadOnline ? (
+              <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white animate-pulse" />
+            ) : customerOnline ? (
+              <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-white" />
+            ) : null}
+          </div>
           <div>
             <div className="text-base font-semibold">
               Chat with {customer.firstName}
             </div>
-            <div className="text-xs text-gray-500">
-              {lead.projectName ?? "Untitled Lead"}
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <span>{getLeadProjectName(lead as Record<string, unknown>, customer)}</span>
+              <span>•</span>
+              {leadOnline ? (
+                <span className="text-emerald-600 font-medium">Active now</span>
+              ) : customerOnline ? (
+                <span className="text-emerald-500 font-medium">Online on site</span>
+              ) : lastSeenAt ? (
+                <span>Last seen {formatLastSeen(lastSeenAt)}</span>
+              ) : (
+                <span>Offline</span>
+              )}
             </div>
           </div>
         </div>
@@ -416,7 +533,7 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
               const senderLabel = isAiMessage
                 ? "Assistant"
                 : isSalesMessage
-                   ? message.senderId === currentUser?._id
+                  ? message.senderId === currentUser?._id
                     ? "You"
                     : (message.senderName ?? "Another Sales")
                   : message.senderType === "customer"
@@ -443,7 +560,7 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
                               .split(" ")
                               .map((n) => n[0])
                               .join("")
-                            : (lead.projectName || "")
+                            : (getLeadProjectName(lead as Record<string, unknown>, customer) || "")
                               .split(" ")
                               .map((value) => value[0])
                               .join("")}
@@ -498,8 +615,13 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
       ) : null}
 
       {/* Input Area */}
-      <div className="px-6 py-4 border-t bg-gray-50">
-        <div className="flex items-center gap-2">
+      <div className="relative px-6 py-4 border-t bg-gray-50">
+        <div
+          className={`flex items-center gap-2 transition-all duration-200 ${messages.length > 0 && !customerOnline
+            ? "blur-[1.5px] pointer-events-none select-none opacity-50"
+            : ""
+            }`}
+        >
           <Button
             variant="ghost"
             size="icon"
@@ -538,6 +660,14 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
             <Send className="h-5 w-5" />
           </Button>
         </div>
+
+        {messages.length > 0 && !customerOnline && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-50/20">
+            <span className="text-sm font-medium text-gray-500 bg-white/90 px-4 py-2 rounded-full shadow-sm border border-gray-100">
+              Customer is offline. Chat is closed.
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

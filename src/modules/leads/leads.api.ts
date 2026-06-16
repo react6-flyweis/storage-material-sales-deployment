@@ -10,6 +10,7 @@ export type LeadCustomerSummary = {
   _id: string;
   firstName: string;
   email: string;
+  isOnline?: boolean;
 };
 
 export type LeadFollowUpSummary = {
@@ -33,6 +34,8 @@ export type LeadListItem = {
   location: string;
   nextFollowUp: LeadFollowUpSummary | null;
   isRaisedToPO?: boolean;
+  isOnline?: boolean;
+  lastSeenAt?: string | null;
 };
 
 export type LeadsListResponse = {
@@ -237,6 +240,9 @@ export type LeadDetailCustomer = {
     number: string;
     countryCode: string;
   };
+  isOnline?: boolean;
+  onlineAt?: string | null;
+  lastSeenAt?: string | null;
 };
 
 export type LeadScoreBreakdown = {
@@ -295,6 +301,9 @@ export type LeadDetailLead = {
   createdAt: string;
   updatedAt: string;
   jobId?: string;
+  isOnline?: boolean;
+  onlineAt?: string | null;
+  lastSeenAt?: string | null;
 };
 
 export type LeadDetailQuotation = {
@@ -503,6 +512,32 @@ export type LeadDetailData = {
   leadNotes: LeadDetailNote[];
   recentMessages: LeadDetailMessage[];
   shipments: unknown[];
+};
+
+export type ChatStatusData = {
+  leadId: string;
+  isChatEnded: boolean;
+  chatEndedAt: string | null;
+  chatEndedBy: string | null;
+  isStaffChatActive: boolean;
+  isHandedToSales: boolean;
+  isAiActive: boolean;
+  canCustomerSend: boolean;
+  canStaffSend: boolean;
+  isCustomerOnline: boolean;
+  leadOnlineAt: string | null;
+  leadLastSeenAt: string | null;
+  customerOnline: {
+    isOnline: boolean;
+    onlineAt: string | null;
+    lastSeenAt: string | null;
+  };
+};
+
+export type ChatStatusResponse = {
+  success: boolean;
+  message: string;
+  data: ChatStatusData;
 };
 
 export type LeadDetailResponse = {
