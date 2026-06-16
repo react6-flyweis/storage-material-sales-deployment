@@ -825,7 +825,7 @@ export default function InvoiceForm({
               <ClientSelector
                 placeholder="Select Project"
                 minLifecycleStatus="proposal_sent"
-                maxLifecycleStatus="deal_closed"
+                maxLifecycleStatus="sent_to_admin"
                 value={leadId}
                 onValueChange={(lead) => {
                   setValue("leadId", lead?.id ?? "");
@@ -867,6 +867,7 @@ export default function InvoiceForm({
                 </label>
                 <Input
                   id="daysToPay"
+                  type="number"
                   {...register("daysToPay")}
                   className="bg-white border-gray-200 h-11"
                 />
