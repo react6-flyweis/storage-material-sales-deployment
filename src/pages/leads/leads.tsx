@@ -358,7 +358,7 @@ export default function LeadsPage() {
                     />
                   </TableHead>
                   <TableHead className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    PROJECT NAME
+                    CUSTOMER / PROJECT
                   </TableHead>
                   <TableHead className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     PROGRESS
@@ -406,13 +406,16 @@ export default function LeadsPage() {
 
                       <TableCell className="">
                         <div className="flex flex-col">
-                          <span className="font-semibold text-gray-900 uppercase">
+                          <span className="font-semibold text-gray-900">
+                            {lead.customerId?.firstName ?? ""}
+                          </span>
+                          <span className="text-sm text-gray-700">
                             {getLeadProjectName(lead)}
                           </span>
-                          <span className="text-sm text-gray-500">
+                          <span className="text-xs text-gray-500">
                             {lead.jobId}
                           </span>
-                          <span className="text-sm text-gray-500">
+                          <span className="text-xs text-gray-500">
                             {lead.buildingType || "-"} · {lead.location || "-"}
                           </span>
                         </div>
