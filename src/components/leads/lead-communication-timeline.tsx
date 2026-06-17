@@ -58,7 +58,7 @@ export default function LeadCommunicationTimeline() {
             ? "bg-gray-50 text-gray-600"
             : "bg-purple-50 text-purple-600";
 
-    const name = getLeadProjectName(e.leadId as Record<string, unknown>, e.customerId as Record<string, unknown>);
+    const name = getLeadProjectName(e)
     const customer = e.customerId?.firstName
     const note = e.metadata?.notes?.trim() || "No notes provided";
     const time = new Date(e.createdAt).toLocaleString();

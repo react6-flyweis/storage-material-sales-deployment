@@ -199,7 +199,7 @@ export default function LeadScoring() {
 
     return {
       id: l.leadId,
-      name: getLeadProjectName(l),
+      name: getLeadProjectName(l, { firstName: l.customerName }),
       leadId: l.leadId,
       jobId: l.jobId,
       location: l.customerName || "",

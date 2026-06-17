@@ -68,7 +68,7 @@ export default function LeadScoring() {
 
       return {
         id: l.leadId,
-        name: getLeadProjectName(l),
+        name: getLeadProjectName({ projectName: l.projectName, customerId: { firstName: l.customerName }, location: l.location },),
         location: l.customerName || "N/A",
         score: scoreNum,
         scoreLabel,
