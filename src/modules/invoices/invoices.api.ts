@@ -11,8 +11,20 @@ export const InvoiceStatus = {
 export type InvoiceStatus = typeof InvoiceStatus[keyof typeof InvoiceStatus];
 
 type InvoiceReferencePerson = {
+  _id?: string;
   name?: string | null;
   email?: string | null;
+  password?: string | null;
+  phone?: string | null;
+  role?: string | null;
+  isActive?: boolean | null;
+  passwordChangedAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  __v?: number | null;
+  resetOtpVerified?: boolean | null;
+  resetOtp?: string | null;
+  resetOtpExpiry?: string | null;
 };
 
 type InvoiceCustomerReference = {
@@ -27,14 +39,18 @@ export type InvoiceDocument = {
   _id: string;
   leadId?: string | null;
   paymentScheduleId?: string | null;
+  paymentScheduleStageId?: string | null;
   customerId?: string | InvoiceCustomerReference | null;
+  quotationId?: string | null;
   invoiceNumber?: string | null;
+  description?: string | null;
   poNumber?: string | null;
   date?: string | null;
   daysToPay?: number | null;
   dueDate?: string | null;
   subtotal?: number | null;
   markupTotal?: number | null;
+  tax?: number | null;
   discount?: number | null;
   depositAmount?: number | null;
   totalAmount?: number | null;
@@ -42,8 +58,11 @@ export type InvoiceDocument = {
   lineItems?: InvoiceLineItem[] | null;
   createdBy?: InvoiceReferencePerson | string | null;
   paidBy?: InvoiceReferencePerson | string | null;
+  sentAt?: string | null;
+  paidAt?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
+  __v?: number | null;
 };
 
 export type InvoiceLineItem = {
