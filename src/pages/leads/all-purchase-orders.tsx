@@ -178,16 +178,16 @@ export default function AllPurchaseOrdersPage() {
 
                       <TableCell className="">
                         <div className="flex flex-col">
-                          <span className="font-semibold text-gray-900 uppercase">
+                          <span className="font-semibold text-gray-900">
+                            {order.customerId
+                              ? `${order.customerId.firstName || ""} ${order.customerId.lastName || ""}`.trim()
+                              : "-"}
+                          </span>
+                          <span className="text-sm text-gray-500 uppercase">
                             {leadName}
                           </span>
                           <span className="text-sm text-gray-500">
                             {order.leadId?.jobId || "-"}
-                          </span>
-                          <span className="text-sm text-gray-500">
-                            {order.customerId
-                              ? `${order.customerId.firstName || ""} ${order.customerId.lastName || ""}`.trim()
-                              : "-"}
                           </span>
                         </div>
                       </TableCell>
