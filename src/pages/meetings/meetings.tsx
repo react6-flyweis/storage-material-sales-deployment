@@ -41,6 +41,20 @@ function getMeetingUserDisplayName(
   return user.name || user.firstName || user.email || "";
 }
 
+function getMeetingCustomerName(
+  customerId?: ApiMeeting["customerId"],
+): string {
+  if (!customerId) {
+    return "";
+  }
+
+  if (typeof customerId === "string") {
+    return customerId;
+  }
+
+  return customerId.firstName || customerId.customerId || customerId.email || "";
+}
+
 function mapApiMeetingToUI(apiMeeting: ApiMeeting): Meeting {
   const dateObject = new Date(apiMeeting.meetingTime);
   const hasValidDate = !Number.isNaN(dateObject.getTime());
@@ -58,6 +72,7 @@ function mapApiMeetingToUI(apiMeeting: ApiMeeting): Meeting {
     title: apiMeeting.title || "Untitled meeting",
     organizer:
       getMeetingUserDisplayName(apiMeeting.leadId) ||
+      getMeetingCustomerName(apiMeeting.customerId) ||
       "Unassigned",
     date: hasValidDate
       ? dateObject.toLocaleDateString("en-CA")
