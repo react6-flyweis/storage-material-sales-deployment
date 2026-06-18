@@ -52,11 +52,11 @@ export default function InvoiceTemplate({ invoice, paymentSchedule }: InvoiceTem
         `${invoice?._id ?? "item"}-${index}`,
       description: item.description ?? undefined,
       notes: item.notes ?? undefined,
-      rate: item.rate ?? 0,
+      rate: item.effectiveRate ?? item.rate ?? 0,
       quantity: item.quantity ?? 0,
-      total: item.total ?? (item.rate ?? 0) * (item.quantity ?? 0),
+      total: item.total ?? (item.effectiveRate ?? item.rate ?? 0) * (item.quantity ?? 0),
       images: item.images ?? item.photos ?? [],
-      tax: item.tax ?? 0,
+      tax: item.taxAmount ?? 0,
       items: item.items ?? [],
     })) ?? [];
 
@@ -65,7 +65,6 @@ export default function InvoiceTemplate({ invoice, paymentSchedule }: InvoiceTem
   const daysToPay = invoice?.daysToPay ?? "-";
   const subtotal = invoice?.subtotal ?? 0;
   const taxAmount = invoice?.tax ?? 0;
-  const markup = invoice?.markupTotal ?? 0;
   const discount = invoice?.discount ?? 0;
   const total = invoice?.totalAmount ?? 0;
   const deposit = invoice?.depositAmount ?? total * 0.25;
@@ -134,7 +133,6 @@ export default function InvoiceTemplate({ invoice, paymentSchedule }: InvoiceTem
           <div className="flex gap-8">
             <span className="text-sm font-bold text-gray-700 w-20 text-right">Rate</span>
             <span className="text-sm font-bold text-gray-700 w-12 text-right">Qty</span>
-            <span className="text-sm font-bold text-gray-700 w-16 text-right">Tax</span>
             <span className="text-sm font-bold text-gray-700 w-24 text-right">Total</span>
           </div>
         </div>
@@ -155,9 +153,6 @@ export default function InvoiceTemplate({ invoice, paymentSchedule }: InvoiceTem
                   </span>
                   <span className="text-sm text-gray-500 w-12 text-right">
                     {item.quantity}
-                  </span>
-                  <span className="text-sm text-gray-500 w-16 text-right">
-                    ${formatCurrency(item.tax)}
                   </span>
                   <span className="text-sm text-gray-600 w-24 text-right">
                     $
@@ -225,7 +220,7 @@ export default function InvoiceTemplate({ invoice, paymentSchedule }: InvoiceTem
           <div className="flex justify-between text-sm">
             <span className="text-gray-900 font-bold">Subtotal</span>
             <span className="text-gray-500">
-              ${formatCurrency(Number(subtotal + markup))}
+              ${formatCurrency(Number(subtotal))}
             </span>
           </div>
           {/* {markup > 0 && (

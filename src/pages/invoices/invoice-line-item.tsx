@@ -37,6 +37,8 @@ type Props = {
   setValue: UseFormSetValue<InvoiceFormValues>;
   remove: (index: number) => void;
   taxes?: { name: string; rate: string }[];
+  markupValue: string;
+  markupType: "%" | "$";
 };
 
 const getFilenameFromUrl = (url: string) => {
@@ -57,6 +59,8 @@ export default function InvoiceLineItem({
   setValue,
   remove,
   taxes = [],
+  markupValue,
+  markupType,
 }: Props) {
   const watchedLineItem = useWatch({
     control,
@@ -71,29 +75,37 @@ export default function InvoiceLineItem({
     const rate = typeof rawRate === "number" && !Number.isNaN(rawRate) ? rawRate : 0;
     const quantity = typeof rawQuantity === "number" && !Number.isNaN(rawQuantity) ? rawQuantity : 1;
     
-    const subtotal = rate * quantity;
+    const markupPercent = markupType === "%" ? (parseFloat(markupValue) || 0) : 0;
+    const effectiveRate = rate * (1 + markupPercent / 100);
+    const markupAmount = (effectiveRate - rate) * quantity;
+    const total = rate * quantity;
+
     const selectedTax = currentItem?.selectedTax;
     const matchingTax = taxes.find((tax) => tax.name === selectedTax);
-    
-    const rawTax = currentItem?.tax;
-    const currentTax = typeof rawTax === "number" && !Number.isNaN(rawTax) ? rawTax : 0;
-    
-    const derivedTax = matchingTax
-      ? subtotal * (Number(matchingTax.rate || 0) / 100)
-      : currentTax;
-    const nextTotal = subtotal + derivedTax;
+    const taxPercent = matchingTax ? parseFloat(matchingTax.rate) || 0 : 0;
+    const taxAmount = (effectiveRate * quantity) * (taxPercent / 100);
 
-    if (currentTax !== derivedTax) {
-      setValue(`lineItems.${index}.tax`, derivedTax);
+    if (currentItem?.effectiveRate !== effectiveRate) {
+      setValue(`lineItems.${index}.effectiveRate` as const, effectiveRate);
     }
-
-    const rawTotal = currentItem?.total;
-    const currentTotal = typeof rawTotal === "number" && !Number.isNaN(rawTotal) ? rawTotal : 0;
-
-    if (currentTotal !== nextTotal) {
-      setValue(`lineItems.${index}.total`, nextTotal);
+    if (currentItem?.markupAmount !== markupAmount) {
+      setValue(`lineItems.${index}.markupAmount` as const, markupAmount);
     }
-  }, [index, item, setValue, taxes, watchedLineItem]);
+    if (currentItem?.markup !== markupPercent) {
+      setValue(`lineItems.${index}.markup` as const, markupPercent);
+      setValue(`lineItems.${index}.markupType` as const, "percentage");
+    }
+    if (currentItem?.tax !== taxPercent) {
+      setValue(`lineItems.${index}.tax` as const, taxPercent);
+      setValue(`lineItems.${index}.taxType` as const, "percentage");
+    }
+    if (currentItem?.taxAmount !== taxAmount) {
+      setValue(`lineItems.${index}.taxAmount` as const, taxAmount);
+    }
+    if (currentItem?.total !== total) {
+      setValue(`lineItems.${index}.total` as const, total);
+    }
+  }, [index, item, setValue, taxes, watchedLineItem, markupValue, markupType]);
 
   const removeImage = (imageIndex: number) => {
     const items = getValues("lineItems") || [];
@@ -144,20 +156,27 @@ export default function InvoiceLineItem({
           </div>
 
           {/* Rate */}
-          <div className="col-span-1 md:col-span-2 p-3 flex flex-col md:flex-row items-start md:items-center justify-center border-b md:border-b-0 border-r border-gray-100 ">
+          <div className="col-span-1 md:col-span-2 p-3 flex flex-col items-start justify-center border-b md:border-b-0 border-r border-gray-100">
             <span className="md:hidden text-gray-400 text-[10px] uppercase tracking-wide mb-1">
               Rate
             </span>
-            <Input
-              type="number"
-              step="0.01"
-              defaultValue={item?.rate ?? undefined}
-              {...register(`lineItems.${index}.rate` as const, {
-                valueAsNumber: true,
-              })}
-              placeholder="0.00"
-              className="text-gray-600 text-sm border-0 focus:ring-0 w-full"
-            />
+            <div className="w-full">
+              <Input
+                type="number"
+                step="0.01"
+                defaultValue={item?.rate ?? undefined}
+                {...register(`lineItems.${index}.rate` as const, {
+                  valueAsNumber: true,
+                })}
+                placeholder="0.00"
+                className="text-gray-600 text-sm border-0 focus:ring-0 w-full"
+              />
+              {watchedLineItem?.effectiveRate !== undefined && (parseFloat(markupValue) || 0) !== 0 && (
+                <span className="text-[10px] text-blue-600 font-medium px-3 block -mt-1 truncate">
+                  Client: ${watchedLineItem.effectiveRate.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Markup */}
@@ -232,8 +251,7 @@ export default function InvoiceLineItem({
             <span className="text-gray-900 md:text-gray-600 text-base md:text-sm font-bold md:font-medium">
               $
               {(
-                (item?.total ?? (item?.rate || 0) * (item?.quantity || 0)) ||
-                0
+                watchedLineItem?.total ?? item?.total ?? 0
               ).toLocaleString("en-US", { minimumFractionDigits: 2 })}
             </span>
           </div>

@@ -78,6 +78,11 @@ export type InvoiceLineItem = {
   tax?: number | null;
   total?: number | null;
   photos?: string[] | null;
+  markupType?: string | null;
+  taxType?: string | null;
+  effectiveRate?: number | null;
+  markupAmount?: number | null;
+  taxAmount?: number | null;
 };
 
 export type PaymentScheduleStage = {
@@ -164,6 +169,11 @@ export type CreateInvoiceLineItemPayload = {
   quantity: number;
   tax: number;
   total: number;
+  markupType?: string;
+  taxType?: string;
+  effectiveRate?: number;
+  markupAmount?: number;
+  taxAmount?: number;
 };
 
 export type CreateInvoiceDraftPayload = {

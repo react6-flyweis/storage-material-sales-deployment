@@ -33,9 +33,15 @@ import ClientSelector from "@/components/customers/client-selector";
 
 type LineItem = Omit<ApiInvoiceLineItem, "markup" | "tax"> & {
   id: string;
-  markup: string;
+  markup: number;
+  markupType: string;
   tax: number;
+  taxType: string;
   selectedTax?: string;
+  effectiveRate?: number;
+  markupAmount?: number;
+  taxAmount?: number;
+  total?: number;
 };
 
 export interface InvoiceFormValues {
@@ -70,9 +76,11 @@ const defaultLineItems: InvoiceFormValues["lineItems"] = [
     description: "",
     notes: "",
     rate: 0,
-    markup: "Markup",
+    markup: 0,
+    markupType: "percentage",
     quantity: 1,
     tax: 0,
+    taxType: "percentage",
     total: 0,
     selectedTax: "",
     images: [],
@@ -232,12 +240,6 @@ function resolveDepositFormValue(invoice?: InvoiceDetail | null) {
   return dollarAmountToFormValue(invoice?.depositAmount);
 }
 
-function lineItemMarkupLabel(markup?: number | null) {
-  if (markup != null && markup > 0) return "Fixed";
-
-  return "Markup";
-}
-
 function invoiceToFormValues(
   invoice?: InvoiceDetail | null,
   paymentSchedule?: PaymentScheduleDocument | null,
@@ -246,11 +248,32 @@ function invoiceToFormValues(
     invoice && typeof invoice.customerId === "object"
       ? invoice.customerId
       : null;
-  const markupValue = dollarAmountToFormValue(invoice?.markupTotal);
+  const firstLineItemWithMarkup = invoice?.lineItems?.find(
+    (item) => item.markup && item.markup > 0
+  );
+  const isPercentMarkup = firstLineItemWithMarkup?.markupType === "percentage";
+  const markupValue = isPercentMarkup
+    ? String(firstLineItemWithMarkup?.markup)
+    : dollarAmountToFormValue(invoice?.markupTotal);
+  const markupType = isPercentMarkup ? "%" : (markupValue ? "$" : defaultFormValues.markupType);
+
   const discountValue = dollarAmountToFormValue(invoice?.discount);
   const depositValue = resolveDepositFormValue(invoice);
   const scheduleValues = paymentScheduleToFormValues(paymentSchedule);
   const depositType = depositValue ? "$" : defaultFormValues.depositType;
+  
+  const taxesList = [...(defaultFormValues.taxes || [])];
+  if (invoice?.lineItems) {
+    invoice.lineItems.forEach((item) => {
+      if (item.tax && item.tax > 0) {
+        const rateStr = String(item.tax);
+        const name = `Tax ${rateStr}%`;
+        if (!taxesList.some((t) => parseFloat(t.rate) === item.tax)) {
+          taxesList.push({ name, rate: rateStr });
+        }
+      }
+    });
+  }
 
   return {
     ...defaultFormValues,
@@ -264,12 +287,13 @@ function invoiceToFormValues(
     clientId: getInvoiceClientId(invoice),
     leadId: invoice?.leadId ?? defaultFormValues.leadId,
     clientName: getCustomerName(customer) || defaultFormValues.clientName,
-    markupType: markupValue ? "$" : defaultFormValues.markupType,
+    markupType,
     markupValue,
     discountType: discountValue ? "$" : defaultFormValues.discountType,
     discountValue,
     depositType,
     depositValue,
+    taxes: taxesList,
     ...scheduleValues,
     paymentSchedulePayments: ensureDepositInSchedulePayments(
       scheduleValues.paymentSchedulePayments,
@@ -277,21 +301,35 @@ function invoiceToFormValues(
     ),
     lineItems:
       invoice?.lineItems?.length && invoice.lineItems.length > 0
-        ? invoice.lineItems.map((item, index) => ({
-          id: item._id ?? item.id ?? `${invoice._id ?? "invoice"}-${index}`,
-          description: item.description ?? "",
-          notes: item.notes ?? "",
-          rate: item.rate ?? 0,
-          markup: lineItemMarkupLabel(item.markup),
-          quantity: item.quantity ?? 1,
-          tax: item.tax ?? 0,
-          total:
-            item.total ??
-            (item.rate ?? 0) * (item.quantity ?? 0) + (item.tax ?? 0),
-          selectedTax: "",
-          images: item.images ?? item.photos ?? [],
-          items: item.items ?? [],
-        }))
+        ? invoice.lineItems.map((item, index) => {
+          const taxVal = item.tax ?? 0;
+          const matchingTax = taxesList.find((t: { name: string; rate: string }) => parseFloat(t.rate) === taxVal);
+          const rateVal = item.rate ?? 0;
+          const qtyVal = item.quantity ?? 1;
+          const markupPercent = item.markup || (markupType === "%" ? parseFloat(markupValue) || 0 : 0);
+          const markupAmt = item.markupAmount ?? (rateVal * (markupPercent / 100) * qtyVal);
+          const effRate = item.effectiveRate ?? (rateVal * (1 + markupPercent / 100));
+          const taxAmt = item.taxAmount ?? (effRate * qtyVal * (taxVal / 100));
+          const itemTotal = effRate * qtyVal;
+          return {
+            id: item._id ?? item.id ?? `${invoice._id ?? "invoice"}-${index}`,
+            description: item.description ?? "",
+            notes: item.notes ?? "",
+            rate: rateVal,
+            markup: markupPercent,
+            markupType: item.markupType ?? "percentage",
+            quantity: qtyVal,
+            tax: taxVal,
+            taxType: item.taxType ?? "percentage",
+            effectiveRate: effRate,
+            markupAmount: markupAmt,
+            taxAmount: taxAmt,
+            total: itemTotal,
+            selectedTax: matchingTax ? matchingTax.name : "",
+            images: item.images ?? item.photos ?? [],
+            items: item.items ?? [],
+          };
+        })
         : defaultLineItems,
   };
 }
@@ -485,9 +523,11 @@ export default function InvoiceForm({
       description: "",
       notes: "",
       rate: 0,
-      markup: "Markup",
+      markup: 0,
+      markupType: "percentage",
       quantity: 1,
       tax: 0,
+      taxType: "percentage",
       total: 0,
       selectedTax: "",
       images: [],
@@ -504,34 +544,38 @@ export default function InvoiceForm({
 
   const calculateSubtotal = () => {
     const items = watchLineItems || [];
-    return items.reduce(
-      (sum, item) =>
-        sum + (parseFloat(String(item.total ?? item.rate ?? 0)) || 0),
-      0,
-    );
+    return items.reduce((sum, item) => {
+      const rate = parseFloat(String(item.rate ?? 0)) || 0;
+      const quantity = parseFloat(String(item.quantity ?? 1)) || 0;
+      return sum + (rate * quantity);
+    }, 0);
   };
 
   const calculateTax = () => {
+    const markupPercent = markupType === "%" ? (parseFloat(markupValue) || 0) : 0;
     const items = watchLineItems || [];
     const available = taxes || [];
 
     return items.reduce((sum, item) => {
-      const itemSubtotal =
-        (parseFloat(String(item.rate || 0)) || 0) * (item.quantity || 0);
+      const rate = parseFloat(String(item.rate || 0)) || 0;
+      const quantity = parseFloat(String(item.quantity || 1)) || 0;
+      const effectiveRate = rate * (1 + markupPercent / 100);
+      const total = effectiveRate * quantity;
+
       const selectedName = item.selectedTax;
       const t = available.find((a) => a.name === selectedName);
-      const rate = t ? parseFloat(t.rate || "0") : 0;
-      const lineTax = parseFloat(String(item.tax ?? 0)) || 0;
-      return sum + (lineTax || itemSubtotal * (rate / 100));
+      const taxRate = t ? parseFloat(t.rate || "0") : 0;
+      return sum + (total * (taxRate / 100));
     }, 0);
   };
 
   const calculateTotal = () => {
-    const subtotal = calculateSubtotal();
-    const markup = getAdjustmentAmount(markupValue, markupType, subtotal);
-    const discount = getAdjustmentAmount(discountValue, discountType, subtotal);
+    const rawSubtotal = calculateSubtotal();
+    const markup = getAdjustmentAmount(markupValue, markupType, rawSubtotal);
+    const discount = getAdjustmentAmount(discountValue, discountType, rawSubtotal);
+    const tax = calculateTax();
 
-    return Math.max(0, subtotal + markup - discount);
+    return Math.max(0, rawSubtotal + markup - discount + tax);
   };
 
   const invoiceTotal = calculateTotal();
@@ -616,32 +660,52 @@ export default function InvoiceForm({
       return;
     }
 
-    const lineItemsSubtotal = (data.lineItems || []).reduce((sum, item) => {
+    const markupPercent = data.markupType === "%" ? parseNumericInput(data.markupValue) : 0;
+
+    let subtotal = 0;
+    let markupTotal = 0;
+    let taxTotal = 0;
+
+    const lineItemsPayload = (data.lineItems || []).map((item) => {
       const rate = parseNumericInput(String(item.rate ?? 0));
-      const quantity = parseNumericInput(String(item.quantity ?? 0));
-      const tax = parseNumericInput(String(item.tax ?? 0));
-      const itemTotal = parseNumericInput(
-        String(item.total ?? 0),
-        rate * quantity + tax,
-      );
+      const quantity = parseNumericInput(String(item.quantity ?? 1));
+      
+      const effectiveRate = rate * (1 + markupPercent / 100);
+      const markupAmount = (effectiveRate - rate) * quantity;
+      const itemTotal = effectiveRate * quantity;
 
-      return sum + itemTotal;
-    }, 0);
+      const matchingTax = (data.taxes || []).find((t) => t.name === item.selectedTax);
+      const taxPercent = matchingTax ? parseNumericInput(matchingTax.rate) : 0;
+      const taxAmount = itemTotal * (taxPercent / 100);
 
-    const markupTotal = getAdjustmentAmount(
-      data.markupValue,
-      data.markupType,
-      lineItemsSubtotal,
-    );
+      subtotal += itemTotal;
+      markupTotal += markupAmount;
+      taxTotal += taxAmount;
+
+      return {
+        description: item.description?.trim() || "",
+        notes: item.notes?.trim() || "",
+        images: item.images ?? [],
+        items: item.items ?? [],
+        rate,
+        markup: markupPercent,
+        markupType: "percentage",
+        quantity,
+        tax: taxPercent,
+        taxType: "percentage",
+        effectiveRate,
+        markupAmount,
+        taxAmount,
+        total: itemTotal,
+      };
+    });
+
     const discount = getAdjustmentAmount(
       data.discountValue,
       data.discountType,
-      lineItemsSubtotal,
+      subtotal,
     );
-    const totalAmount = Math.max(
-      0,
-      lineItemsSubtotal + markupTotal - discount,
-    );
+    const totalAmount = Math.max(0, subtotal - discount + taxTotal);
     const depositAmount = getAdjustmentAmount(
       data.depositValue,
       data.depositType,
@@ -652,20 +716,11 @@ export default function InvoiceForm({
     const payload = {
       date: data.date || undefined,
       daysToPay: Number.isFinite(parsedDaysToPay) ? parsedDaysToPay : undefined,
-      lineItems: (data.lineItems || []).map((item) => ({
-        description: item.description?.trim() || "",
-        notes: item.notes?.trim() || "",
-        images: item.images ?? [],
-        items: item.items ?? [],
-        rate: parseNumericInput(String(item.rate ?? 0)),
-        markup: 0,
-        quantity: parseNumericInput(String(item.quantity ?? 0)),
-        tax: parseNumericInput(String(item.tax ?? 0)),
-        total: parseNumericInput(String(item.total ?? 0)),
-      })),
-      subtotal: lineItemsSubtotal,
+      lineItems: lineItemsPayload,
+      subtotal,
       markupTotal,
       discount,
+      tax: taxTotal,
       depositAmount,
       totalAmount,
       ...(paymentScheduleId ? { paymentScheduleId } : {}),
@@ -706,6 +761,12 @@ export default function InvoiceForm({
 
   return (
     <div className="md:px-5 px-2 md:pt-5 pb-10 space-y-6 min-w-xs">
+      <input type="hidden" {...register("markupType")} />
+      <input type="hidden" {...register("markupValue")} />
+      <input type="hidden" {...register("discountType")} />
+      <input type="hidden" {...register("discountValue")} />
+      <input type="hidden" {...register("depositType")} />
+      <input type="hidden" {...register("depositValue")} />
       <SuccessDialog
         open={successOpen}
         onClose={() => {
@@ -939,6 +1000,8 @@ export default function InvoiceForm({
                 setValue={setValue}
                 remove={remove}
                 taxes={taxes}
+                markupValue={markupValue}
+                markupType={markupType}
               />
             );
           })}
