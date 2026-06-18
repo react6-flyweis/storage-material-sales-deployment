@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/modules/auth/auth.api";
 import {
   getPeriodRange,
@@ -123,8 +123,6 @@ export function useDashboardMetricsQuery(period?: Period) {
       dateRange.endDate,
     ],
     queryFn: () => getDashboardMetrics(dateRange),
-    staleTime: 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 
@@ -132,8 +130,6 @@ export function useLeadsStatsQuery() {
   return useQuery({
     queryKey: ["sales", "leads", "stats"],
     queryFn: getLeadsStats,
-    staleTime: 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 
@@ -162,8 +158,6 @@ export function useFollowUpStatsQuery() {
   return useQuery({
     queryKey: ["sales", "followups", "stats"],
     queryFn: getFollowUpStats,
-    staleTime: 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 
@@ -172,8 +166,6 @@ export function useConversionFunnelQuery(period?: Period) {
   return useQuery({
     queryKey: ["sales", "dashboard", "conversion-funnel", dateRange.startDate, dateRange.endDate],
     queryFn: () => getConversionFunnelMetrics(dateRange),
-    staleTime: 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 
@@ -214,8 +206,6 @@ export function useCustomerStatsQuery(period?: Period) {
   return useQuery({
     queryKey: ["sales", "customers", "stats", dateRange.startDate, dateRange.endDate],
     queryFn: () => getCustomerStats(dateRange),
-    staleTime: 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 
@@ -249,8 +239,6 @@ export function usePerformanceTrendQuery(tab: string, range: string) {
   return useQuery({
     queryKey: ["sales", "dashboard", "performance-trend", tab, range],
     queryFn: () => getPerformanceTrend(tab, range),
-    staleTime: 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 
@@ -301,8 +289,6 @@ export function useDashboardTodayTasksQuery() {
   return useQuery({
     queryKey: ["sales", "dashboard", "today-tasks"],
     queryFn: getDashboardTodayTasks,
-    staleTime: 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 

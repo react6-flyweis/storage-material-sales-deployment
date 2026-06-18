@@ -29,6 +29,5 @@ export function useMeetingsQuery() {
   return useQuery({
     queryKey: ["meetings", "admin-list"],
     queryFn: getAdminMeetingsProvider,
-    staleTime: 60 * 1000,
   });
 }

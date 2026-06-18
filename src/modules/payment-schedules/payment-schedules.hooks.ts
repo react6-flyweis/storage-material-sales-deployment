@@ -13,7 +13,6 @@ export function usePaymentScheduleByLeadQuery(
     queryKey: ["payment-schedules", "lead", leadId],
     queryFn: () => getPaymentScheduleByLeadProvider(leadId!),
     enabled: Boolean(leadId) && enabled,
-    staleTime: 60 * 1000,
   });
 }
 

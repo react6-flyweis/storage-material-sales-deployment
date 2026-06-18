@@ -1,5 +1,4 @@
 import {
-  keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
@@ -19,7 +18,6 @@ export function useInvoiceStatsQuery(params?: { leadId?: string }) {
   return useQuery({
     queryKey: ["invoices", "stats", params?.leadId],
     queryFn: () => getInvoiceStatsProvider(params),
-    staleTime: 60 * 1000,
   });
 }
 
@@ -31,7 +29,6 @@ export function useInvoiceDetailQuery(
     queryKey: ["invoices", "detail", invoiceId],
     queryFn: () => getInvoiceDetailProvider(invoiceId!),
     enabled: Boolean(invoiceId) && enabled,
-    staleTime: 60 * 1000,
   });
 }
 
@@ -67,8 +64,6 @@ export function useInvoicesQuery(params: InvoiceListParams = {}) {
         page,
         limit,
       }),
-    staleTime: 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 

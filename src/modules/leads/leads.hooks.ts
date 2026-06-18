@@ -1,5 +1,4 @@
 import {
-  keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
@@ -70,7 +69,6 @@ export function useEscalatedLeadsQuery() {
   return useQuery({
     queryKey: ["sales", "escalations"],
     queryFn: getEscalationsProvider,
-    staleTime: 60 * 1000,
   });
 }
 
@@ -78,8 +76,6 @@ export function useLeadsQuery(params: GetLeadsParams) {
   return useQuery({
     queryKey: ["sales", "leads", params],
     queryFn: () => getLeadsProvider(params),
-    staleTime: 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 
@@ -87,8 +83,6 @@ export function useLeadsLookupQuery(search?: string, page = 1, limit = 20) {
   return useQuery({
     queryKey: ["leads", "lookup", search, page, limit],
     queryFn: () => lookupLeadsProvider(search, page, limit),
-    staleTime: 60 * 1000,
-    placeholderData: keepPreviousData,
   });
 }
 
@@ -97,7 +91,6 @@ export function useLeadDetailQuery(leadId: string | undefined, enabled = true) {
     queryKey: ["sales", "leads", "detail", leadId],
     queryFn: () => getLeadDetailProvider(leadId!),
     enabled: Boolean(leadId) && enabled,
-    staleTime: 30 * 1000,
   });
 }
 
@@ -105,7 +98,6 @@ export function useScoredLeadsQuery(page: number, limit: number, startDate?: str
   return useQuery({
     queryKey: ["sales", "leads", "scored", page, limit, startDate, endDate],
     queryFn: () => getScoredLeadsProvider(page, limit, startDate, endDate),
-    staleTime: 60 * 1000,
   });
 }
 
@@ -267,7 +259,6 @@ export function useLeadAgreementQuery(leadId: string | undefined) {
     queryKey: ["sales", "leads", "agreement", leadId],
     queryFn: () => getLeadAgreementProvider(leadId!),
     enabled: Boolean(leadId),
-    staleTime: 30 * 1000,
   });
 }
 
