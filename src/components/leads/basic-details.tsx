@@ -211,12 +211,10 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
             </div>
           </div>
 
-          {(!noOfBuildings || noOfBuildings === 0) && (
-            <AddBuildingDialog
-              leadId={leadData?._id}
-              currentNoOfBuildings={noOfBuildings}
-            />
-          )}
+          <AddBuildingDialog
+            leadId={leadData?._id}
+            currentNoOfBuildings={noOfBuildings}
+          />
         </CardHeader>
 
         <CardContent className="pb-4 border-b">
