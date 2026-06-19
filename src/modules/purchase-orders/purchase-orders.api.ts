@@ -13,6 +13,7 @@ export type PurchaseOrderItem = {
   adminNotes?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
+  quoteValue?: number;
 };
 
 export type PurchaseOrdersListResponse = {

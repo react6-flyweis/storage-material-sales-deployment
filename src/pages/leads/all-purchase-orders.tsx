@@ -207,8 +207,8 @@ export default function AllPurchaseOrdersPage() {
                       </TableCell>
 
                       <TableCell className="">
-                        {order.leadId?.quoteValue !== undefined
-                          ? formatCurrency(order.leadId.quoteValue)
+                        {order.quoteValue
+                          ? formatCurrency(order.quoteValue)
                           : "-"}
                       </TableCell>
 
