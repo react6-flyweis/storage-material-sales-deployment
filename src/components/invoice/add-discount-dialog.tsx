@@ -17,8 +17,6 @@ import {
   exceedsPercentLimit,
   getAdjustmentAmount,
   parseNumericInput,
-  roundMoney,
-  roundPercent,
 } from "@/lib/invoice-amounts";
 
 type Props = {
@@ -70,35 +68,6 @@ export default function AddDiscountDialog({
           ? "Discount exceeds the subtotal"
           : "";
 
-  const remainingLabel = React.useMemo(() => {
-    if (!value.trim()) {
-      if (type === "%") {
-        return `${maxDiscountPercent.toFixed(2)}% available`;
-      }
-      if (hasMaxAmount) {
-        return `$${maxDiscountDollars.toFixed(2)} available`;
-      }
-      return "";
-    }
-
-    if (type === "%") {
-      const rem = roundPercent(Math.max(0, maxDiscountPercent - numericValue));
-      return `${rem.toFixed(2)}% Remaining`;
-    }
-    if (hasMaxAmount) {
-      const rem = roundMoney(Math.max(0, maxDiscountDollars - enteredDiscountDollars));
-      return `$${rem.toFixed(2)} Remaining`;
-    }
-    return `$${enteredDiscountDollars.toFixed(2)}`;
-  }, [
-    enteredDiscountDollars,
-    hasMaxAmount,
-    maxDiscountDollars,
-    maxDiscountPercent,
-    numericValue,
-    type,
-    value,
-  ]);
 
   const handleDone = () => {
     const trimmed = value.trim();
@@ -166,14 +135,11 @@ export default function AddDiscountDialog({
                 </div>
               </div>
 
-              {remainingLabel && (
+              {validationError && (
                 <div className="text-center">
-                  <div className="text-blue-600">{remainingLabel}</div>
-                  {validationError && (
-                    <div className="text-sm text-red-500 mt-2">
-                      {validationError}
-                    </div>
-                  )}
+                  <div className="text-sm text-red-500">
+                    {validationError}
+                  </div>
                 </div>
               )}
             </div>

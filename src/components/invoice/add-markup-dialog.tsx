@@ -15,7 +15,6 @@ import { Label } from "@/components/ui/label";
 import {
   exceedsPercentLimit,
   parseNumericInput,
-  roundPercent,
 } from "@/lib/invoice-amounts";
 
 type Props = {
@@ -49,14 +48,6 @@ export default function AddMarkupDialog({
         ? "Markup exceeds 100%"
         : "";
 
-  const remainingLabel = React.useMemo(() => {
-    if (!value.trim()) {
-      return `${maxMarkupPercent.toFixed(2)}% available`;
-    }
-
-    const rem = roundPercent(Math.max(0, maxMarkupPercent - numericValue));
-    return `${rem.toFixed(2)}% Remaining`;
-  }, [maxMarkupPercent, numericValue, value]);
 
   const handleDone = () => {
     const trimmed = value.trim();
@@ -100,14 +91,11 @@ export default function AddMarkupDialog({
                 </div>
               </div>
 
-              {remainingLabel && (
+              {validationError && (
                 <div className="text-center">
-                  <div className="text-blue-600">{remainingLabel}</div>
-                  {validationError && (
-                    <div className="text-sm text-red-500 mt-2">
-                      {validationError}
-                    </div>
-                  )}
+                  <div className="text-sm text-red-500">
+                    {validationError}
+                  </div>
                 </div>
               )}
             </div>
