@@ -223,14 +223,6 @@ export default function InvoiceTemplate({ invoice, paymentSchedule }: InvoiceTem
               ${formatCurrency(Number(subtotal))}
             </span>
           </div>
-          {/* {markup > 0 && (
-            <div className="flex justify-between text-sm">
-              <span className="text-emerald-600">Markup</span>
-              <span className="text-emerald-600 font-medium">
-                ${formatCurrency(Number(markup))}
-              </span>
-            </div>
-          )} */}
           {discount > 0 && (
             <div className="flex justify-between text-sm">
               <span className="text-red-600">Discount</span>

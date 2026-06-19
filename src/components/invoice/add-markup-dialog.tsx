@@ -13,11 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  exceedsMoneyLimit,
   exceedsPercentLimit,
-  getAdjustmentAmount,
   parseNumericInput,
-  roundMoney,
   roundPercent,
 } from "@/lib/invoice-amounts";
 
@@ -31,74 +28,35 @@ type Props = {
 
 export default function AddMarkupDialog({
   children,
-  initialType = "%",
   initialValue = "",
-  maxAmount,
   onDone,
 }: Props) {
   const [open, setOpen] = React.useState(false);
-  const [type, setType] = React.useState<"%" | "$">(initialType);
+  const type = "%";
   const [value, setValue] = React.useState(initialValue);
 
   React.useEffect(() => {
-    setType(initialType);
     setValue(initialValue);
-  }, [initialType, initialValue]);
+  }, [initialValue]);
 
-  const hasMaxAmount = Number.isFinite(maxAmount) && (maxAmount ?? 0) > 0;
   const numericValue = parseNumericInput(value.trim());
-  const baseSubtotal = maxAmount ?? 0;
-
-  const maxMarkupDollars = hasMaxAmount ? baseSubtotal : Infinity;
   const maxMarkupPercent = 100;
-
-  const enteredMarkupDollars = getAdjustmentAmount(
-    value.trim(),
-    type,
-    baseSubtotal,
-  );
 
   const validationError =
     !value.trim()
       ? ""
-      : type === "%"
-        ? exceedsPercentLimit(numericValue, maxMarkupPercent)
-          ? "Markup exceeds 100%"
-          : ""
-        : hasMaxAmount &&
-            exceedsMoneyLimit(enteredMarkupDollars, maxMarkupDollars)
-          ? "Markup exceeds the subtotal"
-          : "";
+      : exceedsPercentLimit(numericValue, maxMarkupPercent)
+        ? "Markup exceeds 100%"
+        : "";
 
   const remainingLabel = React.useMemo(() => {
     if (!value.trim()) {
-      if (type === "%") {
-        return `${maxMarkupPercent.toFixed(2)}% available`;
-      }
-      if (hasMaxAmount) {
-        return `$${maxMarkupDollars.toFixed(2)} available`;
-      }
-      return "";
+      return `${maxMarkupPercent.toFixed(2)}% available`;
     }
 
-    if (type === "%") {
-      const rem = roundPercent(Math.max(0, maxMarkupPercent - numericValue));
-      return `${rem.toFixed(2)}% Remaining`;
-    }
-    if (hasMaxAmount) {
-      const rem = roundMoney(Math.max(0, maxMarkupDollars - enteredMarkupDollars));
-      return `$${rem.toFixed(2)} Remaining`;
-    }
-    return `$${enteredMarkupDollars.toFixed(2)}`;
-  }, [
-    enteredMarkupDollars,
-    hasMaxAmount,
-    maxMarkupDollars,
-    maxMarkupPercent,
-    numericValue,
-    type,
-    value,
-  ]);
+    const rem = roundPercent(Math.max(0, maxMarkupPercent - numericValue));
+    return `${rem.toFixed(2)}% Remaining`;
+  }, [maxMarkupPercent, numericValue, value]);
 
   const handleDone = () => {
     const trimmed = value.trim();
@@ -118,36 +76,12 @@ export default function AddMarkupDialog({
               Add Markup
             </DialogTitle>
             <DialogDescription className="sr-only">
-              Add a markup by percent or dollar
+              Add a markup by percent
             </DialogDescription>
           </DialogHeader>
 
           <div className="p-6">
             <div className="space-y-6">
-              <div className="flex items-center gap-6">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="markup-type"
-                    checked={type === "%"}
-                    onChange={() => setType("%")}
-                    className="w-4 h-4"
-                  />
-                  <span className="text-sm">%</span>
-                </label>
-
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="markup-type"
-                    checked={type === "$"}
-                    onChange={() => setType("$")}
-                    className="w-4 h-4"
-                  />
-                  <span className="text-sm">$</span>
-                </label>
-              </div>
-
               <div className="space-y-2">
                 <Label>Markup</Label>
                 <div className="relative">
