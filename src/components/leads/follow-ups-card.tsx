@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
 import { useCompleteFollowUpMutation } from "@/modules/followups/followups.hooks";
+import { useMeetingsQuery } from "@/modules/meetings/meetings.hooks";
 import SuccessDialog from "@/components/success-dialog";
 import { useParams, Link } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -89,8 +90,6 @@ function mapLeadFollowUpsToDisplay(items?: LeadDetailFollowUp[]): FollowUp[] {
   });
 }
 
-const meetings: Meeting[] = [];
-
 const getTypeBadgeClassName = (type: string) => {
   switch (type.toLowerCase()) {
     case "quotation":
@@ -133,6 +132,47 @@ export default function FollowUpsCard({
       completeFollowUp.reset();
     }
   }, [completeFollowUp, completeFollowUp.isSuccess, leadId, queryClient]);
+
+  const { data: meetingsResponse, isLoading: isLoadingMeetings } = useMeetingsQuery({ leadId });
+
+  const meetingsList = useMemo<Meeting[]>(() => {
+    const responseData = meetingsResponse?.data;
+    if (!responseData) return [];
+
+    const apiMeetings = Array.isArray(responseData.meetings)
+      ? responseData.meetings
+      : responseData.meeting
+        ? [responseData.meeting]
+        : [];
+
+    return apiMeetings.map((m) => {
+      const d = new Date(m.meetingTime);
+      const timeFormatted = !Number.isNaN(d.getTime())
+        ? new Intl.DateTimeFormat("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          }).format(d)
+        : m.meetingTime;
+
+      let company = "";
+      if (m.customerId && typeof m.customerId !== "string") {
+        company = m.customerId.firstName || m.customerId.customerId || m.customerId.email || "";
+      }
+
+      return {
+        id: m._id,
+        time: timeFormatted,
+        title: m.title,
+        company,
+        duration: `${m.duration} mins`,
+        action: m.mode === "online" ? ("call" as const) : ("email" as const),
+        meetingLink: m.meetingLink,
+      };
+    });
+  }, [meetingsResponse]);
 
   const activityEntries = useMemo(() => {
     const entries = [...auditLog].sort(
@@ -262,44 +302,65 @@ export default function FollowUpsCard({
               </Link>
             </CardHeader>
             <CardContent className="space-y-4">
-              {meetings.map((m) => (
-                <div
-                  key={m.id}
-                  className={cn(
-                    "rounded-lg p-4 border-l-5  flex items-start justify-between",
-                    { "bg-rose-50  border-rose-600": m.action === "call" },
-                    { "bg-yellow-50  border-yellow-600": m.action === "email" },
-                  )}
-                >
-                  <div>
-                    <div className="text-xs text-gray-500">{m.time}</div>
-                    <div className="font-semibold mt-1">{m.title}</div>
-                    {m.company && (
-                      <div className="text-sm text-gray-500">{m.company}</div>
+              {isLoadingMeetings ? (
+                <div className="px-4 py-6 text-sm text-gray-500">
+                  Loading meetings...
+                </div>
+              ) : meetingsList.length === 0 ? (
+                <div className="px-4 py-6 text-sm text-gray-500">
+                  No meetings scheduled.
+                </div>
+              ) : (
+                meetingsList.map((m) => (
+                  <div
+                    key={m.id}
+                    className={cn(
+                      "rounded-lg p-4 border-l-5  flex items-start justify-between",
+                      { "bg-rose-50  border-rose-600": m.action === "call" },
+                      { "bg-yellow-50  border-yellow-600": m.action === "email" },
                     )}
-                    <div className="text-sm text-gray-400 mt-1">
-                      {m.duration}
+                  >
+                    <div>
+                      <div className="text-xs text-gray-500">{m.time}</div>
+                      <div className="font-semibold mt-1">{m.title}</div>
+                      {m.company && (
+                        <div className="text-sm text-gray-500">{m.company}</div>
+                      )}
+                      <div className="text-sm text-gray-400 mt-1">
+                        {m.duration}
+                      </div>
+                    </div>
+                    <div>
+                      {m.action === "call" ? (
+                        m.meetingLink ? (
+                          <a href={m.meetingLink} target="_blank" rel="noopener noreferrer">
+                            <Button
+                              variant="ghost"
+                              className="bg-green-50 text-green-700"
+                            >
+                              <Phone className="h-4 w-4 mr-2" /> Join
+                            </Button>
+                          </a>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            className="bg-green-50 text-green-700"
+                          >
+                            <Phone className="h-4 w-4 mr-2" /> Call
+                          </Button>
+                        )
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          className="bg-blue-50 text-blue-700"
+                        >
+                          <Mail className="h-4 w-4 mr-2" /> Email
+                        </Button>
+                      )}
                     </div>
                   </div>
-                  <div>
-                    {m.action === "call" ? (
-                      <Button
-                        variant="ghost"
-                        className="bg-green-50 text-green-700"
-                      >
-                        <Phone className="h-4 w-4 mr-2" /> Call
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        className="bg-blue-50 text-blue-700"
-                      >
-                        <Mail className="h-4 w-4 mr-2" /> Email
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </CardContent>
           </Card>
         </div>

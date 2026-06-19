@@ -25,9 +25,9 @@ export function useUpdateMeetingMutation() {
   });
 }
 
-export function useMeetingsQuery() {
+export function useMeetingsQuery(params?: { leadId?: string }) {
   return useQuery({
-    queryKey: ["meetings", "admin-list"],
-    queryFn: getAdminMeetingsProvider,
+    queryKey: ["meetings", "admin-list", params],
+    queryFn: () => getAdminMeetingsProvider(params),
   });
 }

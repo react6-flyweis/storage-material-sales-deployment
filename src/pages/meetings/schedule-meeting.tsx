@@ -178,7 +178,7 @@ export default function ScheduleMeeting() {
       `${data.date}T${data.time}:00.000Z`,
     ).toISOString();
 
-    let meetingLink = data.link?.trim() ?? "";
+    let meetingLink = data.mode === "online" ? (data.link?.trim() ?? "") : "";
     if (meetingLink && !/^https?:\/\//i.test(meetingLink)) {
       meetingLink = `https://${meetingLink}`;
     }
@@ -379,15 +379,17 @@ export default function ScheduleMeeting() {
           </div>
 
           {/* Meeting Link */}
-          <div className="space-y-2">
-            <Label htmlFor="link">
-              Meeting Link {mode === "online" && <span className="text-red-500">*</span>}
-            </Label>
-            <Input id="link" placeholder="Zoom Meeting" {...register("link")} />
-            {errors.link && (
-              <p className="text-sm text-red-500">{errors.link.message}</p>
-            )}
-          </div>
+          {mode === "online" && (
+            <div className="space-y-2">
+              <Label htmlFor="link">
+                Meeting Link <span className="text-red-500">*</span>
+              </Label>
+              <Input id="link" placeholder="Zoom Meeting" {...register("link")} />
+              {errors.link && (
+                <p className="text-sm text-red-500">{errors.link.message}</p>
+              )}
+            </div>
+          )}
 
           {/* Add Notes */}
           <div className="space-y-2">

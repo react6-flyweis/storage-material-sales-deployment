@@ -84,9 +84,10 @@ export async function editMeetingProvider(
   return response.data;
 }
 
-export async function getAdminMeetingsProvider() {
+export async function getAdminMeetingsProvider(params?: { leadId?: string }) {
   const response = await apiClient.get<GetMeetingsResponse>(
     "/api/sales/meetings",
+    { params },
   );
 
   return response.data;
