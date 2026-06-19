@@ -14,14 +14,6 @@ import { Badge } from "@/components/ui/badge";
 import { getLeadProjectName } from "@/modules/leads/leads.utils";
 import { cn } from "@/lib/utils";
 
-interface LeadScore {
-  id: string;
-  name: string;
-  location: string;
-  score: number;
-  scoreLabel: "Hot" | "Warm" | "Cold";
-}
-
 function LeadScoringSkeleton() {
   return (
     <div className="space-y-3 animate-pulse">
@@ -58,31 +50,18 @@ export default function LeadScoring() {
     isLoading,
     isError,
     refetch,
-  } = useScoredLeadsQuery(1, 10);
+  } = useScoredLeadsQuery(1, 20);
 
-  const leads: LeadScore[] = (scoredResp?.data?.leads || [])
-    .map((l) => {
-      const scoreNum = l.score ?? 0;
-      const scoreLabel: LeadScore["scoreLabel"] =
-        scoreNum >= 70 ? "Hot" : scoreNum >= 40 ? "Warm" : "Cold";
-
-      return {
-        id: l.leadId,
-        name: getLeadProjectName({ projectName: l.projectName, customerId: { firstName: l.customerName }, location: l.location },),
-        location: l.customerName || "N/A",
-        score: scoreNum,
-        scoreLabel,
-      };
-    })
-    .filter((lead) => lead.scoreLabel === "Hot");
+  const leads = (scoredResp?.data?.leads || [])
+    .filter((lead) => lead.temperature === "hot");
 
   const getScoreBadgeClass = (score: string) => {
-    switch (score) {
-      case "Hot":
+    switch (score.toLowerCase()) {
+      case "hot":
         return "bg-red-50 text-red-600";
-      case "Warm":
+      case "warm":
         return "bg-yellow-50 text-yellow-700";
-      case "Cold":
+      case "cold":
         return "bg-blue-50 text-blue-600";
       default:
         return "bg-gray-50 text-gray-600";
@@ -126,17 +105,23 @@ export default function LeadScoring() {
         ) : (
           leads.slice(0, 3).map((lead) => (
             <div
-              key={lead.id}
+              key={lead.leadId}
               className="flex items-center justify-between bg-gray-50 rounded-md p-4"
             >
               <div className="flex space-x-3">
-                <Badge className={cn("capitalize", getScoreBadgeClass(lead.scoreLabel))}>
-                  {lead.scoreLabel.toLowerCase()}
+                <Badge className={cn("capitalize", getScoreBadgeClass(lead.temperature))}>
+                  {lead.temperature}
                 </Badge>
                 <div>
-                  <div className="font-medium text-gray-900">{lead.name}</div>
+                  <div className="font-medium text-gray-900">
+                    {getLeadProjectName({
+                      projectName: lead.projectName,
+                      customerId: { firstName: lead.customerName },
+                      location: lead.location,
+                    })}
+                  </div>
                   <div className="text-sm text-gray-500 mt-1">
-                    {lead.location}
+                    {lead.customerName || "N/A"}
                   </div>
                 </div>
               </div>
