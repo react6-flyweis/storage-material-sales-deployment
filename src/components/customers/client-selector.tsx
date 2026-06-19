@@ -19,6 +19,7 @@ type Client = {
   customerId: string;
   lifecycleStatus?: string;
   jobId?: string;
+  quoteValue?: number;
 };
 
 type Props = {
@@ -53,6 +54,7 @@ export default function ClientSelector({
         customerId: lead.customerId?._id || "",
         lifecycleStatus: lead.lifecycleStatus,
         jobId: lead.jobId,
+        quoteValue: lead.quoteValue,
       })) || [];
 
 

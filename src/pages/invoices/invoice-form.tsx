@@ -17,7 +17,11 @@ import {
   useCreateInvoiceMutation,
   useEditInvoiceMutation,
 } from "@/modules/invoices/invoices.hooks";
-import { usePaymentScheduleByLeadQuery } from "@/modules/payment-schedules/payment-schedules.hooks";
+import {
+  usePaymentScheduleByLeadQuery,
+  useCreatePaymentScheduleMutation,
+  useUpdatePaymentScheduleMutation,
+} from "@/modules/payment-schedules/payment-schedules.hooks";
 import {
   getDepositFromScheduleStages,
   isDepositStageName,
@@ -59,6 +63,7 @@ export interface InvoiceFormValues {
   depositValue: string;
   paymentScheduleType: "%" | "$";
   paymentSchedulePayments: {
+    _id?: string;
     name: string;
     amount: string;
     dueDate?: string;
@@ -377,6 +382,8 @@ export default function InvoiceForm({
   const navigate = useNavigate();
   const createInvoiceMutation = useCreateInvoiceMutation();
   const editInvoiceMutation = useEditInvoiceMutation();
+  const createPaymentScheduleMutation = useCreatePaymentScheduleMutation();
+  const updatePaymentScheduleMutation = useUpdatePaymentScheduleMutation();
   const isEdit = Boolean(invoice && invoice._id);
   const isSummaryReadOnly =
     isEdit && Boolean(invoice?.status) && invoice?.status !== "draft";
@@ -394,6 +401,7 @@ export default function InvoiceForm({
     getValues,
     reset,
     setError,
+    formState: { errors },
   } = useForm<InvoiceFormValues>({
     defaultValues: defaultFormValues,
   });
@@ -612,8 +620,10 @@ export default function InvoiceForm({
   }) => {
     const resolvedDepositValue = payload.depositValue ?? depositValue;
 
-    if (payload.depositType && payload.depositValue) {
+    if (payload.depositType !== undefined) {
       setValue("depositType", payload.depositType);
+    }
+    if (payload.depositValue !== undefined) {
       setValue("depositValue", payload.depositValue);
     }
 
@@ -634,20 +644,6 @@ export default function InvoiceForm({
     applyPaymentScheduleToForm(payload);
   };
 
-  const handlePaymentScheduleLoaded = (
-    payload: Parameters<typeof applyPaymentScheduleToForm>[0],
-  ) => {
-    applyPaymentScheduleToForm(payload);
-    lastAppliedLeadScheduleIdRef.current = leadId;
-  };
-
-  const clearPaymentSchedule = () => {
-    setPaymentScheduleId(null);
-    setValue(
-      "paymentSchedulePayments",
-      ensureDepositInSchedulePayments([], depositValue),
-    );
-  };
 
   const onSubmit = async (data: InvoiceFormValues) => {
     const isEdit = Boolean(invoice && invoice._id);
@@ -713,6 +709,60 @@ export default function InvoiceForm({
     );
 
     const parsedDaysToPay = Number.parseInt(data.daysToPay, 10);
+
+    let finalPaymentScheduleId = paymentScheduleId;
+    const cleanedPayments = (data.paymentSchedulePayments || [])
+      .map((payment) => ({
+        _id: payment._id,
+        name: (payment.name || "").trim(),
+        amount: (payment.amount || "").trim(),
+        dueDate: payment.dueDate,
+      }))
+      .filter((payment) => payment.name && payment.amount);
+
+    if (cleanedPayments.length > 0) {
+      const stages = cleanedPayments.map((payment) => ({
+        ...((payment._id && String(payment._id).length > 5) ? { _id: String(payment._id) } : {}),
+        stageName: payment.name,
+        amount: parseFloat(payment.amount),
+        amountType: (isDepositStageName(payment.name)
+          ? (data.depositType === "%" ? "percentage" : "fixed")
+          : (data.paymentScheduleType === "%" ? "percentage" : "fixed")) as "percentage" | "fixed",
+        dueDate: payment.dueDate ? new Date(payment.dueDate).toISOString() : undefined,
+      }));
+
+      try {
+        if (finalPaymentScheduleId) {
+          const scheduleRes = await updatePaymentScheduleMutation.mutateAsync({
+            leadId,
+            payload: {
+              totalAmount,
+              stages,
+            },
+          });
+          if (scheduleRes.data?.schedule?._id) {
+            finalPaymentScheduleId = scheduleRes.data.schedule._id;
+          }
+        } else {
+          const scheduleRes = await createPaymentScheduleMutation.mutateAsync({
+            leadId,
+            totalAmount,
+            stages,
+          });
+          if (scheduleRes.data?.schedule?._id) {
+            finalPaymentScheduleId = scheduleRes.data.schedule._id;
+          }
+        }
+      } catch (scheduleErr) {
+        console.error("Failed to save/update payment schedule:", scheduleErr);
+        setError("root", {
+          type: "manual",
+          message: `Failed to save payment schedule: ${getApiErrorMessage(scheduleErr)}`,
+        });
+        return;
+      }
+    }
+
     const payload = {
       date: data.date || undefined,
       daysToPay: Number.isFinite(parsedDaysToPay) ? parsedDaysToPay : undefined,
@@ -723,7 +773,7 @@ export default function InvoiceForm({
       tax: taxTotal,
       depositAmount,
       totalAmount,
-      ...(paymentScheduleId ? { paymentScheduleId } : {}),
+      ...(finalPaymentScheduleId ? { paymentScheduleId: finalPaymentScheduleId } : {}),
     };
 
     try {
@@ -803,6 +853,12 @@ export default function InvoiceForm({
           </Button>
         </div>
       </header>
+
+      {errors.root?.message && (
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 max-w-7xl mx-auto">
+          {errors.root.message}
+        </div>
+      )}
 
       <div className="bg-white rounded-md p-4 sm:p-8 lg:p-10 shadow-sm mx-auto max-w-7xl">
         {/* Top Section: Client Info & Invoice Details */}
@@ -890,6 +946,13 @@ export default function InvoiceForm({
                 value={leadId}
                 onValueChange={(lead) => {
                   setValue("leadId", lead?.id ?? "");
+                  if (lead && lead.quoteValue) {
+                    setValue("lineItems.0.rate", lead.quoteValue);
+                    setValue("lineItems.0.quantity", 1);
+                    if (!getValues("lineItems.0.description")) {
+                      setValue("lineItems.0.description", "Project Quote");
+                    }
+                  }
                 }}
               />
             </div>
@@ -1050,6 +1113,7 @@ export default function InvoiceForm({
                       <AddMarkupDialog
                         initialType={markupType}
                         initialValue={markupValue}
+                        maxAmount={calculateSubtotal()}
                         onDone={({ type, value }) => {
                           setValue("markupType", type);
                           setValue("markupValue", value);
@@ -1078,6 +1142,7 @@ export default function InvoiceForm({
                 <AddMarkupDialog
                   initialType={markupType}
                   initialValue={markupValue}
+                  maxAmount={calculateSubtotal()}
                   onDone={({ type, value }) => {
                     setValue("markupType", type);
                     setValue("markupValue", value);
@@ -1109,6 +1174,7 @@ export default function InvoiceForm({
                       <AddDiscountDialog
                         initialType={discountType}
                         initialValue={discountValue}
+                        maxAmount={calculateSubtotal()}
                         onDone={({ type, value }) => {
                           setValue("discountType", type);
                           setValue("discountValue", value);
@@ -1137,6 +1203,7 @@ export default function InvoiceForm({
                 <AddDiscountDialog
                   initialType={discountType}
                   initialValue={discountValue}
+                  maxAmount={calculateSubtotal()}
                   onDone={({ type, value }) => {
                     setValue("discountType", type);
                     setValue("discountValue", value);
@@ -1184,13 +1251,15 @@ export default function InvoiceForm({
                           Edit
                         </button>
                       </AddDepositDialog>
-                      <button
-                        type="button"
-                        onClick={clearDepositFromSchedule}
-                        className="text-gray-500 hover:text-red-500"
-                      >
-                        Remove
-                      </button>
+                      {!hasNonDepositSchedulePayments && (
+                        <button
+                          type="button"
+                          onClick={clearDepositFromSchedule}
+                          className="text-gray-500 hover:text-red-500"
+                        >
+                          Remove
+                        </button>
+                      )}
                     </>
                   )}
                 </div>
@@ -1246,7 +1315,6 @@ export default function InvoiceForm({
                         existingScheduleId={paymentScheduleId}
                         initialType={paymentScheduleType}
                         initialPayments={schedulePaymentsWithDeposit}
-                        onScheduleLoaded={handlePaymentScheduleLoaded}
                         onDone={handlePaymentScheduleDone}
                       >
                         <button
@@ -1258,16 +1326,6 @@ export default function InvoiceForm({
                       </PaymentScheduleDialog>
                     )}
                   </div>
-
-                  {!isSummaryReadOnly && (
-                    <button
-                      type="button"
-                      onClick={clearPaymentSchedule}
-                      className="text-gray-500 hover:text-red-500"
-                    >
-                      Remove
-                    </button>
-                  )}
                 </div>
               ) : depositValue.trim() ? (
                 <div className="flex items-center gap-3 text-right">
@@ -1293,7 +1351,6 @@ export default function InvoiceForm({
                       existingScheduleId={paymentScheduleId}
                       initialType={paymentScheduleType}
                       initialPayments={schedulePaymentsWithDeposit}
-                      onScheduleLoaded={handlePaymentScheduleLoaded}
                       onDone={handlePaymentScheduleDone}
                     >
                       <button
@@ -1316,7 +1373,6 @@ export default function InvoiceForm({
                   existingScheduleId={paymentScheduleId}
                   initialType={paymentScheduleType}
                   initialPayments={schedulePaymentsWithDeposit}
-                  onScheduleLoaded={handlePaymentScheduleLoaded}
                   onDone={handlePaymentScheduleDone}
                 >
                   <button

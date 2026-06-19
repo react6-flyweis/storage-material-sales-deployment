@@ -74,6 +74,7 @@ export default function AddTaxDialog({
                 <Label>Tax Rate</Label>
                 <div className="relative">
                   <Input
+                    type="number"
                     value={rate}
                     onChange={(e) => setRate(e.target.value)}
                     placeholder="Enter"

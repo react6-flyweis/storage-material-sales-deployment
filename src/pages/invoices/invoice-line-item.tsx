@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import {  useWatch } from "react-hook-form";
+import { useWatch } from "react-hook-form";
 import type {
   Control,
   UseFormRegister,
@@ -71,10 +71,10 @@ export default function InvoiceLineItem({
     const currentItem = watchedLineItem ?? item;
     const rawRate = currentItem?.rate;
     const rawQuantity = currentItem?.quantity;
-    
+
     const rate = typeof rawRate === "number" && !Number.isNaN(rawRate) ? rawRate : 0;
     const quantity = typeof rawQuantity === "number" && !Number.isNaN(rawQuantity) ? rawQuantity : 1;
-    
+
     const markupPercent = markupType === "%" ? (parseFloat(markupValue) || 0) : 0;
     const effectiveRate = rate * (1 + markupPercent / 100);
     const markupAmount = (effectiveRate - rate) * quantity;
@@ -171,11 +171,11 @@ export default function InvoiceLineItem({
                 placeholder="0.00"
                 className="text-gray-600 text-sm border-0 focus:ring-0 w-full"
               />
-              {watchedLineItem?.effectiveRate !== undefined && (parseFloat(markupValue) || 0) !== 0 && (
+              {/* {watchedLineItem?.effectiveRate !== undefined && (parseFloat(markupValue) || 0) !== 0 && (
                 <span className="text-[10px] text-blue-600 font-medium px-3 block -mt-1 truncate">
                   Client: ${watchedLineItem.effectiveRate.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
-              )}
+              )} */}
             </div>
           </div>
 

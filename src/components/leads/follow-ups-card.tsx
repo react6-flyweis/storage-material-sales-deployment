@@ -17,8 +17,6 @@ import {
   Calendar,
   Clock,
   PlusIcon,
-  ChevronLeft,
-  ChevronRight,
   Check,
 } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
@@ -424,46 +422,7 @@ export default function FollowUpsCard({
               </table>
             </div>
 
-            <div className="flex items-center justify-between px-6 py-4">
-              <div className="flex items-center gap-4">
-                <div className="text-sm text-gray-600">Showing</div>
-                <select className="h-8 rounded-md border px-2 text-sm">
-                  <option>10</option>
-                  <option>25</option>
-                  <option>50</option>
-                </select>
-                <div className="text-sm text-gray-600">
-                  {activityEntries.length} Results
-                </div>
-              </div>
 
-              <div className="flex items-center gap-2">
-                <button className="rounded-md border px-3 py-1 text-sm text-gray-600">
-                  <ChevronLeft className="inline-block" />
-                </button>
-                <nav
-                  aria-label="Pagination"
-                  className="flex items-center gap-2"
-                >
-                  <button className="h-8 w-8 rounded-md border bg-white text-sm">
-                    1
-                  </button>
-                  <button className="h-8 w-8 rounded-md border text-sm">
-                    2
-                  </button>
-                  <button className="h-8 w-8 rounded-md border text-sm">
-                    3
-                  </button>
-                  <span className="px-2 text-sm">...</span>
-                  <button className="h-8 w-8 rounded-md border text-sm">
-                    15
-                  </button>
-                </nav>
-                <button className="rounded-md border px-3 py-1 text-sm text-gray-600">
-                  <ChevronRight className="inline-block" />
-                </button>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>

@@ -12,11 +12,20 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  exceedsMoneyLimit,
+  exceedsPercentLimit,
+  getAdjustmentAmount,
+  parseNumericInput,
+  roundMoney,
+  roundPercent,
+} from "@/lib/invoice-amounts";
 
 type Props = {
   children?: React.ReactNode;
   initialType?: "%" | "$";
   initialValue?: string;
+  maxAmount?: number;
   onDone: (payload: { type: "%" | "$"; value: string }) => void;
 };
 
@@ -24,6 +33,7 @@ export default function AddDiscountDialog({
   children,
   initialType = "%",
   initialValue = "",
+  maxAmount,
   onDone,
 }: Props) {
   const [open, setOpen] = React.useState(false);
@@ -35,9 +45,64 @@ export default function AddDiscountDialog({
     setValue(initialValue);
   }, [initialType, initialValue]);
 
+  const hasMaxAmount = Number.isFinite(maxAmount) && (maxAmount ?? 0) > 0;
+  const numericValue = parseNumericInput(value.trim());
+  const baseSubtotal = maxAmount ?? 0;
+
+  const maxDiscountDollars = hasMaxAmount ? baseSubtotal : Infinity;
+  const maxDiscountPercent = 100;
+
+  const enteredDiscountDollars = getAdjustmentAmount(
+    value.trim(),
+    type,
+    baseSubtotal,
+  );
+
+  const validationError =
+    !value.trim()
+      ? ""
+      : type === "%"
+        ? exceedsPercentLimit(numericValue, maxDiscountPercent)
+          ? "Discount exceeds 100%"
+          : ""
+        : hasMaxAmount &&
+            exceedsMoneyLimit(enteredDiscountDollars, maxDiscountDollars)
+          ? "Discount exceeds the subtotal"
+          : "";
+
+  const remainingLabel = React.useMemo(() => {
+    if (!value.trim()) {
+      if (type === "%") {
+        return `${maxDiscountPercent.toFixed(2)}% available`;
+      }
+      if (hasMaxAmount) {
+        return `$${maxDiscountDollars.toFixed(2)} available`;
+      }
+      return "";
+    }
+
+    if (type === "%") {
+      const rem = roundPercent(Math.max(0, maxDiscountPercent - numericValue));
+      return `${rem.toFixed(2)}% Remaining`;
+    }
+    if (hasMaxAmount) {
+      const rem = roundMoney(Math.max(0, maxDiscountDollars - enteredDiscountDollars));
+      return `$${rem.toFixed(2)} Remaining`;
+    }
+    return `$${enteredDiscountDollars.toFixed(2)}`;
+  }, [
+    enteredDiscountDollars,
+    hasMaxAmount,
+    maxDiscountDollars,
+    maxDiscountPercent,
+    numericValue,
+    type,
+    value,
+  ]);
+
   const handleDone = () => {
     const trimmed = value.trim();
-    if (!trimmed) return;
+    if (!trimmed || validationError) return;
     onDone({ type, value: trimmed });
     setOpen(false);
   };
@@ -87,6 +152,9 @@ export default function AddDiscountDialog({
                 <Label>Discount</Label>
                 <div className="relative">
                   <Input
+                    type="number"
+                    min="0"
+                    step="any"
                     value={value}
                     onChange={(e) => setValue(e.target.value)}
                     placeholder="10"
@@ -97,6 +165,17 @@ export default function AddDiscountDialog({
                   </div>
                 </div>
               </div>
+
+              {remainingLabel && (
+                <div className="text-center">
+                  <div className="text-blue-600">{remainingLabel}</div>
+                  {validationError && (
+                    <div className="text-sm text-red-500 mt-2">
+                      {validationError}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -114,6 +193,7 @@ export default function AddDiscountDialog({
           <Button
             size="lg"
             onClick={handleDone}
+            disabled={!!validationError || !value.trim()}
             className="rounded-lg w-32 bg-blue-600 hover:bg-blue-700 text-white"
           >
             Done

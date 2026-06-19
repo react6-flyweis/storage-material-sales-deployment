@@ -14,7 +14,6 @@ import { Plus, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
-import { getApiErrorMessage } from "@/lib/api-error";
 import {
   exceedsMoneyLimit,
   exceedsPercentLimit,
@@ -26,15 +25,8 @@ import {
   sumPercentValues,
 } from "@/lib/invoice-amounts";
 import {
-  useCreatePaymentScheduleMutation,
-  usePaymentScheduleByLeadQuery,
-} from "@/modules/payment-schedules/payment-schedules.hooks";
-import type { PaymentScheduleAmountType } from "@/modules/payment-schedules/payment-schedules.api";
-import {
   buildDefaultSchedulePayments,
-  getDepositFromScheduleStages,
   isDepositStageName,
-  paymentScheduleToDialogValues,
   type PaymentScheduleFormPayment,
 } from "@/modules/payment-schedules/payment-schedules.utils";
 
@@ -49,32 +41,14 @@ type Props = {
   existingScheduleId?: string | null;
   initialType?: "%" | "$";
   initialPayments?: Payment[];
-  onScheduleLoaded?: (payload: {
+  onDone: (payload: {
     scheduleId: string;
     type: "%" | "$";
     payments: Payment[];
     depositType?: "%" | "$";
     depositValue?: string;
   }) => void;
-  onDone: (payload: {
-    scheduleId: string;
-    type: "%" | "$";
-    payments: Payment[];
-  }) => void;
 };
-
-function toApiAmountType(type: "%" | "$"): PaymentScheduleAmountType {
-  return type === "%" ? "percentage" : "fixed";
-}
-
-function toDueDateIso(value?: string) {
-  if (!value?.trim()) return undefined;
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return undefined;
-
-  return date.toISOString();
-}
 
 function normalizePayment(payment: Payment) {
   return {
@@ -92,12 +66,10 @@ export default function PaymentScheduleDialog({
   children,
   leadId,
   maxAmount,
-  depositType = "%",
   depositValue = "",
   existingScheduleId,
   initialType = "%",
   initialPayments = [],
-  onScheduleLoaded,
   onDone,
 }: Props) {
   type FormValues = { type: "%" | "$"; payments: Payment[] };
@@ -106,18 +78,6 @@ export default function PaymentScheduleDialog({
   const [submitError, setSubmitError] = React.useState("");
   const [activeScheduleId, setActiveScheduleId] = React.useState<string | null>(
     existingScheduleId ?? null,
-  );
-  const [isFormReady, setIsFormReady] = React.useState(false);
-  const initializedForOpenRef = React.useRef(false);
-  const onScheduleLoadedRef = React.useRef(onScheduleLoaded);
-  React.useEffect(() => {
-    onScheduleLoadedRef.current = onScheduleLoaded;
-  }, [onScheduleLoaded]);
-  const createPaymentScheduleMutation = useCreatePaymentScheduleMutation();
-
-  const leadScheduleQuery = usePaymentScheduleByLeadQuery(
-    leadId || undefined,
-    open && Boolean(leadId),
   );
 
   const { control, register, handleSubmit, reset, setValue } =
@@ -133,84 +93,19 @@ export default function PaymentScheduleDialog({
 
   React.useEffect(() => {
     if (!open) {
-      initializedForOpenRef.current = false;
-      setIsFormReady(false);
       setActiveScheduleId(existingScheduleId ?? null);
       reset({ type: initialType, payments: initialPayments });
       return;
     }
 
     setSubmitError("");
-
-    if (!leadId) {
-      setIsFormReady(true);
-      reset({
-        type: initialType,
-        payments: buildDefaultSchedulePayments(depositValue),
-      });
-      return;
-    }
-
-    if (leadScheduleQuery.isLoading || leadScheduleQuery.isFetching) {
-      setIsFormReady(false);
-      return;
-    }
-
-    if (leadScheduleQuery.isError) {
-      initializedForOpenRef.current = true;
-      const payments = initialPayments.length
-        ? initialPayments
-        : buildDefaultSchedulePayments(depositValue);
-      reset({ type: initialType, payments });
-      setActiveScheduleId(existingScheduleId ?? null);
-      setIsFormReady(true);
-      return;
-    }
-
-    if (!leadScheduleQuery.isSuccess || initializedForOpenRef.current) {
-      return;
-    }
-
-    initializedForOpenRef.current = true;
-
-    const schedule = leadScheduleQuery.data?.schedule ?? null;
-
-    if (schedule) {
-      const scheduleValues = paymentScheduleToDialogValues(schedule);
-      const depositFromSchedule = getDepositFromScheduleStages(schedule.stages);
-      const payments = scheduleValues.payments.length
-        ? scheduleValues.payments
-        : buildDefaultSchedulePayments(
-          depositFromSchedule?.depositValue ?? depositValue,
-        );
-
-      reset({ type: scheduleValues.type, payments });
-      setActiveScheduleId(schedule._id);
-      onScheduleLoadedRef.current?.({
-        scheduleId: schedule._id,
-        type: scheduleValues.type,
-        payments,
-        depositType: depositFromSchedule?.depositType,
-        depositValue: depositFromSchedule?.depositValue,
-      });
-      setIsFormReady(true);
-      return;
-    }
-
     const payments = initialPayments.length
       ? initialPayments
       : buildDefaultSchedulePayments(depositValue);
-
     reset({ type: initialType, payments });
-    setActiveScheduleId(null);
-    setIsFormReady(true);
+    setActiveScheduleId(existingScheduleId ?? null);
   }, [
     open,
-    leadId,
-    leadScheduleQuery.isLoading,
-    leadScheduleQuery.isFetching,
-    leadScheduleQuery.isSuccess,
-    leadScheduleQuery.data,
     initialType,
     initialPayments,
     depositValue,
@@ -235,18 +130,27 @@ export default function PaymentScheduleDialog({
 
   const hasMaxAmount = Number.isFinite(maxAmount) && (maxAmount ?? 0) > 0;
   const invoiceTotal = maxAmount ?? 0;
-  const hasDeposit = Boolean(depositValue.trim());
+  const depositPaymentFromForm = (watchedPayments || []).find((payment) =>
+    isDepositStageName(payment.name || ""),
+  );
+  const currentDepositValue = depositPaymentFromForm?.amount ?? "";
+  const currentDepositType = watchedType;
+  const hasDeposit = Boolean(currentDepositValue.trim());
 
   const maxSchedulePercent = hasMaxAmount
     ? getRemainingPercentAfterAdjustment(
       invoiceTotal,
-      depositValue,
-      depositType,
+      currentDepositValue,
+      currentDepositType,
     )
     : 100;
 
   const maxScheduleDollars = hasMaxAmount
-    ? getRemainingAfterAdjustment(invoiceTotal, depositValue, depositType)
+    ? getRemainingAfterAdjustment(
+      invoiceTotal,
+      currentDepositValue,
+      currentDepositType,
+    )
     : Infinity;
 
   const validationError =
@@ -261,11 +165,7 @@ export default function PaymentScheduleDialog({
           ? "Sum of payments exceeds the remaining amount after deposit"
           : "Sum of payments exceeds the invoice total"
         : "";
-  const loadError =
-    leadScheduleQuery.isError && open
-      ? "Could not load the payment schedule for this project."
-      : "";
-  const error = validationError || submitError || loadError;
+  const error = validationError || submitError;
 
   const remainingLabel = React.useMemo(() => {
     if (watchedType === "%") {
@@ -289,16 +189,12 @@ export default function PaymentScheduleDialog({
     const depositFromForm = payments.find((payment) =>
       isDepositStageName(payment.name || ""),
     );
-    if (depositFromForm?.amount?.trim()) {
+    if (depositFromForm) {
       return {
         name: "Deposit",
-        amount: depositFromForm.amount.trim(),
+        amount: (depositFromForm.amount || "").trim(),
         dueDate: depositFromForm.dueDate,
       };
-    }
-
-    if (depositValue.trim()) {
-      return { name: "Deposit", amount: depositValue.trim() };
     }
 
     return null;
@@ -319,19 +215,6 @@ export default function PaymentScheduleDialog({
     return [depositPayment, ...nonDepositPayments];
   };
 
-  const buildStagesPayload = (payments: Payment[]) => {
-    const schedulePaymentsForApi = buildSchedulePayments(payments);
-
-    return schedulePaymentsForApi.map((payment) => ({
-      stageName: payment.name,
-      amount: parseFloat(payment.amount),
-      amountType: isDepositStageName(payment.name)
-        ? toApiAmountType(depositType)
-        : toApiAmountType(watchedType),
-      dueDate: toDueDateIso(payment.dueDate),
-    }));
-  };
-
   const handleOpenChange = (nextOpen: boolean) => {
     if (nextOpen && !leadId) {
       setSubmitError("Select a project before adding a payment schedule.");
@@ -341,7 +224,7 @@ export default function PaymentScheduleDialog({
     setOpen(nextOpen);
   };
 
-  const onSubmit = async (data: FormValues) => {
+  const onSubmit = (data: FormValues) => {
     if (watchedType === "%" && exceedsPercentLimit(totalAmount, maxSchedulePercent)) {
       return;
     }
@@ -360,55 +243,20 @@ export default function PaymentScheduleDialog({
       return;
     }
 
+    const depositPayment = resolveDepositPayment(data.payments);
     const resultPayload = {
       type: data.type,
       payments: cleaned,
+      depositType: data.type,
+      depositValue: depositPayment?.amount ?? "",
     };
 
-    if (activeScheduleId) {
-      onDone({
-        scheduleId: activeScheduleId,
-        ...resultPayload,
-      });
-      setOpen(false);
-      return;
-    }
-
-    if (!leadId) {
-      setSubmitError("Select a project before creating a payment schedule.");
-      return;
-    }
-
-    const stages = buildStagesPayload(data.payments);
-
-    try {
-      setSubmitError("");
-      const response = await createPaymentScheduleMutation.mutateAsync({
-        leadId,
-        totalAmount: hasMaxAmount ? maxAmount : undefined,
-        stages,
-      });
-
-      const scheduleId = response.data.schedule._id;
-      if (!scheduleId) {
-        setSubmitError(
-          "Payment schedule was created but no schedule id was returned.",
-        );
-        return;
-      }
-
-      onDone({
-        scheduleId,
-        ...resultPayload,
-      });
-      setOpen(false);
-    } catch (apiError) {
-      setSubmitError(getApiErrorMessage(apiError));
-    }
+    onDone({
+      scheduleId: activeScheduleId ?? "",
+      ...resultPayload,
+    });
+    setOpen(false);
   };
-
-  const isLoadingSchedule =
-    open && Boolean(leadId) && (leadScheduleQuery.isLoading || !isFormReady);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -427,93 +275,88 @@ export default function PaymentScheduleDialog({
             </DialogHeader>
 
             <div className="p-6">
-              {isLoadingSchedule ? (
-                <div className="py-12 text-center text-sm text-gray-500">
-                  Loading payment schedule...
+              <div className="space-y-4">
+                <div className="flex items-center gap-6">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="radio"
+                      value="%"
+                      {...register("type")}
+                      checked={watchedType === "%"}
+                      onChange={() => setValue("type", "%")}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm">%</span>
+                  </label>
+
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="radio"
+                      value="$"
+                      {...register("type")}
+                      checked={watchedType === "$"}
+                      onChange={() => setValue("type", "$")}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm">$</span>
+                  </label>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-6">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="radio"
-                        value="%"
-                        {...register("type")}
-                        checked={watchedType === "%"}
-                        onChange={() => setValue("type", "%")}
-                        className="w-4 h-4"
-                      />
-                      <span className="text-sm">%</span>
-                    </label>
 
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="radio"
-                        value="$"
-                        {...register("type")}
-                        checked={watchedType === "$"}
-                        onChange={() => setValue("type", "$")}
-                        className="w-4 h-4"
-                      />
-                      <span className="text-sm">$</span>
-                    </label>
-                  </div>
+                <div className="grid grid-cols-2 gap-4">
+                  {fields.map((field, i) => (
+                    <React.Fragment key={field.id}>
+                      <div className="space-y-2">
+                        <Label>Payment Name</Label>
+                        <Input
+                          {...register(`payments.${i}.name` as const)}
+                          placeholder={
+                            i === 0 ? "Deposit" : `Payment ${i + 1}`
+                          }
+                          className="h-12 rounded-lg"
+                        />
+                      </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    {fields.map((field, i) => (
-                      <React.Fragment key={field.id}>
-                        <div className="space-y-2">
-                          <Label>Payment Name</Label>
-                          <Input
-                            {...register(`payments.${i}.name` as const)}
-                            placeholder={
-                              i === 0 ? "Deposit" : `Payment ${i + 1}`
-                            }
-                            className="h-12 rounded-lg"
-                          />
-                        </div>
-
-                        <div className="space-y-2 relative">
-                          <Label>Payment Amount</Label>
-                          <Input
-                            {...register(`payments.${i}.amount` as const)}
-                            placeholder={watchedType === "%" ? "25%" : "0.00"}
-                            className="h-12 rounded-lg"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => remove(i)}
-                            className="absolute right-5 top-9 text-gray-400 hover:text-red-500"
-                            aria-label={`remove-payment-${i}`}
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </React.Fragment>
-                    ))}
-                  </div>
-
-                  <div>
-                    <button
-                      type="button"
-                      onClick={() => append({ name: "", amount: "" })}
-                      className="flex items-center gap-3 text-blue-600 hover:underline mt-3"
-                    >
-                      <span className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center">
-                        <Plus className="w-4 h-4" />
-                      </span>
-                      <span className="text-sm">Add payment</span>
-                    </button>
-                  </div>
-
-                  <div className="text-center">
-                    <div className="text-blue-600">{remainingLabel}</div>
-                    {error && (
-                      <div className="text-sm text-red-500 mt-2">{error}</div>
-                    )}
-                  </div>
+                      <div className="space-y-2 relative">
+                        <Label>Payment Amount</Label>
+                        <Input
+                          type="number"
+                          {...register(`payments.${i}.amount` as const)}
+                          placeholder={watchedType === "%" ? "25%" : "0.00"}
+                          className="h-12 rounded-lg"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => remove(i)}
+                          className="absolute right-5 top-9 text-gray-400 hover:text-red-500"
+                          aria-label={`remove-payment-${i}`}
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </React.Fragment>
+                  ))}
                 </div>
-              )}
+
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => append({ name: "", amount: "" })}
+                    className="flex items-center gap-3 text-blue-600 hover:underline mt-3"
+                  >
+                    <span className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center">
+                      <Plus className="w-4 h-4" />
+                    </span>
+                    <span className="text-sm">Add payment</span>
+                  </button>
+                </div>
+
+                <div className="text-center">
+                  <div className="text-blue-600">{remainingLabel}</div>
+                  {error && (
+                    <div className="text-sm text-red-500 mt-2">{error}</div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -530,11 +373,7 @@ export default function PaymentScheduleDialog({
             <Button
               type="submit"
               size="lg"
-              disabled={
-                isLoadingSchedule ||
-                !!validationError ||
-                createPaymentScheduleMutation.isPending
-              }
+              disabled={!!validationError}
               className="rounded-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white"
             >
               Done

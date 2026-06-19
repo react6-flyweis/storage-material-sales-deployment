@@ -50,3 +50,26 @@ export async function getPaymentScheduleByLeadProvider(leadId: string) {
 
   return response.data.data;
 }
+
+export type UpdatePaymentSchedulePayload = {
+  totalAmount?: number;
+  stages: Array<{
+    _id?: string;
+    stageName: string;
+    amount: number;
+    amountType: PaymentScheduleAmountType;
+    dueDate?: string;
+  }>;
+};
+
+export async function updatePaymentScheduleProvider(
+  leadId: string,
+  payload: UpdatePaymentSchedulePayload,
+) {
+  const response = await apiClient.put<CreatePaymentScheduleResponse>(
+    `/api/payment-schedules/lead/${leadId}`,
+    payload,
+  );
+  return response.data;
+}
+
