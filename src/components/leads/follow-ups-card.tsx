@@ -51,6 +51,7 @@ type Meeting = {
   company?: string;
   duration: string;
   action: "call" | "email";
+  meetingLink?: string;
 };
 
 function mapLeadFollowUpsToDisplay(items?: LeadDetailFollowUp[]): FollowUp[] {
