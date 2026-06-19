@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useForm, Controller, useFieldArray, useWatch } from "react-hook-form";
+import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { Calendar, Plus } from "lucide-react";
 import { useNavigate } from "react-router";
 import InvoiceLineItem from "./invoice-line-item";
@@ -266,7 +266,7 @@ function invoiceToFormValues(
   const depositValue = resolveDepositFormValue(invoice);
   const scheduleValues = paymentScheduleToFormValues(paymentSchedule);
   const depositType = depositValue ? "$" : defaultFormValues.depositType;
-  
+
   const taxesList = [...(defaultFormValues.taxes || [])];
   if (invoice?.lineItems) {
     invoice.lineItems.forEach((item) => {
@@ -665,7 +665,7 @@ export default function InvoiceForm({
     const lineItemsPayload = (data.lineItems || []).map((item) => {
       const rate = parseNumericInput(String(item.rate ?? 0));
       const quantity = parseNumericInput(String(item.quantity ?? 1));
-      
+
       const effectiveRate = rate * (1 + markupPercent / 100);
       const markupAmount = (effectiveRate - rate) * quantity;
       const itemTotal = effectiveRate * quantity;
@@ -1023,7 +1023,7 @@ export default function InvoiceForm({
           <div className="col-span-1 text-right">Total</div>
         </div>
 
-        <div className="mb-6">
+        {/* <div className="mb-6">
           <div className="flex items-center gap-3 mb-4">
             <Controller
               control={control}
@@ -1045,7 +1045,7 @@ export default function InvoiceForm({
               Group items into Sections
             </span>
           </div>
-        </div>
+        </div> */}
 
         {/* Invoice Items List */}
         <div className="space-y-4">
