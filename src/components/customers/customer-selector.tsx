@@ -20,12 +20,14 @@ type Props = {
   value: string;
   onValueChange: (value: Customer | null | undefined) => void;
   placeholder?: string;
+  disabled?: boolean;
 };
 
 export default function CustomerSelector({
   value,
   onValueChange,
   placeholder = "Search customers...",
+  disabled,
 }: Props) {
   const { data, isLoading } = useSalesCustomersQuery(1, 100);
   const lastEmittedCustomerIdRef = useRef<string | null>(null);
@@ -66,7 +68,7 @@ export default function CustomerSelector({
         onValueChange(val);
       }}
     >
-      <ComboboxInput placeholder={placeholder} />
+      <ComboboxInput placeholder={placeholder} disabled={disabled} />
       <ComboboxContent className="pointer-events-auto">
         <ComboboxEmpty>
           {isLoading ? "Loading customers..." : "No customer found"}
