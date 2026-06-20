@@ -252,6 +252,7 @@ export const salesRoutes: RouteObject[] = [
                 path: ":leadId",
                 children: [
                   { index: true, element: <LeadDetails /> },
+                  { path: "edit", element: <AddNewLead /> },
                   { path: "agreement", element: <ContractDetail /> },
                   { path: "timeline", element: <SingleLeadTimelinePage /> },
                   {

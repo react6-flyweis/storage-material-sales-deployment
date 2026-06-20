@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft } from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
-import { useNavigate } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import { z } from "zod";
 import CustomerSelector from "@/components/customers/customer-selector";
 import Counter from "@/components/counter-input";
@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getApiErrorMessage } from "@/lib/api-error";
-import { useCreateLeadMutation } from "@/modules/leads/leads.hooks";
+import { useCreateLeadMutation, useLeadDetailQuery, useUpdateLeadMutation } from "@/modules/leads/leads.hooks";
 
 const requiredNumber = (message: string) => z.number().min(0, message);
 
@@ -63,8 +63,14 @@ const defaultValues: AddNewLeadFormValues = {
 
 export default function AddNewLead() {
   const navigate = useNavigate();
+  const { leadId } = useParams<{ leadId: string }>();
+  const isEditMode = Boolean(leadId);
+
   const [showSuccess, setShowSuccess] = useState(false);
   const createLeadMutation = useCreateLeadMutation();
+  const updateLeadMutation = useUpdateLeadMutation();
+  const { data: response, isLoading: isLoadingLead } = useLeadDetailQuery(leadId, isEditMode);
+  const detail = response?.success ? response.data : undefined;
 
   const {
     register,
@@ -77,6 +83,28 @@ export default function AddNewLead() {
     defaultValues,
     resolver: zodResolver(addNewLeadSchema),
   });
+
+  useEffect(() => {
+    if (isEditMode && detail) {
+      const lead = detail.lead;
+      reset({
+        customerId: lead.customerId || "",
+        projectName: lead.projectName || "",
+        location: lead.location || "",
+        estimatedValue: lead.quoteValue ? lead.quoteValue.toString() : "",
+        priority: lead.priority || "Medium",
+        roofStyle: lead.roofStyle === "Arch" ? "arch" : "gable",
+        buildingType: (lead.buildingType?.toLowerCase() === "garage" ? "garage" : "garage") as "garage",
+        width: lead.width || 0,
+        length: lead.length || 0,
+        height: lead.height || 0,
+        doors: lead.numDoors || 0,
+        windows: lead.numWindows || 0,
+        insulation: lead.numInsulation || 0,
+        notes: lead.notes || "",
+      });
+    }
+  }, [isEditMode, detail, reset]);
 
   const onSubmit = async (values: AddNewLeadFormValues) => {
     const payload = {
@@ -96,28 +124,44 @@ export default function AddNewLead() {
       windows: values.windows,
       insulation: values.insulation,
       notes: values.notes.trim() || undefined,
-      leadStatus: "initial_contact",
+      leadStatus: detail?.lead.lifecycleStatus || "initial_contact",
     };
 
     try {
-      await createLeadMutation.mutateAsync(payload);
+      if (isEditMode && leadId) {
+        await updateLeadMutation.mutateAsync({ leadId, payload });
+      } else {
+        await createLeadMutation.mutateAsync(payload);
+        reset(defaultValues);
+      }
       setShowSuccess(true);
-      reset(defaultValues);
     } catch (error) {
-      console.error("Create lead failed:", error);
+      console.error(isEditMode ? "Update lead failed:" : "Create lead failed:", error);
       const errorMessage =
         getApiErrorMessage(error) ||
-        "An error occurred while creating the lead.";
+        `An error occurred while ${isEditMode ? "updating" : "creating"} the lead.`;
       setError("root", { message: errorMessage });
     }
   };
 
   const handleSuccessClose = () => {
     setShowSuccess(false);
-    navigate("/leads");
+    if (isEditMode && leadId) {
+      navigate(`/leads/${leadId}`);
+    } else {
+      navigate("/leads");
+    }
   };
 
-  const submitting = isSubmitting || createLeadMutation.isPending;
+  if (isEditMode && isLoadingLead) {
+    return (
+      <div className="p-6">
+        <p className="text-gray-600 animate-pulse">Loading lead details...</p>
+      </div>
+    );
+  }
+
+  const submitting = isSubmitting || createLeadMutation.isPending || updateLeadMutation.isPending;
 
   return (
     <form className="p-6 w-full min-h-0" onSubmit={handleSubmit(onSubmit)}>
@@ -129,15 +173,19 @@ export default function AddNewLead() {
           </Button>
 
           <div>
-            <h1 className="text-2xl font-semibold">Add New Lead</h1>
+            <h1 className="text-2xl font-semibold">
+              {isEditMode ? "Edit Lead" : "Add New Lead"}
+            </h1>
             <p className="text-sm text-gray-600">
-              Create a new lead record and assign it to your pipeline
+              {isEditMode
+                ? "Update the lead record details in your pipeline"
+                : "Create a new lead record and assign it to your pipeline"}
             </p>
           </div>
         </div>
 
         <Button type="submit" className="rounded-sm" disabled={submitting}>
-          {submitting ? "Saving..." : "Save Lead"}
+          {submitting ? "Saving..." : isEditMode ? "Save Changes" : "Save Lead"}
         </Button>
       </div>
 
@@ -157,6 +205,7 @@ export default function AddNewLead() {
               <CustomerSelector
                 value={field.value}
                 onValueChange={(customer) => field.onChange(customer?.id || "")}
+                disabled={isEditMode}
               />
             )}
           />
@@ -359,7 +408,7 @@ export default function AddNewLead() {
       <SuccessDialog
         open={showSuccess}
         onClose={handleSuccessClose}
-        title="Lead Added Successfully!"
+        title={isEditMode ? "Lead Updated Successfully!" : "Lead Added Successfully!"}
       />
     </form>
   );

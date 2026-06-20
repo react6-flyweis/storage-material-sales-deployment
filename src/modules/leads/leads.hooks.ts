@@ -18,9 +18,11 @@ import {
   lookupLeadsProvider,
   getLeadAgreementProvider,
   updateLeadBuildingsProvider,
+  updateLeadProvider,
   type ImportLeadsPayload,
   type GetLeadsParams,
   type UpdateLeadBuildingsPayload,
+  type UpdateLeadPayload,
 } from "./leads.api";
 
 type EscalationStatus = "pending" | "assigned" | "resolved";
@@ -285,5 +287,30 @@ export function useUpdateLeadBuildingsMutation() {
     },
   });
 }
+
+type UpdateLeadVariables = {
+  leadId: string;
+  payload: UpdateLeadPayload;
+};
+
+export function useUpdateLeadMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ leadId, payload }: UpdateLeadVariables) =>
+      updateLeadProvider(leadId, payload),
+    onSuccess: (response, variables) => {
+      if (!response.success) {
+        return;
+      }
+
+      void queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["sales", "leads", "detail", variables.leadId],
+      });
+    },
+  });
+}
+
 
 

@@ -292,6 +292,12 @@ export type LeadDetailLead = {
   width?: number | null;
   length?: number | null;
   height?: number | null;
+  roofStyle?: string;
+  numDoors?: number;
+  numWindows?: number;
+  numInsulation?: number;
+  notes?: string;
+  priority?: "Low" | "Medium" | "High";
   numberOfBuildings?: number;
   isTerminated?: boolean;
   terminationReason?: string;
@@ -729,6 +735,24 @@ export async function updateLeadBuildingsProvider(
 
   return response.data;
 }
+
+export type UpdateLeadPayload = Partial<CreateLeadPayload>;
+
+export type UpdateLeadResponse = {
+  success: boolean;
+  message: string;
+  data?: unknown;
+};
+
+export async function updateLeadProvider(leadId: string, payload: UpdateLeadPayload) {
+  const response = await apiClient.put<UpdateLeadResponse>(
+    `/api/sales/leads/${leadId}`,
+    payload,
+  );
+
+  return response.data;
+}
+
 
 
 
