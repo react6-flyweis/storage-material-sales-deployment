@@ -10,7 +10,7 @@ import {
   Redo,
   TrendingUp,
   Search,
-  // Pen,
+  Edit,
   AlertCircle,
 } from "lucide-react";
 import ImportLeadsDialog from "@/components/leads/import-leads-dialog";
@@ -461,8 +461,14 @@ export default function LeadsPage() {
                       <TableCell className="">
                         <div className="flex items-center gap-1">
                           <Link to={`/leads/${lead._id}`}>
-                            <Button variant="ghost" size="icon">
+                            <Button variant="ghost" size="icon" title="View Lead">
                               <Eye className=" text-purple-600 stroke-2" />
+                            </Button>
+                          </Link>
+
+                          <Link to={`/leads/${lead._id}/edit`}>
+                            <Button variant="ghost" size="icon" title="Edit Lead">
+                              <Edit className=" text-green-600 stroke-2" />
                             </Button>
                           </Link>
 

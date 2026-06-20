@@ -146,6 +146,18 @@ export default function LeadDetails() {
           </div>
 
           <div className="flex items-center gap-3">
+            <Button
+              size="sm"
+              variant="outline"
+              className="rounded-sm shadow-md border-slate-200"
+              onClick={() => {
+                if (!leadId) return;
+                navigate(`/leads/${leadId}/edit`);
+              }}
+            >
+              <span>Edit Lead</span>
+            </Button>
+
             {canMoveToOrders && (
               <MoveToOrdersDialog
                 leadId={leadId}
