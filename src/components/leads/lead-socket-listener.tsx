@@ -98,31 +98,29 @@ export function LeadSocketListener() {
 
       // Extract project name as lead name
       const projectName = getLeadProjectName(payload.lead);
-      const isAssigned = payload.meta.trigger === "admin_create_lead" || payload.meta.trigger === "assigned";
+      const isAssigned = payload.meta?.trigger === "admin_create_lead" || payload.meta?.trigger === "assigned";
 
-      if (document.visibilityState !== "visible") {
-        // Tab is inactive - fire browser notification
-        if ("Notification" in window && Notification.permission === "granted") {
-          const title = isAssigned ? "New Lead Assigned" : "New Lead Created";
-          const triggerInfo = payload.meta.trigger ? ` (via ${payload.meta.trigger})` : "";
-          const body = isAssigned
-            ? `Lead for ${projectName} has been assigned to you. Click to view.`
-            : `Lead for ${projectName} has been created${triggerInfo}. Click to view.`;
+      if (document.visibilityState !== "visible" && "Notification" in window && Notification.permission === "granted") {
+        // Tab is inactive AND we have notification permission - fire browser notification
+        const title = isAssigned ? "New Lead Assigned" : "New Lead Created";
+        const triggerInfo = payload.meta?.trigger ? ` (via ${payload.meta.trigger})` : "";
+        const body = isAssigned
+          ? `Lead for ${projectName} has been assigned to you. Click to view.`
+          : `Lead for ${projectName} has been created${triggerInfo}. Click to view.`;
 
-          const notification = new Notification(title, {
-            body,
-            icon: "/favicon.ico"
-          });
-          notification.onclick = () => {
-            window.focus();
-            if (payload.leadId) {
-              navigate(`/leads/${payload.leadId}`);
-            }
-            notification.close();
-          };
-        }
+        const notification = new Notification(title, {
+          body,
+          icon: "/favicon.ico"
+        });
+        notification.onclick = () => {
+          window.focus();
+          if (payload.leadId) {
+            navigate(`/leads/${payload.leadId}`);
+          }
+          notification.close();
+        };
       } else {
-        // Tab is active - show dialog
+        // Tab is active OR notification permission is not granted - show dialog
         setAssignedLead(payload);
       }
     };
@@ -137,26 +135,24 @@ export function LeadSocketListener() {
       }
 
       // If meta action is updated and trigger is assigned, treat it as a new lead assignment
-      if (payload.meta.trigger === "assigned" || payload.meta.trigger === "admin_create_lead") {
+      if (payload.meta?.trigger === "assigned" || payload.meta?.trigger === "admin_create_lead") {
         const projectName = getLeadProjectName(payload.lead);
 
-        if (document.visibilityState !== "visible") {
-          // Tab is inactive - fire browser notification
-          if ("Notification" in window && Notification.permission === "granted") {
-            const notification = new Notification("New Lead Assigned", {
-              body: `Lead for ${projectName} has been assigned to you. Click to view.`,
-              icon: "/favicon.ico"
-            });
-            notification.onclick = () => {
-              window.focus();
-              if (payload.leadId) {
-                navigate(`/leads/${payload.leadId}`);
-              }
-              notification.close();
-            };
-          }
+        if (document.visibilityState !== "visible" && "Notification" in window && Notification.permission === "granted") {
+          // Tab is inactive AND we have notification permission - fire browser notification
+          const notification = new Notification("New Lead Assigned", {
+            body: `Lead for ${projectName} has been assigned to you. Click to view.`,
+            icon: "/favicon.ico"
+          });
+          notification.onclick = () => {
+            window.focus();
+            if (payload.leadId) {
+              navigate(`/leads/${payload.leadId}`);
+            }
+            notification.close();
+          };
         } else {
-          // Tab is active - show dialog
+          // Tab is active OR notification permission is not granted - show dialog
           setAssignedLead(payload);
         }
       }
@@ -178,23 +174,21 @@ export function LeadSocketListener() {
         queryClient.invalidateQueries({ queryKey: ["sales", "leads", "detail", leadId] });
       }
 
-      if (document.visibilityState !== "visible") {
-        // Tab is inactive - fire browser notification
-        if ("Notification" in window && Notification.permission === "granted") {
-          const notification = new Notification(title, {
-            body: message,
-            icon: "/favicon.ico"
-          });
-          notification.onclick = () => {
-            window.focus();
-            if (leadId) {
-              navigate(`/leads/${leadId}`);
-            }
-            notification.close();
-          };
-        }
+      if (document.visibilityState !== "visible" && "Notification" in window && Notification.permission === "granted") {
+        // Tab is inactive AND we have notification permission - fire browser notification
+        const notification = new Notification(title, {
+          body: message,
+          icon: "/favicon.ico"
+        });
+        notification.onclick = () => {
+          window.focus();
+          if (leadId) {
+            navigate(`/leads/${leadId}`);
+          }
+          notification.close();
+        };
       } else {
-        // Tab is active - show dialog
+        // Tab is active OR notification permission is not granted - show dialog
         setActiveReminder(data);
       }
     };
