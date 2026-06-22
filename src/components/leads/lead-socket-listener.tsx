@@ -98,13 +98,19 @@ export function LeadSocketListener() {
 
       // Extract project name as lead name
       const projectName = getLeadProjectName(payload.lead);
-      const triggerInfo = payload.meta.trigger ? ` (via ${payload.meta.trigger})` : "";
+      const isAssigned = payload.meta.trigger === "admin_create_lead" || payload.meta.trigger === "assigned";
 
       if (document.visibilityState !== "visible") {
         // Tab is inactive - fire browser notification
         if ("Notification" in window && Notification.permission === "granted") {
-          const notification = new Notification("New Lead Created", {
-            body: `Lead for ${projectName} has been created${triggerInfo}. Click to view.`,
+          const title = isAssigned ? "New Lead Assigned" : "New Lead Created";
+          const triggerInfo = payload.meta.trigger ? ` (via ${payload.meta.trigger})` : "";
+          const body = isAssigned
+            ? `Lead for ${projectName} has been assigned to you. Click to view.`
+            : `Lead for ${projectName} has been created${triggerInfo}. Click to view.`;
+
+          const notification = new Notification(title, {
+            body,
             icon: "/favicon.ico"
           });
           notification.onclick = () => {
@@ -131,7 +137,7 @@ export function LeadSocketListener() {
       }
 
       // If meta action is updated and trigger is assigned, treat it as a new lead assignment
-      if (payload.meta.trigger === "assigned") {
+      if (payload.meta.trigger === "assigned" || payload.meta.trigger === "admin_create_lead") {
         const projectName = getLeadProjectName(payload.lead);
 
         if (document.visibilityState !== "visible") {
