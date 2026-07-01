@@ -1,7 +1,7 @@
 import { Component, useState } from "react";
 import type { ErrorInfo, ReactNode } from "react";
 import * as Sentry from "@sentry/react";
-import { useRouteError, isRouteErrorResponse } from "react-router-dom";
+import { useRouteError, isRouteErrorResponse } from "react-router";
 import { AlertCircle, RefreshCw, Home, ChevronDown, ChevronUp, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
