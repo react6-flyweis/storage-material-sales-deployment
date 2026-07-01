@@ -13,7 +13,7 @@ Sentry.init({
     environment: import.meta.env.MODE,
     initialScope: {
         tags: {
-            panel: "plant"
+            panel: "sales"
         }
     },
     dataCollection: {
