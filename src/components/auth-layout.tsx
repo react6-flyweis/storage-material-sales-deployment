@@ -18,7 +18,7 @@ export function AuthLayout({ title, subtitle, children }: AuthLayoutProps) {
       </div>
 
       {/* Auth Form Card */}
-      <div className="py-10">
+      <div className="py-10 w-full flex justify-center">
         <div className="relative z-10 w-full max-w-lg rounded-lg bg-white px-12 py-10 shadow-2xl">
           <div className="mb-6 text-center">
             <h1 className="text-2xl font-semibold text-gray-900">{title}</h1>
