@@ -31,7 +31,8 @@ const verifyOtpSchema = z.object({
     .string()
     .trim()
     .min(1, "OTP is required")
-    .min(6, "OTP must be at least 6 characters"),
+    .length(6, "OTP must be exactly 6 digits")
+    .regex(/^\d+$/, "OTP must contain only numbers"),
 });
 
 type RequestOtpFormValues = z.infer<typeof requestOtpSchema>;
@@ -217,11 +218,20 @@ export default function ForgotPassword() {
             <div className="relative mt-1.5">
               <Input
                 id="otp"
-                type="text"
+                type="number"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 placeholder="Enter 6-digit OTP"
-                {...verifyForm.register("otp")}
+                {...verifyForm.register("otp", {
+                  onChange: (e) => {
+                    if (e.target.value.length > 6) {
+                      e.target.value = e.target.value.slice(0, 6);
+                    }
+                  },
+                })}
                 className="h-12 rounded border-gray-200 pl-10 tracking-widest placeholder:tracking-normal placeholder:text-gray-400"
-                maxLength={10}
+                maxLength={6}
+                max={999999}
               />
               <KeyRound className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
             </div>
