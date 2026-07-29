@@ -1,7 +1,18 @@
 import { useMutation } from "@tanstack/react-query";
-import { loginProvider, logoutProvider } from "./auth.api";
+import {
+  loginProvider,
+  logoutProvider,
+  forgotPasswordProvider,
+  verifyOtpProvider,
+  resetPasswordProvider,
+} from "./auth.api";
 import { useAuthStore } from "./auth.store";
-import type { LoginRequest } from "./auth.types";
+import type {
+  LoginRequest,
+  ForgotPasswordRequest,
+  VerifyOtpRequest,
+  ResetPasswordRequest,
+} from "./auth.types";
 
 export function useLoginMutation() {
   const setLoginData = useAuthStore((state) => state.setLoginData);
@@ -26,3 +37,22 @@ export function useLogoutMutation() {
     },
   });
 }
+
+export function useForgotPasswordMutation() {
+  return useMutation({
+    mutationFn: (payload: ForgotPasswordRequest) => forgotPasswordProvider(payload),
+  });
+}
+
+export function useVerifyOtpMutation() {
+  return useMutation({
+    mutationFn: (payload: VerifyOtpRequest) => verifyOtpProvider(payload),
+  });
+}
+
+export function useResetPasswordMutation() {
+  return useMutation({
+    mutationFn: (payload: ResetPasswordRequest) => resetPasswordProvider(payload),
+  });
+}
+

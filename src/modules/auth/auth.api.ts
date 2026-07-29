@@ -6,6 +6,12 @@ import type {
   RefreshTokenRequest,
   RefreshTokenResponse,
   LogoutResponse,
+  ForgotPasswordRequest,
+  ForgotPasswordResponse,
+  VerifyOtpRequest,
+  VerifyOtpResponse,
+  ResetPasswordRequest,
+  ResetPasswordResponse,
 } from "./auth.types";
 
 export const FALLBACK_BASE_URL = "";
@@ -93,3 +99,31 @@ export async function logoutProvider() {
 
   return response.data;
 }
+
+export async function forgotPasswordProvider(payload: ForgotPasswordRequest) {
+  const response = await apiClient.post<ForgotPasswordResponse>(
+    "/api/auth/forgot-password",
+    payload,
+  );
+
+  return response.data;
+}
+
+export async function verifyOtpProvider(payload: VerifyOtpRequest) {
+  const response = await apiClient.post<VerifyOtpResponse>(
+    "/api/auth/verify-otp",
+    payload,
+  );
+
+  return response.data;
+}
+
+export async function resetPasswordProvider(payload: ResetPasswordRequest) {
+  const response = await apiClient.post<ResetPasswordResponse>(
+    "/api/auth/reset-password",
+    payload,
+  );
+
+  return response.data;
+}
+
