@@ -6,6 +6,8 @@ import { AdminLayout } from "@/components/admin-layout";
 import { ProtectedRoute, PublicOnlyRoute } from "@/modules/auth/auth.guards";
 
 const SignIn = lazy(() => import("@/pages/sign-in"));
+const ForgotPassword = lazy(() => import("@/pages/forgot-password"));
+const ResetPassword = lazy(() => import("@/pages/reset-password"));
 const Notifications = lazy(() => import("@/pages/notifications"));
 const Communication = lazy(() => import("@/pages/communication"));
 const Analytics = lazy(() => import("@/pages/analytics"));
@@ -128,6 +130,14 @@ export const salesRoutes: RouteObject[] = [
       {
         path: "/sign-in",
         element: <SignIn />,
+      },
+      {
+        path: "/forgot-password",
+        element: <ForgotPassword />,
+      },
+      {
+        path: "/reset-password",
+        element: <ResetPassword />,
       },
     ],
   },
