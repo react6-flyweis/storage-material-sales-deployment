@@ -3,8 +3,10 @@ import { lazy } from "react";
 import { NotFound } from "@/pages/not-found";
 import { RouterErrorFallback } from "@/pages/error-page";
 import { AdminLayout } from "@/components/admin-layout";
+import { QuotationLayout } from "@/modules/quotation-generator";
 import { ProtectedRoute, PublicOnlyRoute } from "@/modules/auth/auth.guards";
 
+const QuotationSystemPage = lazy(() => import("@/modules/quotation-generator/pages/quotation-system"));
 const SignIn = lazy(() => import("@/pages/sign-in"));
 const ForgotPassword = lazy(() => import("@/pages/forgot-password"));
 const ResetPassword = lazy(() => import("@/pages/reset-password"));
@@ -109,6 +111,18 @@ const PurchaseOrderDetails = lazy(
 const QuotationList = lazy(() => import("@/pages/leads/quotation-list"));
 const QuotationDetails = lazy(() => import("@/pages/leads/quotation-details"));
 const NewInquiry = lazy(() => import("@/pages/leads/new-inquiry"));
+const CreateQuotationPage = lazy(
+  () => import("@/modules/quotation-generator/pages/create-quotation-page"),
+);
+const UploadDrawingPage = lazy(
+  () => import("@/modules/quotation-generator/pages/upload-drawing-page"),
+);
+const ExtractedDrawingPage = lazy(
+  () => import("@/modules/quotation-generator/pages/extracted-drawing-page"),
+);
+const QuotePreviewPage = lazy(
+  () => import("@/modules/quotation-generator/pages/quote-preview-page"),
+);
 
 // Invoice section
 const InvoiceForm = lazy(() => import("@/pages/invoices/invoice-form"));
@@ -350,6 +364,19 @@ export const salesRoutes: RouteObject[] = [
             element: <SalesPage />,
           },
 
+          { path: "*", element: <NotFound /> },
+        ],
+      },
+      // quotation generator layout
+      {
+        path: "quotation",
+        element: <QuotationLayout />,
+        children: [
+          { index: true, element: <QuotationSystemPage /> },
+          { path: "create", element: <CreateQuotationPage /> },
+          { path: "upload-drawing", element: <UploadDrawingPage /> },
+          { path: "extracted-drawing", element: <ExtractedDrawingPage /> },
+          { path: "quote-preview", element: <QuotePreviewPage /> },
           { path: "*", element: <NotFound /> },
         ],
       },
