@@ -3,7 +3,7 @@ import { lazy } from "react";
 import { NotFound } from "@/pages/not-found";
 import { RouterErrorFallback } from "@/pages/error-page";
 import { AdminLayout } from "@/components/admin-layout";
-import { QuotationLayout } from "@/modules/quotation-generator";
+// import { QuotationLayout } from "@/modules/quotation-generator";
 import { ProtectedRoute, PublicOnlyRoute } from "@/modules/auth/auth.guards";
 
 const QuotationSystemPage = lazy(() => import("@/modules/quotation-generator/pages/quotation-system"));
@@ -122,6 +122,12 @@ const ExtractedDrawingPage = lazy(
 );
 const QuotePreviewPage = lazy(
   () => import("@/modules/quotation-generator/pages/quote-preview-page"),
+);
+const QuoteHistoryPage = lazy(
+  () => import("@/modules/quotation-generator/pages/quote-history-page"),
+);
+const PricingRulesPage = lazy(
+  () => import("@/modules/quotation-generator/pages/pricing-rules-page"),
 );
 
 // Invoice section
@@ -364,19 +370,21 @@ export const salesRoutes: RouteObject[] = [
             element: <SalesPage />,
           },
 
-          { path: "*", element: <NotFound /> },
-        ],
-      },
-      // quotation generator layout
-      {
-        path: "quotation",
-        element: <QuotationLayout />,
-        children: [
-          { index: true, element: <QuotationSystemPage /> },
-          { path: "create", element: <CreateQuotationPage /> },
-          { path: "upload-drawing", element: <UploadDrawingPage /> },
-          { path: "extracted-drawing", element: <ExtractedDrawingPage /> },
-          { path: "quote-preview", element: <QuotePreviewPage /> },
+          // quotation generator layout
+          {
+            path: "quotation",
+            // element: <QuotationLayout />,
+            children: [
+              { index: true, element: <QuotationSystemPage /> },
+              { path: "create", element: <CreateQuotationPage /> },
+              { path: "upload-drawing", element: <UploadDrawingPage /> },
+              { path: "extracted-drawing", element: <ExtractedDrawingPage /> },
+              { path: "preview", element: <QuotePreviewPage /> },
+              { path: "history", element: <QuoteHistoryPage /> },
+              { path: "pricing-rules", element: <PricingRulesPage /> },
+            ],
+          },
+
           { path: "*", element: <NotFound /> },
         ],
       },
