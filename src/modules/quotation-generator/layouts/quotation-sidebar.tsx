@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useLocation } from "react-router";
 import {
   FileText,
   Copy,
@@ -25,8 +25,22 @@ export function QuotationSidebar({
   className,
 }: QuotationSidebarProps) {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<string>("pemb-quote");
+  const location = useLocation();
   const [isRoofSelectOpen, setIsRoofSelectOpen] = useState(false);
+
+  // Compute activeTab from current route location
+  const activeTab = location.pathname.includes("/quotation/pricing-rules")
+    ? "pricing-rules"
+    : location.pathname.includes("/quotation/quote-history")
+    ? "quote-history"
+    : location.pathname.includes("/quotation/quote-preview")
+    ? "quote-preview"
+    : location.pathname.includes("/quotation/create")
+    ? "custom-quote"
+    : location.pathname.includes("/quotation/extracted-drawing") ||
+      location.pathname.includes("/quotation/upload-drawing")
+    ? "pemb-quote"
+    : "pemb-quote";
 
   // Store Hooks
   const {
@@ -107,7 +121,6 @@ export function QuotationSidebar({
             <nav className="space-y-1">
               <button
                 onClick={() => {
-                  setActiveTab("pemb-quote");
                   navigate("/quotation/extracted-drawing");
                 }}
                 className={cn(
@@ -122,14 +135,10 @@ export function QuotationSidebar({
               </button>
 
               <button
-                onClick={() => {
-                  setActiveTab("storage-cog");
-                }}
+                onClick={() => {}}
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-150 text-left cursor-pointer",
-                  activeTab === "storage-cog"
-                    ? "bg-[#1d3d63] text-white border border-blue-400/30 shadow-xs"
-                    : "text-slate-300 hover:bg-slate-800/50 hover:text-white"
+                  "text-slate-300 hover:bg-slate-800/50 hover:text-white"
                 )}
               >
                 <Copy className="h-4 w-4 shrink-0 text-slate-300" />
@@ -138,7 +147,6 @@ export function QuotationSidebar({
 
               <button
                 onClick={() => {
-                  setActiveTab("quote-preview");
                   navigate("/quotation/quote-preview");
                 }}
                 className={cn(
@@ -154,7 +162,6 @@ export function QuotationSidebar({
 
               <button
                 onClick={() => {
-                  setActiveTab("custom-quote");
                   navigate("/quotation/create");
                 }}
                 className={cn(
@@ -170,8 +177,7 @@ export function QuotationSidebar({
 
               <button
                 onClick={() => {
-                  setActiveTab("quote-history");
-                  navigate("/leads/quotation-list");
+                  navigate("/quotation/quote-history");
                 }}
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-150 text-left cursor-pointer",
@@ -193,9 +199,9 @@ export function QuotationSidebar({
             </div>
             <nav className="space-y-1">
               <button
-                onClick={() => setActiveTab("pricing-rules")}
+                onClick={() => navigate("/quotation/pricing-rules")}
                 className={cn(
-                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-150 text-left",
+                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-150 text-left cursor-pointer",
                   activeTab === "pricing-rules"
                     ? "bg-[#1d3d63] text-white border border-blue-400/30 shadow-xs"
                     : "text-slate-300 hover:bg-slate-800/50 hover:text-white"
