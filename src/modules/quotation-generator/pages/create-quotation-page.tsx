@@ -106,13 +106,14 @@ export default function CreateQuotationPage() {
   };
 
   return (
-    <div className="">
+    <div className="p-5">
       {/* Page Header */}
       <div className="flex items-center gap-4 mb-6">
         <Button
           type="button"
           onClick={() => navigate(-1)}
-          className="bg-[#3B82F6] hover:bg-[#2563EB] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 cursor-pointer"
+          variant="outline"
+          className="border-primary text-primary"
         >
           <ArrowLeft className="h-4 w-4" />
           Back
