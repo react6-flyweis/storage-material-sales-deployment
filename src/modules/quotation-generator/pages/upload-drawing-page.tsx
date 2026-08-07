@@ -22,13 +22,14 @@ export default function UploadDrawingPage() {
   });
 
   return (
-    <div>
+    <div className="p-5">
       {/* Top Header Banner */}
       <div className="flex items-center gap-4 mb-6">
         <Button
           type="button"
           onClick={() => navigate(-1)}
-          className="bg-[#3B82F6] hover:bg-[#2563EB] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 cursor-pointer"
+          variant="outline"
+          className="border-primary text-primary"
         >
           <ArrowLeft className="h-4 w-4" />
           Back
@@ -41,7 +42,7 @@ export default function UploadDrawingPage() {
         </div>
       </div>
 
-      <div className="space-y-6 max-w-5xl">
+      <div className="space-y-6">
         {/* Step 1 Card: Upload Prelim Drawing (PDF) */}
         <Card className="">
           <CardHeader className="">
