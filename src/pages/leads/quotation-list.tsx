@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import { useMemo, useState } from "react";
-import { Download, Eye, Upload, Loader2 } from "lucide-react";
+import { Download, Eye, Upload, Loader2, PlusCircle } from "lucide-react";
 import TitleSubtitle from "@/components/TitleSubtitle";
 import { Button } from "@/components/ui/button";
 import {
@@ -197,19 +197,25 @@ export default function QuotationListPage() {
       <TitleSubtitle
         title={
           <div className="flex items-center gap-2">
-            <span>Quotation List</span>
-            {isLoading ? (
-              <Loader2 className="h-5 w-5 animate-spin text-gray-600" />
-            ) : (
-              <span>- {quotationStats.total}</span>
-            )}
+            <span>Quotation</span>
+            {isLoading && <Loader2 className="h-5 w-5 animate-spin text-gray-600" />}
           </div>
         }
         subtitle="Manage your assigned leads and track their progress."
         action={
-          <Link to="/leads/new-inquiry">
-            <Button>Create New Inquiry</Button>
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link to="/leads/new-inquiry">
+              <Button className="bg-[#2563EB] hover:bg-[#1d4ed8] text-white font-medium rounded-lg px-4 py-2">
+                Create New Inquiry
+              </Button>
+            </Link>
+            <Link to="/quotation/create">
+              <Button className="bg-[#1e40af] hover:bg-[#1e3a8a] text-white font-medium rounded-lg px-4 py-2 flex items-center gap-2">
+                <PlusCircle className="w-4 h-4" />
+                Create New Quotation
+              </Button>
+            </Link>
+          </div>
         }
       />
 
