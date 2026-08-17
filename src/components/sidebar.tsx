@@ -165,7 +165,7 @@ const navigationGroups: NavigationGroup[] = [
     label: "Quoting",
     color: "bg-[#2563EB]",
     link: "/quotation",
-    hiddenFromSidebar: true,
+    hiddenFromSidebar: false,
     items: [
       { sectionHeader: "QUOTING" },
       { path: "/quotation/create", label: "PEMB Quote", icon: pembIcon },
