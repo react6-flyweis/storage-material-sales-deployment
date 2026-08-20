@@ -434,6 +434,10 @@ export function QuoteBreakdownPricingSection({
         {/* Contract Tab */}
         <TabsContent value="contract" className="m-0 outline-none">
           <QuoteContractTab
+            extractedShipper={shipperData}
+            quotationForm={quotationForm}
+            extractedDrawing={extractedDrawing}
+            sqFt={sqFt}
             onBackToBreakdown={() => setActiveTab("breakdown")}
             onQuotePreview={handleNavigateToPreview}
           />
