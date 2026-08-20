@@ -158,22 +158,32 @@ export function QuotePreviewPage() {
   const initialPdfName = navState.pdfFileName || navState.extractedDrawing?.fileName || "Steel_Building_Preliminary_Drawing_Vector.pdf";
 
   // File state for PDF dropzone
-  const [selectedPdf, setSelectedPdf] = useState<{ name: string } | null>({
+  const [selectedPdf, setSelectedPdf] = useState<{ name: string; url?: string } | null>({
     name: initialPdfName,
   });
+
+  const handlePrint = () => {
+    const originalTitle = document.title;
+    const safeCustomer = (customerLeadName || "Quote").replace(/[^a-zA-Z0-9_-]/g, "_");
+    document.title = `Quote_Package_${safeCustomer}`;
+    window.print();
+    document.title = originalTitle;
+  };
 
   const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
-      setSelectedPdf({ name: file.name });
+      const url = URL.createObjectURL(file);
+      setSelectedPdf({ name: file.name, url });
     }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setSelectedPdf({ name: file.name });
+      const url = URL.createObjectURL(file);
+      setSelectedPdf({ name: file.name, url });
     }
   };
 
@@ -184,7 +194,7 @@ export function QuotePreviewPage() {
   return (
     <div className="space-y-6">
       {/* Top Action Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 no-print">
         <div className="flex items-center gap-3">
           <Button
             type="button"
@@ -207,6 +217,7 @@ export function QuotePreviewPage() {
         <div className="flex items-center gap-3">
           <Button
             type="button"
+            onClick={handlePrint}
             className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
           >
             <Printer className="h-4 w-4" />
@@ -214,6 +225,7 @@ export function QuotePreviewPage() {
           </Button>
           <Button
             type="button"
+            onClick={() => navigate("/sales/quotation/history")}
             className="bg-[#16A34A] hover:bg-[#15803D] text-white px-5 py-2.5 rounded-lg text-xs font-bold cursor-pointer shadow-xs"
           >
             Save to History
@@ -222,9 +234,9 @@ export function QuotePreviewPage() {
       </div>
 
       {/* Main Content Area */}
-      <div className="space-y-6 max-w-5xl">
+      <div className="space-y-6 w-full max-w-5xl print:max-w-none print:w-full">
         {/* Building drawings & plans Card */}
-        <Card className="p-6 bg-white border border-slate-200 shadow-xs rounded-xl">
+        <Card className="p-6 bg-white border border-slate-200 shadow-xs rounded-xl no-print">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
             <div>
               <h2 className="text-lg font-bold text-slate-900">
@@ -246,6 +258,7 @@ export function QuotePreviewPage() {
               </Button>
               <Button
                 type="button"
+                onClick={handlePrint}
                 className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2 text-xs font-semibold rounded-lg cursor-pointer shadow-xs flex items-center gap-1.5"
               >
                 Preview assembled PDF ↓
@@ -295,9 +308,9 @@ export function QuotePreviewPage() {
         </Card>
 
         {/* Printable Estimate Card Box */}
-        <Card className="p-6 md:p-8 bg-white border border-slate-200 shadow-xs rounded-xl space-y-6 text-slate-800">
+        <Card className="p-6 md:p-8 bg-white border border-slate-200 shadow-xs rounded-xl space-y-6 text-slate-800 print-card">
           {/* Estimate Header */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b-2 border-slate-900">
+          <div className="flex flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b-2 border-slate-900">
             <div>
               <div className="flex items-center gap-1 font-extrabold text-xl tracking-tight">
                 <span className="text-slate-900 tracking-wider">STORAGE</span>
@@ -322,7 +335,7 @@ export function QuotePreviewPage() {
           </div>
 
           {/* Info Grid */}
-          <div className="bg-[#F8FAFC] rounded-xl p-6 grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+          <div className="bg-[#F8FAFC] rounded-xl p-6 grid grid-cols-1 sm:grid-cols-2 print:grid-cols-2 gap-6 text-xs">
             <div className="space-y-4">
               <div>
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
@@ -382,7 +395,7 @@ export function QuotePreviewPage() {
           </div>
 
           {/* Pricing Summary, Scope Included, Exclusions Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-xs pt-2">
+          <div className="grid grid-cols-1 md:grid-cols-3 print:grid-cols-3 gap-8 text-xs pt-2">
             {/* PRICING SUMMARY */}
             <div>
               <h4 className="font-bold text-[#1E3A8A] uppercase border-b border-slate-200 pb-2 mb-3 tracking-wider">
@@ -468,7 +481,7 @@ export function QuotePreviewPage() {
           </div>
 
           {/* Signature Lines */}
-          <div className="pt-10 border-t-2 border-slate-900 grid grid-cols-1 md:grid-cols-2 gap-12 text-xs">
+          <div className="pt-10 border-t-2 border-slate-900 grid grid-cols-2 gap-8 md:gap-12 text-xs">
             <div>
               <h5 className="font-bold text-slate-900 mb-10">Steel Investments DBA Storage Materials</h5>
               <div className="border-b border-slate-300 flex justify-between pb-1 text-[10px] text-slate-400 font-medium">
@@ -501,9 +514,9 @@ export function QuotePreviewPage() {
         </Card>
 
         {/* Printable Statement of Work (SOW) Card Box */}
-        <Card className="p-6 md:p-8 bg-white border border-slate-200 shadow-xs rounded-xl space-y-6 text-slate-800">
+        <Card className="p-6 md:p-8 bg-white border border-slate-200 shadow-xs rounded-xl space-y-6 text-slate-800 print-card">
           {/* Header */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b-2 border-slate-900">
+          <div className="flex flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b-2 border-slate-900">
             <div>
               <div className="flex items-center gap-1 font-extrabold text-xl tracking-tight">
                 <span className="text-slate-900 tracking-wider">STORAGE</span>
@@ -531,7 +544,7 @@ export function QuotePreviewPage() {
           </div>
 
           {/* Info Grid */}
-          <div className="bg-[#F8FAFC] rounded-xl p-6 grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+          <div className="bg-[#F8FAFC] rounded-xl p-6 grid grid-cols-1 sm:grid-cols-2 print:grid-cols-2 gap-6 text-xs">
             <div className="space-y-4">
               <div>
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
@@ -775,7 +788,7 @@ export function QuotePreviewPage() {
           </div>
 
           {/* Signature Lines */}
-          <div className="pt-10 border-t-2 border-slate-900 grid grid-cols-1 md:grid-cols-2 gap-12 text-xs">
+          <div className="pt-10 border-t-2 border-slate-900 grid grid-cols-2 gap-8 md:gap-12 text-xs">
             <div>
               <h5 className="font-bold text-slate-900 mb-10">Steel Investments DBA Storage Materials</h5>
               <div className="border-b border-slate-300 flex justify-between pb-1 text-[10px] text-slate-400 font-medium">
@@ -795,7 +808,7 @@ export function QuotePreviewPage() {
         </Card>
 
         {/* Printable Fabrication & Supply Agreement Card Box */}
-        <Card className="p-6 md:p-8 bg-white border border-slate-200 shadow-xs rounded-xl space-y-6 text-slate-800">
+        <Card className="p-6 md:p-8 bg-white border border-slate-200 shadow-xs rounded-xl space-y-6 text-slate-800 print-card">
           <h3 className="text-lg font-bold text-slate-900 text-center">
             Fabrication & Supply Agreement
           </h3>
@@ -859,7 +872,7 @@ export function QuotePreviewPage() {
               SIGNATURES
             </h4>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-12 text-xs">
+            <div className="grid grid-cols-2 gap-8 md:gap-12 text-xs">
               <div className="space-y-4">
                 <h5 className="font-bold text-slate-900 uppercase">STEEL INVESTMENTS, LLC</h5>
                 <div className="border-b border-slate-300 flex justify-between pb-1 text-[10px] text-slate-400 font-medium pt-8">
