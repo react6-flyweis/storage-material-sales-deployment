@@ -2,45 +2,93 @@ import { useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SuccessDialog from "@/components/success-dialog";
+import { useQuotationStore } from "@/modules/quotation/quotation.store";
+import type {
+  ExtractShipperResponseData,
+  ComputeEstimateRequest,
+} from "../estimates.api";
 
-export function QuoteConcreteTab() {
-  // Config state
-  const [slabThickness, setSlabThickness] = useState<'4"' | '6"'>('6"');
-  const [psiRating, setPsiRating] = useState("4000 PSI");
-  const [installCostSf, setInstallCostSf] = useState(7.25);
-  const [targetMarginPct, setTargetMarginPct] = useState(25);
-  const [additionalNotes, setAdditionalNotes] = useState("");
+interface QuoteConcreteTabProps {
+  extractedShipper?: ExtractShipperResponseData;
+  sqFt?: string;
+  onTriggerCompute?: (overrides?: Partial<ComputeEstimateRequest>) => void;
+}
+
+export function QuoteConcreteTab({
+  extractedShipper,
+  sqFt: propSqFt,
+  onTriggerCompute,
+}: QuoteConcreteTabProps) {
+  const {
+    concreteInclude,
+    setConcreteInclude,
+    concreteCostSf,
+    setConcreteCostSf,
+    concreteMarginPct,
+    setConcreteMarginPct,
+    concreteSlabThickness,
+    setConcreteSlabThickness,
+    concretePsiRating,
+    setConcretePsiRating,
+    concreteNotes,
+    setConcreteNotes,
+    concreteInclusions,
+    toggleConcreteInclusion,
+    resetConcreteSettings,
+  } = useQuotationStore();
 
   // Dialog state
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
 
-  // Base building footprint constant
-  const areaSqFt = 68750;
+  // Base building footprint
+  const areaSqFt =
+    parseFloat(propSqFt || "") ||
+    extractedShipper?.squareFootage ||
+    68750;
 
   // Calculation logic
-  const totalCost = areaSqFt * installCostSf;
-  const marginDecimal = targetMarginPct / 100;
-  const totalSell = marginDecimal < 1 ? totalCost / (1 - marginDecimal) : totalCost;
-  const sellCostSf = totalSell / areaSqFt;
+  const totalCost = areaSqFt * concreteCostSf;
+  const marginDecimal = concreteMarginPct / 100;
+  const totalSell =
+    marginDecimal < 1 ? totalCost / (1 - marginDecimal) : totalCost;
+  const sellCostSf = areaSqFt > 0 ? totalSell / areaSqFt : 0;
   const totalProfit = totalSell - totalCost;
 
   const handleApply = () => {
-    setSuccessMessage("Concrete calculations and SOW inclusions applied successfully!");
+    setConcreteInclude(true);
+    setSuccessMessage(
+      "Concrete calculations and SOW inclusions applied successfully!"
+    );
     setSuccessDialogOpen(true);
+    if (onTriggerCompute) {
+      onTriggerCompute({
+        concrete: {
+          include: true,
+          costSF: concreteCostSf,
+          marginPct: concreteMarginPct,
+          slabThickness: concreteSlabThickness,
+          psiRating: concretePsiRating,
+        },
+      });
+    }
   };
 
   const handleReset = () => {
-    setSlabThickness('6"');
-    setPsiRating("4000 PSI");
-    setInstallCostSf(7.25);
-    setTargetMarginPct(25);
-    setAdditionalNotes("");
+    resetConcreteSettings();
+    setConcreteInclude(false);
     setSuccessMessage("Concrete settings reset to defaults!");
     setSuccessDialogOpen(true);
+    if (onTriggerCompute) {
+      onTriggerCompute({
+        concrete: {
+          include: false,
+        },
+      });
+    }
   };
 
-  const sowInclusions = [
+  const allSowInclusions = [
     "Pier excavation & placement",
     "Reinforced rebar system (tied)",
     "10mm vapor barrier",
@@ -82,9 +130,9 @@ export function QuoteConcreteTab() {
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
-                    onClick={() => setSlabThickness('4"')}
+                    onClick={() => setConcreteSlabThickness('4"')}
                     className={`py-2.5 px-4 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
-                      slabThickness === '4"'
+                      concreteSlabThickness === '4"'
                         ? "border-blue-600 bg-blue-50/50 text-blue-900 shadow-2xs"
                         : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                     }`}
@@ -93,9 +141,9 @@ export function QuoteConcreteTab() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setSlabThickness('6"')}
+                    onClick={() => setConcreteSlabThickness('6"')}
                     className={`py-2.5 px-4 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
-                      slabThickness === '6"'
+                      concreteSlabThickness === '6"'
                         ? "border-blue-600 bg-blue-50/60 text-blue-900 shadow-2xs"
                         : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                     }`}
@@ -112,8 +160,8 @@ export function QuoteConcreteTab() {
                 </label>
                 <div className="relative">
                   <select
-                    value={psiRating}
-                    onChange={(e) => setPsiRating(e.target.value)}
+                    value={concretePsiRating}
+                    onChange={(e) => setConcretePsiRating(e.target.value)}
                     className="w-full appearance-none border border-slate-200 rounded-lg px-3.5 py-2.5 text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer pr-10"
                   >
                     <option value="3000 PSI">3000 PSI</option>
@@ -129,7 +177,7 @@ export function QuoteConcreteTab() {
               {/* Live Result Card */}
               <div className="border border-slate-200 rounded-xl bg-slate-50/40 p-5 space-y-4 shadow-2xs">
                 <span className="text-xs font-bold text-slate-800 block">
-                  Live Result
+                  Live Result {!concreteInclude && "(Click 'Apply to Quote & SOW' to include)"}
                 </span>
 
                 <div className="grid grid-cols-2 gap-y-4 gap-x-6">
@@ -139,7 +187,7 @@ export function QuoteConcreteTab() {
                       SLAB
                     </span>
                     <span className="text-sm font-bold text-slate-900 block">
-                      {slabThickness} · {psiRating}
+                      {concreteSlabThickness} · {concretePsiRating}
                     </span>
                   </div>
 
@@ -149,7 +197,7 @@ export function QuoteConcreteTab() {
                       AREA
                     </span>
                     <span className="text-sm font-bold text-slate-900 block">
-                      {areaSqFt.toLocaleString()} SF
+                      {Math.round(areaSqFt).toLocaleString()} SF
                     </span>
                   </div>
 
@@ -159,7 +207,7 @@ export function QuoteConcreteTab() {
                       COST
                     </span>
                     <span className="text-sm font-extrabold text-orange-600 block">
-                      ${Math.round(totalCost).toLocaleString()} (${installCostSf.toFixed(2)}/SF)
+                      ${Math.round(totalCost).toLocaleString()} (${concreteCostSf.toFixed(2)}/SF)
                     </span>
                   </div>
 
@@ -189,7 +237,7 @@ export function QuoteConcreteTab() {
                       MARGIN
                     </span>
                     <span className="text-sm font-extrabold text-emerald-600 block">
-                      {targetMarginPct}%
+                      {concreteMarginPct}%
                     </span>
                   </div>
                 </div>
@@ -209,12 +257,12 @@ export function QuoteConcreteTab() {
                     min="3.00"
                     max="15.00"
                     step="0.05"
-                    value={installCostSf}
-                    onChange={(e) => setInstallCostSf(parseFloat(e.target.value))}
+                    value={concreteCostSf}
+                    onChange={(e) => setConcreteCostSf(parseFloat(e.target.value))}
                     className="flex-1 accent-amber-500 cursor-pointer h-2.5 bg-slate-800 rounded-lg"
                   />
                   <div className="border border-slate-200 rounded-lg px-3 py-1.5 bg-slate-50 text-xs font-bold text-slate-900 min-w-16 text-center">
-                    {installCostSf.toFixed(2)}
+                    {concreteCostSf.toFixed(2)}
                   </div>
                 </div>
                 <p className="text-[11px] text-slate-400 font-medium">
@@ -232,12 +280,12 @@ export function QuoteConcreteTab() {
                     type="range"
                     min="0"
                     max="50"
-                    value={targetMarginPct}
-                    onChange={(e) => setTargetMarginPct(parseFloat(e.target.value))}
+                    value={concreteMarginPct}
+                    onChange={(e) => setConcreteMarginPct(parseFloat(e.target.value))}
                     className="flex-1 accent-emerald-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
                   />
                   <div className="border border-slate-200 rounded-lg px-3 py-1.5 bg-slate-50 text-xs font-bold text-slate-900 flex items-center gap-1 min-w-16 justify-between">
-                    <span>{targetMarginPct}</span>
+                    <span>{concreteMarginPct}</span>
                     <span className="text-slate-400 font-normal">%</span>
                   </div>
                 </div>
@@ -251,21 +299,41 @@ export function QuoteConcreteTab() {
 
         {/* SOW Inclusions for Concrete */}
         <div className="space-y-4 pt-2">
-          <label className="block text-xs font-bold text-slate-800">
-            SOW Inclusions for Concrete
-          </label>
-          <div className="flex flex-wrap items-center gap-3">
-            {sowInclusions.map((item, idx) => (
-              <div
-                key={idx}
-                className="flex items-center gap-1.5 text-xs font-bold text-blue-700 bg-blue-50/70 border border-blue-100 rounded-full px-3 py-1.5"
-              >
-                <span className="w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px]">
-                  ✓
-                </span>
-                <span>{item}</span>
-              </div>
-            ))}
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-bold text-slate-800">
+              SOW Inclusions for Concrete
+            </label>
+            <span className="text-[10px] text-slate-400">
+              Click items to include/exclude from SOW & Quote
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2.5">
+            {allSowInclusions.map((item, idx) => {
+              const isSelected = concreteInclusions.includes(item);
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => toggleConcreteInclusion(item)}
+                  className={`flex items-center gap-1.5 text-xs rounded-full px-3 py-1.5 transition-all cursor-pointer border ${
+                    isSelected
+                      ? "text-blue-700 bg-blue-50/90 border-blue-300 shadow-2xs font-bold"
+                      : "text-slate-500 bg-slate-100/70 border-slate-200 hover:bg-slate-200/60 font-medium"
+                  }`}
+                >
+                  <span
+                    className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${
+                      isSelected
+                        ? "bg-blue-600 text-white"
+                        : "bg-slate-300 text-slate-600 font-bold"
+                    }`}
+                  >
+                    {isSelected ? "✓" : "+"}
+                  </span>
+                  <span>{item}</span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Additional Notes Textarea */}
@@ -275,8 +343,8 @@ export function QuoteConcreteTab() {
             </label>
             <textarea
               rows={2}
-              value={additionalNotes}
-              onChange={(e) => setAdditionalNotes(e.target.value)}
+              value={concreteNotes}
+              onChange={(e) => setConcreteNotes(e.target.value)}
               placeholder="e.g. 6&quot; tall block wash bay wall, special drain requirements..."
               className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-slate-50/50 resize-none"
             />
