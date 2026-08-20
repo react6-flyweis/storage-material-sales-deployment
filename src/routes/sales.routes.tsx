@@ -6,7 +6,7 @@ import { AdminLayout } from "@/components/admin-layout";
 // import { QuotationLayout } from "@/modules/quotation-generator";
 import { ProtectedRoute, PublicOnlyRoute } from "@/modules/auth/auth.guards";
 
-const QuotationSystemPage = lazy(() => import("@/modules/quotation-generator/pages/quotation-system"));
+// const QuotationSystemPage = lazy(() => import("@/modules/quotation-generator/pages/quotation-system"));
 const SignIn = lazy(() => import("@/pages/sign-in"));
 const ForgotPassword = lazy(() => import("@/pages/forgot-password"));
 const ResetPassword = lazy(() => import("@/pages/reset-password"));
@@ -375,7 +375,7 @@ export const salesRoutes: RouteObject[] = [
             path: "quotation",
             // element: <QuotationLayout />,
             children: [
-              { index: true, element: <QuotationSystemPage /> },
+              { index: true, element: <CreateQuotationPage /> },
               { path: "create", element: <CreateQuotationPage /> },
               { path: "upload-drawing", element: <UploadDrawingPage /> },
               { path: "extracted-drawing", element: <ExtractedDrawingPage /> },
