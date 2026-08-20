@@ -1,8 +1,9 @@
-import { useNavigate } from "react-router";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams, useLocation } from "react-router";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ArrowLeft, User } from "lucide-react";
+import { ArrowLeft, User, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
@@ -13,6 +14,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useLeadsLookupQuery, useLeadDetailQuery } from "@/modules/leads/leads.hooks";
+import { getLeadProjectName } from "@/modules/leads/leads.utils";
 
 const createQuotationSchema = z.object({
   leadId: z.string().min(1, "Lead selection is required"),
@@ -28,42 +31,34 @@ const createQuotationSchema = z.object({
 
 type CreateQuotationFormValues = z.infer<typeof createQuotationSchema>;
 
-interface LeadOption {
-  id: string;
-  name: string;
-  email: string;
-  street: string;
-  cityStateZip: string;
-  buildingSize: string;
-  squareFootage: string;
-  jobNumber: string;
-}
-
-const mockLeads: LeadOption[] = [
-  {
-    id: "1",
-    name: "John Doe",
-    email: "johndoe@gmail.com",
-    street: "1234 Main Street",
-    cityStateZip: "Pune, 412101",
-    buildingSize: "200x250x36",
-    squareFootage: "50000",
-    jobNumber: "8098",
-  },
-  {
-    id: "2",
-    name: "Jane Smith",
-    email: "janesmith@gmail.com",
-    street: "5678 Market Street",
-    cityStateZip: "Mumbai, 400001",
-    buildingSize: "150x200x30",
-    squareFootage: "30000",
-    jobNumber: "8099",
-  },
-];
-
 export default function CreateQuotationPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+
+  const initialLeadId =
+    searchParams.get("lead") ||
+    searchParams.get("leadId") ||
+    (location.state as { leadId?: string })?.leadId ||
+    "";
+
+  const [selectedLeadId, setSelectedLeadId] = useState<string>(initialLeadId);
+
+  // Fetch leads lookup list
+  const { data: leadsLookupData, isLoading: isLeadsLoading } = useLeadsLookupQuery(undefined, 1, 100);
+  const leads = leadsLookupData?.data.leads || [];
+
+  // Fetch detailed info for selected lead
+  const { data: leadDetailData, isLoading: isDetailLoading } = useLeadDetailQuery(
+    selectedLeadId,
+    Boolean(selectedLeadId)
+  );
+
+  const formattedToday = new Date().toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
 
   const {
     register,
@@ -74,35 +69,95 @@ export default function CreateQuotationPage() {
   } = useForm<CreateQuotationFormValues>({
     resolver: zodResolver(createQuotationSchema),
     defaultValues: {
-      leadId: "1",
-      leadName: mockLeads[0].name,
-      email: mockLeads[0].email,
-      street: mockLeads[0].street,
-      cityStateZip: mockLeads[0].cityStateZip,
-      buildingSize: mockLeads[0].buildingSize,
-      squareFootage: mockLeads[0].squareFootage,
-      jobNumber: mockLeads[0].jobNumber,
-      quoteDate: "July 31, 2026",
+      leadId: selectedLeadId,
+      leadName: "",
+      email: "",
+      street: "",
+      cityStateZip: "",
+      buildingSize: "",
+      squareFootage: "",
+      jobNumber: "",
+      quoteDate: formattedToday,
     },
   });
 
+  // Auto-select first lead if none selected and leads list arrives
+  useEffect(() => {
+    if (!selectedLeadId && leads.length > 0) {
+      const firstId = leads[0]._id;
+      setSelectedLeadId(firstId);
+      setValue("leadId", firstId);
+    }
+  }, [leads, selectedLeadId, setValue]);
+
+  // Update form fields when lead detail or lead lookup item changes
+  useEffect(() => {
+    if (!selectedLeadId) return;
+
+    const lookupItem = leads.find((l) => l._id === selectedLeadId);
+
+    if (leadDetailData?.data) {
+      const { lead, customer } = leadDetailData.data;
+      const name =
+        getLeadProjectName(
+          {
+            projectName: lead?.projectName,
+            buildingType: lead?.buildingType,
+            location: lead?.location,
+          },
+          customer
+            ? { firstName: customer.firstName }
+            : null
+        ) ||
+        customer?.firstName ||
+        lookupItem?.projectName ||
+        "";
+
+      const email = customer?.email || lookupItem?.customerId?.email || "";
+      const street = lead?.location || lookupItem?.location || "";
+
+      let bSize = lead?.buildingType || lookupItem?.buildingType || "";
+      if (lead?.width && lead?.length && lead?.height) {
+        bSize = `${lead.width}x${lead.length}x${lead.height}`;
+      }
+
+      let sqftStr = "";
+      if (lead?.sqft) {
+        sqftStr = String(lead.sqft);
+      } else if (lead?.width && lead?.length) {
+        sqftStr = String(lead.width * lead.length);
+      }
+
+      const jobId = lead?.jobId || lookupItem?.jobId || "";
+
+      setValue("leadName", name);
+      setValue("email", email);
+      setValue("street", street);
+      setValue("buildingSize", bSize);
+      setValue("squareFootage", sqftStr);
+      setValue("jobNumber", jobId);
+    } else if (lookupItem) {
+      const name =
+        getLeadProjectName(lookupItem, lookupItem.customerId) ||
+        `${lookupItem.customerId?.firstName || ""} ${lookupItem.customerId?.lastName || ""}`.trim() ||
+        lookupItem.projectName;
+
+      setValue("leadName", name);
+      setValue("email", lookupItem.customerId?.email || "");
+      setValue("street", lookupItem.location || "");
+      setValue("buildingSize", lookupItem.buildingType || "");
+      setValue("jobNumber", lookupItem.jobId || "");
+    }
+  }, [selectedLeadId, leadDetailData, leads, setValue]);
+
   const handleLeadChange = (leadId: string) => {
     setValue("leadId", leadId);
-    const lead = mockLeads.find((l) => l.id === leadId);
-    if (lead) {
-      setValue("leadName", lead.name);
-      setValue("email", lead.email);
-      setValue("street", lead.street);
-      setValue("cityStateZip", lead.cityStateZip);
-      setValue("buildingSize", lead.buildingSize);
-      setValue("squareFootage", lead.squareFootage);
-      setValue("jobNumber", lead.jobNumber);
-    }
+    setSelectedLeadId(leadId);
   };
 
   const onSubmit = (data: CreateQuotationFormValues) => {
     console.log("Quotation Form Data:", data);
-    navigate("/quotation/upload-drawing");
+    navigate("/quotation/upload-drawing", { state: { quotationForm: data } });
   };
 
   return (
@@ -137,21 +192,38 @@ export default function CreateQuotationPage() {
                 control={control}
                 render={({ field }) => (
                   <Select
-                    value={field.value}
+                    value={field.value || selectedLeadId}
                     onValueChange={(val) => {
                       field.onChange(val);
                       handleLeadChange(val);
                     }}
+                    disabled={isLeadsLoading}
                   >
                     <SelectTrigger className="w-full max-w-md bg-[#F8FAFC] border-slate-200 text-slate-900 text-sm h-11 rounded-lg">
-                      <SelectValue placeholder="Select lead" />
+                      <SelectValue
+                        placeholder={
+                          isLeadsLoading ? "Loading leads..." : "Select lead"
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockLeads.map((lead) => (
-                        <SelectItem key={lead.id} value={lead.id}>
-                          {lead.name}
-                        </SelectItem>
-                      ))}
+                      {leads.map((lead) => {
+                        const label = getLeadProjectName(
+                          lead,
+                          lead.customerId
+                        );
+                        return (
+                          <SelectItem key={lead._id} value={lead._id}>
+                            {label} (
+                            {lead.customerId?.firstName
+                              ? `${lead.customerId.firstName} ${
+                                  lead.customerId.lastName ?? ""
+                                }`.trim()
+                              : "N/A"}
+                            )
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 )}
@@ -174,9 +246,15 @@ export default function CreateQuotationPage() {
               <div>
                 <div className="text-base font-bold text-slate-900 flex items-center gap-1.5">
                   Customer & Project Information{" "}
-                  <span className="text-blue-600 font-normal text-sm">
-                    (Auto-Fill after Lead Selection)
-                  </span>
+                  {isDetailLoading ? (
+                    <span className="text-blue-600 font-normal text-sm flex items-center gap-1">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Fetching details...
+                    </span>
+                  ) : (
+                    <span className="text-blue-600 font-normal text-sm">
+                      (Auto-Fill after Lead Selection)
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Fill in customer details — auto-populates Quote, SOW & Contract
@@ -300,3 +378,4 @@ export default function CreateQuotationPage() {
     </div>
   );
 }
+
