@@ -2,46 +2,111 @@ import { useState } from "react";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SuccessDialog from "@/components/success-dialog";
+import { useQuotationStore } from "@/modules/quotation/quotation.store";
+import type {
+  ExtractShipperResponseData,
+  ComputeEstimateRequest,
+} from "../estimates.api";
 
-export function QuoteCogsTab() {
-  // Step 1 states
-  const [costInput, setCostInput] = useState("525000");
-  const [costAdjustPercent, setCostAdjustPercent] = useState(0);
+interface QuoteCogsTabProps {
+  extractedShipper?: ExtractShipperResponseData;
+  onTriggerCompute?: (overrides?: Partial<ComputeEstimateRequest>) => void;
+}
 
-  // Step 2 states
-  const [materialMargin, setMaterialMargin] = useState(20);
-  const [fixedSellPrice, setFixedSellPrice] = useState("");
+export function QuoteCogsTab({
+  extractedShipper,
+  onTriggerCompute,
+}: QuoteCogsTabProps) {
+  const {
+    cogsCostInput,
+    setCogsCostInput,
+    cogsCostAdjustPercent,
+    setCogsCostAdjustPercent,
+    cogsMaterialMargin,
+    setCogsMaterialMargin,
+    cogsFixedSellPrice,
+    setCogsFixedSellPrice,
+    setCogsOverrideApplied,
+    resetCogsSettings,
+  } = useQuotationStore();
 
   // Dialog state
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
 
+  const pricing = extractedShipper?.pricing;
+
   // Base shipper values
-  const baseCogs = 168663;
+  const baseCogs =
+    pricing?.matCost != null
+      ? pricing.matCost
+      : pricing?.totCost != null
+      ? pricing.totCost
+      : 168663;
+
+  const baseSell =
+    pricing?.matSell != null
+      ? pricing.matSell
+      : pricing?.totSell != null
+      ? pricing.totSell
+      : 219262;
+
+  const baseMarginText =
+    pricing?.profPct != null ? `${pricing.profPct}%` : "23.1%";
+
+  const sfPriceText =
+    pricing?.sfPrice != null
+      ? `$${pricing.sfPrice}`
+      : "$2.45 Cost / $3.19 Sell";
 
   // Calculation logic
-  const adjustedCogs = parseFloat(costInput) || baseCogs;
+  const adjustedCogs = parseFloat(cogsCostInput) || baseCogs;
   const costDiff = adjustedCogs - baseCogs;
 
   // Calculate material sell based on margin or fixed sell
-  const targetMarginDecimal = materialMargin / 100;
-  const computedMaterialSell = targetMarginDecimal < 1 ? adjustedCogs / (1 - targetMarginDecimal) : adjustedCogs;
-  const materialSell = fixedSellPrice !== "" ? (parseFloat(fixedSellPrice) || computedMaterialSell) : computedMaterialSell;
+  const targetMarginDecimal = cogsMaterialMargin / 100;
+  const computedMaterialSell =
+    targetMarginDecimal < 1
+      ? adjustedCogs / (1 - targetMarginDecimal)
+      : adjustedCogs;
+  const materialSell =
+    cogsFixedSellPrice !== ""
+      ? parseFloat(cogsFixedSellPrice) || computedMaterialSell
+      : computedMaterialSell;
   const totalProfit = materialSell - adjustedCogs;
-  const overallMargin = materialSell > 0 ? (totalProfit / materialSell) * 100 : 0;
+  const overallMargin =
+    materialSell > 0 ? (totalProfit / materialSell) * 100 : 0;
 
   const handleApply = () => {
-    setSuccessMessage("COGS & Target Margin applied to Quote & SOW successfully!");
+    setCogsOverrideApplied(true);
+    setSuccessMessage(
+      "COGS & Target Margin applied to Quote & SOW successfully!"
+    );
     setSuccessDialogOpen(true);
+    if (onTriggerCompute) {
+      onTriggerCompute({
+        cogsOverride: {
+          applied: true,
+          costInput: parseFloat(cogsCostInput) || undefined,
+          costAdjustPercent: cogsCostAdjustPercent,
+          materialMargin: cogsMaterialMargin,
+          fixedSellPrice: parseFloat(cogsFixedSellPrice) || undefined,
+        },
+      });
+    }
   };
 
   const handleReset = () => {
-    setCostInput(baseCogs.toString());
-    setCostAdjustPercent(0);
-    setMaterialMargin(20);
-    setFixedSellPrice("");
+    resetCogsSettings();
     setSuccessMessage("Values reset to default shipper numbers!");
     setSuccessDialogOpen(true);
+    if (onTriggerCompute) {
+      onTriggerCompute({
+        cogsOverride: {
+          applied: false,
+        },
+      });
+    }
   };
 
   return (
@@ -76,7 +141,7 @@ export function QuoteCogsTab() {
               COGS
             </span>
             <span className="text-sm md:text-base font-extrabold text-slate-900">
-              $168,663
+              ${baseCogs.toLocaleString()}
             </span>
           </div>
 
@@ -85,7 +150,7 @@ export function QuoteCogsTab() {
               COMPUTED SELL
             </span>
             <span className="text-sm md:text-base font-extrabold text-blue-600">
-              $219,262
+              ${baseSell.toLocaleString()}
             </span>
           </div>
 
@@ -94,7 +159,7 @@ export function QuoteCogsTab() {
               COMPUTED MARGIN
             </span>
             <span className="text-sm md:text-base font-extrabold text-emerald-500">
-              23.1%
+              {baseMarginText}
             </span>
           </div>
 
@@ -103,7 +168,7 @@ export function QuoteCogsTab() {
               $/SF
             </span>
             <span className="text-sm md:text-base font-extrabold text-slate-900">
-              $2.45 Cost / $3.19 Sell
+              {sfPriceText}
             </span>
           </div>
         </div>
@@ -125,8 +190,8 @@ export function QuoteCogsTab() {
               </label>
               <input
                 type="text"
-                value={costInput}
-                onChange={(e) => setCostInput(e.target.value)}
+                value={cogsCostInput}
+                onChange={(e) => setCogsCostInput(e.target.value)}
                 className="w-full border-2 border-orange-400 rounded-lg px-3 py-2 text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
               />
             </div>
@@ -141,17 +206,17 @@ export function QuoteCogsTab() {
                   type="range"
                   min="-50"
                   max="50"
-                  value={costAdjustPercent}
+                  value={cogsCostAdjustPercent}
                   onChange={(e) => {
                     const pct = parseFloat(e.target.value);
-                    setCostAdjustPercent(pct);
+                    setCogsCostAdjustPercent(pct);
                     const newCost = Math.round(baseCogs * (1 + pct / 100));
-                    setCostInput(newCost.toString());
+                    setCogsCostInput(newCost.toString());
                   }}
                   className="flex-1 accent-orange-500 cursor-pointer h-2 bg-slate-200 rounded-lg"
                 />
                 <span className="text-xs font-bold text-orange-600 min-w-[2.5rem] text-right">
-                  {costAdjustPercent}%
+                  {cogsCostAdjustPercent}%
                 </span>
               </div>
               <p className="text-[10px] text-slate-400 font-medium">
@@ -178,12 +243,12 @@ export function QuoteCogsTab() {
                   type="range"
                   min="0"
                   max="50"
-                  value={materialMargin}
-                  onChange={(e) => setMaterialMargin(parseFloat(e.target.value))}
+                  value={cogsMaterialMargin}
+                  onChange={(e) => setCogsMaterialMargin(parseFloat(e.target.value))}
                   className="flex-1 accent-blue-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
                 />
                 <div className="border border-slate-300 rounded-md px-3 py-1 bg-white text-xs font-bold text-slate-900 flex items-center gap-1.5 min-w-[4rem] justify-between shadow-2xs">
-                  <span>{materialMargin}</span>
+                  <span>{cogsMaterialMargin}</span>
                   <span className="text-slate-400 font-normal">%</span>
                 </div>
               </div>
@@ -197,8 +262,8 @@ export function QuoteCogsTab() {
               <input
                 type="text"
                 placeholder="Leave blank to use margin"
-                value={fixedSellPrice}
-                onChange={(e) => setFixedSellPrice(e.target.value)}
+                value={cogsFixedSellPrice}
+                onChange={(e) => setCogsFixedSellPrice(e.target.value)}
                 className="w-full border border-blue-500 rounded-lg px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
               />
             </div>
@@ -236,7 +301,7 @@ export function QuoteCogsTab() {
               ${Math.round(materialSell).toLocaleString()}
             </div>
             <p className="text-[11px] text-slate-400 font-medium">
-              {materialMargin.toFixed(1)}% mat margin · ${costDiff >= 0 ? `-${Math.abs(costDiff).toLocaleString()}` : `+${Math.abs(costDiff).toLocaleString()}`}
+              {cogsMaterialMargin.toFixed(1)}% mat margin · ${costDiff >= 0 ? `-${Math.abs(costDiff).toLocaleString()}` : `+${Math.abs(costDiff).toLocaleString()}`}
             </p>
           </div>
 
