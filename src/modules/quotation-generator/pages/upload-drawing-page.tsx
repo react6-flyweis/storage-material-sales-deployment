@@ -60,10 +60,8 @@ export default function UploadDrawingPage() {
   };
 
   const handleNext = async () => {
-    if (!pdfFileItem && !xlsxFile) {
-      navigate("/quotation/extracted-drawing", {
-        state: { ...location.state },
-      });
+    if (!pdfFileItem || !xlsxFile) {
+      setExtractionError("Please upload both the Prelim Drawing (PDF) and Xshipper file (.xlsx) to proceed.");
       return;
     }
 
@@ -238,12 +236,12 @@ export default function UploadDrawingPage() {
         </Card>
 
         {/* Next Action Button */}
-        <div className="flex justify-center pt-2">
+        <div className="flex flex-col items-center gap-2 pt-2">
           <Button
             type="button"
             onClick={handleNext}
-            disabled={isProcessing}
-            className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-14 py-2.5 rounded font-medium cursor-pointer flex items-center gap-2"
+            disabled={isProcessing || !pdfFileItem || !xlsxFile}
+            className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-14 py-2.5 rounded font-medium cursor-pointer flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isProcessing ? (
               <>
@@ -254,6 +252,11 @@ export default function UploadDrawingPage() {
               "Next"
             )}
           </Button>
+          {(!pdfFileItem || !xlsxFile) && (
+            <p className="text-xs text-amber-600 font-medium">
+              Please upload both the Prelim Drawing (PDF) and Xshipper file (.xlsx) to proceed.
+            </p>
+          )}
         </div>
       </div>
     </div>
