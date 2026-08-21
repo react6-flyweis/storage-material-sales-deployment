@@ -55,6 +55,7 @@ export interface ExtractShipperRequest {
   roof?: "screw-down" | "standing-seam" | string;
   install?: string;
   squareFootage?: number;
+  useManualSquareFootage?: boolean;
   blendPct?: number;
   installCostPerSf?: number;
   sellPerSf?: number;
@@ -134,6 +135,7 @@ export async function extractShipperProvider(
       roof: "screw-down",
       install: "medium",
       squareFootage: 0,
+      useManualSquareFootage: false,
       blendPct: 50,
       installCostPerSf: 5.85,
       sellPerSf: 9.0,
@@ -192,6 +194,7 @@ export interface ComputeEstimateRequest {
   scope?: string;
   squareFootage?: number;
   sf?: number;
+  useManualSquareFootage?: boolean;
   blendPct?: number;
   roof?: string;
   install?: string;
@@ -269,6 +272,7 @@ export interface SaveEstimatePayload extends Record<string, unknown> {
   buildingSize?: string;
   squareFootage?: number;
   sf?: number;
+  useManualSquareFootage?: boolean;
   jobNumber?: string;
   sourceFileName?: string;
   parsedCategories?: Record<string, unknown>;

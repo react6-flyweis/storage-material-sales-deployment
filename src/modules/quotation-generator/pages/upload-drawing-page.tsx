@@ -118,6 +118,7 @@ export default function UploadDrawingPage() {
           roof: roofType.toLowerCase(),
           install: "medium",
           squareFootage: 0,
+          useManualSquareFootage: false,
           blendPct: blendPercentage,
           installCostPerSf: installCost,
           sellPerSf: installSell,

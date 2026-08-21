@@ -124,8 +124,14 @@ export function QuoteBreakdownPricingSection({
   const [sqFt, setSqFt] = useState(
     initialShipper?.squareFootage ? String(initialShipper.squareFootage) : ""
   );
+  const [isManualSqFt, setIsManualSqFt] = useState(false);
   const [buildingSize, setBuildingSize] = useState("");
   const [additionalNotes, setAdditionalNotes] = useState("");
+
+  const handleSqFtChange = useCallback((val: string) => {
+    setSqFt(val);
+    setIsManualSqFt(true);
+  }, []);
 
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [estimateId, setEstimateId] = useState<string | null>(null);
@@ -163,6 +169,7 @@ export function QuoteBreakdownPricingSection({
           buildingSize: buildingSize || quotationForm?.buildingSize || "",
           squareFootage: parsedSqFt,
           sf: parsedSqFt,
+          useManualSquareFootage: isManualSqFt,
           jobNumber: quotationForm?.jobNumber || extractedDrawing?.extracted?.jobnumber || "",
           sourceFileName: pdfFileName || shipperData.fileName || "",
           parsedCategories: shipperData.parsedCategories,
@@ -214,6 +221,7 @@ export function QuoteBreakdownPricingSection({
     extractedDrawing,
     buildingSize,
     sqFt,
+    isManualSqFt,
     pdfFileName,
     concreteInclude,
     concreteCostSf,
@@ -253,6 +261,7 @@ export function QuoteBreakdownPricingSection({
           scope: normalizeScope(scope),
           squareFootage: parsedSqFt,
           sf: parsedSqFt,
+          useManualSquareFootage: isManualSqFt,
           blendPct: blendPercentage,
           roof: normalizeRoof(roofType),
           install: installDifficulty || "medium",
@@ -336,6 +345,7 @@ export function QuoteBreakdownPricingSection({
       jobType,
       scope,
       sqFt,
+      isManualSqFt,
       blendPercentage,
       roofType,
       installDifficulty,
@@ -398,6 +408,8 @@ export function QuoteBreakdownPricingSection({
           scope: normalizeScope(scope),
           roof: normalizeRoof(roofType),
           install: installDifficulty || "medium",
+          squareFootage: 0,
+          useManualSquareFootage: false,
           blendPct: blendPercentage,
           installCostPerSf: installCost,
           sellPerSf: installSell,
@@ -407,6 +419,7 @@ export function QuoteBreakdownPricingSection({
           if (res.data.squareFootage) {
             setSqFt(String(res.data.squareFootage));
           }
+          setIsManualSqFt(false);
         }
       } catch (err) {
         console.error("Failed to parse shipper XLSX:", err);
@@ -473,7 +486,7 @@ export function QuoteBreakdownPricingSection({
         <TabsContent value="quote" className="m-0 outline-none">
           <QuoteDetailTab
             sqFt={sqFt}
-            setSqFt={setSqFt}
+            setSqFt={handleSqFtChange}
             buildingSize={buildingSize}
             setBuildingSize={setBuildingSize}
             additionalNotes={additionalNotes}
