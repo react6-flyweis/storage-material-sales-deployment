@@ -14,6 +14,7 @@ import { QuoteContractTab } from "./quote-contract-tab";
 import {
   extractShipperProvider,
   computeEstimateProvider,
+  saveEstimateProvider,
   type ExtractShipperResponseData,
   type ExtractDrawingResponseData,
   type ComputeEstimateRequest,
@@ -103,7 +104,7 @@ export function QuoteBreakdownPricingSection({
     includeTax,
     cogsOverrideApplied,
     cogsCostInput,
-    cogsCostAdjustPercent,
+    // cogsCostAdjustPercent,
     cogsMaterialMargin,
     cogsFixedSellPrice,
     marginOverrideApplied,
@@ -126,6 +127,9 @@ export function QuoteBreakdownPricingSection({
   const [buildingSize, setBuildingSize] = useState("");
   const [additionalNotes, setAdditionalNotes] = useState("");
 
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [estimateId, setEstimateId] = useState<string | null>(null);
+
   const navigate = useNavigate();
 
   const handleNavigateToPreview = useCallback(() => {
@@ -142,6 +146,91 @@ export function QuoteBreakdownPricingSection({
     });
   }, [navigate, quotationForm, extractedDrawing, shipperData, sqFt, buildingSize, additionalNotes, pdfFileName]);
 
+  const handleSaveDraft = useCallback(async () => {
+    if (!shipperData?.parsedCategories) return;
+    setIsSavingDraft(true);
+    try {
+      const parsedSqFt = parseFloat(sqFt) || shipperData.squareFootage || 0;
+      const res = await saveEstimateProvider(
+        {
+          _id: estimateId || undefined,
+          jobType,
+          scope: normalizeScope(scope),
+          leadCompanyName: quotationForm?.leadName || extractedDrawing?.extracted?.customer || "",
+          customerEmail: quotationForm?.email || "",
+          streetAddress: quotationForm?.street || "",
+          cityStateZip: quotationForm?.cityStateZip || "",
+          buildingSize: buildingSize || quotationForm?.buildingSize || "",
+          squareFootage: parsedSqFt,
+          sf: parsedSqFt,
+          jobNumber: quotationForm?.jobNumber || extractedDrawing?.extracted?.jobnumber || "",
+          sourceFileName: pdfFileName || shipperData.fileName || "",
+          parsedCategories: shipperData.parsedCategories,
+          tabSummary: shipperData.tabSummary,
+          pricingResult: shipperData.pricing,
+          extractedDrawingFields: extractedDrawing?.extracted,
+          concreteAddon: {
+            include: concreteInclude,
+            costSF: concreteCostSf,
+            marginPct: concreteMarginPct,
+            slabThickness: concreteSlabThickness,
+            psiRating: concretePsiRating,
+          },
+          insulationAddon: {
+            include: insulationInclude,
+            costSF: insulationCogsSf,
+            cogsSF: insulationCogsSf,
+            marginPct: insulationMarginPct,
+            system: insulationSystem,
+            rValueRoof: insulationRValueRoof,
+            rValueWalls: insulationRValueWalls,
+          },
+          salesTax: {
+            rate: taxRate,
+            include: includeTax,
+            zip: taxZip,
+          },
+          status: "draft",
+        },
+        estimateId || undefined
+      );
+
+      const data = res.data || res;
+      const savedId = data?.estimate?._id || data?._id;
+      if (savedId) {
+        setEstimateId(savedId);
+      }
+    } catch (err) {
+      console.error("Failed to save draft estimate:", err);
+    } finally {
+      setIsSavingDraft(false);
+    }
+  }, [
+    estimateId,
+    shipperData,
+    jobType,
+    scope,
+    quotationForm,
+    extractedDrawing,
+    buildingSize,
+    sqFt,
+    pdfFileName,
+    concreteInclude,
+    concreteCostSf,
+    concreteMarginPct,
+    concreteSlabThickness,
+    concretePsiRating,
+    insulationInclude,
+    insulationCogsSf,
+    insulationMarginPct,
+    insulationSystem,
+    insulationRValueRoof,
+    insulationRValueWalls,
+    taxRate,
+    includeTax,
+    taxZip,
+  ]);
+
   const computeAbortRef = useRef<number | null>(null);
 
   // Compute estimate function
@@ -151,11 +240,19 @@ export function QuoteBreakdownPricingSection({
 
       setIsComputing(true);
       try {
+        const parsedSqFt = parseFloat(sqFt) || shipperData.squareFootage || 0;
+        const cogsCostVal = parseFloat(cogsCostInput) || undefined;
+        const cogsSellVal = parseFloat(cogsFixedSellPrice) || undefined;
+        const marginLaborVal = parseFloat(marginLaborOverride) || undefined;
+        const marginTargetVal = parseFloat(marginTargetMargin) || undefined;
+        const marginSellVal = parseFloat(marginFixedSellOverride) || undefined;
+
         const payload: ComputeEstimateRequest = {
           parsedCategories: shipperData.parsedCategories,
           jobType,
           scope: normalizeScope(scope),
-          squareFootage: parseFloat(sqFt) || shipperData.squareFootage || 0,
+          squareFootage: parsedSqFt,
+          sf: parsedSqFt,
           blendPct: blendPercentage,
           roof: normalizeRoof(roofType),
           install: installDifficulty || "medium",
@@ -172,13 +269,13 @@ export function QuoteBreakdownPricingSection({
             include: insulationInclude,
             ...(insulationInclude
               ? {
-                  system: insulationSystem,
-                  rValueRoof: insulationRValueRoof,
-                  rValueWalls: insulationRValueWalls,
-                  costSF: insulationCogsSf,
-                  cogsSF: insulationCogsSf,
-                  marginPct: insulationMarginPct,
-                }
+                system: insulationSystem,
+                rValueRoof: insulationRValueRoof,
+                rValueWalls: insulationRValueWalls,
+                costSF: insulationCogsSf,
+                cogsSF: insulationCogsSf,
+                marginPct: insulationMarginPct,
+              }
               : {}),
           },
           salesTax: {
@@ -188,25 +285,24 @@ export function QuoteBreakdownPricingSection({
           },
           cogsOverride: cogsOverrideApplied
             ? {
-                applied: true,
-                costInput: parseFloat(cogsCostInput) || undefined,
-                costAdjustPercent: cogsCostAdjustPercent,
-                materialMargin: cogsMaterialMargin,
-                fixedSellPrice: parseFloat(cogsFixedSellPrice) || undefined,
-              }
+              applied: true,
+              costDollar: cogsCostVal,
+              marginPct: cogsMaterialMargin,
+              sellDollar: cogsSellVal,
+            }
             : {
-                applied: false,
-              },
+              applied: false,
+            },
           marginOverride: marginOverrideApplied
             ? {
-                applied: true,
-                laborOverride: parseFloat(marginLaborOverride) || undefined,
-                targetMargin: parseFloat(marginTargetMargin) || undefined,
-                fixedSellOverride: parseFloat(marginFixedSellOverride) || undefined,
-              }
+              applied: true,
+              laborSF: marginLaborVal,
+              pct: marginTargetVal,
+              sellFixed: marginSellVal,
+            }
             : {
-                applied: false,
-              },
+              applied: false,
+            },
           ...overrides,
         };
 
@@ -220,10 +316,10 @@ export function QuoteBreakdownPricingSection({
             setShipperData((prev) =>
               prev
                 ? {
-                    ...prev,
-                    ...(weightByCategory ? { weightByCategory } : {}),
-                    ...(pricing ? { pricing } : {}),
-                  }
+                  ...prev,
+                  ...(weightByCategory ? { weightByCategory } : {}),
+                  ...(pricing ? { pricing } : {}),
+                }
                 : prev
             );
           }
@@ -261,7 +357,6 @@ export function QuoteBreakdownPricingSection({
       taxZip,
       cogsOverrideApplied,
       cogsCostInput,
-      cogsCostAdjustPercent,
       cogsMaterialMargin,
       cogsFixedSellPrice,
       marginOverrideApplied,
@@ -369,6 +464,8 @@ export function QuoteBreakdownPricingSection({
             onViewQuote={() => setActiveTab("quote")}
             onViewSow={() => setActiveTab("sow")}
             onQuotePreview={handleNavigateToPreview}
+            onSaveDraft={handleSaveDraft}
+            isSavingDraft={isSavingDraft}
           />
         </TabsContent>
 
