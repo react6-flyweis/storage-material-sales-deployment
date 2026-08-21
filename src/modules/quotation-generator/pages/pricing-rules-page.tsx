@@ -1,8 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
-import { ArrowLeft, Wrench, X } from "lucide-react";
+import { ArrowLeft, Wrench, X, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import SuccessDialog from "@/components/success-dialog";
 import {
   Card,
   CardHeader,
@@ -28,6 +29,7 @@ import type {
   CustomRuleMethod,
   PricingRulesData,
 } from "../pricing-rules.api";
+import { getApiErrorMessage } from "@/lib/api-error";
 
 export interface PricingRulesFormValues {
   steelRatesPerLb: {
@@ -232,47 +234,55 @@ function formatFormValues(rulesData: PricingRulesData): PricingRulesFormValues {
 
 export function PricingRulesPage() {
   const navigate = useNavigate();
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
   const { data: pricingData } = usePricingRulesQuery();
   const updateMutation = useUpdatePricingRulesMutation();
 
-  const { register, control, handleSubmit, reset } =
-    useForm<PricingRulesFormValues>({
-      defaultValues: {
-        steelRatesPerLb: {
-          primaryFrames: "",
-          secondarySteel: "",
-          hssBeams: "",
-          angles: "",
-          openingsJambs: "",
-          platesClips: "",
-        },
-        sheetingRatesPerSf: {
-          standardScrewDown: "",
-          standingSeam: "",
-        },
-        freight: {
-          ratePerLb: "",
-          lbsPerTruck: "",
-          accessoriesAllowancePerSf: "",
-          vendorDeltaPerLb: "",
-        },
-        markup: {
-          pembMultiplier: "",
-          storageMultiplier: "",
-        },
-        install: {
-          pembEasy: { cost: "", sell: "" },
-          pembMedium: { cost: "", sell: "" },
-          pembHard: { cost: "", sell: "" },
-          pembTallHard: { cost: "", sell: "" },
-          storageBasic: { cost: "", sell: "" },
-          storageTall: { cost: "", sell: "" },
-          storageOverhang: { cost: "", sell: "" },
-        },
-        customTabRules: [],
+  const {
+    register,
+    control,
+    handleSubmit,
+    reset,
+    setError,
+    clearErrors,
+    formState: { errors, isSubmitting },
+  } = useForm<PricingRulesFormValues>({
+    defaultValues: {
+      steelRatesPerLb: {
+        primaryFrames: "",
+        secondarySteel: "",
+        hssBeams: "",
+        angles: "",
+        openingsJambs: "",
+        platesClips: "",
       },
-    });
+      sheetingRatesPerSf: {
+        standardScrewDown: "",
+        standingSeam: "",
+      },
+      freight: {
+        ratePerLb: "",
+        lbsPerTruck: "",
+        accessoriesAllowancePerSf: "",
+        vendorDeltaPerLb: "",
+      },
+      markup: {
+        pembMultiplier: "",
+        storageMultiplier: "",
+      },
+      install: {
+        pembEasy: { cost: "", sell: "" },
+        pembMedium: { cost: "", sell: "" },
+        pembHard: { cost: "", sell: "" },
+        pembTallHard: { cost: "", sell: "" },
+        storageBasic: { cost: "", sell: "" },
+        storageTall: { cost: "", sell: "" },
+        storageOverhang: { cost: "", sell: "" },
+      },
+      customTabRules: [],
+    },
+  });
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -295,75 +305,88 @@ export function PricingRulesPage() {
     }
   };
 
-  const onSubmit = (formData: PricingRulesFormValues) => {
-    const payload: PricingRulesData = {
-      steelRatesPerLb: {
-        primaryFrames: parseFloat(formData.steelRatesPerLb.primaryFrames) || 0,
-        secondarySteel: parseFloat(formData.steelRatesPerLb.secondarySteel) || 0,
-        hssBeams: parseFloat(formData.steelRatesPerLb.hssBeams) || 0,
-        angles: parseFloat(formData.steelRatesPerLb.angles) || 0,
-        openingsJambs: parseFloat(formData.steelRatesPerLb.openingsJambs) || 0,
-        platesClips: parseFloat(formData.steelRatesPerLb.platesClips) || 0,
-      },
-      sheetingRatesPerSf: {
-        standardScrewDown:
-          parseFloat(formData.sheetingRatesPerSf.standardScrewDown) || 0,
-        standingSeam:
-          parseFloat(formData.sheetingRatesPerSf.standingSeam) || 0,
-      },
-      freight: {
-        ratePerLb: parseFloat(formData.freight.ratePerLb) || 0,
-        lbsPerTruck: parseFloat(formData.freight.lbsPerTruck) || 0,
-        accessoriesAllowancePerSf:
-          parseFloat(formData.freight.accessoriesAllowancePerSf) || 0,
-        vendorDeltaPerLb: parseFloat(formData.freight.vendorDeltaPerLb) || 0,
-      },
-      markup: {
-        pembMultiplier: parseFloat(formData.markup.pembMultiplier) || 0,
-        storageMultiplier: parseFloat(formData.markup.storageMultiplier) || 0,
-      },
-      install: {
-        pembEasy: {
-          cost: parseFloat(formData.install.pembEasy.cost) || 0,
-          sell: parseFloat(formData.install.pembEasy.sell) || 0,
-        },
-        pembMedium: {
-          cost: parseFloat(formData.install.pembMedium.cost) || 0,
-          sell: parseFloat(formData.install.pembMedium.sell) || 0,
-        },
-        pembHard: {
-          cost: parseFloat(formData.install.pembHard.cost) || 0,
-          sell: parseFloat(formData.install.pembHard.sell) || 0,
-        },
-        pembTallHard: {
-          cost: parseFloat(formData.install.pembTallHard.cost) || 0,
-          sell: parseFloat(formData.install.pembTallHard.sell) || 0,
-        },
-        storageBasic: {
-          cost: parseFloat(formData.install.storageBasic.cost) || 0,
-          sell: parseFloat(formData.install.storageBasic.sell) || 0,
-        },
-        storageTall: {
-          cost: parseFloat(formData.install.storageTall.cost) || 0,
-          sell: parseFloat(formData.install.storageTall.sell) || 0,
-        },
-        storageOverhang: {
-          cost: parseFloat(formData.install.storageOverhang.cost) || 0,
-          sell: parseFloat(formData.install.storageOverhang.sell) || 0,
-        },
-      },
-      customTabRules: formData.customTabRules.map((r) => ({
-        ...(r.id ? { id: r.id } : {}),
-        matchType: r.matchType,
-        match: r.match,
-        cat: r.cat,
-        method: r.method,
-        rate: parseFloat(r.rate) || 0,
-        note: r.note,
-      })),
-    };
+  const isSubmittingState = isSubmitting || updateMutation.isPending;
 
-    updateMutation.mutate(payload);
+  const onSubmit = async (formData: PricingRulesFormValues) => {
+    clearErrors("root");
+    try {
+      const payload: PricingRulesData = {
+        steelRatesPerLb: {
+          primaryFrames: parseFloat(formData.steelRatesPerLb.primaryFrames) || 0,
+          secondarySteel: parseFloat(formData.steelRatesPerLb.secondarySteel) || 0,
+          hssBeams: parseFloat(formData.steelRatesPerLb.hssBeams) || 0,
+          angles: parseFloat(formData.steelRatesPerLb.angles) || 0,
+          openingsJambs: parseFloat(formData.steelRatesPerLb.openingsJambs) || 0,
+          platesClips: parseFloat(formData.steelRatesPerLb.platesClips) || 0,
+        },
+        sheetingRatesPerSf: {
+          standardScrewDown:
+            parseFloat(formData.sheetingRatesPerSf.standardScrewDown) || 0,
+          standingSeam:
+            parseFloat(formData.sheetingRatesPerSf.standingSeam) || 0,
+        },
+        freight: {
+          ratePerLb: parseFloat(formData.freight.ratePerLb) || 0,
+          lbsPerTruck: parseFloat(formData.freight.lbsPerTruck) || 0,
+          accessoriesAllowancePerSf:
+            parseFloat(formData.freight.accessoriesAllowancePerSf) || 0,
+          vendorDeltaPerLb: parseFloat(formData.freight.vendorDeltaPerLb) || 0,
+        },
+        markup: {
+          pembMultiplier: parseFloat(formData.markup.pembMultiplier) || 0,
+          storageMultiplier: parseFloat(formData.markup.storageMultiplier) || 0,
+        },
+        install: {
+          pembEasy: {
+            cost: parseFloat(formData.install.pembEasy.cost) || 0,
+            sell: parseFloat(formData.install.pembEasy.sell) || 0,
+          },
+          pembMedium: {
+            cost: parseFloat(formData.install.pembMedium.cost) || 0,
+            sell: parseFloat(formData.install.pembMedium.sell) || 0,
+          },
+          pembHard: {
+            cost: parseFloat(formData.install.pembHard.cost) || 0,
+            sell: parseFloat(formData.install.pembHard.sell) || 0,
+          },
+          pembTallHard: {
+            cost: parseFloat(formData.install.pembTallHard.cost) || 0,
+            sell: parseFloat(formData.install.pembTallHard.sell) || 0,
+          },
+          storageBasic: {
+            cost: parseFloat(formData.install.storageBasic.cost) || 0,
+            sell: parseFloat(formData.install.storageBasic.sell) || 0,
+          },
+          storageTall: {
+            cost: parseFloat(formData.install.storageTall.cost) || 0,
+            sell: parseFloat(formData.install.storageTall.sell) || 0,
+          },
+          storageOverhang: {
+            cost: parseFloat(formData.install.storageOverhang.cost) || 0,
+            sell: parseFloat(formData.install.storageOverhang.sell) || 0,
+          },
+        },
+        customTabRules: formData.customTabRules.map((r) => ({
+          ...(r.id ? { id: r.id } : {}),
+          matchType: r.matchType,
+          match: r.match,
+          cat: r.cat,
+          method: r.method,
+          rate: parseFloat(r.rate) || 0,
+          note: r.note,
+        })),
+      };
+
+      await updateMutation.mutateAsync(payload);
+      setShowSuccessDialog(true);
+    } catch (error) {
+      const errorMessage = getApiErrorMessage(error,
+        "Failed to save pricing rules. Please check your inputs or network connection.");
+      setError("root", {
+        type: "manual",
+        message: errorMessage,
+      });
+    }
   };
 
   return (
@@ -395,12 +418,37 @@ export function PricingRulesPage() {
 
         <Button
           type="submit"
-          disabled={updateMutation.isPending}
-          className="bg-[#1b4ed8] hover:bg-[#1e40af] text-white px-6 font-semibold shadow-xs"
+          disabled={isSubmittingState}
+          className="bg-[#1b4ed8] hover:bg-[#1e40af] text-white px-6 font-semibold shadow-xs flex items-center gap-2 cursor-pointer"
         >
-          Save Rules
+          {isSubmittingState ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            "Save Rules"
+          )}
         </Button>
       </div>
+
+      {/* Root Form Error Banner */}
+      {errors.root?.message && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center justify-between text-xs font-medium shadow-xs">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-red-500 shrink-0" />
+            <span>{errors.root.message}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => clearErrors("root")}
+            className="text-red-500 hover:text-red-700 p-0.5 rounded cursor-pointer"
+            aria-label="Dismiss error"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Section 1: Steel ($/lb) */}
       <Card>
@@ -1139,14 +1187,23 @@ export function PricingRulesPage() {
           <div className="flex items-center gap-3 pt-2">
             <Button
               type="submit"
-              className="bg-[#1d5bd8] hover:bg-[#1546af] text-white px-5 font-semibold text-xs h-9 rounded-md shadow-xs cursor-pointer"
+              disabled={isSubmittingState}
+              className="bg-[#1d5bd8] hover:bg-[#1546af] text-white px-5 font-semibold text-xs h-9 rounded-md shadow-xs flex items-center gap-2 cursor-pointer"
             >
-              Save Custom Rules
+              {isSubmittingState ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Custom Rules"
+              )}
             </Button>
             <Button
               type="button"
               variant="outline"
               onClick={handleReset}
+              disabled={isSubmittingState}
               className="border-slate-400 text-slate-800 font-medium text-xs h-9 px-5 hover:bg-slate-50 bg-white cursor-pointer"
             >
               Reset
@@ -1176,6 +1233,12 @@ export function PricingRulesPage() {
           </div>
         </CardContent>
       </Card>
+
+      <SuccessDialog
+        open={showSuccessDialog}
+        onClose={() => setShowSuccessDialog(false)}
+        title="Pricing Rules Saved Successfully!"
+      />
     </form>
   );
 }
