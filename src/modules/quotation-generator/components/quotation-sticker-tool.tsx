@@ -13,6 +13,11 @@ import {
 } from "@/components/ui/popover";
 import { useQuotationStore } from "@/modules/quotation/quotation.store";
 
+const roofOptions = [
+  { value: "screw-down", label: "Screw Down (SD)" },
+  { value: "standing-seam", label: "Standing Seam (SS)" },
+];
+
 export function QuotationStickerTool() {
   const {
     jobType,
@@ -128,20 +133,18 @@ export function QuotationStickerTool() {
                   type="button"
                   className="flex items-center justify-between gap-3 px-3.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 font-medium text-slate-800 text-sm shadow-2xs min-w-[200px] cursor-pointer"
                 >
-                  <span>{roofType}</span>
+                  <span>
+                    {roofOptions.find((opt) => opt.value === roofType)?.label || roofType}
+                  </span>
                   <ChevronDown className="h-4 w-4 text-slate-500 shrink-0" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-[200px]">
-                <DropdownMenuItem onClick={() => setRoofType("Standing Seam (SS)")}>
-                  Standing Seam (SS)
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setRoofType("Screw Down (SD)")}>
-                  Screw Down (SD)
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setRoofType("TPO / EPDM")}>
-                  TPO / EPDM
-                </DropdownMenuItem>
+                {roofOptions.map((opt) => (
+                  <DropdownMenuItem key={opt.value} onClick={() => setRoofType(opt.value)}>
+                    {opt.label}
+                  </DropdownMenuItem>
+                ))}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
