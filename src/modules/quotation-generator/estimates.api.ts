@@ -116,6 +116,7 @@ export interface ExtractShipperResponseData {
   };
   weightByCategory?: ShipperWeightByCategoryItem[];
   pricing?: ShipperPricing;
+  fullQuote?: Record<string, unknown>;
 }
 
 export interface ExtractShipperResponse {
@@ -149,14 +150,20 @@ export interface ComputeConcreteConfig {
   include: boolean;
   costSF?: number;
   marginPct?: number;
+  thickness?: number | string;
+  psi?: number | string;
   slabThickness?: string;
   psiRating?: string;
+  sowItems?: string[];
+  sowNotes?: string;
   [key: string]: unknown;
 }
 
 export interface ComputeInsulationConfig {
   include: boolean;
   system?: string;
+  rRoof?: string;
+  rWall?: string;
   rValueRoof?: string;
   rValueWalls?: string;
   costSF?: number;
@@ -211,6 +218,7 @@ export interface ComputeEstimateRequest {
 export interface ComputeEstimateResponseData {
   weightByCategory?: ShipperWeightByCategoryItem[];
   pricing?: ShipperPricing;
+  fullQuote?: Record<string, unknown>;
   [key: string]: unknown;
 }
 
@@ -220,6 +228,7 @@ export interface ComputeEstimateResponse {
   data?: ComputeEstimateResponseData;
   weightByCategory?: ShipperWeightByCategoryItem[];
   pricing?: ShipperPricing;
+  fullQuote?: Record<string, unknown>;
 }
 
 export async function computeEstimateProvider(
@@ -401,6 +410,31 @@ export async function extractStorageCogProvider(
   return response.data;
 }
 
+export interface ComputeStorageRequest {
+  storageData?: Record<string, unknown>;
+  concrete?: ComputeConcreteConfig;
+  insulation?: ComputeInsulationConfig;
+  salesTax?: ComputeSalesTaxConfig;
+  [key: string]: unknown;
+}
+
+export interface ComputeStorageResponse {
+  success?: boolean;
+  message?: string;
+  data?: { storagePricing?: Record<string, unknown> };
+  storagePricing?: Record<string, unknown>;
+}
+
+export async function computeStorageProvider(
+  payload: ComputeStorageRequest
+): Promise<ComputeStorageResponse> {
+  const response = await apiClient.post<ComputeStorageResponse>(
+    "/api/sales/estimates/compute-storage",
+    payload
+  );
+  return response.data;
+}
+
 // ----------------------------------------------------------------------------
 // DOCUMENT PREVIEW & PDF DOWNLOAD
 // ----------------------------------------------------------------------------
@@ -415,6 +449,7 @@ export interface PreviewDocumentRequest {
   pricingResult?: ShipperPricing;
   fullQuote?: Record<string, unknown>;
   extractedDrawingFields?: ExtractedDrawingData;
+  drawingAttachments?: Array<{ name?: string; fileBase64?: string; includeInQuote?: boolean; [key: string]: unknown }>;
   sections?: string[];
 }
 

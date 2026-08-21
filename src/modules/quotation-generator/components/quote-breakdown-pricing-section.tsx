@@ -157,6 +157,12 @@ export function QuoteBreakdownPricingSection({
     setIsSavingDraft(true);
     try {
       const parsedSqFt = parseFloat(sqFt) || shipperData.squareFootage || 0;
+      const cogsCostVal = parseFloat(cogsCostInput) || undefined;
+      const cogsSellVal = parseFloat(cogsFixedSellPrice) || undefined;
+      const marginLaborVal = parseFloat(marginLaborOverride) || undefined;
+      const marginTargetVal = parseFloat(marginTargetMargin) || undefined;
+      const marginSellVal = parseFloat(marginFixedSellOverride) || undefined;
+
       const res = await saveEstimateProvider(
         {
           _id: estimateId || undefined,
@@ -175,11 +181,14 @@ export function QuoteBreakdownPricingSection({
           parsedCategories: shipperData.parsedCategories,
           tabSummary: shipperData.tabSummary,
           pricingResult: shipperData.pricing,
+          fullQuoteResult: shipperData.fullQuote || (shipperData.pricing as Record<string, unknown> | undefined),
           extractedDrawingFields: extractedDrawing?.extracted,
           concreteAddon: {
             include: concreteInclude,
             costSF: concreteCostSf,
             marginPct: concreteMarginPct,
+            thickness: concreteSlabThickness,
+            psi: concretePsiRating,
             slabThickness: concreteSlabThickness,
             psiRating: concretePsiRating,
           },
@@ -189,6 +198,8 @@ export function QuoteBreakdownPricingSection({
             cogsSF: insulationCogsSf,
             marginPct: insulationMarginPct,
             system: insulationSystem,
+            rRoof: insulationRValueRoof,
+            rWall: insulationRValueWalls,
             rValueRoof: insulationRValueRoof,
             rValueWalls: insulationRValueWalls,
           },
@@ -197,6 +208,26 @@ export function QuoteBreakdownPricingSection({
             include: includeTax,
             zip: taxZip,
           },
+          cogsOverride: cogsOverrideApplied
+            ? {
+                applied: true,
+                costDollar: cogsCostVal,
+                marginPct: cogsMaterialMargin,
+                sellDollar: cogsSellVal,
+              }
+            : {
+                applied: false,
+              },
+          marginOverride: marginOverrideApplied
+            ? {
+                applied: true,
+                laborSF: marginLaborVal,
+                pct: marginTargetVal,
+                sellFixed: marginSellVal,
+              }
+            : {
+                applied: false,
+              },
           status: "draft",
         },
         estimateId || undefined
@@ -237,6 +268,14 @@ export function QuoteBreakdownPricingSection({
     taxRate,
     includeTax,
     taxZip,
+    cogsOverrideApplied,
+    cogsCostInput,
+    cogsMaterialMargin,
+    cogsFixedSellPrice,
+    marginOverrideApplied,
+    marginLaborOverride,
+    marginTargetMargin,
+    marginFixedSellOverride,
   ]);
 
   const computeAbortRef = useRef<number | null>(null);
@@ -271,6 +310,8 @@ export function QuoteBreakdownPricingSection({
             include: concreteInclude,
             costSF: concreteCostSf,
             marginPct: concreteMarginPct,
+            thickness: concreteSlabThickness,
+            psi: concretePsiRating,
             slabThickness: concreteSlabThickness,
             psiRating: concretePsiRating,
           },
@@ -279,6 +320,8 @@ export function QuoteBreakdownPricingSection({
             ...(insulationInclude
               ? {
                 system: insulationSystem,
+                rRoof: insulationRValueRoof,
+                rWall: insulationRValueWalls,
                 rValueRoof: insulationRValueRoof,
                 rValueWalls: insulationRValueWalls,
                 costSF: insulationCogsSf,
@@ -321,13 +364,15 @@ export function QuoteBreakdownPricingSection({
           const data = res.data || res;
           const weightByCategory = data.weightByCategory || res.weightByCategory;
           const pricing = data.pricing || res.pricing;
-          if (weightByCategory || pricing) {
+          const fullQuote = data.fullQuote || res.fullQuote;
+          if (weightByCategory || pricing || fullQuote) {
             setShipperData((prev) =>
               prev
                 ? {
                   ...prev,
                   ...(weightByCategory ? { weightByCategory } : {}),
                   ...(pricing ? { pricing } : {}),
+                  ...(fullQuote ? { fullQuote } : {}),
                 }
                 : prev
             );

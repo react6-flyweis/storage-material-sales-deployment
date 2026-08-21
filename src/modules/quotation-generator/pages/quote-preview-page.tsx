@@ -176,8 +176,10 @@ export function QuotePreviewPage() {
         squareFootage: effectiveSqFt,
         jobNumber: navState.quotationForm?.jobNumber || navState.extractedDrawing?.extracted?.jobnumber || "",
         pricingResult: navState.extractedShipper?.pricing,
+        fullQuote: navState.extractedShipper?.fullQuote || (navState.extractedShipper?.pricing as Record<string, unknown> | undefined),
         extractedDrawingFields: navState.extractedDrawing?.extracted,
-        sections: ["quote", "sow", "contract"],
+        drawingAttachments: selectedPdf ? [{ name: selectedPdf.name, includeInQuote: true }] : [],
+        sections: selectedPdf ? ["quote", "sow", "contract", "drawings"] : ["quote", "sow", "contract"],
       };
       const res = await downloadPdfProvider(payload, estimateId || undefined);
       const pdfData = res.data || res;
@@ -217,6 +219,7 @@ export function QuotePreviewPage() {
           parsedCategories: navState.extractedShipper?.parsedCategories,
           tabSummary: navState.extractedShipper?.tabSummary,
           pricingResult: navState.extractedShipper?.pricing,
+          fullQuoteResult: navState.extractedShipper?.fullQuote || (navState.extractedShipper?.pricing as Record<string, unknown> | undefined),
           extractedDrawingFields: navState.extractedDrawing?.extracted,
           status: "draft",
         },
