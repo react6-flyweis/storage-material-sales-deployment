@@ -172,18 +172,17 @@ export interface ComputeSalesTaxConfig {
 
 export interface ComputeCogsOverrideConfig {
   applied: boolean;
-  costInput?: number;
-  costAdjustPercent?: number;
-  materialMargin?: number;
-  fixedSellPrice?: number;
+  costDollar?: number;
+  marginPct?: number;
+  sellDollar?: number;
   [key: string]: unknown;
 }
 
 export interface ComputeMarginOverrideConfig {
   applied: boolean;
-  laborOverride?: number;
-  targetMargin?: number;
-  fixedSellOverride?: number;
+  laborSF?: number;
+  pct?: number;
+  sellFixed?: number;
   [key: string]: unknown;
 }
 
@@ -192,6 +191,7 @@ export interface ComputeEstimateRequest {
   jobType?: string;
   scope?: string;
   squareFootage?: number;
+  sf?: number;
   blendPct?: number;
   roof?: string;
   install?: string;
@@ -251,6 +251,249 @@ export async function taxLookupProvider(
 ): Promise<TaxLookupResponse> {
   const response = await apiClient.get<TaxLookupResponse>(
     `/api/sales/estimates/tax-lookup/${encodeURIComponent(zip.trim())}`
+  );
+  return response.data;
+}
+
+// ----------------------------------------------------------------------------
+// SAVE ESTIMATE DRAFT / UPDATE
+// ----------------------------------------------------------------------------
+export interface SaveEstimatePayload extends Record<string, unknown> {
+  _id?: string;
+  jobType?: string;
+  scope?: string;
+  leadCompanyName?: string;
+  customerEmail?: string;
+  streetAddress?: string;
+  cityStateZip?: string;
+  buildingSize?: string;
+  squareFootage?: number;
+  sf?: number;
+  jobNumber?: string;
+  sourceFileName?: string;
+  parsedCategories?: Record<string, unknown>;
+  tabSummary?: ShipperTabSummary[];
+  pricingResult?: ShipperPricing;
+  fullQuoteResult?: Record<string, unknown>;
+  extractedDrawingFields?: ExtractedDrawingData;
+  concreteAddon?: ComputeConcreteConfig;
+  insulationAddon?: ComputeInsulationConfig;
+  salesTax?: ComputeSalesTaxConfig;
+  cogsOverride?: ComputeCogsOverrideConfig;
+  marginOverride?: ComputeMarginOverrideConfig;
+  storageData?: Record<string, unknown>;
+  storagePricingResult?: Record<string, unknown>;
+  status?: string;
+}
+
+export interface SaveEstimateResponse {
+  success?: boolean;
+  message?: string;
+  data?: { estimate?: { _id: string } & SaveEstimatePayload; _id?: string };
+  estimate?: { _id: string } & SaveEstimatePayload;
+  _id?: string;
+}
+
+export async function saveEstimateProvider(
+  payload: SaveEstimatePayload,
+  estimateId?: string
+): Promise<SaveEstimateResponse> {
+  const targetId = estimateId || payload._id;
+  const method = targetId ? "put" : "post";
+  const url = targetId
+    ? `/api/sales/estimates/${encodeURIComponent(targetId as string)}`
+    : "/api/sales/estimates";
+
+  const response = await apiClient.request<SaveEstimateResponse>({
+    method,
+    url,
+    data: payload,
+  });
+  return response.data;
+}
+
+// ----------------------------------------------------------------------------
+// ESTIMATES HISTORY & LIBRARY
+// ----------------------------------------------------------------------------
+export interface EstimatesListResponse {
+  success?: boolean;
+  message?: string;
+  data?: SaveEstimatePayload[] | { estimates?: SaveEstimatePayload[]; items?: SaveEstimatePayload[] };
+  estimates?: SaveEstimatePayload[];
+  items?: SaveEstimatePayload[];
+}
+
+export async function getEstimatesListProvider(
+  limit = 30
+): Promise<EstimatesListResponse> {
+  const response = await apiClient.get<EstimatesListResponse>(
+    `/api/sales/estimates?limit=${limit}`
+  );
+  return response.data;
+}
+
+export async function getEstimateByIdProvider(
+  id: string
+): Promise<SaveEstimateResponse> {
+  const response = await apiClient.get<SaveEstimateResponse>(
+    `/api/sales/estimates/${encodeURIComponent(id)}`
+  );
+  return response.data;
+}
+
+export interface HistorySummaryResponse {
+  success?: boolean;
+  data?: {
+    allTime?: { totalQuotes?: number; totalValue?: number; totalProfit?: number };
+    totalQuotes?: number;
+    totalValue?: number;
+    totalProfit?: number;
+  };
+  allTime?: { totalQuotes?: number; totalValue?: number; totalProfit?: number };
+}
+
+export async function getHistorySummaryProvider(): Promise<HistorySummaryResponse> {
+  const response = await apiClient.get<HistorySummaryResponse>(
+    "/api/sales/estimates/history/summary"
+  );
+  return response.data;
+}
+
+// ----------------------------------------------------------------------------
+// STORAGE COG EXTRACTION
+// ----------------------------------------------------------------------------
+export interface ExtractStorageCogRequest {
+  fileBase64: string;
+  fileName: string;
+  salesTax?: ComputeSalesTaxConfig;
+}
+
+export interface ExtractStorageCogResponse {
+  success?: boolean;
+  message?: string;
+  data?: {
+    buildings?: Array<Record<string, unknown>>;
+    doors?: Array<Record<string, unknown>>;
+    extras?: Array<Record<string, unknown>>;
+    shippingDefault?: Record<string, unknown>;
+    project?: Record<string, unknown>;
+    storagePricing?: Record<string, unknown>;
+  };
+  buildings?: Array<Record<string, unknown>>;
+  doors?: Array<Record<string, unknown>>;
+  extras?: Array<Record<string, unknown>>;
+  shippingDefault?: Record<string, unknown>;
+  project?: Record<string, unknown>;
+  storagePricing?: Record<string, unknown>;
+}
+
+export async function extractStorageCogProvider(
+  payload: ExtractStorageCogRequest
+): Promise<ExtractStorageCogResponse> {
+  const response = await apiClient.post<ExtractStorageCogResponse>(
+    "/api/sales/estimates/extract-storage-cog",
+    payload
+  );
+  return response.data;
+}
+
+// ----------------------------------------------------------------------------
+// DOCUMENT PREVIEW & PDF DOWNLOAD
+// ----------------------------------------------------------------------------
+export interface PreviewDocumentRequest {
+  leadCompanyName?: string;
+  customerEmail?: string;
+  streetAddress?: string;
+  cityStateZip?: string;
+  buildingSize?: string;
+  squareFootage?: number;
+  jobNumber?: string;
+  pricingResult?: ShipperPricing;
+  fullQuote?: Record<string, unknown>;
+  extractedDrawingFields?: ExtractedDrawingData;
+  sections?: string[];
+}
+
+export interface PreviewDocumentResponse {
+  success?: boolean;
+  message?: string;
+  data?: { assembledHtml?: string; quoteHtml?: string };
+  assembledHtml?: string;
+  quoteHtml?: string;
+}
+
+export async function previewDocumentProvider(
+  payload: PreviewDocumentRequest
+): Promise<PreviewDocumentResponse> {
+  const response = await apiClient.post<PreviewDocumentResponse>(
+    "/api/sales/estimates/documents/preview",
+    payload
+  );
+  return response.data;
+}
+
+export interface DownloadPdfResponse {
+  success?: boolean;
+  message?: string;
+  data?: { fileBase64?: string; mimeType?: string; fileName?: string };
+  fileBase64?: string;
+  mimeType?: string;
+  fileName?: string;
+}
+
+export async function downloadPdfProvider(
+  payload: PreviewDocumentRequest,
+  estimateId?: string
+): Promise<DownloadPdfResponse> {
+  const url = estimateId
+    ? `/api/sales/estimates/${encodeURIComponent(estimateId)}/documents/pdf`
+    : "/api/sales/estimates/documents/pdf";
+
+  const response = await apiClient.post<DownloadPdfResponse>(url, payload);
+  return response.data;
+}
+
+// ----------------------------------------------------------------------------
+// COGS & MARGIN PREVIEW HELPERS
+// ----------------------------------------------------------------------------
+export interface PreviewCogsRequest {
+  pricingResult?: ShipperPricing;
+  cogsOverride?: ComputeCogsOverrideConfig;
+}
+
+export interface PreviewCogsResponse {
+  success?: boolean;
+  data?: { preview?: { adjusted?: { cost?: number; sell?: number; matMargin?: number; grandSell?: number; totalMargin?: number } } };
+  preview?: { adjusted?: { cost?: number; sell?: number; matMargin?: number; grandSell?: number; totalMargin?: number } };
+}
+
+export async function previewCogsProvider(
+  payload: PreviewCogsRequest
+): Promise<PreviewCogsResponse> {
+  const response = await apiClient.post<PreviewCogsResponse>(
+    "/api/sales/estimates/cogs/preview",
+    payload
+  );
+  return response.data;
+}
+
+export interface PreviewMarginRequest {
+  pricingResult?: ShipperPricing;
+  marginOverride?: ComputeMarginOverrideConfig;
+}
+
+export interface PreviewMarginResponse {
+  success?: boolean;
+  data?: { preview?: { adjusted?: { totSell?: number; sfPrice?: number; totCost?: number; profit?: number; profPct?: number }; originalSell?: number } };
+  preview?: { adjusted?: { totSell?: number; sfPrice?: number; totCost?: number; profit?: number; profPct?: number }; originalSell?: number };
+}
+
+export async function previewMarginProvider(
+  payload: PreviewMarginRequest
+): Promise<PreviewMarginResponse> {
+  const response = await apiClient.post<PreviewMarginResponse>(
+    "/api/sales/estimates/margin/preview",
+    payload
   );
   return response.data;
 }
