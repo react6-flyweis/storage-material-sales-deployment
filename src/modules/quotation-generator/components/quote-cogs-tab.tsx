@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SuccessDialog from "@/components/success-dialog";
 import { useQuotationStore } from "@/modules/quotation/quotation.store";
-import type {
-  ExtractShipperResponseData,
-  ComputeEstimateRequest,
+import {
+  previewCogsProvider,
+  type ExtractShipperResponseData,
+  type ComputeEstimateRequest,
 } from "../estimates.api";
 
 interface QuoteCogsTabProps {
@@ -33,6 +34,23 @@ export function QuoteCogsTab({
   // Dialog state
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+
+  useEffect(() => {
+    if (!extractedShipper?.pricing) return;
+    const costVal = parseFloat(cogsCostInput) || undefined;
+    const sellVal = parseFloat(cogsFixedSellPrice) || undefined;
+    previewCogsProvider({
+      pricingResult: extractedShipper.pricing,
+      cogsOverride: {
+        applied: true,
+        costDollar: costVal,
+        marginPct: cogsMaterialMargin,
+        sellDollar: sellVal,
+      },
+    }).catch((err) => {
+      console.error("COGS preview error:", err);
+    });
+  }, [cogsCostInput, cogsMaterialMargin, cogsFixedSellPrice, extractedShipper?.pricing]);
 
   const pricing = extractedShipper?.pricing;
 
@@ -84,13 +102,14 @@ export function QuoteCogsTab({
     );
     setSuccessDialogOpen(true);
     if (onTriggerCompute) {
+      const costVal = parseFloat(cogsCostInput) || undefined;
+      const sellVal = parseFloat(cogsFixedSellPrice) || undefined;
       onTriggerCompute({
         cogsOverride: {
           applied: true,
-          costInput: parseFloat(cogsCostInput) || undefined,
-          costAdjustPercent: cogsCostAdjustPercent,
-          materialMargin: cogsMaterialMargin,
-          fixedSellPrice: parseFloat(cogsFixedSellPrice) || undefined,
+          costDollar: costVal,
+          marginPct: cogsMaterialMargin,
+          sellDollar: sellVal,
         },
       });
     }
