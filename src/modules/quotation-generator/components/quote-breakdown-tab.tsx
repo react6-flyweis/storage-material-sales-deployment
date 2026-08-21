@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import { Edit3, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ExtractShipperResponseData } from "../estimates.api";
@@ -6,13 +7,42 @@ interface QuoteBreakdownTabProps {
   onViewQuote?: () => void;
   onViewSow?: () => void;
   onQuotePreview?: () => void;
+  onSaveDraft?: () => void;
+  isSavingDraft?: boolean;
   extractedShipper?: ExtractShipperResponseData;
+}
+
+function getCategoryBadgeStyle(cat?: string, label?: string): string {
+  const c = (cat || label || "").toLowerCase();
+
+  if (c.includes("primary") || c.includes("rigid") || c.includes("main")) {
+    return "bg-blue-600 text-white shadow-2xs border border-blue-700";
+  }
+  if (c.includes("secondary") || c.includes("cold") || c.includes("purlin") || c.includes("girt")) {
+    return "bg-slate-700 text-white shadow-2xs border border-slate-800";
+  }
+  if (c.includes("sheeting") || c.includes("panel") || c.includes("roof") || c.includes("wall") || c.includes("trim")) {
+    return "bg-amber-600 text-white shadow-2xs border border-amber-700";
+  }
+  if (c.includes("accessory") || c.includes("fastener") || c.includes("screw") || c.includes("hardware") || c.includes("door")) {
+    return "bg-emerald-600 text-white shadow-2xs border border-emerald-700";
+  }
+  if (c.includes("concrete") || c.includes("slab") || c.includes("foundation")) {
+    return "bg-purple-600 text-white shadow-2xs border border-purple-700";
+  }
+  if (c.includes("insulation")) {
+    return "bg-indigo-600 text-white shadow-2xs border border-indigo-700";
+  }
+
+  return "bg-[#2563EB] text-white shadow-2xs border border-blue-700";
 }
 
 export function QuoteBreakdownTab({
   onViewQuote,
   onViewSow,
   onQuotePreview,
+  onSaveDraft,
+  isSavingDraft,
   extractedShipper,
 }: QuoteBreakdownTabProps) {
   const pricing = extractedShipper?.pricing;
@@ -48,7 +78,7 @@ export function QuoteBreakdownTab({
 
         {/* MATERIAL COST */}
         <div className="bg-slate-50/80 border border-slate-200 rounded-lg p-3 relative overflow-hidden">
-          <div className="h-1 bg-blue-500 absolute top-0 left-0 right-0" />
+          <div className="h-1 bg-slate-300 absolute top-0 left-0 right-0" />
           <span className="text-[10px] font-bold tracking-wider text-slate-500 uppercase block">
             MATERIAL COST
           </span>
@@ -56,42 +86,44 @@ export function QuoteBreakdownTab({
           <div className="text-[11px] text-slate-500 mt-0.5">{blendLabel}</div>
         </div>
 
-        {/* PROFIT */}
-        <div className="bg-slate-50/80 border border-slate-200 rounded-lg p-3 relative overflow-hidden">
+        {/* PROFIT & MARGIN */}
+        <div className="bg-[#E6F4EA] border border-emerald-300 rounded-lg p-3 relative overflow-hidden">
           <div className="h-1 bg-emerald-500 absolute top-0 left-0 right-0" />
-          <span className="text-[10px] font-bold tracking-wider text-slate-500 uppercase block">
-            PROFIT
+          <span className="text-[10px] font-bold tracking-wider text-emerald-800 uppercase block">
+            PROFIT & MARGIN
           </span>
-          <div className="text-lg font-extrabold text-slate-900 mt-1">{profit}</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">{profPct}</div>
+          <div className="text-lg font-extrabold text-emerald-700 mt-1">{profit}</div>
+          <div className="text-[11px] text-emerald-800 font-semibold mt-0.5">{profPct}</div>
         </div>
 
-        {/* S/SF */}
+        {/* $/SF PRICE */}
         <div className="bg-slate-50/80 border border-slate-200 rounded-lg p-3 relative overflow-hidden">
+          <div className="h-1 bg-slate-300 absolute top-0 left-0 right-0" />
           <span className="text-[10px] font-bold tracking-wider text-slate-500 uppercase block">
-            S/SF
+            $/SF PRICE
           </span>
           <div className="text-lg font-extrabold text-slate-900 mt-1">{sfPrice}</div>
           <div className="text-[11px] text-slate-500 mt-0.5">{sqFt} SF</div>
         </div>
 
-        {/* WEIGHT */}
+        {/* SHIPPER WEIGHT */}
         <div className="bg-slate-50/80 border border-slate-200 rounded-lg p-3 relative overflow-hidden">
+          <div className="h-1 bg-slate-300 absolute top-0 left-0 right-0" />
           <span className="text-[10px] font-bold tracking-wider text-slate-500 uppercase block">
-            WEIGHT
+            SHIPPER WEIGHT
           </span>
           <div className="text-lg font-extrabold text-slate-900 mt-1">{weightDisplay}</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">lbs - {trucks} trucks</div>
+          <div className="text-[11px] text-slate-500 mt-0.5">{trucks} Trucks</div>
         </div>
 
-        {/* VENDOR BLEND SAVINGS */}
-        <div className="bg-slate-50/80 border border-slate-200 rounded-lg p-3 relative overflow-hidden">
-          <div className="h-1 bg-rose-400 absolute top-0 left-0 right-0" />
-          <span className="text-[10px] font-bold tracking-wider text-slate-500 uppercase block">
-            VENDOR BLEND SAVINGS
+        {/* VENDOR SAVINGS */}
+        <div className="bg-blue-50/80 border border-blue-200 rounded-lg p-3 relative overflow-hidden">
+          <div className="h-1 bg-blue-500 absolute top-0 left-0 right-0" />
+          <span className="text-[10px] font-bold tracking-wider text-blue-800 uppercase block">
+            VENDOR SAVINGS
           </span>
-          <div className="text-lg font-extrabold text-slate-900 mt-1">{vendorBlendSavings}</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">vs 100% Central</div>
+          <div className="text-lg font-extrabold text-blue-700 mt-1">{vendorBlendSavings}</div>
+          <div className="text-[11px] text-blue-700 font-medium mt-0.5 truncate">{fileName || "Shipper"}</div>
         </div>
       </div>
 
@@ -104,12 +136,14 @@ export function QuoteBreakdownTab({
           </p>
         </div>
         <Button
-          type="button"
+          asChild
           variant="outline"
           className="border-slate-300 text-slate-800 text-xs font-semibold rounded-lg hover:bg-slate-50 flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
         >
-          <Edit3 className="h-3.5 w-3.5" />
-          Edit Pricing Rules
+          <Link to="/quotation/pricing-rules">
+            <Edit3 className="h-3.5 w-3.5" />
+            Edit Pricing Rules
+          </Link>
         </Button>
       </div>
 
@@ -130,7 +164,7 @@ export function QuoteBreakdownTab({
               rows.map((r, idx) => (
                 <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
                   <td className="p-3">
-                    <span className="inline-block px-2.5 py-1 rounded-md text-xs font-semibold shadow-2xs bg-blue-600 text-white">
+                    <span className={`inline-block px-2.5 py-1 rounded-md text-xs font-semibold ${getCategoryBadgeStyle(r.cat, r.label)}`}>
                       {r.label}
                     </span>
                   </td>
@@ -144,7 +178,7 @@ export function QuoteBreakdownTab({
               extractedShipper.tabSummary.map((tab, idx) => (
                 <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
                   <td className="p-3">
-                    <span className="inline-block px-2.5 py-1 rounded-md text-xs font-semibold shadow-2xs bg-blue-600 text-white">
+                    <span className={`inline-block px-2.5 py-1 rounded-md text-xs font-semibold ${getCategoryBadgeStyle(tab.category, tab.sheetName)}`}>
                       {tab.sheetName}
                     </span>
                   </td>
@@ -242,6 +276,17 @@ export function QuoteBreakdownTab({
         >
           View SOW
         </Button>
+        {onSaveDraft && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onSaveDraft}
+            disabled={isSavingDraft}
+            className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 px-5 py-2.5 rounded-lg text-xs font-semibold cursor-pointer bg-white"
+          >
+            {isSavingDraft ? "Saving Draft..." : "Save Draft"}
+          </Button>
+        )}
         <Button
           type="button"
           onClick={onQuotePreview || onViewQuote}
