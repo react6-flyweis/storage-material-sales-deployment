@@ -1,14 +1,23 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router";
-import { ArrowLeft, Printer, FolderUp } from "lucide-react";
+import { ArrowLeft, Printer, FolderUp, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useQuotationStore } from "@/modules/quotation/quotation.store";
-import type { ExtractDrawingResponseData, ExtractShipperResponseData } from "../estimates.api";
+import {
+  downloadPdfProvider,
+  saveEstimateProvider,
+  type ExtractDrawingResponseData,
+  type ExtractShipperResponseData,
+} from "../estimates.api";
 
 export function QuotePreviewPage() {
   const navigate = useNavigate();
   const location = useLocation();
+
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [isSavingEstimate, setIsSavingEstimate] = useState(false);
+  const [estimateId, setEstimateId] = useState<string | null>(null);
 
   const navState = (location.state || {}) as {
     quotationForm?: Record<string, string>;
@@ -25,8 +34,6 @@ export function QuotePreviewPage() {
     scope,
     roofType,
     squareFootage: storeSqFt,
-    // includeTax,
-    // taxRate,
     concreteInclude,
     concreteInclusions,
     concreteSlabThickness,
@@ -105,18 +112,6 @@ export function QuotePreviewPage() {
           ? "Full Storage Structural System"
           : "Full PEMB Rigid Frame Structural System",
     });
-    // dynamicScopeIncluded.push({
-    //   text: `${roofType || "Screw-Down"} Metal Roof Panels`,
-    // });
-    // dynamicScopeIncluded.push({
-    //   text: "Wall Panels, Trim & Accessories",
-    // });
-    // dynamicScopeIncluded.push({
-    //   text: "All Fasteners, Sealants & Closures",
-    // });
-    // dynamicScopeIncluded.push({
-    //   text: "Freight To Jobsite",
-    // });
   }
   // 2. Installation & Equipment
   if (isInstall) {
@@ -148,7 +143,6 @@ export function QuotePreviewPage() {
     });
   }
 
-
   // 6. Standard Unincluded Items
   dynamicExclusions.push("Doors (Overhead, Roll-Up, Man Doors - Unless Noted)");
   dynamicExclusions.push("Electrical, Plumbing, HVAC");
@@ -168,6 +162,79 @@ export function QuotePreviewPage() {
     document.title = `Quote_Package_${safeCustomer}`;
     window.print();
     document.title = originalTitle;
+  };
+
+  const handleDownloadPdf = async () => {
+    setIsDownloadingPdf(true);
+    try {
+      const payload = {
+        leadCompanyName: customerLeadName,
+        customerEmail,
+        streetAddress: customerAddress,
+        cityStateZip: customerAddress,
+        buildingSize: displayBuildingSize,
+        squareFootage: effectiveSqFt,
+        jobNumber: navState.quotationForm?.jobNumber || navState.extractedDrawing?.extracted?.jobnumber || "",
+        pricingResult: navState.extractedShipper?.pricing,
+        extractedDrawingFields: navState.extractedDrawing?.extracted,
+        sections: ["quote", "sow", "contract"],
+      };
+      const res = await downloadPdfProvider(payload, estimateId || undefined);
+      const pdfData = res.data || res;
+      if (pdfData?.fileBase64) {
+        const a = document.createElement("a");
+        a.href = `data:${pdfData.mimeType || "application/pdf"};base64,${pdfData.fileBase64}`;
+        a.download = pdfData.fileName || `Quote_${(customerLeadName || "Package").replace(/\s+/g, "_")}.pdf`;
+        a.click();
+      } else {
+        handlePrint();
+      }
+    } catch (err) {
+      console.error("Failed to download PDF via API, opening print dialog:", err);
+      handlePrint();
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
+
+  const handleSaveToHistory = async () => {
+    setIsSavingEstimate(true);
+    try {
+      const res = await saveEstimateProvider(
+        {
+          _id: estimateId || undefined,
+          jobType,
+          scope: scope.toLowerCase(),
+          leadCompanyName: customerLeadName,
+          customerEmail,
+          streetAddress: navState.quotationForm?.street || "",
+          cityStateZip: navState.quotationForm?.cityStateZip || customerAddress,
+          buildingSize: displayBuildingSize,
+          squareFootage: effectiveSqFt,
+          sf: effectiveSqFt,
+          jobNumber: navState.quotationForm?.jobNumber || navState.extractedDrawing?.extracted?.jobnumber || "",
+          sourceFileName: navState.pdfFileName || navState.extractedShipper?.fileName || "",
+          parsedCategories: navState.extractedShipper?.parsedCategories,
+          tabSummary: navState.extractedShipper?.tabSummary,
+          pricingResult: navState.extractedShipper?.pricing,
+          extractedDrawingFields: navState.extractedDrawing?.extracted,
+          status: "draft",
+        },
+        estimateId || undefined
+      );
+
+      const data = res.data || res;
+      const savedId = data?.estimate?._id || data?._id;
+      if (savedId) {
+        setEstimateId(savedId);
+      }
+      navigate("/sales/quotation/history");
+    } catch (err) {
+      console.error("Failed to save estimate to history:", err);
+      navigate("/sales/quotation/history");
+    } finally {
+      setIsSavingEstimate(false);
+    }
   };
 
   const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -192,7 +259,7 @@ export function QuotePreviewPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       {/* Top Action Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 no-print">
         <div className="flex items-center gap-3">
@@ -217,18 +284,25 @@ export function QuotePreviewPage() {
         <div className="flex items-center gap-3">
           <Button
             type="button"
-            onClick={handlePrint}
+            onClick={handleDownloadPdf}
+            disabled={isDownloadingPdf}
             className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
           >
-            <Printer className="h-4 w-4" />
-            Generate & Print PDF
+            {isDownloadingPdf ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Printer className="h-4 w-4" />
+            )}
+            {isDownloadingPdf ? "Generating PDF..." : "Generate & Print PDF"}
           </Button>
           <Button
             type="button"
-            onClick={() => navigate("/sales/quotation/history")}
-            className="bg-[#16A34A] hover:bg-[#15803D] text-white px-5 py-2.5 rounded-lg text-xs font-bold cursor-pointer shadow-xs"
+            onClick={handleSaveToHistory}
+            disabled={isSavingEstimate}
+            className="bg-[#16A34A] hover:bg-[#15803D] text-white px-5 py-2.5 rounded-lg text-xs font-bold cursor-pointer shadow-xs flex items-center gap-1.5"
           >
-            Save to History
+            {isSavingEstimate && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {isSavingEstimate ? "Saving..." : "Save to History"}
           </Button>
         </div>
       </div>
