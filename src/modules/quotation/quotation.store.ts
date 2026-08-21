@@ -109,7 +109,7 @@ export interface QuotationState {
 export const useQuotationStore = create<QuotationState>((set) => ({
   jobType: "PEMB",
   scope: "Both",
-  roofType: "Screw-down",
+  roofType: "screw-down",
   installCost: 5.85,
   installSell: 9.0,
   blendPercentage: 50,
