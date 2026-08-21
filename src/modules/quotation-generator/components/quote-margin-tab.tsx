@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SuccessDialog from "@/components/success-dialog";
 import { useQuotationStore } from "@/modules/quotation/quotation.store";
 import {
   taxLookupProvider,
+  previewMarginProvider,
   type ExtractShipperResponseData,
   type ComputeEstimateRequest,
 } from "../estimates.api";
@@ -45,6 +46,24 @@ export function QuoteMarginTab({
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [taxMessage, setTaxMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!extractedShipper?.pricing) return;
+    const laborVal = parseFloat(marginLaborOverride) || undefined;
+    const targetVal = parseFloat(marginTargetMargin) || undefined;
+    const sellVal = parseFloat(marginFixedSellOverride) || undefined;
+    previewMarginProvider({
+      pricingResult: extractedShipper.pricing,
+      marginOverride: {
+        applied: true,
+        laborSF: laborVal,
+        pct: targetVal,
+        sellFixed: sellVal,
+      },
+    }).catch((err) => {
+      console.error("Margin preview error:", err);
+    });
+  }, [marginLaborOverride, marginTargetMargin, marginFixedSellOverride, extractedShipper?.pricing]);
 
   // Perform tax lookup when user enters ZIP and blurs or clicks Search
   const handleTaxLookup = async () => {
@@ -109,12 +128,15 @@ export function QuoteMarginTab({
     setSuccessMessage("Margin overrides applied to Quote & SOW successfully!");
     setSuccessDialogOpen(true);
     if (onTriggerCompute) {
+      const laborVal = parseFloat(marginLaborOverride) || undefined;
+      const targetVal = parseFloat(marginTargetMargin) || undefined;
+      const sellVal = parseFloat(marginFixedSellOverride) || undefined;
       onTriggerCompute({
         marginOverride: {
           applied: true,
-          laborOverride: parseFloat(marginLaborOverride) || undefined,
-          targetMargin: parseFloat(marginTargetMargin) || undefined,
-          fixedSellOverride: parseFloat(marginFixedSellOverride) || undefined,
+          laborSF: laborVal,
+          pct: targetVal,
+          sellFixed: sellVal,
         },
       });
     }
