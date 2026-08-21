@@ -11,17 +11,33 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useQuotationStore } from "@/modules/quotation/quotation.store";
+
+const roofOptions = [
+  { value: "screw-down", label: "Screw Down (SD)" },
+  { value: "standing-seam", label: "Standing Seam (SS)" },
+];
 
 export function QuotationStickerTool() {
-  const [jobType, setJobType] = useState<"PEMB" | "Storage">("Storage");
-  const [scope, setScope] = useState<"Supply" | "Install" | "Both">("Both");
-  const [roofType, setRoofType] = useState("Standing Seam (SS)");
+  const {
+    jobType,
+    setJobType,
+    scope,
+    setScope,
+    roofType,
+    setRoofType,
+    installCost,
+    setInstallCost,
+    installSell,
+    setInstallSell,
+    blendPercentage,
+    setBlendPercentage,
+  } = useQuotationStore();
+
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
-  // State values for sliders in popover
-  const [installCost, setInstallCost] = useState(4.75);
-  const [installSell, setInstallSell] = useState(4.75);
-  const [blend, setBlend] = useState(50);
+  const laborProfit = installSell - installCost;
+  const laborMarginPct = installSell > 0 ? (laborProfit / installSell) * 100 : 0;
 
   return (
     <div className="sticky top-0 z-30 bg-white border-b border-slate-200 shadow px-4 py-3 mb-6 transition-all">
@@ -36,20 +52,22 @@ export function QuotationStickerTool() {
               <button
                 type="button"
                 onClick={() => setJobType("PEMB")}
-                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${jobType === "PEMB"
-                  ? "bg-blue-600 text-white shadow-xs"
-                  : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
-                  }`}
+                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${
+                  jobType === "PEMB"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
+                }`}
               >
                 PEMB
               </button>
               <button
                 type="button"
                 onClick={() => setJobType("Storage")}
-                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${jobType === "Storage"
-                  ? "bg-blue-600 text-white shadow-xs"
-                  : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
-                  }`}
+                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${
+                  jobType === "Storage"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
+                }`}
               >
                 Storage
               </button>
@@ -68,30 +86,33 @@ export function QuotationStickerTool() {
               <button
                 type="button"
                 onClick={() => setScope("Supply")}
-                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${scope === "Supply"
-                  ? "bg-blue-600 text-white shadow-xs"
-                  : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
-                  }`}
+                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${
+                  scope === "Supply"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
+                }`}
               >
                 Supply
               </button>
               <button
                 type="button"
                 onClick={() => setScope("Install")}
-                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${scope === "Install"
-                  ? "bg-blue-600 text-white shadow-xs"
-                  : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
-                  }`}
+                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${
+                  scope === "Install"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
+                }`}
               >
                 Install
               </button>
               <button
                 type="button"
                 onClick={() => setScope("Both")}
-                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${scope === "Both"
-                  ? "bg-blue-600 text-white shadow-xs"
-                  : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
-                  }`}
+                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${
+                  scope === "Both"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
+                }`}
               >
                 Both
               </button>
@@ -112,20 +133,18 @@ export function QuotationStickerTool() {
                   type="button"
                   className="flex items-center justify-between gap-3 px-3.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 font-medium text-slate-800 text-sm shadow-2xs min-w-[200px] cursor-pointer"
                 >
-                  <span>{roofType}</span>
+                  <span>
+                    {roofOptions.find((opt) => opt.value === roofType)?.label || roofType}
+                  </span>
                   <ChevronDown className="h-4 w-4 text-slate-500 shrink-0" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-[200px]">
-                <DropdownMenuItem onClick={() => setRoofType("Standing Seam (SS)")}>
-                  Standing Seam (SS)
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setRoofType("Screw Down (SD)")}>
-                  Screw Down (SD)
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setRoofType("TPO / EPDM")}>
-                  TPO / EPDM
-                </DropdownMenuItem>
+                {roofOptions.map((opt) => (
+                  <DropdownMenuItem key={opt.value} onClick={() => setRoofType(opt.value)}>
+                    {opt.label}
+                  </DropdownMenuItem>
+                ))}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -148,9 +167,15 @@ export function QuotationStickerTool() {
                   </div>
 
                   {/* Mini Slider Graphic */}
-                  <div className="relative w-28 h-3 bg-slate-700 rounded-full flex items-center px-0.5 ml-1">
-                    <div className="absolute left-1/4 w-4 h-4 bg-amber-500 rounded-full border-2 border-amber-400 shadow-md -translate-x-1/2" />
-                    <div className="w-1/4 h-full bg-amber-500 rounded-l-full" />
+                  <div className="relative w-28 h-3 bg-slate-700 rounded-full flex items-center px-0.5 ml-1 overflow-hidden">
+                    <div
+                      className="absolute h-4 w-4 bg-amber-500 rounded-full border-2 border-amber-400 shadow-md -translate-x-1/2"
+                      style={{ left: `${Math.min(Math.max(blendPercentage, 5), 95)}%` }}
+                    />
+                    <div
+                      className="h-full bg-amber-500 rounded-l-full"
+                      style={{ width: `${blendPercentage}%` }}
+                    />
                   </div>
                 </div>
               </PopoverTrigger>
@@ -219,8 +244,8 @@ export function QuotationStickerTool() {
                   {/* 3. LABOR MARGIN BOX */}
                   <div className="p-3 rounded-lg bg-[#0F3C70] text-white space-y-0.5">
                     <div className="text-xs font-semibold text-slate-200">Labor Margin</div>
-                    <div className="text-xs font-bold text-emerald-400">
-                      $1.50/SF profit · 31.6% margin
+                    <div className={`text-xs font-bold ${laborProfit < 0 ? "text-red-400" : "text-emerald-400"}`}>
+                      ${laborProfit.toFixed(2)}/SF profit · {laborMarginPct.toFixed(1)}% margin
                     </div>
                   </div>
 
@@ -235,15 +260,15 @@ export function QuotationStickerTool() {
                         type="range"
                         min="0"
                         max="100"
-                        value={blend}
-                        onChange={(e) => setBlend(parseInt(e.target.value))}
+                        value={blendPercentage}
+                        onChange={(e) => setBlendPercentage(parseInt(e.target.value))}
                         className="w-full accent-purple-500 h-2 bg-slate-700 rounded-lg cursor-pointer"
                       />
                       <span>Quicken</span>
                     </div>
                     <div className="text-center space-y-0.5 pt-0.5">
                       <div className="text-xs font-semibold text-purple-400">
-                        {blend}% blend
+                        {blendPercentage}% blend
                       </div>
                       <div className="text-xs font-bold text-slate-900">
                         $475 saved vs Central
@@ -259,8 +284,8 @@ export function QuotationStickerTool() {
               <span className="text-xs font-semibold text-slate-800 leading-tight">
                 Labor Margin
               </span>
-              <span className="text-xs font-semibold text-emerald-600 leading-tight mt-0.5">
-                $1.50/SF profit · 31.6% margin
+              <span className={`text-xs font-semibold leading-tight mt-0.5 ${laborProfit < 0 ? "text-red-600" : "text-emerald-600"}`}>
+                ${laborProfit.toFixed(2)}/SF profit · {laborMarginPct.toFixed(1)}% margin
               </span>
             </div>
           </div>

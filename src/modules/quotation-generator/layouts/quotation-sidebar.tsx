@@ -64,10 +64,8 @@ export function QuotationSidebar({
   const savedVsCentral = Math.round((blendPercentage / 100) * 950);
 
   const roofOptions = [
-    "Standing Seam (SS)",
-    "Screw Down (R-Panel)",
-    "Insulated Metal Panel (IMP)",
-    "Membrane Roof",
+    { value: "screw-down", label: "Screw Down (SD)" },
+    { value: "standing-seam", label: "Standing Seam (SS)" },
   ];
 
   return (
@@ -283,7 +281,7 @@ export function QuotationSidebar({
                 onClick={() => setIsRoofSelectOpen(!isRoofSelectOpen)}
                 className="w-full bg-white text-slate-900 rounded-lg px-3 py-2 text-xs font-bold flex items-center justify-between shadow-sm hover:bg-slate-50 transition-colors cursor-pointer"
               >
-                <span>{roofType}</span>
+                <span>{roofOptions.find((opt) => opt.value === roofType)?.label || roofType}</span>
                 <ChevronDown className={cn("h-4 w-4 text-slate-700 transition-transform", isRoofSelectOpen && "rotate-180")} />
               </button>
 
@@ -291,18 +289,18 @@ export function QuotationSidebar({
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white text-slate-900 rounded-lg shadow-xl z-20 py-1 border border-slate-200">
                   {roofOptions.map((opt) => (
                     <button
-                      key={opt}
+                      key={opt.value}
                       type="button"
                       onClick={() => {
-                        setRoofType(opt);
+                        setRoofType(opt.value);
                         setIsRoofSelectOpen(false);
                       }}
                       className={cn(
                         "w-full text-left px-3 py-2 text-xs font-medium hover:bg-blue-50 transition-colors cursor-pointer",
-                        roofType === opt && "bg-blue-100 text-blue-900 font-bold"
+                        roofType === opt.value && "bg-blue-100 text-blue-900 font-bold"
                       )}
                     >
-                      {opt}
+                      {opt.label}
                     </button>
                   ))}
                 </div>

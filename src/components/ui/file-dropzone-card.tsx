@@ -17,7 +17,7 @@ export interface FileDropzoneCardProps {
   fileTypeLabel?: string;
   fileIcon?: "pdf" | "xlsx";
   selectedFile: FileItem | null;
-  onFileSelect: (file: FileItem | null) => void;
+  onFileSelect: (file: FileItem | null, rawFile?: File | null) => void;
   className?: string;
 }
 
@@ -55,20 +55,26 @@ export function FileDropzoneCard({
 
     const file = e.dataTransfer.files?.[0];
     if (file) {
-      onFileSelect({
-        name: file.name,
-        size: `${(file.size / (1024 * 1024)).toFixed(1)}MB`,
-      });
+      onFileSelect(
+        {
+          name: file.name,
+          size: `${(file.size / (1024 * 1024)).toFixed(1)}MB`,
+        },
+        file
+      );
     }
   };
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      onFileSelect({
-        name: file.name,
-        size: `${(file.size / (1024 * 1024)).toFixed(1)}MB`,
-      });
+      onFileSelect(
+        {
+          name: file.name,
+          size: `${(file.size / (1024 * 1024)).toFixed(1)}MB`,
+        },
+        file
+      );
     }
   };
 

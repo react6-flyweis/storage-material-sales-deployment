@@ -1,106 +1,67 @@
+import { Link } from "react-router";
 import { Edit3, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-
-interface CategoryRow {
-  id: string;
-  category: string;
-  categoryBg: string;
-  categoryTextColor: string;
-  weight: string;
-  rate: string;
-  price: string;
-  notes: string;
-}
-
-const categoryData: CategoryRow[] = [
-  {
-    id: "purlins",
-    category: "Purlins, Girts & Eave Structs",
-    categoryBg: "bg-emerald-500",
-    categoryTextColor: "text-white",
-    weight: "950",
-    rate: "$0.88/lb",
-    price: "$836",
-    notes: "-",
-  },
-  {
-    id: "door_jambs",
-    category: "Door Jambs & Headers",
-    categoryBg: "bg-purple-600",
-    categoryTextColor: "text-white",
-    weight: "1,650",
-    rate: "$1.2/lb",
-    price: "$1,980",
-    notes: "-",
-  },
-  {
-    id: "roof_wall_sheeting",
-    category: "Roof & Wall Sheeting",
-    categoryBg: "bg-orange-500",
-    categoryTextColor: "text-white",
-    weight: "6,241",
-    rate: "$1.3/SF",
-    price: "$3,245",
-    notes: "~2,496 SF",
-  },
-  {
-    id: "connection_plates",
-    category: "Connection Plates & Clips",
-    categoryBg: "bg-red-500",
-    categoryTextColor: "text-white",
-    weight: "233",
-    rate: "$1.2/lb",
-    price: "$279",
-    notes: "-",
-  },
-  {
-    id: "trim",
-    category: "Trim",
-    categoryBg: "bg-lime-600",
-    categoryTextColor: "text-white",
-    weight: "-",
-    rate: "bucket",
-    price: "$44,688",
-    notes: "-",
-  },
-  {
-    id: "cables_bracing",
-    category: "Cables, Bracing & Sealant",
-    categoryBg: "bg-slate-400",
-    categoryTextColor: "text-white",
-    weight: "-",
-    rate: "bucket",
-    price: "$15,125",
-    notes: "~2,496 SF",
-  },
-  {
-    id: "accessories",
-    category: "Accessories",
-    categoryBg: "bg-slate-400",
-    categoryTextColor: "text-white",
-    weight: "434",
-    rate: "bucket",
-    price: "$68,750",
-    notes: "-",
-  },
-  {
-    id: "fasteners",
-    category: "Fasteners",
-    categoryBg: "bg-[#84CC16]",
-    categoryTextColor: "text-white",
-    weight: "-",
-    rate: "per item (not $/lb)",
-    price: "$33,000",
-    notes: "Priced per piece — screws, tape, sealant",
-  },
-];
+import type { ExtractShipperResponseData } from "../estimates.api";
 
 interface QuoteBreakdownTabProps {
   onViewQuote?: () => void;
+  onViewSow?: () => void;
+  onQuotePreview?: () => void;
+  onSaveDraft?: () => void;
+  isSavingDraft?: boolean;
+  extractedShipper?: ExtractShipperResponseData;
 }
 
-export function QuoteBreakdownTab({ onViewQuote }: QuoteBreakdownTabProps) {
+function getCategoryBadgeStyle(cat?: string, label?: string): string {
+  const c = (cat || label || "").toLowerCase();
+
+  if (c.includes("primary") || c.includes("rigid") || c.includes("main")) {
+    return "bg-blue-600 text-white shadow-2xs border border-blue-700";
+  }
+  if (c.includes("secondary") || c.includes("cold") || c.includes("purlin") || c.includes("girt")) {
+    return "bg-slate-700 text-white shadow-2xs border border-slate-800";
+  }
+  if (c.includes("sheeting") || c.includes("panel") || c.includes("roof") || c.includes("wall") || c.includes("trim")) {
+    return "bg-amber-600 text-white shadow-2xs border border-amber-700";
+  }
+  if (c.includes("accessory") || c.includes("fastener") || c.includes("screw") || c.includes("hardware") || c.includes("door")) {
+    return "bg-emerald-600 text-white shadow-2xs border border-emerald-700";
+  }
+  if (c.includes("concrete") || c.includes("slab") || c.includes("foundation")) {
+    return "bg-purple-600 text-white shadow-2xs border border-purple-700";
+  }
+  if (c.includes("insulation")) {
+    return "bg-indigo-600 text-white shadow-2xs border border-indigo-700";
+  }
+
+  return "bg-[#2563EB] text-white shadow-2xs border border-blue-700";
+}
+
+export function QuoteBreakdownTab({
+  onViewQuote,
+  onViewSow,
+  onQuotePreview,
+  onSaveDraft,
+  isSavingDraft,
+  extractedShipper,
+}: QuoteBreakdownTabProps) {
+  const pricing = extractedShipper?.pricing;
+
+  const totalSell = pricing?.totSell != null ? `$${pricing.totSell.toLocaleString()}` : "-";
+  const matCost = pricing?.matCost != null ? `$${pricing.matCost.toLocaleString()}` : "-";
+  const profit = pricing?.profit != null ? `$${pricing.profit.toLocaleString()}` : "-";
+  const profPct = pricing?.profPct != null ? `${pricing.profPct}% margin` : "-";
+  const sfPrice = pricing?.sfPrice != null ? `$${pricing.sfPrice}` : "-";
+  const sqFt = extractedShipper?.squareFootage ? extractedShipper.squareFootage.toLocaleString() : "-";
+  const totalWeight = extractedShipper?.totalWeightLbs || pricing?.totWt;
+  const weightDisplay = totalWeight != null ? (totalWeight > 1000 ? `${(totalWeight / 1000).toFixed(1)}K` : `${totalWeight}`) : "-";
+  const trucks = pricing?.trucks != null ? pricing.trucks : "-";
+  const vendorBlendSavings = pricing?.vendorBlendSavings != null ? `$${pricing.vendorBlendSavings.toLocaleString()}` : "-";
+  const blendLabel = pricing?.blendLabel || "Vendor blend";
+  const fileName = extractedShipper?.fileName || "";
+
+  const rows = pricing?.rows;
+
   return (
     <div className="space-y-6">
       {/* Summary KPI Metric Cards */}
@@ -111,56 +72,58 @@ export function QuoteBreakdownTab({ onViewQuote }: QuoteBreakdownTabProps) {
           <span className="text-[10px] font-bold tracking-wider text-slate-500 uppercase block">
             TOTAL SELL
           </span>
-          <div className="text-lg font-extrabold text-slate-900 mt-1">$326,563</div>
+          <div className="text-lg font-extrabold text-slate-900 mt-1">{totalSell}</div>
           <div className="text-[11px] text-slate-500 mt-0.5">Install Only</div>
         </div>
 
         {/* MATERIAL COST */}
         <div className="bg-slate-50/80 border border-slate-200 rounded-lg p-3 relative overflow-hidden">
-          <div className="h-1 bg-blue-500 absolute top-0 left-0 right-0" />
+          <div className="h-1 bg-slate-300 absolute top-0 left-0 right-0" />
           <span className="text-[10px] font-bold tracking-wider text-slate-500 uppercase block">
             MATERIAL COST
           </span>
-          <div className="text-lg font-extrabold text-slate-900 mt-1">$167,427</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">50% Quicken blend</div>
+          <div className="text-lg font-extrabold text-slate-900 mt-1">{matCost}</div>
+          <div className="text-[11px] text-slate-500 mt-0.5">{blendLabel}</div>
         </div>
 
-        {/* PROFIT */}
-        <div className="bg-slate-50/80 border border-slate-200 rounded-lg p-3 relative overflow-hidden">
+        {/* PROFIT & MARGIN */}
+        <div className="bg-[#E6F4EA] border border-emerald-300 rounded-lg p-3 relative overflow-hidden">
           <div className="h-1 bg-emerald-500 absolute top-0 left-0 right-0" />
-          <span className="text-[10px] font-bold tracking-wider text-slate-500 uppercase block">
-            PROFIT
+          <span className="text-[10px] font-bold tracking-wider text-emerald-800 uppercase block">
+            PROFIT & MARGIN
           </span>
-          <div className="text-lg font-extrabold text-slate-900 mt-1">$-65,538</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">-20.1% margin</div>
+          <div className="text-lg font-extrabold text-emerald-700 mt-1">{profit}</div>
+          <div className="text-[11px] text-emerald-800 font-semibold mt-0.5">{profPct}</div>
         </div>
 
-        {/* S/SF */}
+        {/* $/SF PRICE */}
         <div className="bg-slate-50/80 border border-slate-200 rounded-lg p-3 relative overflow-hidden">
+          <div className="h-1 bg-slate-300 absolute top-0 left-0 right-0" />
           <span className="text-[10px] font-bold tracking-wider text-slate-500 uppercase block">
-            S/SF
+            $/SF PRICE
           </span>
-          <div className="text-lg font-extrabold text-slate-900 mt-1">$4.75</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">68,750 SF</div>
+          <div className="text-lg font-extrabold text-slate-900 mt-1">{sfPrice}</div>
+          <div className="text-[11px] text-slate-500 mt-0.5">{sqFt} SF</div>
         </div>
 
-        {/* WEIGHT */}
+        {/* SHIPPER WEIGHT */}
         <div className="bg-slate-50/80 border border-slate-200 rounded-lg p-3 relative overflow-hidden">
+          <div className="h-1 bg-slate-300 absolute top-0 left-0 right-0" />
           <span className="text-[10px] font-bold tracking-wider text-slate-500 uppercase block">
-            WEIGHT
+            SHIPPER WEIGHT
           </span>
-          <div className="text-lg font-extrabold text-slate-900 mt-1">9.5K</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">lbs - 1 trucks</div>
+          <div className="text-lg font-extrabold text-slate-900 mt-1">{weightDisplay}</div>
+          <div className="text-[11px] text-slate-500 mt-0.5">{trucks} Trucks</div>
         </div>
 
-        {/* VENDOR BLEND SAVINGS */}
-        <div className="bg-slate-50/80 border border-slate-200 rounded-lg p-3 relative overflow-hidden">
-          <div className="h-1 bg-rose-400 absolute top-0 left-0 right-0" />
-          <span className="text-[10px] font-bold tracking-wider text-slate-500 uppercase block">
-            VENDOR BLEND SAVINGS
+        {/* VENDOR SAVINGS */}
+        <div className="bg-blue-50/80 border border-blue-200 rounded-lg p-3 relative overflow-hidden">
+          <div className="h-1 bg-blue-500 absolute top-0 left-0 right-0" />
+          <span className="text-[10px] font-bold tracking-wider text-blue-800 uppercase block">
+            VENDOR SAVINGS
           </span>
-          <div className="text-lg font-extrabold text-slate-900 mt-1">$561</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">vs 100% Central - 50% Quicken</div>
+          <div className="text-lg font-extrabold text-blue-700 mt-1">{vendorBlendSavings}</div>
+          <div className="text-[11px] text-blue-700 font-medium mt-0.5 truncate">{fileName || "Shipper"}</div>
         </div>
       </div>
 
@@ -169,16 +132,18 @@ export function QuoteBreakdownTab({ onViewQuote }: QuoteBreakdownTabProps) {
         <div>
           <h3 className="text-base font-bold text-slate-900">Weight + Price by Category</h3>
           <p className="text-xs text-slate-500">
-            #6959 Paris, TN expansion (Shipper).xlsx - 68,750 SF - 9,508 lbs
+            {fileName ? `${fileName} - ${sqFt} SF - ${totalWeight ? totalWeight.toLocaleString() : "-"} lbs` : "No shipper file loaded"}
           </p>
         </div>
         <Button
-          type="button"
+          asChild
           variant="outline"
           className="border-slate-300 text-slate-800 text-xs font-semibold rounded-lg hover:bg-slate-50 flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
         >
-          <Edit3 className="h-3.5 w-3.5" />
-          Edit Pricing Rules
+          <Link to="/quotation/pricing-rules">
+            <Edit3 className="h-3.5 w-3.5" />
+            Edit Pricing Rules
+          </Link>
         </Button>
       </div>
 
@@ -195,40 +160,60 @@ export function QuoteBreakdownTab({ onViewQuote }: QuoteBreakdownTabProps) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-slate-800 font-medium">
-            {categoryData.map((row) => (
-              <tr key={row.id} className="hover:bg-slate-50/60 transition-colors">
-                <td className="p-3">
-                  <span
-                    className={cn(
-                      "inline-block px-2.5 py-1 rounded-md text-xs font-semibold shadow-2xs",
-                      row.categoryBg,
-                      row.categoryTextColor
-                    )}
-                  >
-                    {row.category}
-                  </span>
+            {rows && rows.length > 0 ? (
+              rows.map((r, idx) => (
+                <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                  <td className="p-3">
+                    <span className={`inline-block px-2.5 py-1 rounded-md text-xs font-semibold ${getCategoryBadgeStyle(r.cat, r.label)}`}>
+                      {r.label}
+                    </span>
+                  </td>
+                  <td className="p-3 font-semibold text-slate-900">{r.wt?.toLocaleString()}</td>
+                  <td className="p-3 text-slate-600">{typeof r.rate === "number" ? `$${r.rate}/lb` : r.rate}</td>
+                  <td className="p-3 font-bold text-slate-900">${r.price?.toLocaleString()}</td>
+                  <td className="p-3 text-slate-500">{r.notes || "-"}</td>
+                </tr>
+              ))
+            ) : extractedShipper?.tabSummary && extractedShipper.tabSummary.length > 0 ? (
+              extractedShipper.tabSummary.map((tab, idx) => (
+                <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                  <td className="p-3">
+                    <span className={`inline-block px-2.5 py-1 rounded-md text-xs font-semibold ${getCategoryBadgeStyle(tab.category, tab.sheetName)}`}>
+                      {tab.sheetName}
+                    </span>
+                  </td>
+                  <td className="p-3 font-semibold text-slate-900">{tab.weightLbs?.toLocaleString()}</td>
+                  <td className="p-3 text-slate-600">-</td>
+                  <td className="p-3 font-bold text-slate-900">-</td>
+                  <td className="p-3 text-slate-500">{tab.category}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={5} className="p-6 text-center text-slate-400 font-normal">
+                  Upload an Xshipper (.xlsx) file to view material breakdown & pricing rules.
                 </td>
-                <td className="p-3 font-semibold text-slate-900">{row.weight}</td>
-                <td className="p-3 text-slate-600">{row.rate}</td>
-                <td className="p-3 font-bold text-slate-900">{row.price}</td>
-                <td className="p-3 text-slate-500">{row.notes}</td>
               </tr>
-            ))}
+            )}
 
             {/* Subtotals & Cost Rows */}
             <tr className="bg-slate-50/90 font-bold border-t border-slate-200">
               <td className="p-3 text-slate-900 font-bold">Material total</td>
-              <td className="p-3 text-slate-900 font-bold">9,508 lbs</td>
+              <td className="p-3 text-slate-900 font-bold">
+                {totalWeight != null ? `${totalWeight.toLocaleString()} lbs` : "-"}
+              </td>
               <td className="p-3"></td>
-              <td className="p-3 text-slate-900 font-bold">$167,427</td>
+              <td className="p-3 text-slate-900 font-bold">{matCost}</td>
               <td className="p-3"></td>
             </tr>
 
             <tr>
-              <td className="p-3 text-slate-700">Freight (1 trucks)</td>
+              <td className="p-3 text-slate-700">Freight ({trucks} trucks)</td>
               <td className="p-3"></td>
               <td className="p-3"></td>
-              <td className="p-3 font-semibold text-slate-900">$1,236</td>
+              <td className="p-3 font-semibold text-slate-900">
+                {pricing?.freight != null ? `$${pricing.freight.toLocaleString()}` : "$1,236"}
+              </td>
               <td className="p-3"></td>
             </tr>
 
@@ -236,7 +221,9 @@ export function QuoteBreakdownTab({ onViewQuote }: QuoteBreakdownTabProps) {
               <td className="p-3 text-slate-700">Install cost</td>
               <td className="p-3"></td>
               <td className="p-3"></td>
-              <td className="p-3 font-semibold text-slate-900">$223,438</td>
+              <td className="p-3 font-semibold text-slate-900">
+                {pricing?.instCost != null ? `$${pricing.instCost.toLocaleString()}` : "$223,438"}
+              </td>
               <td className="p-3"></td>
             </tr>
 
@@ -244,7 +231,9 @@ export function QuoteBreakdownTab({ onViewQuote }: QuoteBreakdownTabProps) {
               <td className="p-3 text-slate-900 font-bold">Total cost</td>
               <td className="p-3"></td>
               <td className="p-3"></td>
-              <td className="p-3 text-slate-900 font-bold">$392,101</td>
+              <td className="p-3 text-slate-900 font-bold">
+                {pricing?.totCost != null ? `$${pricing.totCost.toLocaleString()}` : "$392,101"}
+              </td>
               <td className="p-3"></td>
             </tr>
 
@@ -252,7 +241,9 @@ export function QuoteBreakdownTab({ onViewQuote }: QuoteBreakdownTabProps) {
               <td className="p-3 text-slate-700">Install sell</td>
               <td className="p-3"></td>
               <td className="p-3"></td>
-              <td className="p-3 font-semibold text-slate-900">$326,563</td>
+              <td className="p-3 font-semibold text-slate-900">
+                {pricing?.instSell != null ? `$${pricing.instSell.toLocaleString()}` : "$326,563"}
+              </td>
               <td className="p-3"></td>
             </tr>
 
@@ -261,8 +252,8 @@ export function QuoteBreakdownTab({ onViewQuote }: QuoteBreakdownTabProps) {
               <td className="p-3 text-slate-900 font-extrabold text-sm uppercase">SELL PRICE</td>
               <td className="p-3"></td>
               <td className="p-3"></td>
-              <td className="p-3 text-slate-900 font-extrabold text-sm">$326,563</td>
-              <td className="p-3 text-slate-900 font-bold text-xs">$4.75/SF</td>
+              <td className="p-3 text-slate-900 font-extrabold text-sm">{totalSell}</td>
+              <td className="p-3 text-slate-900 font-bold text-xs">{sfPrice}/SF</td>
             </tr>
           </tbody>
         </table>
@@ -280,13 +271,25 @@ export function QuoteBreakdownTab({ onViewQuote }: QuoteBreakdownTabProps) {
         <Button
           type="button"
           variant="outline"
+          onClick={onViewSow}
           className="border-slate-300 text-slate-800 px-5 py-2.5 rounded-lg text-xs font-semibold hover:bg-slate-50 cursor-pointer"
         >
           View SOW
         </Button>
+        {onSaveDraft && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onSaveDraft}
+            disabled={isSavingDraft}
+            className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 px-5 py-2.5 rounded-lg text-xs font-semibold cursor-pointer bg-white"
+          >
+            {isSavingDraft ? "Saving Draft..." : "Save Draft"}
+          </Button>
+        )}
         <Button
           type="button"
-          onClick={onViewQuote}
+          onClick={onQuotePreview || onViewQuote}
           className="bg-[#10B981] hover:bg-[#059669] text-white px-5 py-2.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
         >
           Quote Preview <ArrowRight className="h-4 w-4" />

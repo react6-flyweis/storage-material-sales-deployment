@@ -1,40 +1,138 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowLeft, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SuccessDialog from "@/components/success-dialog";
+import { useQuotationStore } from "@/modules/quotation/quotation.store";
+import type { ExtractShipperResponseData, ExtractDrawingResponseData } from "../estimates.api";
 
 interface QuoteContractTabProps {
+  extractedShipper?: ExtractShipperResponseData;
+  quotationForm?: Record<string, string>;
+  extractedDrawing?: ExtractDrawingResponseData;
+  sqFt?: string | number;
   onBackToBreakdown?: () => void;
   onQuotePreview?: () => void;
 }
 
 export function QuoteContractTab({
+  extractedShipper,
+  quotationForm,
+  extractedDrawing,
   onBackToBreakdown,
   onQuotePreview,
 }: QuoteContractTabProps) {
+  const { scope } = useQuotationStore();
+
+  const defaultCustomerLegalName =
+    quotationForm?.leadName ||
+    extractedDrawing?.extracted?.customer ||
+    extractedShipper?.coverSheet?.labelMap?.customer ||
+    "Council Bluffs, IA 51503";
+
+  const defaultCustomerAddress =
+    quotationForm?.street ||
+    extractedShipper?.coverSheet?.labelMap?.project ||
+    "123 Main Street";
+
+  const defaultCustomerCityStateZip =
+    quotationForm?.cityStateZip ||
+    extractedShipper?.coverSheet?.labelMap?.location ||
+    "Council Bluffs, IA 51503";
+
+  const defaultCustomerEmail = quotationForm?.email || "customer@gmail.com";
+
+  const defaultEffectiveDate = quotationForm?.quoteDate || "July 31, 2026";
+
+  const computedContractType =
+    scope?.toLowerCase() === "supply"
+      ? "Supply & Delivery Only"
+      : scope?.toLowerCase() === "install"
+      ? "Installation Only"
+      : scope?.toLowerCase() === "both"
+      ? "Supply, Delivery & Erection"
+      : "Supply & Delivery Only";
+
+  const pricing = extractedShipper?.pricing;
+  const totalSellVal = pricing?.totSell ?? pricing?.matSell ?? 366584;
+  const defaultTotalContractValue =
+    typeof totalSellVal === "number"
+      ? `$${Math.round(totalSellVal).toLocaleString()}`
+      : String(totalSellVal).startsWith("$")
+      ? String(totalSellVal)
+      : `$${totalSellVal}`;
+
   // Customer Form State
-  const [customerLegalName, setCustomerLegalName] = useState("");
-  const [customerAddress, setCustomerAddress] = useState("");
-  const [customerCityStateZip, setCustomerCityStateZip] = useState("");
-  const [customerEmail, setCustomerEmail] = useState("customer@gmail.com");
-  const [effectiveDate, setEffectiveDate] = useState("July 31, 2026");
-  const [contractType, setContractType] = useState("Supply & Delivery Only");
+  const [customerLegalName, setCustomerLegalName] = useState(defaultCustomerLegalName);
+  const [customerAddress, setCustomerAddress] = useState(defaultCustomerAddress);
+  const [customerCityStateZip, setCustomerCityStateZip] = useState(defaultCustomerCityStateZip);
+  const [customerEmail, setCustomerEmail] = useState(defaultCustomerEmail);
+  const [effectiveDate, setEffectiveDate] = useState(defaultEffectiveDate);
+  const [contractType, setContractType] = useState(computedContractType);
   const [depositPct, setDepositPct] = useState("Forty-percent (40%)");
-  const [totalContractValue, setTotalContractValue] = useState("$366,584");
+  const [totalContractValue, setTotalContractValue] = useState(defaultTotalContractValue);
+
+  // Sync state when dynamic props arrive/change
+  useEffect(() => {
+    if (quotationForm?.leadName || extractedDrawing?.extracted?.customer || extractedShipper?.coverSheet?.labelMap?.customer) {
+      setCustomerLegalName(
+        quotationForm?.leadName ||
+          extractedDrawing?.extracted?.customer ||
+          extractedShipper?.coverSheet?.labelMap?.customer ||
+          "Council Bluffs, IA 51503"
+      );
+    }
+    if (quotationForm?.street || extractedShipper?.coverSheet?.labelMap?.project) {
+      setCustomerAddress(
+        quotationForm?.street ||
+          extractedShipper?.coverSheet?.labelMap?.project ||
+          "123 Main Street"
+      );
+    }
+    if (quotationForm?.cityStateZip || extractedShipper?.coverSheet?.labelMap?.location) {
+      setCustomerCityStateZip(
+        quotationForm?.cityStateZip ||
+          extractedShipper?.coverSheet?.labelMap?.location ||
+          "Council Bluffs, IA 51503"
+      );
+    }
+    if (quotationForm?.email) {
+      setCustomerEmail(quotationForm.email);
+    }
+    if (quotationForm?.quoteDate) {
+      setEffectiveDate(quotationForm.quoteDate);
+    }
+    if (scope) {
+      setContractType(
+        scope.toLowerCase() === "supply"
+          ? "Supply & Delivery Only"
+          : scope.toLowerCase() === "install"
+          ? "Installation Only"
+          : scope.toLowerCase() === "both"
+          ? "Supply, Delivery & Erection"
+          : "Supply & Delivery Only"
+      );
+    }
+    if (pricing?.totSell != null || pricing?.matSell != null) {
+      const val = pricing?.totSell ?? pricing?.matSell;
+      setTotalContractValue(
+        typeof val === "number" ? `$${Math.round(val).toLocaleString()}` : String(val)
+      );
+    }
+  }, [extractedShipper, quotationForm, extractedDrawing, scope, pricing?.totSell, pricing?.matSell]);
 
   // Success dialog state
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
 
   const handleAutoFill = () => {
-    setCustomerLegalName("Council Bluffs, IA 51503");
-    setCustomerAddress("123 Main Street");
-    setCustomerCityStateZip("Council Bluffs, IA 51503");
-    setCustomerEmail("customer@gmail.com");
-    setEffectiveDate("July 31, 2026");
-    setContractType("Supply & Delivery Only");
+    setCustomerLegalName(defaultCustomerLegalName);
+    setCustomerAddress(defaultCustomerAddress);
+    setCustomerCityStateZip(defaultCustomerCityStateZip);
+    setCustomerEmail(defaultCustomerEmail);
+    setEffectiveDate(defaultEffectiveDate);
+    setContractType(computedContractType);
     setDepositPct("Forty-percent (40%)");
-    setTotalContractValue("$366,584");
+    setTotalContractValue(defaultTotalContractValue);
     setSuccessMessage("Customer info auto-filled from quote successfully!");
     setSuccessDialogOpen(true);
   };

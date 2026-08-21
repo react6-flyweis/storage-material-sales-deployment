@@ -379,7 +379,7 @@ export const salesRoutes: RouteObject[] = [
               { path: "create", element: <CreateQuotationPage /> },
               { path: "upload-drawing", element: <UploadDrawingPage /> },
               { path: "extracted-drawing", element: <ExtractedDrawingPage /> },
-              { path: "preview", element: <QuotePreviewPage /> },
+              { path: "quote-preview", element: <QuotePreviewPage /> },
               { path: "history", element: <QuoteHistoryPage /> },
               { path: "pricing-rules", element: <PricingRulesPage /> },
             ],

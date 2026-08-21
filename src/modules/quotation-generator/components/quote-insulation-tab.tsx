@@ -2,49 +2,97 @@ import { useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SuccessDialog from "@/components/success-dialog";
+import { useQuotationStore } from "@/modules/quotation/quotation.store";
+import type {
+  ExtractShipperResponseData,
+  ComputeEstimateRequest,
+} from "../estimates.api";
 
-export function QuoteInsulationTab() {
-  // Config state
-  const [insulationSystem, setInsulationSystem] = useState<
-    "Vinyl-backed (single layer)" | "Double-layer system" | "Spray Foam"
-  >("Vinyl-backed (single layer)");
-  const [rValueRoof, setRValueRoof] = useState("R-19");
-  const [rValueWalls, setRValueWalls] = useState("R-13");
-  const [cogsSf, setCogsSf] = useState(1.5);
-  const [targetMarginPct, setTargetMarginPct] = useState(25);
-  const [additionalNotes, setAdditionalNotes] = useState("");
+interface QuoteInsulationTabProps {
+  extractedShipper?: ExtractShipperResponseData;
+  sqFt?: string;
+  onTriggerCompute?: (overrides?: Partial<ComputeEstimateRequest>) => void;
+}
+
+export function QuoteInsulationTab({
+  extractedShipper,
+  sqFt: propSqFt,
+  onTriggerCompute,
+}: QuoteInsulationTabProps) {
+  const {
+    insulationInclude,
+    setInsulationInclude,
+    insulationSystem,
+    setInsulationSystem,
+    insulationRValueRoof,
+    setInsulationRValueRoof,
+    insulationRValueWalls,
+    setInsulationRValueWalls,
+    insulationCogsSf,
+    setInsulationCogsSf,
+    insulationMarginPct,
+    setInsulationMarginPct,
+    insulationNotes,
+    setInsulationNotes,
+    insulationInclusions,
+    toggleInsulationInclusion,
+    resetInsulationSettings,
+  } = useQuotationStore();
 
   // Dialog state
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
 
-  // Base building footprint constant
-  const areaSqFt = 68750;
+  // Base building footprint
+  const areaSqFt =
+    parseFloat(propSqFt || "") ||
+    extractedShipper?.squareFootage ||
+    68750;
 
   // Calculation logic
-  const totalCogs = areaSqFt * cogsSf;
-  const marginDecimal = targetMarginPct / 100;
-  const totalSell = marginDecimal < 1 ? totalCogs / (1 - marginDecimal) : totalCogs;
-  const sellSf = totalSell / areaSqFt;
+  const totalCogs = areaSqFt * insulationCogsSf;
+  const marginDecimal = insulationMarginPct / 100;
+  const totalSell =
+    marginDecimal < 1 ? totalCogs / (1 - marginDecimal) : totalCogs;
+  const sellSf = areaSqFt > 0 ? totalSell / areaSqFt : 0;
   const totalProfit = totalSell - totalCogs;
 
   const handleApply = () => {
-    setSuccessMessage("Insulation calculations and SOW inclusions applied successfully!");
+    setInsulationInclude(true);
+    setSuccessMessage(
+      "Insulation calculations and SOW inclusions applied successfully!"
+    );
     setSuccessDialogOpen(true);
+    if (onTriggerCompute) {
+      onTriggerCompute({
+        insulation: {
+          include: true,
+          system: insulationSystem,
+          rValueRoof: insulationRValueRoof,
+          rValueWalls: insulationRValueWalls,
+          costSF: insulationCogsSf,
+          cogsSF: insulationCogsSf,
+          marginPct: insulationMarginPct,
+        },
+      });
+    }
   };
 
   const handleReset = () => {
-    setInsulationSystem("Vinyl-backed (single layer)");
-    setRValueRoof("R-19");
-    setRValueWalls("R-13");
-    setCogsSf(1.5);
-    setTargetMarginPct(25);
-    setAdditionalNotes("");
+    resetInsulationSettings();
+    setInsulationInclude(false);
     setSuccessMessage("Insulation settings reset to defaults!");
     setSuccessDialogOpen(true);
+    if (onTriggerCompute) {
+      onTriggerCompute({
+        insulation: {
+          include: false,
+        },
+      });
+    }
   };
 
-  const sowInclusions = [
+  const allSowInclusions = [
     "Roof insulation",
     "Wall insulation",
     "Vapor retarder / facing",
@@ -133,8 +181,8 @@ export function QuoteInsulationTab() {
                 </label>
                 <div className="relative">
                   <select
-                    value={rValueRoof}
-                    onChange={(e) => setRValueRoof(e.target.value)}
+                    value={insulationRValueRoof}
+                    onChange={(e) => setInsulationRValueRoof(e.target.value)}
                     className="w-full appearance-none border border-slate-200 rounded-lg px-3.5 py-2 text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-purple-500 cursor-pointer pr-10"
                   >
                     <option value="R-10">R-10</option>
@@ -154,8 +202,8 @@ export function QuoteInsulationTab() {
                 </label>
                 <div className="relative">
                   <select
-                    value={rValueWalls}
-                    onChange={(e) => setRValueWalls(e.target.value)}
+                    value={insulationRValueWalls}
+                    onChange={(e) => setInsulationRValueWalls(e.target.value)}
                     className="w-full appearance-none border border-slate-200 rounded-lg px-3.5 py-2 text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-purple-500 cursor-pointer pr-10"
                   >
                     <option value="R-10">R-10</option>
@@ -182,12 +230,14 @@ export function QuoteInsulationTab() {
                     min="0.50"
                     max="10.00"
                     step="0.05"
-                    value={cogsSf}
-                    onChange={(e) => setCogsSf(parseFloat(e.target.value))}
+                    value={insulationCogsSf}
+                    onChange={(e) =>
+                      setInsulationCogsSf(parseFloat(e.target.value))
+                    }
                     className="flex-1 accent-amber-500 cursor-pointer h-2.5 bg-slate-800 rounded-lg"
                   />
                   <div className="border border-slate-200 rounded-lg px-3 py-1.5 bg-slate-50 text-xs font-bold text-slate-900 min-w-16 text-center">
-                    {cogsSf.toFixed(2)}
+                    {insulationCogsSf.toFixed(2)}
                   </div>
                 </div>
                 <p className="text-[11px] text-slate-400 font-medium">
@@ -205,12 +255,14 @@ export function QuoteInsulationTab() {
                     type="range"
                     min="0"
                     max="50"
-                    value={targetMarginPct}
-                    onChange={(e) => setTargetMarginPct(parseFloat(e.target.value))}
+                    value={insulationMarginPct}
+                    onChange={(e) =>
+                      setInsulationMarginPct(parseFloat(e.target.value))
+                    }
                     className="flex-1 accent-emerald-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
                   />
                   <div className="border border-slate-200 rounded-lg px-3 py-1.5 bg-slate-50 text-xs font-bold text-slate-900 flex items-center gap-1 min-w-16 justify-between">
-                    <span>{targetMarginPct}</span>
+                    <span>{insulationMarginPct}</span>
                     <span className="text-slate-400 font-normal">%</span>
                   </div>
                 </div>
@@ -223,7 +275,7 @@ export function QuoteInsulationTab() {
             {/* Right Column: Live Result Card (4 cols) */}
             <div className="md:col-span-4 border border-slate-200 rounded-xl bg-slate-50/40 p-5 space-y-5 shadow-2xs">
               <span className="text-xs font-bold text-slate-800 block">
-                Live Result
+                Live Result {!insulationInclude && "(Click 'Apply to Quote & SOW' to include)"}
               </span>
 
               <div className="grid grid-cols-2 gap-y-4 gap-x-6">
@@ -233,7 +285,9 @@ export function QuoteInsulationTab() {
                     SYSTEM
                   </span>
                   <span className="text-xs font-bold text-slate-900 block leading-tight">
-                    {insulationSystem.includes("Vinyl-backed") ? "Vinyl-Backed" : insulationSystem}
+                    {insulationSystem.includes("Vinyl-backed")
+                      ? "Vinyl-Backed"
+                      : insulationSystem}
                   </span>
                 </div>
 
@@ -243,7 +297,7 @@ export function QuoteInsulationTab() {
                     AREA
                   </span>
                   <span className="text-xs font-bold text-slate-900 block">
-                    {areaSqFt.toLocaleString()} SF
+                    {Math.round(areaSqFt).toLocaleString()} SF
                   </span>
                 </div>
 
@@ -253,7 +307,7 @@ export function QuoteInsulationTab() {
                     R-VALUES
                   </span>
                   <span className="text-xs font-bold text-slate-900 block">
-                    Roof {rValueRoof} / Wall {rValueWalls}
+                    Roof {insulationRValueRoof} / Wall {insulationRValueWalls}
                   </span>
                 </div>
 
@@ -263,7 +317,7 @@ export function QuoteInsulationTab() {
                     COGS
                   </span>
                   <span className="text-xs font-extrabold text-orange-600 block">
-                    ${Math.round(totalCogs).toLocaleString()} (${cogsSf.toFixed(2)}/SF)
+                    ${Math.round(totalCogs).toLocaleString()} (${insulationCogsSf.toFixed(2)}/SF)
                   </span>
                 </div>
 
@@ -293,21 +347,41 @@ export function QuoteInsulationTab() {
 
         {/* SOW Inclusions for Insulation */}
         <div className="space-y-4 pt-2">
-          <label className="block text-xs font-bold text-slate-800">
-            SOW Inclusions for Insulation
-          </label>
-          <div className="flex flex-wrap items-center gap-3">
-            {sowInclusions.map((item, idx) => (
-              <div
-                key={idx}
-                className="flex items-center gap-1.5 text-xs font-bold text-blue-700 bg-blue-50/70 border border-blue-100 rounded-full px-3 py-1.5"
-              >
-                <span className="w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px]">
-                  ✓
-                </span>
-                <span>{item}</span>
-              </div>
-            ))}
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-bold text-slate-800">
+              SOW Inclusions for Insulation
+            </label>
+            <span className="text-[10px] text-slate-400">
+              Click items to include/exclude from SOW & Quote
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2.5">
+            {allSowInclusions.map((item, idx) => {
+              const isSelected = insulationInclusions.includes(item);
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => toggleInsulationInclusion(item)}
+                  className={`flex items-center gap-1.5 text-xs rounded-full px-3 py-1.5 transition-all cursor-pointer border ${
+                    isSelected
+                      ? "text-blue-700 bg-blue-50/90 border-blue-300 shadow-2xs font-bold"
+                      : "text-slate-500 bg-slate-100/70 border-slate-200 hover:bg-slate-200/60 font-medium"
+                  }`}
+                >
+                  <span
+                    className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${
+                      isSelected
+                        ? "bg-blue-600 text-white"
+                        : "bg-slate-300 text-slate-600 font-bold"
+                    }`}
+                  >
+                    {isSelected ? "✓" : "+"}
+                  </span>
+                  <span>{item}</span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Additional Notes Textarea */}
@@ -317,8 +391,8 @@ export function QuoteInsulationTab() {
             </label>
             <textarea
               rows={2}
-              value={additionalNotes}
-              onChange={(e) => setAdditionalNotes(e.target.value)}
+              value={insulationNotes}
+              onChange={(e) => setInsulationNotes(e.target.value)}
               placeholder="e.g. R-40 roof / R-30 walls in wash bay, exposed vapor barrier in storage area..."
               className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500 bg-slate-50/50 resize-none"
             />

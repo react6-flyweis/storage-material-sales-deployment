@@ -247,3 +247,90 @@
   color: inherit;
   padding: 0;
 }
+
+/* Print styles for Quote Generator & PDF output */
+@media print {
+  /* Hide non-printable UI elements */
+  header,
+  aside,
+  nav,
+  .no-print,
+  [data-no-print] {
+    display: none !important;
+  }
+
+  /* Reset layout constraints and side margins for document printing */
+  html,
+  body,
+  #root,
+  #root > div,
+  main,
+  div[class*="ml-"],
+  [class*="ml-"] {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: static !important;
+    float: none !important;
+    margin: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+  }
+
+  /* Force full width on max-width wrappers in print mode */
+  .max-w-5xl,
+  .max-w-4xl,
+  .max-w-3xl,
+  [class*="max-w-"] {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* Preserve full color contrast and background colors in PDF export */
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    box-sizing: border-box !important;
+  }
+
+  @page {
+    size: portrait;
+    margin: 8mm;
+  }
+
+  /* Individual printable card styling and page breaking */
+  .print-card {
+    width: calc(100% - 4px) !important;
+    max-width: calc(100% - 4px) !important;
+    box-sizing: border-box !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+    break-before: page;
+    page-break-before: always;
+    margin-top: 0 !important;
+    margin-bottom: 24px !important;
+    margin-left: 2px !important;
+    margin-right: 2px !important;
+    padding: 24px !important;
+    background-color: #ffffff !important;
+  }
+
+  .print-card:first-of-type {
+    break-before: auto;
+    page-break-before: auto;
+  }
+
+  .print-avoid-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
