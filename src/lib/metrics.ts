@@ -53,6 +53,7 @@ type ConversionFunnelResponse = {
 };
 
 const formatDateParam = (date: Date) => date.toISOString().slice(0, 10);
+const getQueryDateKey = (date: Date | null) => (date ? formatDateParam(date) : null);
 
 export async function getDashboardMetrics(
   dateRange: DateRange,
@@ -119,8 +120,8 @@ export function useDashboardMetricsQuery(period?: Period) {
       "sales",
       "dashboard",
       "stats",
-      dateRange.startDate,
-      dateRange.endDate,
+      getQueryDateKey(dateRange.startDate),
+      getQueryDateKey(dateRange.endDate),
     ],
     queryFn: () => getDashboardMetrics(dateRange),
   });
@@ -164,7 +165,13 @@ export function useFollowUpStatsQuery() {
 export function useConversionFunnelQuery(period?: Period) {
   const dateRange = getPeriodRange(period);
   return useQuery({
-    queryKey: ["sales", "dashboard", "conversion-funnel", dateRange.startDate, dateRange.endDate],
+    queryKey: [
+      "sales",
+      "dashboard",
+      "conversion-funnel",
+      getQueryDateKey(dateRange.startDate),
+      getQueryDateKey(dateRange.endDate),
+    ],
     queryFn: () => getConversionFunnelMetrics(dateRange),
   });
 }
@@ -204,7 +211,13 @@ export async function getCustomerStats(
 export function useCustomerStatsQuery(period?: Period) {
   const dateRange = getPeriodRange(period);
   return useQuery({
-    queryKey: ["sales", "customers", "stats", dateRange.startDate, dateRange.endDate],
+    queryKey: [
+      "sales",
+      "customers",
+      "stats",
+      getQueryDateKey(dateRange.startDate),
+      getQueryDateKey(dateRange.endDate),
+    ],
     queryFn: () => getCustomerStats(dateRange),
   });
 }
