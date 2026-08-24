@@ -74,12 +74,20 @@ export interface PricingRulesFormValues {
   }>;
 }
 
-function extractPricingRules(raw: any): PricingRulesData {
-  if (!raw) return {};
-  if (raw.pricingRules) return raw.pricingRules;
-  if (raw.data?.pricingRules) return raw.data.pricingRules;
-  if (raw.data) return raw.data;
-  return raw;
+function extractPricingRules(raw: unknown): PricingRulesData {
+  if (!raw || typeof raw !== "object") return {};
+  const record = raw as Record<string, unknown>;
+  if (record.pricingRules && typeof record.pricingRules === "object") {
+    return record.pricingRules as PricingRulesData;
+  }
+  if (record.data && typeof record.data === "object") {
+    const dataRecord = record.data as Record<string, unknown>;
+    if (dataRecord.pricingRules && typeof dataRecord.pricingRules === "object") {
+      return dataRecord.pricingRules as PricingRulesData;
+    }
+    return record.data as PricingRulesData;
+  }
+  return raw as PricingRulesData;
 }
 
 function formatFormValues(rulesData: PricingRulesData): PricingRulesFormValues {

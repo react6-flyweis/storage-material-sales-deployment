@@ -1,9 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ArrowLeft, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SuccessDialog from "@/components/success-dialog";
 import { useQuotationStore } from "@/modules/quotation/quotation.store";
 import type { ExtractShipperResponseData, ExtractDrawingResponseData } from "../estimates.api";
+import { useQuotationPricing } from "../hooks/use-quotation-pricing";
+import { ContractPreviewDocument } from "./contract-preview-document";
 
 interface QuoteContractTabProps {
   extractedShipper?: ExtractShipperResponseData;
@@ -18,48 +20,61 @@ export function QuoteContractTab({
   extractedShipper,
   quotationForm,
   extractedDrawing,
+  sqFt,
   onBackToBreakdown,
   onQuotePreview,
 }: QuoteContractTabProps) {
   const { scope } = useQuotationStore();
 
+  const pricingData = useQuotationPricing({
+    extractedShipper,
+    sqFt,
+    quotationForm,
+    extractedDrawing,
+  });
+
   const defaultCustomerLegalName =
     quotationForm?.leadName ||
     extractedDrawing?.extracted?.customer ||
     extractedShipper?.coverSheet?.labelMap?.customer ||
-    "Council Bluffs, IA 51503";
+    pricingData.customerLeadName ||
+    "";
 
   const defaultCustomerAddress =
     quotationForm?.street ||
     extractedShipper?.coverSheet?.labelMap?.project ||
-    "123 Main Street";
+    pricingData.customerAddress ||
+    "";
 
   const defaultCustomerCityStateZip =
     quotationForm?.cityStateZip ||
     extractedShipper?.coverSheet?.labelMap?.location ||
-    "Council Bluffs, IA 51503";
+    "";
 
-  const defaultCustomerEmail = quotationForm?.email || "customer@gmail.com";
+  const defaultCustomerEmail =
+    quotationForm?.email ||
+    pricingData.customerEmail ||
+    "";
 
-  const defaultEffectiveDate = quotationForm?.quoteDate || "July 31, 2026";
+  const defaultEffectiveDate =
+    quotationForm?.quoteDate ||
+    pricingData.quoteDate ||
+    new Date().toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
 
   const computedContractType =
     scope?.toLowerCase() === "supply"
       ? "Supply & Delivery Only"
       : scope?.toLowerCase() === "install"
-      ? "Installation Only"
-      : scope?.toLowerCase() === "both"
-      ? "Supply, Delivery & Erection"
-      : "Supply & Delivery Only";
+        ? "Installation Only"
+        : scope?.toLowerCase() === "both"
+          ? "Supply, Delivery & Erection"
+          : "Supply & Delivery Only";
 
-  const pricing = extractedShipper?.pricing;
-  const totalSellVal = pricing?.totSell ?? pricing?.matSell ?? 366584;
-  const defaultTotalContractValue =
-    typeof totalSellVal === "number"
-      ? `$${Math.round(totalSellVal).toLocaleString()}`
-      : String(totalSellVal).startsWith("$")
-      ? String(totalSellVal)
-      : `$${totalSellVal}`;
+  const defaultTotalContractValue = pricingData.grandTotalFormatted || "-";
 
   // Customer Form State
   const [customerLegalName, setCustomerLegalName] = useState(defaultCustomerLegalName);
@@ -70,55 +85,6 @@ export function QuoteContractTab({
   const [contractType, setContractType] = useState(computedContractType);
   const [depositPct, setDepositPct] = useState("Forty-percent (40%)");
   const [totalContractValue, setTotalContractValue] = useState(defaultTotalContractValue);
-
-  // Sync state when dynamic props arrive/change
-  useEffect(() => {
-    if (quotationForm?.leadName || extractedDrawing?.extracted?.customer || extractedShipper?.coverSheet?.labelMap?.customer) {
-      setCustomerLegalName(
-        quotationForm?.leadName ||
-          extractedDrawing?.extracted?.customer ||
-          extractedShipper?.coverSheet?.labelMap?.customer ||
-          "Council Bluffs, IA 51503"
-      );
-    }
-    if (quotationForm?.street || extractedShipper?.coverSheet?.labelMap?.project) {
-      setCustomerAddress(
-        quotationForm?.street ||
-          extractedShipper?.coverSheet?.labelMap?.project ||
-          "123 Main Street"
-      );
-    }
-    if (quotationForm?.cityStateZip || extractedShipper?.coverSheet?.labelMap?.location) {
-      setCustomerCityStateZip(
-        quotationForm?.cityStateZip ||
-          extractedShipper?.coverSheet?.labelMap?.location ||
-          "Council Bluffs, IA 51503"
-      );
-    }
-    if (quotationForm?.email) {
-      setCustomerEmail(quotationForm.email);
-    }
-    if (quotationForm?.quoteDate) {
-      setEffectiveDate(quotationForm.quoteDate);
-    }
-    if (scope) {
-      setContractType(
-        scope.toLowerCase() === "supply"
-          ? "Supply & Delivery Only"
-          : scope.toLowerCase() === "install"
-          ? "Installation Only"
-          : scope.toLowerCase() === "both"
-          ? "Supply, Delivery & Erection"
-          : "Supply & Delivery Only"
-      );
-    }
-    if (pricing?.totSell != null || pricing?.matSell != null) {
-      const val = pricing?.totSell ?? pricing?.matSell;
-      setTotalContractValue(
-        typeof val === "number" ? `$${Math.round(val).toLocaleString()}` : String(val)
-      );
-    }
-  }, [extractedShipper, quotationForm, extractedDrawing, scope, pricing?.totSell, pricing?.matSell]);
 
   // Success dialog state
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
@@ -335,167 +301,14 @@ export function QuoteContractTab({
         </div>
 
         {/* Document Contract Preview Box */}
-        <div className="border border-slate-200 rounded-2xl p-8 md:p-12 bg-white space-y-8 shadow-xs text-slate-600 text-xs leading-relaxed max-w-4xl mx-auto">
-          {/* Document Title */}
-          <h2 className="text-base font-extrabold text-slate-900 text-center uppercase tracking-wide">
-            Fabrication & Supply Agreement
-          </h2>
-
-          {/* Contract Content */}
-          <div className="space-y-4 font-normal text-slate-500 text-[11px] leading-relaxed">
-            <p>Fabrication & Supply Agreement</p>
-
-            <p>
-              This Fabrication & Supply Agreement ("Agreement"), Dated As Of{" "}
-              <span className="font-semibold text-slate-700">
-                {effectiveDate || "July 31, 2026"}
-              </span>{" "}
-              ("Effective Date"), Is Entered Into By And Between Steel Investments, LLC
-              ("Steel"), And{" "}
-              <span className="font-semibold text-slate-700">
-                {customerLegalName || "Council Bluffs, IA 51503"}
-              </span>{" "}
-              ("Customer").
-            </p>
-
-            <p>
-              Purchase And Sale Of Goods. Subject To The Terms And Conditions Of This Agreement,
-              Customer Shall Purchase, And Steel Shall Fabricate And Sell, The Goods Set Forth In
-              Exhibit A. Upon Steel's Receipt Of Customer's First Deposit, Customer Agrees To
-              Purchase All Goods Under Exhibit A And Further Agrees That Customer May Not Cancel
-              Or Request Revisions To The Goods.
-            </p>
-
-            <p>
-              Engineering Drawings. Steel Will Commence Engineering Drawing For The Goods Upon
-              Customer's Payment Of The First Deposit.
-            </p>
-
-            <p>
-              Delivery. The Goods Will Be Delivered To The Location Specified By Customer Using
-              Standard Methods For Packaging And Shipping.
-            </p>
-
-            <p>
-              Price And Payment.
-              <br />
-              Price. Customer Shall Purchase The Goods From Steel At The Price Set Forth In
-              Exhibit A. The Price May Fluctuate Due To Variations In The Cost Of Raw Materials,
-              Labor, Transport, Or Overhead Expenses.
-            </p>
-
-            <p>
-              Deposit. Customer Acknowledges And Agrees That Steel Requires An Upfront,
-              Non-Refundable Deposit Of{" "}
-              <span className="font-semibold text-slate-700">
-                {depositPct || "Forty-Percent (40%)"}
-              </span>{" "}
-              For Purposes Of Procuring Materials, Payable In Two Installments: (i) Ten-Percent
-              (10%) Of The Price Due Upon The Effective Date; And (ii) Thirty-Percent (30%) Due
-              Upon Engineer Approval.
-            </p>
-
-            <p>
-              Payment Terms. Upon Completion Of Fabrication, Steel Shall Invoice Customer For All
-              Remaining Amounts. Customer Shall Pay All Invoiced Amounts At Least Two (2) Days
-              Prior To Shipment.
-            </p>
-
-            <p>
-              Late Payments. Customer Shall Pay Interest On All Late Payments At 1.5% Per Month.
-              Customer Shall Reimburse Steel For All Costs Incurred In Collecting Late Payments,
-              Including Attorneys' Fees.
-            </p>
-
-            <p>
-              Termination. Steel May Immediately Terminate This Agreement If Customer Fails To
-              Pay Any Amount When Due, Or If Customer Is In Breach Of Any Representation,
-              Warranty, Or Covenant.
-            </p>
-
-            <p>
-              Limited Product Warranty. Steel Warrants That The Goods Shall Be Free From Material
-              Defects In Workmanship Upon Delivery. Customer Shall Notify Steel Within Seventy-Two
-              (72) Hours Of Any Alleged Defect.
-            </p>
-
-            <p>
-              Indemnification. Customer Shall Indemnify, Defend And Hold Harmless Steel And Its
-              Affiliates From Any Third-Party Claims Arising From: (i) Breach Of This Agreement;
-              (ii) Negligence Or Willful Misconduct; (iii) Any Bodily Injury Or Property Damage;
-              Or (iv) Failure To Comply With Applicable Laws.
-            </p>
-
-            <p>
-              Limitation Of Liability. TO THE MAXIMUM EXTENT PERMITTED BY LAW, STEEL SHALL NOT BE
-              LIABLE FOR CONSEQUENTIAL, INDIRECT, INCIDENTAL, SPECIAL, OR PUNITIVE DAMAGES.
-            </p>
-
-            <p>
-              Force Majeure. Steel Shall Not Be Liable For Any Failure Or Delay In Fulfilling Any
-              Term Of This Agreement When Caused By Circumstances Beyond Its Reasonable Control.
-            </p>
-
-            <p>
-              Governing Law. This Agreement Shall Be Governed By The Laws Of The State Of Delaware.
-              Any Disputes Shall Be Brought In The Appropriate Courts Located In Douglas County,
-              Nebraska.
-            </p>
-
-            <p className="pt-2">
-              EXHIBIT A — GOODS
-              <br />
-              Total Contract Value:{" "}
-              <span className="font-semibold text-slate-700">
-                {totalContractValue || "$18,398"}
-              </span>
-              <br />
-              Scope: Fabrication And Supply Of Pre-Engineered Metal Building Materials And Systems.
-            </p>
-          </div>
-
-          {/* SIGNATURES Section */}
-          <div className="pt-6 space-y-8 border-t border-slate-100">
-            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              SIGNATURES
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-10 text-[11px]">
-              {/* STEEL INVESTMENTS, LLC */}
-              <div className="space-y-4">
-                <span className="font-bold text-slate-900 block">
-                  STEEL INVESTMENTS, LLC
-                </span>
-
-                <div className="flex items-center gap-6 pt-4 text-slate-400">
-                  <span>Authorized Signature</span>
-                  <span>Date</span>
-                </div>
-
-                <div className="space-y-1 text-slate-500 pt-2 font-medium">
-                  <p>Name: Travis Overhue</p>
-                  <p>Title: Owner</p>
-                </div>
-              </div>
-
-              {/* [CUSTOMER LEGAL ENTITY NAME] */}
-              <div className="space-y-4">
-                <span className="font-bold text-slate-900 block uppercase">
-                  [{customerLegalName || "CUSTOMER LEGAL ENTITY NAME"}]
-                </span>
-
-                <div className="flex items-center gap-6 pt-4 text-slate-400">
-                  <span>Authorized Signature</span>
-                  <span>Date</span>
-                </div>
-
-                <div className="space-y-1 text-slate-400 pt-2 font-medium">
-                  <p>[EMAIL ADDRESS]</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ContractPreviewDocument
+          effectiveDate={effectiveDate}
+          customerLegalName={customerLegalName}
+          customerAddress={customerAddress}
+          depositPct={depositPct}
+          totalContractValue={totalContractValue}
+          contractType={contractType}
+        />
       </div>
     </div>
   );

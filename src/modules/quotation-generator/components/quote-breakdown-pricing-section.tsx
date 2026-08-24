@@ -537,7 +537,13 @@ export function QuoteBreakdownPricingSection({
             additionalNotes={additionalNotes}
             setAdditionalNotes={setAdditionalNotes}
             extractedShipper={shipperData}
+            quotationForm={quotationForm}
+            extractedDrawing={extractedDrawing}
+            pdfFileName={pdfFileName}
+            estimateId={estimateId}
             onQuotePreview={handleNavigateToPreview}
+            onSaveDraft={handleSaveDraft}
+            isSavingDraft={isSavingDraft}
           />
         </TabsContent>
 
