@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -42,16 +42,17 @@ export default function CreateQuotationPage() {
     (location.state as { leadId?: string })?.leadId ||
     "";
 
-  const [selectedLeadId, setSelectedLeadId] = useState<string>(initialLeadId);
-
   // Fetch leads lookup list
   const { data: leadsLookupData, isLoading: isLeadsLoading } = useLeadsLookupQuery(undefined, 1, 100);
-  const leads = leadsLookupData?.data.leads || [];
+  const leads = useMemo(() => leadsLookupData?.data.leads || [], [leadsLookupData]);
+
+  const [selectedLeadId, setSelectedLeadId] = useState<string>(initialLeadId);
+  const activeLeadId = selectedLeadId || leads[0]?._id || "";
 
   // Fetch detailed info for selected lead
   const { data: leadDetailData, isLoading: isDetailLoading } = useLeadDetailQuery(
-    selectedLeadId,
-    Boolean(selectedLeadId)
+    activeLeadId,
+    Boolean(activeLeadId)
   );
 
   const formattedToday = new Date().toLocaleDateString("en-US", {
@@ -63,17 +64,17 @@ export default function CreateQuotationPage() {
   const {
     register,
     handleSubmit,
-    control,
     setValue,
+    control,
     formState: { errors },
   } = useForm<CreateQuotationFormValues>({
     resolver: zodResolver(createQuotationSchema),
     defaultValues: {
-      leadId: selectedLeadId,
+      leadId: initialLeadId,
       leadName: "",
       email: "",
       street: "",
-      cityStateZip: "",
+      cityStateZip: "Council Bluffs, IA 51503",
       buildingSize: "",
       squareFootage: "",
       jobNumber: "",
@@ -81,20 +82,12 @@ export default function CreateQuotationPage() {
     },
   });
 
-  // Auto-select first lead if none selected and leads list arrives
-  useEffect(() => {
-    if (!selectedLeadId && leads.length > 0) {
-      const firstId = leads[0]._id;
-      setSelectedLeadId(firstId);
-      setValue("leadId", firstId);
-    }
-  }, [leads, selectedLeadId, setValue]);
-
   // Update form fields when lead detail or lead lookup item changes
   useEffect(() => {
-    if (!selectedLeadId) return;
+    if (!activeLeadId) return;
 
-    const lookupItem = leads.find((l) => l._id === selectedLeadId);
+    setValue("leadId", activeLeadId);
+    const lookupItem = leads.find((l) => l._id === activeLeadId);
 
     if (leadDetailData?.data) {
       const { lead, customer } = leadDetailData.data;
@@ -148,7 +141,7 @@ export default function CreateQuotationPage() {
       setValue("buildingSize", lookupItem.buildingType || "");
       setValue("jobNumber", lookupItem.jobId || "");
     }
-  }, [selectedLeadId, leadDetailData, leads, setValue]);
+  }, [activeLeadId, leadDetailData, leads, setValue]);
 
   const handleLeadChange = (leadId: string) => {
     setValue("leadId", leadId);
