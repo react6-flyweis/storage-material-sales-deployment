@@ -1,12 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useQuotationStore } from "@/modules/quotation/quotation.store";
-import type {
-  ExtractDrawingResponseData,
-  ExtractShipperResponseData,
-} from "../estimates.api";
 import { useQuotationPricing, type UseQuotationPricingParams } from "./use-quotation-pricing";
+import type { ShipperWeightByCategoryItem } from "../estimates.api";
 
-export interface UseSowDocumentParams extends UseQuotationPricingParams {}
+export type UseSowDocumentParams = UseQuotationPricingParams;
 
 export interface SowDocumentState {
   documentTitle: string;
@@ -65,7 +62,7 @@ export function useSowDocument(params: UseSowDocumentParams = {}) {
   const isSupply = scope.toLowerCase() === "supply" || scope.toLowerCase() === "both";
   const isInstall = scope.toLowerCase() === "install" || scope.toLowerCase() === "both";
 
-  const initialWeights = extractedShipper?.weightByCategory || [];
+  const initialWeights: ShipperWeightByCategoryItem[] = extractedShipper?.weightByCategory || [];
   const mainFramesWeight = initialWeights.find((w) =>
     w.category.toLowerCase().includes("columns") || w.category.toLowerCase().includes("rafters")
   )?.weightLbs;
@@ -79,16 +76,14 @@ export function useSowDocument(params: UseSowDocumentParams = {}) {
   )?.weightLbs;
 
   const getDefaultState = (): SowDocumentState => ({
-    documentTitle: `Pre-Engineered Metal Building ${
-      scope === "Supply"
-        ? "Supply & Delivery"
-        : scope === "Install"
+    documentTitle: `Pre-Engineered Metal Building ${scope === "Supply"
+      ? "Supply & Delivery"
+      : scope === "Install"
         ? "Installation"
         : "Supply, Delivery & Installation"
-    }`,
-    projectOverviewText: `Storage Materials Will Furnish ${
-      isInstall ? "And Install " : ""
-    }A Complete ${jobType} Pre-Engineered Metal Building Package Based On Preliminary Drawings.`,
+      }`,
+    projectOverviewText: `Storage Materials Will Furnish ${isInstall ? "And Install " : ""
+      }A Complete ${jobType} Pre-Engineered Metal Building Package Based On Preliminary Drawings.`,
     buildingSummaryItems: [
       `Approx ${pricingData.effectiveSqFt.toLocaleString()} SF (${pricingData.displayBuildingSize})`,
       `${jobType} Clear Span Rigid Frame Structure`,
@@ -97,23 +92,20 @@ export function useSowDocument(params: UseSowDocumentParams = {}) {
       `Total Steel Weight: ${(extractedShipper?.totalWeightLbs || 145000).toLocaleString()} lbs`,
     ],
     primaryStructuralItems: [
-      `Rigid Frames (Rafters & Columns)${
-        mainFramesWeight ? ` — ${mainFramesWeight.toLocaleString()} lbs` : ""
+      `Rigid Frames (Rafters & Columns)${mainFramesWeight ? ` — ${mainFramesWeight.toLocaleString()} lbs` : ""
       }`,
       "Base Plates And Welded Connections",
       "Anchor Bolt Plans (For Reference Only)",
     ],
     secondaryFramingItems: [
-      `Purlins (Roof) & Girts (Walls)${
-        purlinsWeight ? ` — ${purlinsWeight.toLocaleString()} lbs` : ""
+      `Purlins (Roof) & Girts (Walls)${purlinsWeight ? ` — ${purlinsWeight.toLocaleString()} lbs` : ""
       }`,
       "Eave Struts",
       "Bracing (Rod/Cable/Portal As Designed)",
       "Flange Bracing",
     ],
     roofSystemItems: [
-      `26 GA Galvalume Roof Panels (${roofType} System${
-        sheetingWeight ? ` — ${sheetingWeight.toLocaleString()} lbs` : ""
+      `26 GA Galvalume Roof Panels (${roofType} System${sheetingWeight ? ` — ${sheetingWeight.toLocaleString()} lbs` : ""
       })`,
       "Ridge Cap",
       "Closure Strips",
