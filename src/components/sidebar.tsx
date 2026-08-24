@@ -170,7 +170,7 @@ const navigationGroups: NavigationGroup[] = [
       { sectionHeader: "QUOTING" },
       { path: "/quotation/create", label: "PEMB Quote", icon: pembIcon },
       { path: "/quotation/storage-cog", label: "Storage COG Sheet", icon: storageCogIcon },
-      { path: "/quotation/preview", label: "Quote Preview", icon: quotePreviewIcon },
+      { path: "/quotation/quote-preview", label: "Quote Preview", icon: quotePreviewIcon },
       { path: "/quotation/custom", label: "Custom Quote", icon: customQuoteIcon },
       { path: "/quotation/history", label: "Quote History", icon: quotationHistoryIcon },
       { sectionHeader: "SETTINGS" },
