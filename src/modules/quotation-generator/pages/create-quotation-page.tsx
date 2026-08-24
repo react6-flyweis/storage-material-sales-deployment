@@ -74,7 +74,7 @@ export default function CreateQuotationPage() {
       leadName: "",
       email: "",
       street: "",
-      cityStateZip: "Council Bluffs, IA 51503",
+      cityStateZip: "",
       buildingSize: "",
       squareFootage: "",
       jobNumber: "",
@@ -209,8 +209,7 @@ export default function CreateQuotationPage() {
                           <SelectItem key={lead._id} value={lead._id}>
                             {label} (
                             {lead.customerId?.firstName
-                              ? `${lead.customerId.firstName} ${
-                                  lead.customerId.lastName ?? ""
+                              ? `${lead.customerId.firstName} ${lead.customerId.lastName ?? ""
                                 }`.trim()
                               : "N/A"}
                             )
