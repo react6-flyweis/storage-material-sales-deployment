@@ -118,7 +118,7 @@ export function QuotePreviewPage() {
         {
           _id: estimateId || undefined,
           jobType,
-          scope: scope.toLowerCase(),
+          scope: (scope || "Both").toLowerCase() === "supply" ? "Supply" : (scope || "Both").toLowerCase() === "install" ? "Install" : "Both",
           leadCompanyName: customerLeadName,
           customerEmail,
           streetAddress: navState.quotationForm?.street || "",
