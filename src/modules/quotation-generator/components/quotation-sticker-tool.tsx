@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate, useLocation } from "react-router";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import {
   DropdownMenu,
@@ -19,6 +20,9 @@ const roofOptions = [
 ];
 
 export function QuotationStickerTool() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const {
     jobType,
     setJobType,
@@ -51,7 +55,12 @@ export function QuotationStickerTool() {
             <div className="inline-flex rounded-lg p-0.5 bg-slate-100/80 border border-slate-200/60">
               <button
                 type="button"
-                onClick={() => setJobType("PEMB")}
+                onClick={() => {
+                  setJobType("PEMB");
+                  if (location.pathname.includes("/quotation/storage")) {
+                    navigate("/quotation/extracted-drawing");
+                  }
+                }}
                 className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${
                   jobType === "PEMB"
                     ? "bg-blue-600 text-white shadow-xs"
@@ -62,7 +71,12 @@ export function QuotationStickerTool() {
               </button>
               <button
                 type="button"
-                onClick={() => setJobType("Storage")}
+                onClick={() => {
+                  setJobType("Storage");
+                  if (!location.pathname.includes("/quotation/storage")) {
+                    navigate("/quotation/storage");
+                  }
+                }}
                 className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${
                   jobType === "Storage"
                     ? "bg-blue-600 text-white shadow-xs"
@@ -131,7 +145,7 @@ export function QuotationStickerTool() {
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="flex items-center justify-between gap-3 px-3.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 font-medium text-slate-800 text-sm shadow-2xs min-w-[200px] cursor-pointer"
+                  className="flex items-center justify-between gap-3 px-3.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 font-medium text-slate-800 text-sm shadow-2xs min-w-50 cursor-pointer"
                 >
                   <span>
                     {roofOptions.find((opt) => opt.value === roofType)?.label || roofType}
@@ -139,7 +153,7 @@ export function QuotationStickerTool() {
                   <ChevronDown className="h-4 w-4 text-slate-500 shrink-0" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-[200px]">
+              <DropdownMenuContent align="start" className="w-50">
                 {roofOptions.map((opt) => (
                   <DropdownMenuItem key={opt.value} onClick={() => setRoofType(opt.value)}>
                     {opt.label}
