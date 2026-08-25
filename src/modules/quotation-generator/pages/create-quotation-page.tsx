@@ -112,13 +112,22 @@ export default function CreateQuotationPage() {
       let bSize = lead?.buildingType || lookupItem?.buildingType || "";
       if (lead?.width && lead?.length && lead?.height) {
         bSize = `${lead.width}x${lead.length}x${lead.height}`;
+      } else if (lead?.width && lead?.length) {
+        bSize = `${lead.width}x${lead.length}`;
       }
 
       let sqftStr = "";
       if (lead?.sqft) {
         sqftStr = String(lead.sqft);
       } else if (lead?.width && lead?.length) {
-        sqftStr = String(lead.width * lead.length);
+        sqftStr = String(Number(lead.width) * Number(lead.length));
+      }
+
+      if (!sqftStr && bSize) {
+        const match = bSize.toLowerCase().match(/(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/);
+        if (match) {
+          sqftStr = String(parseFloat(match[1]) * parseFloat(match[2]));
+        }
       }
 
       const jobId = lead?.jobId || lookupItem?.jobId || "";
@@ -135,10 +144,21 @@ export default function CreateQuotationPage() {
         `${lookupItem.customerId?.firstName || ""} ${lookupItem.customerId?.lastName || ""}`.trim() ||
         lookupItem.projectName;
 
+      const bSize = lookupItem.buildingType || "";
+      let sqftStr = "";
+
+      if (bSize) {
+        const match = bSize.toLowerCase().match(/(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/);
+        if (match) {
+          sqftStr = String(parseFloat(match[1]) * parseFloat(match[2]));
+        }
+      }
+
       setValue("leadName", name);
       setValue("email", lookupItem.customerId?.email || "");
       setValue("street", lookupItem.location || "");
-      setValue("buildingSize", lookupItem.buildingType || "");
+      setValue("buildingSize", bSize);
+      setValue("squareFootage", sqftStr);
       setValue("jobNumber", lookupItem.jobId || "");
     }
   }, [activeLeadId, leadDetailData, leads, setValue]);
@@ -316,7 +336,17 @@ export default function CreateQuotationPage() {
                   Building Size
                 </label>
                 <Input
-                  {...register("buildingSize")}
+                  {...register("buildingSize", {
+                    onChange: (e) => {
+                      const val = e.target.value;
+                      const match = val.toLowerCase().match(/(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/);
+                      if (match) {
+                        const computed = parseFloat(match[1]) * parseFloat(match[2]);
+                        if (computed > 0) setValue("squareFootage", String(computed));
+                      }
+                    },
+                  })}
+                  placeholder="e.g. 40x100x14"
                   className="bg-[#F8FAFC] border-slate-200 text-slate-900 text-sm h-11 rounded-lg"
                 />
               </div>
