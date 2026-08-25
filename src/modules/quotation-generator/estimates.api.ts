@@ -384,20 +384,48 @@ export interface ExtractStorageCogRequest {
 export interface ExtractStorageCogResponse {
   success?: boolean;
   message?: string;
-  data?: {
-    buildings?: Array<Record<string, unknown>>;
-    doors?: Array<Record<string, unknown>>;
-    extras?: Array<Record<string, unknown>>;
-    shippingDefault?: Record<string, unknown>;
-    project?: Record<string, unknown>;
-    storagePricing?: Record<string, unknown>;
+  project?: {
+    customer?: string;
+    location?: string;
+    date?: string;
+    jobNumber?: string;
+    [key: string]: unknown;
   };
   buildings?: Array<Record<string, unknown>>;
   doors?: Array<Record<string, unknown>>;
   extras?: Array<Record<string, unknown>>;
-  shippingDefault?: Record<string, unknown>;
-  project?: Record<string, unknown>;
+  shippingDefault?: number | Record<string, unknown>;
+  format?: string;
   storagePricing?: Record<string, unknown>;
+  summary?: {
+    buildingCount?: number;
+    totalSqft?: number;
+    subtotalSell?: number;
+    [key: string]: unknown;
+  };
+  data?: {
+    project?: {
+      customer?: string;
+      location?: string;
+      date?: string;
+      jobNumber?: string;
+      [key: string]: unknown;
+    };
+    buildings?: Array<Record<string, unknown>>;
+    doors?: Array<Record<string, unknown>>;
+    extras?: Array<Record<string, unknown>>;
+    shippingDefault?: number | Record<string, unknown>;
+    format?: string;
+    storagePricing?: Record<string, unknown>;
+    summary?: {
+      buildingCount?: number;
+      totalSqft?: number;
+      subtotalSell?: number;
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
 }
 
 export async function extractStorageCogProvider(
@@ -446,11 +474,15 @@ export interface PreviewDocumentRequest {
   buildingSize?: string;
   squareFootage?: number;
   jobNumber?: string;
+  jobType?: string;
   pricingResult?: ShipperPricing;
   fullQuote?: Record<string, unknown>;
   extractedDrawingFields?: ExtractedDrawingData;
   drawingAttachments?: Array<{ name?: string; fileBase64?: string; includeInQuote?: boolean; [key: string]: unknown }>;
   sections?: string[];
+  storageData?: Record<string, unknown>;
+  storagePricingResult?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
 export interface PreviewDocumentResponse {
