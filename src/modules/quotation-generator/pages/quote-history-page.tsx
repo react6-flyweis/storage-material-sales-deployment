@@ -79,6 +79,22 @@ export function QuoteHistoryPage() {
         }
       }
 
+      if (estimate.jobType === "Storage" || estimate.storageData) {
+        navigate("/quotation/storage", {
+          state: {
+            storageData: estimate.storageData,
+            storagePricing: estimate.storagePricingResult,
+            estimateId: estimate._id,
+            sourceFileName: estimate.sourceFileName || "Storage_COG.xlsx",
+            customerLeadName: estimate.leadCompanyName || "",
+            customerAddress: estimate.cityStateZip || estimate.streetAddress || "",
+            customerEmail: estimate.customerEmail || "",
+            jobNumber: estimate.jobNumber || "",
+          },
+        });
+        return;
+      }
+
       const pricingRes = estimate.pricingResult as Record<string, unknown> | undefined;
 
       navigate("/quotation/extracted-drawing", {
@@ -123,11 +139,11 @@ export function QuoteHistoryPage() {
 
   const totalQuotesCount = summaryData?.totalQuotes ?? estimatesList.length;
   const totalPipelineVal = summaryData?.totalValue ?? estimatesList.reduce((sum, e) => {
-    const pr = e.pricingResult as Record<string, unknown> | undefined;
-    return sum + (Number(pr?.totSell) || 0);
+    const pr = (e.pricingResult || e.storagePricingResult) as Record<string, unknown> | undefined;
+    return sum + (Number(pr?.totSell ?? pr?.grandTotal) || 0);
   }, 0);
   const totalProfitVal = summaryData?.totalProfit ?? estimatesList.reduce((sum, e) => {
-    const pr = e.pricingResult as Record<string, unknown> | undefined;
+    const pr = (e.pricingResult || e.storagePricingResult) as Record<string, unknown> | undefined;
     return sum + (Number(pr?.profit) || 0);
   }, 0);
 
@@ -314,11 +330,18 @@ export function QuoteHistoryPage() {
         ) : (
           <div className="space-y-4">
             {filteredQuotes.map((quote) => {
-              const pricingRes = quote.pricingResult as Record<string, unknown> | undefined;
-              const totSell = Number(pricingRes?.totSell) || 0;
+              const isStorage = quote.jobType?.toUpperCase() === "STORAGE" || Boolean(quote.storageData);
+              const pricingRes = (quote.pricingResult || quote.storagePricingResult) as Record<string, unknown> | undefined;
+              const totSell = Number(pricingRes?.totSell ?? pricingRes?.grandTotal ?? quote.totalSell) || 0;
               const prof = Number(pricingRes?.profit) || 0;
-              const marginPct = Number(pricingRes?.profPct) || 23.1;
-              const sfPrice = Number(pricingRes?.sfPrice) || (totSell && quote.squareFootage ? (totSell / quote.squareFootage).toFixed(2) : 0);
+              const marginPct = Number(pricingRes?.profPct ?? pricingRes?.marginPercent) || 23.1;
+              const effectiveSqFt = Number(quote.squareFootage || quote.sf || pricingRes?.totalSqFt || 0);
+              const sfPrice = Number(pricingRes?.sfPrice ?? pricingRes?.pricePerSf) || (totSell && effectiveSqFt ? (totSell / effectiveSqFt).toFixed(2) : 0);
+
+              const storageBuildings = (quote.storageData as { buildings?: unknown[] } | undefined)?.buildings;
+              const displayBuilding = isStorage
+                ? `${storageBuildings?.length || 1} Storage Building${(storageBuildings?.length || 1) > 1 ? "s" : ""}`
+                : quote.buildingSize || "Building";
 
               return (
                 <div
@@ -336,15 +359,15 @@ export function QuoteHistoryPage() {
                         <span>·</span>
                         <span>{quote.scope?.toUpperCase() || "SUPPLY"}</span>
                         <span>·</span>
-                        <span>{(quote.squareFootage || quote.sf || 0).toLocaleString()} SF</span>
+                        <span>{effectiveSqFt.toLocaleString()} SF</span>
                         <span>·</span>
-                        <span>{quote.buildingSize || "Building"}</span>
+                        <span>{displayBuilding}</span>
                         <span>·</span>
                         <span>{quote.cityStateZip || "IA"}</span>
                       </div>
                     </div>
                     <div className="text-xs font-semibold text-[#2563eb] pt-1">
-                      Job #{quote.jobNumber || "Draft"} · {quote.sourceFileName || "Drawing.pdf"}
+                      Job #{quote.jobNumber || "Draft"} · {quote.sourceFileName || (isStorage ? "Storage_COG.xlsx" : "Drawing.pdf")}
                     </div>
                   </div>
 
@@ -363,18 +386,20 @@ export function QuoteHistoryPage() {
                         <span>${prof.toLocaleString()}</span>
                       </div>
                       <div className="text-xs font-semibold text-[#16a34a]">
-                        {marginPct}%
+                        {typeof marginPct === "number" ? marginPct.toFixed(1) : marginPct}%
                       </div>
                     </div>
 
                     {/* Bottom Right Badge & Action Buttons */}
                     <div className="flex flex-wrap items-center gap-3">
                       <div className="flex items-center gap-1.5">
-                        <span className="bg-[#dbeafe] text-[#2563eb] px-1.5 py-0.5 rounded-xs text-[10px] font-bold tracking-wide uppercase">
-                          {quote.jobType?.toUpperCase() || "PEMB"}
+                        <span className={`px-1.5 py-0.5 rounded-xs text-[10px] font-bold tracking-wide uppercase ${
+                          isStorage ? "bg-amber-100 text-amber-900" : "bg-[#dbeafe] text-[#2563eb]"
+                        }`}>
+                          {isStorage ? "STORAGE COG" : quote.jobType?.toUpperCase() || "PEMB"}
                         </span>
                         <span className="text-xs text-slate-500 font-normal">
-                          Vendor blend
+                          {isStorage ? "Mini storage" : "Vendor blend"}
                         </span>
                       </div>
 
