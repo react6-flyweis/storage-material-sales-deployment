@@ -49,6 +49,20 @@ export interface QuotationState {
   marginTargetMargin: string;
   marginFixedSellOverride: string;
 
+  // Storage Specific State
+  storageData: Record<string, unknown> | null;
+  storagePricing: Record<string, unknown> | null;
+  storageFileName: string;
+  storageEstimateId: string | null;
+  storageGlobalMarkup: number;
+  storageShipping: number;
+  storageDrawingsCost: number;
+  storageCustomerLeadName: string;
+  storageCustomerAddress: string;
+  storageCustomerEmail: string;
+  storageJobNumber: string;
+  storageDrawings: Array<{ name: string; data: string; includeInPackage: boolean }>;
+
   // Actions
   setJobType: (jobType: "PEMB" | "Storage") => void;
   setScope: (scope: "Supply" | "Install" | "Both") => void;
@@ -57,7 +71,26 @@ export interface QuotationState {
   setInstallSell: (sell: number) => void;
   setBlendPercentage: (percentage: number) => void;
   setInstallDifficulty: (installDifficulty: string) => void;
+  buildingSize: string;
+  setBuildingSize: (buildingSize: string) => void;
   setSquareFootage: (squareFootage: number) => void;
+
+  // Storage Actions
+  setStorageData: (data: Record<string, unknown> | null) => void;
+  setStoragePricing: (pricing: Record<string, unknown> | null) => void;
+  setStorageFileName: (fileName: string) => void;
+  setStorageEstimateId: (id: string | null) => void;
+  setStorageGlobalMarkup: (markup: number) => void;
+  setStorageShipping: (shipping: number) => void;
+  setStorageDrawingsCost: (cost: number) => void;
+  setStorageCustomerLeadName: (name: string) => void;
+  setStorageCustomerAddress: (address: string) => void;
+  setStorageCustomerEmail: (email: string) => void;
+  setStorageJobNumber: (jobNumber: string) => void;
+  setStorageDrawings: (
+    drawings: Array<{ name: string; data: string; includeInPackage: boolean }>
+  ) => void;
+  resetStorageState: () => void;
 
   // Concrete Actions
   setConcreteInclude: (concreteInclude: boolean) => void;
@@ -114,6 +147,7 @@ export const useQuotationStore = create<QuotationState>((set) => ({
   installSell: 9.0,
   blendPercentage: 50,
   installDifficulty: "medium",
+  buildingSize: "",
   squareFootage: 0,
 
   // Concrete initial state
@@ -166,6 +200,21 @@ export const useQuotationStore = create<QuotationState>((set) => ({
   marginTargetMargin: "",
   marginFixedSellOverride: "",
 
+
+  // Storage initial state
+  storageData: null,
+  storagePricing: null,
+  storageFileName: "",
+  storageEstimateId: null,
+  storageGlobalMarkup: 25,
+  storageShipping: 12000,
+  storageDrawingsCost: 0,
+  storageCustomerLeadName: "",
+  storageCustomerAddress: "",
+  storageCustomerEmail: "",
+  storageJobNumber: "",
+  storageDrawings: [],
+
   // General Setters
   setJobType: (jobType) => set({ jobType }),
   setScope: (scope) => set({ scope }),
@@ -174,7 +223,40 @@ export const useQuotationStore = create<QuotationState>((set) => ({
   setInstallSell: (installSell) => set({ installSell }),
   setBlendPercentage: (blendPercentage) => set({ blendPercentage }),
   setInstallDifficulty: (installDifficulty) => set({ installDifficulty }),
+  setBuildingSize: (buildingSize) => set({ buildingSize }),
   setSquareFootage: (squareFootage) => set({ squareFootage }),
+
+  // Storage Actions
+  setStorageData: (storageData) => set({ storageData }),
+  setStoragePricing: (storagePricing) => set({ storagePricing }),
+  setStorageFileName: (storageFileName) => set({ storageFileName }),
+  setStorageEstimateId: (storageEstimateId) => set({ storageEstimateId }),
+  setStorageGlobalMarkup: (storageGlobalMarkup) => set({ storageGlobalMarkup }),
+  setStorageShipping: (storageShipping) => set({ storageShipping }),
+  setStorageDrawingsCost: (storageDrawingsCost) => set({ storageDrawingsCost }),
+  setStorageCustomerLeadName: (storageCustomerLeadName) =>
+    set({ storageCustomerLeadName }),
+  setStorageCustomerAddress: (storageCustomerAddress) =>
+    set({ storageCustomerAddress }),
+  setStorageCustomerEmail: (storageCustomerEmail) =>
+    set({ storageCustomerEmail }),
+  setStorageJobNumber: (storageJobNumber) => set({ storageJobNumber }),
+  setStorageDrawings: (storageDrawings) => set({ storageDrawings }),
+  resetStorageState: () =>
+    set({
+      storageData: null,
+      storagePricing: null,
+      storageFileName: "",
+      storageEstimateId: null,
+      storageGlobalMarkup: 25,
+      storageShipping: 12000,
+      storageDrawingsCost: 0,
+      storageCustomerLeadName: "",
+      storageCustomerAddress: "",
+      storageCustomerEmail: "",
+      storageJobNumber: "",
+      storageDrawings: [],
+    }),
 
   // Concrete Actions
   setConcreteInclude: (concreteInclude) => set({ concreteInclude }),
