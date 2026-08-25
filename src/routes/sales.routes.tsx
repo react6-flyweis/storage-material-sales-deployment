@@ -120,6 +120,12 @@ const UploadDrawingPage = lazy(
 const ExtractedDrawingPage = lazy(
   () => import("@/modules/quotation-generator/pages/extracted-drawing-page"),
 );
+const StorageQuotePage = lazy(
+  () => import("@/modules/quotation-generator/pages/storage-quote-page"),
+);
+const StoragePreviewPage = lazy(
+  () => import("@/modules/quotation-generator/pages/storage-preview-page"),
+);
 const QuotePreviewPage = lazy(
   () => import("@/modules/quotation-generator/pages/quote-preview-page"),
 );
@@ -377,10 +383,15 @@ export const salesRoutes: RouteObject[] = [
             children: [
               { index: true, element: <CreateQuotationPage /> },
               { path: "create", element: <CreateQuotationPage /> },
+              { path: "custom", element: <CreateQuotationPage /> },
               { path: "upload-drawing", element: <UploadDrawingPage /> },
               { path: "extracted-drawing", element: <ExtractedDrawingPage /> },
+              { path: "storage", element: <StorageQuotePage /> },
+              { path: "storage-cog", element: <StorageQuotePage /> },
+              { path: "storage-preview", element: <StoragePreviewPage /> },
               { path: "quote-preview", element: <QuotePreviewPage /> },
               { path: "history", element: <QuoteHistoryPage /> },
+              { path: "quote-history", element: <QuoteHistoryPage /> },
               { path: "pricing-rules", element: <PricingRulesPage /> },
             ],
           },
