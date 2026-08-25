@@ -39,8 +39,11 @@ function normalizeRoof(roof: string): string {
   return r.replace(/\s+/g, "-") || "screw-down";
 }
 
-function normalizeScope(scope: string): string {
-  return (scope || "both").toLowerCase();
+function normalizeScope(scope?: string): "Supply" | "Install" | "Both" {
+  const s = (scope || "Both").toLowerCase();
+  if (s === "supply") return "Supply";
+  if (s === "install") return "Install";
+  return "Both";
 }
 
 const tabs = [
