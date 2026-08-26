@@ -168,7 +168,7 @@ const navigationGroups: NavigationGroup[] = [
     hiddenFromSidebar: false,
     items: [
       { sectionHeader: "QUOTING" },
-      { path: "/quotation/create", label: "PEMB Quote", icon: pembIcon },
+      { path: "/quotation/pemb", label: "PEMB Quote", icon: pembIcon },
       { path: "/quotation/storage-cog", label: "Storage COG Sheet", icon: storageCogIcon },
       { path: "/quotation/quote-preview", label: "Quote Preview", icon: quotePreviewIcon },
       { path: "/quotation/custom", label: "Custom Quote", icon: customQuoteIcon },
