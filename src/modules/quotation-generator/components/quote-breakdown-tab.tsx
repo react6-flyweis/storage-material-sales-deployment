@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { Edit3, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 import type { ExtractShipperResponseData } from "../estimates.api";
 
 interface QuoteBreakdownTabProps {
@@ -45,6 +46,7 @@ export function QuoteBreakdownTab({
   isSavingDraft,
   extractedShipper,
 }: QuoteBreakdownTabProps) {
+  const { scope } = useQuotationStore();
   const pricing = extractedShipper?.pricing;
 
   const totalSell = pricing?.totSell != null ? `$${pricing.totSell.toLocaleString()}` : "-";
@@ -62,6 +64,13 @@ export function QuoteBreakdownTab({
 
   const rows = pricing?.rows;
 
+  const scopeLabel =
+    scope?.toLowerCase() === "supply"
+      ? "Supply Only"
+      : scope?.toLowerCase() === "install"
+      ? "Install Only"
+      : "Supply & Install";
+
   return (
     <div className="space-y-6">
       {/* Summary KPI Metric Cards */}
@@ -73,7 +82,7 @@ export function QuoteBreakdownTab({
             TOTAL SELL
           </span>
           <div className="text-lg font-extrabold text-slate-900 mt-1">{totalSell}</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">Install Only</div>
+          <div className="text-[11px] text-slate-500 mt-0.5">{scopeLabel}</div>
         </div>
 
         {/* MATERIAL COST */}
@@ -168,9 +177,15 @@ export function QuoteBreakdownTab({
                       {r.label}
                     </span>
                   </td>
-                  <td className="p-3 font-semibold text-slate-900">{r.wt?.toLocaleString()}</td>
-                  <td className="p-3 text-slate-600">{typeof r.rate === "number" ? `$${r.rate}/lb` : r.rate}</td>
-                  <td className="p-3 font-bold text-slate-900">${r.price?.toLocaleString()}</td>
+                  <td className="p-3 font-semibold text-slate-900">
+                    {r.wt != null ? Number(r.wt).toLocaleString() : "-"}
+                  </td>
+                  <td className="p-3 text-slate-600">
+                    {typeof r.rate === "number" ? `$${r.rate}/lb` : r.rate || "-"}
+                  </td>
+                  <td className="p-3 font-bold text-slate-900">
+                    {r.price != null ? `$${Math.round(r.price).toLocaleString()}` : "-"}
+                  </td>
                   <td className="p-3 text-slate-500">{r.notes || "-"}</td>
                 </tr>
               ))
@@ -182,10 +197,12 @@ export function QuoteBreakdownTab({
                       {tab.sheetName}
                     </span>
                   </td>
-                  <td className="p-3 font-semibold text-slate-900">{tab.weightLbs?.toLocaleString()}</td>
+                  <td className="p-3 font-semibold text-slate-900">
+                    {tab.weightLbs != null ? tab.weightLbs.toLocaleString() : "-"}
+                  </td>
                   <td className="p-3 text-slate-600">-</td>
                   <td className="p-3 font-bold text-slate-900">-</td>
-                  <td className="p-3 text-slate-500">{tab.category}</td>
+                  <td className="p-3 text-slate-500">{tab.category || "-"}</td>
                 </tr>
               ))
             ) : (
@@ -200,7 +217,7 @@ export function QuoteBreakdownTab({
             <tr className="bg-slate-50/90 font-bold border-t border-slate-200">
               <td className="p-3 text-slate-900 font-bold">Material total</td>
               <td className="p-3 text-slate-900 font-bold">
-                {totalWeight != null ? `${totalWeight.toLocaleString()} lbs` : "-"}
+                {totalWeight != null ? `${Number(totalWeight).toLocaleString()} lbs` : "-"}
               </td>
               <td className="p-3"></td>
               <td className="p-3 text-slate-900 font-bold">{matCost}</td>
@@ -212,7 +229,7 @@ export function QuoteBreakdownTab({
               <td className="p-3"></td>
               <td className="p-3"></td>
               <td className="p-3 font-semibold text-slate-900">
-                {pricing?.freight != null ? `$${pricing.freight.toLocaleString()}` : "$1,236"}
+                {pricing?.freight != null ? `$${Math.round(pricing.freight).toLocaleString()}` : "$0"}
               </td>
               <td className="p-3"></td>
             </tr>
@@ -222,7 +239,7 @@ export function QuoteBreakdownTab({
               <td className="p-3"></td>
               <td className="p-3"></td>
               <td className="p-3 font-semibold text-slate-900">
-                {pricing?.instCost != null ? `$${pricing.instCost.toLocaleString()}` : "$223,438"}
+                {pricing?.instCost != null ? `$${Math.round(pricing.instCost).toLocaleString()}` : "$0"}
               </td>
               <td className="p-3"></td>
             </tr>
@@ -232,7 +249,7 @@ export function QuoteBreakdownTab({
               <td className="p-3"></td>
               <td className="p-3"></td>
               <td className="p-3 text-slate-900 font-bold">
-                {pricing?.totCost != null ? `$${pricing.totCost.toLocaleString()}` : "$392,101"}
+                {pricing?.totCost != null ? `$${Math.round(pricing.totCost).toLocaleString()}` : "-"}
               </td>
               <td className="p-3"></td>
             </tr>
@@ -242,7 +259,7 @@ export function QuoteBreakdownTab({
               <td className="p-3"></td>
               <td className="p-3"></td>
               <td className="p-3 font-semibold text-slate-900">
-                {pricing?.instSell != null ? `$${pricing.instSell.toLocaleString()}` : "$326,563"}
+                {pricing?.instSell != null ? `$${Math.round(pricing.instSell).toLocaleString()}` : "$0"}
               </td>
               <td className="p-3"></td>
             </tr>
