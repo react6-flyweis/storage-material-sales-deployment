@@ -86,6 +86,8 @@ export default function StorageQuotePage() {
         customerAddress?: string;
         customerEmail?: string;
         jobNumber?: string;
+        buildingSize?: string;
+        squareFootage?: number;
       },
     [location.state]
   );
@@ -262,9 +264,9 @@ export default function StorageQuotePage() {
           buildingType: lead?.buildingType,
           location: lead?.location,
         },
-        customer ? { firstName: customer.firstName, lastName: customer.lastName } : null
+        customer ? { firstName: customer.firstName } : null
       ) ||
-      (customer ? `${customer.firstName || ""} ${customer.lastName || ""}`.trim() : "") ||
+      customer?.firstName ||
       lookupItem?.projectName ||
       "";
 
@@ -626,7 +628,7 @@ export default function StorageQuotePage() {
       const data = res.data || res;
       const savedId = data?.estimate?._id || data?._id;
       if (savedId) {
-        setEstimateId(savedId);
+        setStorageEstimateId(savedId);
       }
       setFeedbackMsg({
         type: "success",
@@ -2318,21 +2320,23 @@ export default function StorageQuotePage() {
                     System
                   </div>
                   <div className="space-y-1.5">
-                    {(["vinyl", "double", "spray"] as const).map((s) => (
+                    {(
+                      [
+                        { id: "Vinyl-backed (single layer)", label: "Vinyl-Backed Batt" },
+                        { id: "Double-layer system", label: "Double-Layer Batt" },
+                        { id: "Spray Foam", label: "Spray Foam" },
+                      ] as const
+                    ).map((s) => (
                       <button
-                        key={s}
+                        key={s.id}
                         type="button"
-                        onClick={() => setInsulationSystem(s)}
-                        className={`w-full py-1.5 px-3 rounded-lg text-xs font-bold border transition-all text-left cursor-pointer ${insulationSystem === s
+                        onClick={() => setInsulationSystem(s.id)}
+                        className={`w-full py-1.5 px-3 rounded-lg text-xs font-bold border transition-all text-left cursor-pointer ${insulationSystem === s.id
                           ? "bg-purple-100 border-purple-600 text-purple-900"
                           : "bg-slate-50 border-slate-200 text-slate-700"
                           }`}
                       >
-                        {s === "vinyl"
-                          ? "Vinyl-Backed Batt"
-                          : s === "double"
-                            ? "Double-Layer Batt"
-                            : "Spray Foam"}
+                        {s.label}
                       </button>
                     ))}
                   </div>
@@ -2426,8 +2430,8 @@ export default function StorageQuotePage() {
                       files.forEach((file) => {
                         const reader = new FileReader();
                         reader.onload = (ev) => {
-                          setStorageDrawings((prev) => [
-                            ...prev,
+                          setStorageDrawings([
+                            ...storageDrawings,
                             {
                               name: file.name,
                               data: ev.target?.result as string,
