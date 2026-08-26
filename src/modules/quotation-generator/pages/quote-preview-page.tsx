@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router";
-import { ArrowLeft, Printer, FolderUp, Loader2 } from "lucide-react";
+import { ArrowLeft, Printer, FolderUp, Loader2, FileSearch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
@@ -22,7 +22,6 @@ export function QuotePreviewPage() {
 
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [isSavingEstimate, setIsSavingEstimate] = useState(false);
-  const [estimateId, setEstimateId] = useState<string | null>(null);
 
   const navState = (location.state || {}) as {
     quotationForm?: Record<string, string>;
@@ -32,7 +31,12 @@ export function QuotePreviewPage() {
     buildingSize?: string;
     additionalNotes?: string;
     pdfFileName?: string;
+    estimateId?: string;
   };
+
+  const [estimateId, setEstimateId] = useState<string | null>(
+    navState.estimateId || null
+  );
 
   const { jobType, scope } = useQuotationStore();
 
@@ -60,17 +64,26 @@ export function QuotePreviewPage() {
     "Steel_Building_Preliminary_Drawing_Vector.pdf";
 
   // File state for PDF dropzone
-  const [selectedPdf, setSelectedPdf] = useState<{ name: string; url?: string } | null>({
+  const [selectedPdf, setSelectedPdf] = useState<{
+    name: string;
+    url?: string;
+  } | null>({
     name: initialPdfName,
   });
 
   const handleScrollToPreview = () => {
-    previewSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    previewSectionRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
   };
 
   const handlePrint = () => {
     const originalTitle = document.title;
-    const safeCustomer = (customerLeadName || "Quote").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const safeCustomer = (customerLeadName || "Quote").replace(
+      /[^a-zA-Z0-9_-]/g,
+      "_"
+    );
     document.title = `Quote_Package_${safeCustomer}`;
     window.print();
     document.title = originalTitle;
@@ -86,19 +99,32 @@ export function QuotePreviewPage() {
         cityStateZip: customerAddress,
         buildingSize: displayBuildingSize,
         squareFootage: effectiveSqFt,
-        jobNumber: navState.quotationForm?.jobNumber || navState.extractedDrawing?.extracted?.jobnumber || "",
+        jobNumber:
+          navState.quotationForm?.jobNumber ||
+          navState.extractedDrawing?.extracted?.jobnumber ||
+          "",
         pricingResult: navState.extractedShipper?.pricing,
-        fullQuote: navState.extractedShipper?.fullQuote || (navState.extractedShipper?.pricing as Record<string, unknown> | undefined),
+        fullQuote:
+          navState.extractedShipper?.fullQuote ||
+          (navState.extractedShipper?.pricing as
+            | Record<string, unknown>
+            | undefined),
         extractedDrawingFields: navState.extractedDrawing?.extracted,
-        drawingAttachments: selectedPdf ? [{ name: selectedPdf.name, includeInQuote: true }] : [],
-        sections: selectedPdf ? ["quote", "sow", "contract", "drawings"] : ["quote", "sow", "contract"],
+        drawingAttachments: selectedPdf
+          ? [{ name: selectedPdf.name, includeInQuote: true }]
+          : [],
+        sections: selectedPdf
+          ? ["quote", "sow", "contract", "drawings"]
+          : ["quote", "sow", "contract"],
       };
       const res = await downloadPdfProvider(payload, estimateId || undefined);
       const pdfData = res.data || res;
       if (pdfData?.fileBase64) {
         const a = document.createElement("a");
         a.href = `data:${pdfData.mimeType || "application/pdf"};base64,${pdfData.fileBase64}`;
-        a.download = pdfData.fileName || `Quote_${(customerLeadName || "Package").replace(/\s+/g, "_")}.pdf`;
+        a.download =
+          pdfData.fileName ||
+          `Quote_${(customerLeadName || "Package").replace(/\s+/g, "_")}.pdf`;
         a.click();
       } else {
         handlePrint();
@@ -118,20 +144,36 @@ export function QuotePreviewPage() {
         {
           _id: estimateId || undefined,
           jobType,
-          scope: (scope || "Both").toLowerCase() === "supply" ? "Supply" : (scope || "Both").toLowerCase() === "install" ? "Install" : "Both",
+          scope:
+            (scope || "Both").toLowerCase() === "supply"
+              ? "Supply"
+              : (scope || "Both").toLowerCase() === "install"
+              ? "Install"
+              : "Both",
           leadCompanyName: customerLeadName,
           customerEmail,
           streetAddress: navState.quotationForm?.street || "",
-          cityStateZip: navState.quotationForm?.cityStateZip || customerAddress,
+          cityStateZip:
+            navState.quotationForm?.cityStateZip || customerAddress,
           buildingSize: displayBuildingSize,
           squareFootage: effectiveSqFt,
           sf: effectiveSqFt,
-          jobNumber: navState.quotationForm?.jobNumber || navState.extractedDrawing?.extracted?.jobnumber || "",
-          sourceFileName: navState.pdfFileName || navState.extractedShipper?.fileName || "",
+          jobNumber:
+            navState.quotationForm?.jobNumber ||
+            navState.extractedDrawing?.extracted?.jobnumber ||
+            "",
+          sourceFileName:
+            navState.pdfFileName ||
+            navState.extractedShipper?.fileName ||
+            "",
           parsedCategories: navState.extractedShipper?.parsedCategories,
           tabSummary: navState.extractedShipper?.tabSummary,
           pricingResult: navState.extractedShipper?.pricing,
-          fullQuoteResult: navState.extractedShipper?.fullQuote || (navState.extractedShipper?.pricing as Record<string, unknown> | undefined),
+          fullQuoteResult:
+            navState.extractedShipper?.fullQuote ||
+            (navState.extractedShipper?.pricing as
+              | Record<string, unknown>
+              | undefined),
           extractedDrawingFields: navState.extractedDrawing?.extracted,
           status: "draft",
         },
@@ -143,10 +185,10 @@ export function QuotePreviewPage() {
       if (savedId) {
         setEstimateId(savedId);
       }
-      navigate("/quotation/history");
+      navigate("/quotation/quote-preview");
     } catch (err) {
       console.error("Failed to save estimate to history:", err);
-      navigate("/quotation/history");
+      navigate("/quotation/quote-preview");
     } finally {
       setIsSavingEstimate(false);
     }
@@ -173,6 +215,14 @@ export function QuotePreviewPage() {
     setSelectedPdf(null);
   };
 
+  const hasData = Boolean(
+    navState.extractedShipper ||
+    navState.quotationForm ||
+    navState.extractedDrawing ||
+    navState.sqFt ||
+    navState.buildingSize
+  );
+
   return (
     <div className="space-y-6 p-6">
       {/* Top Action Header Bar */}
@@ -180,11 +230,11 @@ export function QuotePreviewPage() {
         <div className="flex items-center gap-3">
           <Button
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={() => navigate("/quotation/quote-preview")}
             className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 cursor-pointer shadow-xs"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back
+            Back to Preview List
           </Button>
           <div>
             <h1 className="text-2xl font-bold text-slate-900 leading-tight">
@@ -221,6 +271,29 @@ export function QuotePreviewPage() {
           </Button>
         </div>
       </div>
+
+      {!hasData && (
+        <Card className="p-8 text-center bg-blue-50/50 border border-blue-200 rounded-xl mb-4">
+          <div className="flex flex-col items-center justify-center gap-3">
+            <FileSearch className="h-8 w-8 text-blue-600" />
+            <div>
+              <h3 className="text-sm font-bold text-slate-800">
+                Viewing Default Quote Template
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                You can select a specific quote package from the Quote Preview Hub to inspect its custom document.
+              </p>
+            </div>
+            <Button
+              type="button"
+              onClick={() => navigate("/quotation/quote-preview")}
+              className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-xs font-semibold px-4 py-2 rounded-lg cursor-pointer"
+            >
+              Browse Quote Packages
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* Main Content Area */}
       <div className="space-y-6 w-full max-w-5xl print:max-w-none print:w-full">
@@ -320,7 +393,11 @@ export function QuotePreviewPage() {
           customerLegalName={customerLeadName}
           customerAddress={customerAddress}
           totalContractValue={totalSellFormatted}
-          contractType={scope?.toLowerCase() === "both" ? "Supply, Delivery & Erection" : "Supply & Delivery Only"}
+          contractType={
+            scope?.toLowerCase() === "both"
+              ? "Supply, Delivery & Erection"
+              : "Supply & Delivery Only"
+          }
         />
       </div>
     </div>
