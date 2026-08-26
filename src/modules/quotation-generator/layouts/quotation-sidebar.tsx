@@ -43,7 +43,8 @@ export function QuotationSidebar({
     : location.pathname.includes("/quotation/create")
     ? "custom-quote"
     : location.pathname.includes("/quotation/extracted-drawing") ||
-      location.pathname.includes("/quotation/upload-drawing")
+      location.pathname.includes("/quotation/upload-drawing") ||
+      location.pathname.includes("/quotation/pemb")
     ? "pemb-quote"
     : "pemb-quote";
 
@@ -125,7 +126,7 @@ export function QuotationSidebar({
               <button
                 onClick={() => {
                   setJobType("PEMB");
-                  navigate("/quotation/extracted-drawing");
+                  navigate("/quotation/pemb");
                 }}
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-150 text-left cursor-pointer",
@@ -238,7 +239,7 @@ export function QuotationSidebar({
                   onClick={() => {
                     setJobType("PEMB");
                     if (location.pathname.includes("/quotation/storage")) {
-                      navigate("/quotation/extracted-drawing");
+                      navigate("/quotation/pemb");
                     }
                   }}
                   className={cn(
