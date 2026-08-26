@@ -1,4 +1,8 @@
 import { create } from "zustand";
+import type {
+  ExtractDrawingResponseData,
+  ExtractShipperResponseData,
+} from "./estimates.api";
 
 export interface QuotationState {
   // Shared fields between Sidebar, Sticky Header, and Quotation Views
@@ -10,6 +14,21 @@ export interface QuotationState {
   blendPercentage: number;
   installDifficulty: string;
   squareFootage: number;
+
+  // PEMB Specific State
+  pembLeadId: string;
+  pembLeadName: string;
+  pembEmail: string;
+  pembStreet: string;
+  pembCityStateZip: string;
+  pembJobNumber: string;
+  pembBuildingSize: string;
+  pembSquareFootage: string;
+  pembQuoteDate: string;
+  pembExtractedDrawing: ExtractDrawingResponseData | null;
+  pembExtractedShipper: ExtractShipperResponseData | null;
+  pembPdfFileName: string;
+  pembEstimateId: string | null;
 
   // Concrete settings
   concreteInclude: boolean;
@@ -74,6 +93,24 @@ export interface QuotationState {
   buildingSize: string;
   setBuildingSize: (buildingSize: string) => void;
   setSquareFootage: (squareFootage: number) => void;
+
+  // PEMB Actions
+  setPembLeadData: (data: {
+    leadId?: string;
+    leadName?: string;
+    email?: string;
+    street?: string;
+    cityStateZip?: string;
+    jobNumber?: string;
+    buildingSize?: string;
+    squareFootage?: string;
+    quoteDate?: string;
+  }) => void;
+  setPembExtractedDrawing: (data: ExtractDrawingResponseData | null) => void;
+  setPembExtractedShipper: (data: ExtractShipperResponseData | null) => void;
+  setPembPdfFileName: (fileName: string) => void;
+  setPembEstimateId: (id: string | null) => void;
+  resetPembState: () => void;
 
   // Storage Actions
   setStorageData: (data: Record<string, unknown> | null) => void;
@@ -141,12 +178,12 @@ export interface QuotationState {
 
 export const useQuotationStore = create<QuotationState>((set) => ({
   jobType: "PEMB",
-  scope: "Both",
+  scope: "Supply",
   roofType: "screw-down",
-  installCost: 5.85,
-  installSell: 9.0,
+  installCost: 5.5,
+  installSell: 8.5,
   blendPercentage: 50,
-  installDifficulty: "medium",
+  installDifficulty: "easy",
   buildingSize: "",
   squareFootage: 0,
 
@@ -189,9 +226,9 @@ export const useQuotationStore = create<QuotationState>((set) => ({
 
   // COGS Override initial state
   cogsOverrideApplied: false,
-  cogsCostInput: "525000",
+  cogsCostInput: "",
   cogsCostAdjustPercent: 0,
-  cogsMaterialMargin: 20,
+  cogsMaterialMargin: 0,
   cogsFixedSellPrice: "",
 
   // Margin Override initial state
@@ -200,6 +237,21 @@ export const useQuotationStore = create<QuotationState>((set) => ({
   marginTargetMargin: "",
   marginFixedSellOverride: "",
 
+
+  // PEMB initial state
+  pembLeadId: "",
+  pembLeadName: "",
+  pembEmail: "",
+  pembStreet: "",
+  pembCityStateZip: "",
+  pembJobNumber: "",
+  pembBuildingSize: "",
+  pembSquareFootage: "",
+  pembQuoteDate: "",
+  pembExtractedDrawing: null,
+  pembExtractedShipper: null,
+  pembPdfFileName: "",
+  pembEstimateId: null,
 
   // Storage initial state
   storageData: null,
@@ -216,7 +268,27 @@ export const useQuotationStore = create<QuotationState>((set) => ({
   storageDrawings: [],
 
   // General Setters
-  setJobType: (jobType) => set({ jobType }),
+  setJobType: (jobType) =>
+    set((state) => ({
+      jobType,
+      ...(jobType === "Storage"
+        ? {
+          installCost:
+            state.installCost === 5.5 || state.installCost === 5.85
+              ? 2.5
+              : state.installCost,
+          installSell:
+            state.installSell === 8.5 || state.installSell === 9.0
+              ? 3.25
+              : state.installSell,
+        }
+        : {
+          installCost:
+            state.installCost === 2.5 ? 5.5 : state.installCost,
+          installSell:
+            state.installSell === 3.25 ? 8.5 : state.installSell,
+        }),
+    })),
   setScope: (scope) => set({ scope }),
   setRoofType: (roofType) => set({ roofType }),
   setInstallCost: (installCost) => set({ installCost }),
@@ -225,6 +297,44 @@ export const useQuotationStore = create<QuotationState>((set) => ({
   setInstallDifficulty: (installDifficulty) => set({ installDifficulty }),
   setBuildingSize: (buildingSize) => set({ buildingSize }),
   setSquareFootage: (squareFootage) => set({ squareFootage }),
+
+  // PEMB Actions
+  setPembLeadData: (data) =>
+    set((state) => ({
+      pembLeadId: data.leadId !== undefined ? data.leadId : state.pembLeadId,
+      pembLeadName: data.leadName !== undefined ? data.leadName : state.pembLeadName,
+      pembEmail: data.email !== undefined ? data.email : state.pembEmail,
+      pembStreet: data.street !== undefined ? data.street : state.pembStreet,
+      pembCityStateZip: data.cityStateZip !== undefined ? data.cityStateZip : state.pembCityStateZip,
+      pembJobNumber: data.jobNumber !== undefined ? data.jobNumber : state.pembJobNumber,
+      pembBuildingSize: data.buildingSize !== undefined ? data.buildingSize : state.pembBuildingSize,
+      pembSquareFootage: data.squareFootage !== undefined ? data.squareFootage : state.pembSquareFootage,
+      pembQuoteDate: data.quoteDate !== undefined ? data.quoteDate : state.pembQuoteDate,
+      buildingSize: data.buildingSize || state.buildingSize,
+      squareFootage: data.squareFootage
+        ? parseFloat(data.squareFootage) || state.squareFootage
+        : state.squareFootage,
+    })),
+  setPembExtractedDrawing: (pembExtractedDrawing) => set({ pembExtractedDrawing }),
+  setPembExtractedShipper: (pembExtractedShipper) => set({ pembExtractedShipper }),
+  setPembPdfFileName: (pembPdfFileName) => set({ pembPdfFileName }),
+  setPembEstimateId: (pembEstimateId) => set({ pembEstimateId }),
+  resetPembState: () =>
+    set({
+      pembLeadId: "",
+      pembLeadName: "",
+      pembEmail: "",
+      pembStreet: "",
+      pembCityStateZip: "",
+      pembJobNumber: "",
+      pembBuildingSize: "",
+      pembSquareFootage: "",
+      pembQuoteDate: "",
+      pembExtractedDrawing: null,
+      pembExtractedShipper: null,
+      pembPdfFileName: "",
+      pembEstimateId: null,
+    }),
 
   // Storage Actions
   setStorageData: (storageData) => set({ storageData }),
@@ -337,9 +447,9 @@ export const useQuotationStore = create<QuotationState>((set) => ({
   resetCogsSettings: () =>
     set({
       cogsOverrideApplied: false,
-      cogsCostInput: "525000",
+      cogsCostInput: "",
       cogsCostAdjustPercent: 0,
-      cogsMaterialMargin: 20,
+      cogsMaterialMargin: 0,
       cogsFixedSellPrice: "",
     }),
 
