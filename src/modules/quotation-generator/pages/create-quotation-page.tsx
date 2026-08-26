@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { useLeadsLookupQuery, useLeadDetailQuery } from "@/modules/leads/leads.hooks";
 import { getLeadProjectName } from "@/modules/leads/leads.utils";
+import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 
 const createQuotationSchema = z.object({
   leadId: z.string().min(1, "Lead selection is required"),
@@ -35,11 +36,16 @@ export default function CreateQuotationPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+  const {
+    setPembLeadData,
+    pembLeadId,
+  } = useQuotationStore();
 
   const initialLeadId =
     searchParams.get("lead") ||
     searchParams.get("leadId") ||
     (location.state as { leadId?: string })?.leadId ||
+    pembLeadId ||
     "";
 
   // Fetch leads lookup list
@@ -170,7 +176,8 @@ export default function CreateQuotationPage() {
 
   const onSubmit = (data: CreateQuotationFormValues) => {
     console.log("Quotation Form Data:", data);
-    navigate("/quotation/upload-drawing", { state: { quotationForm: data } });
+    setPembLeadData(data);
+    navigate("/quotation/pemb", { state: { quotationForm: data } });
   };
 
   return (
