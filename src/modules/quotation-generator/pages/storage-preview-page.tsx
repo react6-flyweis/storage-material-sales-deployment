@@ -142,9 +142,25 @@ export function StoragePreviewPage() {
           storageData?.buildings?.map((b) => `${b.width}x${b.length}`).join(", ") ||
           "Storage Complex",
         squareFootage:
-          Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) || 0,
+          Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) ||
+          storageData?.buildings?.reduce(
+            (acc, b) =>
+              acc +
+              (Number(b.sqft || b.squareFootage) ||
+                Number(b.width || 0) * Number(b.length || 0)),
+            0
+          ) ||
+          0,
         sf:
-          Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) || 0,
+          Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) ||
+          storageData?.buildings?.reduce(
+            (acc, b) =>
+              acc +
+              (Number(b.sqft || b.squareFootage) ||
+                Number(b.width || 0) * Number(b.length || 0)),
+            0
+          ) ||
+          0,
         pricingResult: storagePricing as Record<string, unknown>,
         storagePricingResult: storagePricing as Record<string, unknown>,
         storagePricing: storagePricing as Record<string, unknown>,
