@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { ArrowLeft, Search, Trash2, ExternalLink, Loader2, RefreshCw } from "lucide-react";
+import { ArrowLeft, Search, Trash2, ExternalLink, Loader2, RefreshCw, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   InputGroup,
@@ -14,11 +14,13 @@ import {
   getEstimateByIdProvider,
   type SaveEstimatePayload,
 } from "../estimates.api";
+import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 
 export function QuoteHistoryPage() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingItem, setIsLoadingItem] = useState<string | null>(null);
   const [estimatesList, setEstimatesList] = useState<SaveEstimatePayload[]>([]);
   const [summaryData, setSummaryData] = useState<{
     totalQuotes?: number;
@@ -70,17 +72,95 @@ export function QuoteHistoryPage() {
     try {
       let estimate = item;
       if (item._id) {
-        const res = await getEstimateByIdProvider(item._id);
-        const fetchedData = res.data || res;
-        if ((fetchedData as Record<string, unknown>)?.estimate) {
-          estimate = (fetchedData as Record<string, unknown>).estimate as SaveEstimatePayload;
-        } else if (fetchedData) {
-          estimate = fetchedData as SaveEstimatePayload;
+        setIsLoadingItem(item._id);
+        try {
+          const res = await getEstimateByIdProvider(item._id);
+          const fetchedData = res.data || res;
+          if ((fetchedData as Record<string, unknown>)?.estimate) {
+            estimate = (fetchedData as Record<string, unknown>).estimate as SaveEstimatePayload;
+          } else if (fetchedData && typeof fetchedData === "object" && !Array.isArray(fetchedData)) {
+            estimate = fetchedData as SaveEstimatePayload;
+          }
+        } catch (fetchErr) {
+          console.warn("Failed to fetch full estimate detail by ID, using item from list:", fetchErr);
+          estimate = item;
         }
       }
 
-      if (estimate.jobType === "Storage" || estimate.storageData) {
-        navigate("/quotation/storage", {
+      const isStorage =
+        estimate.jobType?.toUpperCase() === "STORAGE" ||
+        Boolean(estimate.storageData);
+
+      const store = useQuotationStore.getState();
+
+      // Synchronize addons & overrides if present
+      if (estimate.concreteAddon) {
+        if (estimate.concreteAddon.include !== undefined) store.setConcreteInclude(Boolean(estimate.concreteAddon.include));
+        if (estimate.concreteAddon.costSF !== undefined) store.setConcreteCostSf(Number(estimate.concreteAddon.costSF));
+        if (estimate.concreteAddon.marginPct !== undefined) store.setConcreteMarginPct(Number(estimate.concreteAddon.marginPct));
+        if (estimate.concreteAddon.slabThickness || estimate.concreteAddon.thickness) {
+          const thick = (estimate.concreteAddon.slabThickness || estimate.concreteAddon.thickness) as '4"' | '6"';
+          store.setConcreteSlabThickness(thick);
+        }
+        if (estimate.concreteAddon.psi || estimate.concreteAddon.psiRating) {
+          store.setConcretePsiRating(String(estimate.concreteAddon.psi || estimate.concreteAddon.psiRating));
+        }
+      }
+
+      if (estimate.insulationAddon) {
+        if (estimate.insulationAddon.include !== undefined) store.setInsulationInclude(Boolean(estimate.insulationAddon.include));
+        if (estimate.insulationAddon.system) store.setInsulationSystem(estimate.insulationAddon.system as "Vinyl-backed (single layer)" | "Double-layer system" | "Spray Foam");
+        if (estimate.insulationAddon.rRoof || estimate.insulationAddon.rValueRoof) {
+          store.setInsulationRValueRoof(String(estimate.insulationAddon.rRoof || estimate.insulationAddon.rValueRoof));
+        }
+        if (estimate.insulationAddon.rWall || estimate.insulationAddon.rValueWalls) {
+          store.setInsulationRValueWalls(String(estimate.insulationAddon.rWall || estimate.insulationAddon.rValueWalls));
+        }
+        if (estimate.insulationAddon.costSF !== undefined || estimate.insulationAddon.cogsSF !== undefined) {
+          store.setInsulationCogsSf(Number(estimate.insulationAddon.costSF ?? estimate.insulationAddon.cogsSF));
+        }
+        if (estimate.insulationAddon.marginPct !== undefined) {
+          store.setInsulationMarginPct(Number(estimate.insulationAddon.marginPct));
+        }
+      }
+
+      if (estimate.salesTax) {
+        if (estimate.salesTax.zip) store.setTaxZip(estimate.salesTax.zip);
+        if (estimate.salesTax.rate !== undefined) store.setTaxRate(Number(estimate.salesTax.rate));
+        if (estimate.salesTax.include !== undefined) store.setIncludeTax(Boolean(estimate.salesTax.include));
+      }
+
+      if (estimate.cogsOverride) {
+        store.setCogsOverrideApplied(Boolean(estimate.cogsOverride.applied));
+        if (estimate.cogsOverride.costDollar !== undefined) store.setCogsCostInput(String(estimate.cogsOverride.costDollar || ""));
+        if (estimate.cogsOverride.costPctAdj !== undefined) store.setCogsCostAdjustPercent(Number(estimate.cogsOverride.costPctAdj || 0));
+        if (estimate.cogsOverride.marginPct !== undefined) store.setCogsMaterialMargin(Number(estimate.cogsOverride.marginPct || 0));
+        if (estimate.cogsOverride.sellDollar !== undefined) store.setCogsFixedSellPrice(String(estimate.cogsOverride.sellDollar || ""));
+      }
+
+      if (estimate.marginOverride) {
+        store.setMarginOverrideApplied(Boolean(estimate.marginOverride.applied));
+        if (estimate.marginOverride.laborSF !== undefined) store.setMarginLaborOverride(String(estimate.marginOverride.laborSF || ""));
+        if (estimate.marginOverride.pct !== undefined) store.setMarginTargetMargin(String(estimate.marginOverride.pct || ""));
+        if (estimate.marginOverride.sellFixed !== undefined) store.setMarginFixedSellOverride(String(estimate.marginOverride.sellFixed || ""));
+      }
+
+      if (isStorage) {
+        store.setJobType("Storage");
+        if (estimate.scope) {
+          const normScope = estimate.scope.toLowerCase();
+          store.setScope(normScope === "supply" ? "Supply" : normScope === "install" ? "Install" : "Both");
+        }
+        store.setStorageData(estimate.storageData || null);
+        store.setStoragePricing(estimate.storagePricingResult || null);
+        store.setStorageEstimateId(estimate._id || null);
+        store.setStorageFileName(estimate.sourceFileName || "Storage_COG.xlsx");
+        store.setStorageCustomerLeadName(estimate.leadCompanyName || "");
+        store.setStorageCustomerAddress(estimate.cityStateZip || estimate.streetAddress || "");
+        store.setStorageCustomerEmail(estimate.customerEmail || "");
+        store.setStorageJobNumber(estimate.jobNumber || "");
+
+        navigate("/quotation/storage-cog", {
           state: {
             storageData: estimate.storageData,
             storagePricing: estimate.storagePricingResult,
@@ -96,21 +176,163 @@ export function QuoteHistoryPage() {
       }
 
       const pricingRes = estimate.pricingResult as Record<string, unknown> | undefined;
+      const effectiveSqFt = Number(estimate.squareFootage || estimate.sf || pricingRes?.totalSqFt || 0);
 
-      navigate("/quotation/extracted-drawing", {
+      store.setJobType("PEMB");
+      if (estimate.scope) {
+        const normScope = estimate.scope.toLowerCase();
+        store.setScope(normScope === "install" ? "Install" : normScope === "both" ? "Both" : "Supply");
+      }
+      if (estimate.roofType) {
+        store.setRoofType(String(estimate.roofType));
+      }
+      if (estimate.blendPct !== undefined) {
+        const bp = Number(estimate.blendPct);
+        store.setBlendPercentage(bp <= 1 && bp > 0 ? bp * 100 : bp);
+      }
+      if (estimate.installLevel || (estimate).installDifficulty) {
+        store.setInstallDifficulty(String(estimate.installLevel || (estimate).installDifficulty));
+      }
+      if (estimate.installCostPerSf) {
+        store.setInstallCost(Number(estimate.installCostPerSf));
+      }
+      if (estimate.sellPerSf) {
+        store.setInstallSell(Number(estimate.sellPerSf));
+      }
+      store.setPembEstimateId(estimate._id || null);
+      store.setSquareFootage(effectiveSqFt);
+      store.setBuildingSize(estimate.buildingSize || "");
+
+      const leadInfo = {
+        leadName: estimate.leadCompanyName || estimate.jobNumber || estimate.cityStateZip || "Saved Estimate",
+        email: estimate.customerEmail || "",
+        street: estimate.streetAddress || "",
+        cityStateZip: estimate.cityStateZip || "",
+        buildingSize: estimate.buildingSize || "",
+        squareFootage: String(effectiveSqFt || ""),
+        jobNumber: estimate.jobNumber || "",
+      };
+
+      store.setPembLeadData(leadInfo);
+
+      const pricingObj = (estimate.pricingResult || {}) as Record<string, unknown>;
+      if (!pricingObj.rows && (estimate).breakdownRows) {
+        pricingObj.rows = (estimate).breakdownRows;
+      }
+
+      const shipperData = {
+        fileName: estimate.sourceFileName || "Shipper.xlsx",
+        sheetCount: estimate.tabSummary?.length || 1,
+        totalWeightLbs: Number(estimate.totalWeightLbs || pricingRes?.totWt || 0),
+        squareFootage: effectiveSqFt,
+        tabSummary: estimate.tabSummary || [],
+        parsedCategories: estimate.parsedCategories,
+        pricing: pricingObj,
+        fullQuote: (estimate.fullQuoteResult || pricingObj),
+      };
+
+      store.setPembExtractedShipper(shipperData);
+
+      if (estimate.extractedDrawingFields) {
+        store.setPembExtractedDrawing({
+          fileName: estimate.sourceFileName || "Drawing.pdf",
+          textItemCount: 0,
+          filledCount: 0,
+          extracted: estimate.extractedDrawingFields,
+          rawTextPreview: "",
+        });
+      }
+
+      if (estimate.sourceFileName) {
+        store.setPembPdfFileName(estimate.sourceFileName);
+      }
+
+      navigate("/quotation/pemb", {
+        state: {
+          extractedShipper: shipperData,
+          extractedDrawing: estimate.extractedDrawingFields ? {
+            fileName: estimate.sourceFileName || "Drawing.pdf",
+            textItemCount: 0,
+            filledCount: 0,
+            extracted: estimate.extractedDrawingFields,
+            rawTextPreview: "",
+          } : undefined,
+          quotationForm: leadInfo,
+          estimateId: estimate._id,
+        },
+      });
+    } catch (err) {
+      console.error("Failed to load estimate detail:", err);
+    } finally {
+      setIsLoadingItem(null);
+    }
+  };
+
+  const handlePreviewQuote = async (item: SaveEstimatePayload) => {
+    try {
+      let estimate = item;
+      if (item._id) {
+        setIsLoadingItem(item._id);
+        try {
+          const res = await getEstimateByIdProvider(item._id);
+          const fetchedData = res.data || res;
+          if ((fetchedData as Record<string, unknown>)?.estimate) {
+            estimate = (fetchedData as Record<string, unknown>).estimate as SaveEstimatePayload;
+          } else if (fetchedData && typeof fetchedData === "object" && !Array.isArray(fetchedData)) {
+            estimate = fetchedData as SaveEstimatePayload;
+          }
+        } catch (fetchErr) {
+          console.warn("Failed to fetch full estimate detail for preview, using item from list:", fetchErr);
+          estimate = item;
+        }
+      }
+
+      const isStorage =
+        estimate.jobType?.toUpperCase() === "STORAGE" ||
+        Boolean(estimate.storageData);
+
+      if (isStorage) {
+        navigate("/quotation/storage-preview", {
+          state: {
+            storageData: estimate.storageData,
+            storagePricing: estimate.storagePricingResult,
+            estimateId: estimate._id,
+            sourceFileName: estimate.sourceFileName || "Storage_COG.xlsx",
+            customerLeadName: estimate.leadCompanyName || "",
+            customerAddress: estimate.cityStateZip || estimate.streetAddress || "",
+            customerEmail: estimate.customerEmail || "",
+            jobNumber: estimate.jobNumber || "",
+            scope: estimate.scope || "Both",
+            concreteInclude: estimate.concreteAddon?.include ?? false,
+            insulationInclude: estimate.insulationAddon?.include ?? false,
+            includeTax: estimate.salesTax?.include ?? true,
+            taxRate: estimate.salesTax?.rate ?? 0,
+          },
+        });
+        return;
+      }
+
+      const pricingRes = estimate.pricingResult as Record<string, unknown> | undefined;
+
+      navigate("/quotation/quote-preview/view", {
         state: {
           extractedShipper: {
             fileName: estimate.sourceFileName || "Shipper.xlsx",
             totalWeightLbs: (pricingRes?.totWt as number) || 0,
-            squareFootage: estimate.squareFootage || 0,
+            squareFootage: estimate.squareFootage || estimate.sf || 0,
             parsedCategories: estimate.parsedCategories,
             tabSummary: estimate.tabSummary,
             pricing: estimate.pricingResult,
+            fullQuote:
+              estimate.fullQuoteResult ||
+              (estimate.pricingResult as Record<string, unknown> | undefined),
           },
-          extractedDrawing: estimate.extractedDrawingFields ? {
-            fileName: estimate.sourceFileName || "Drawing.pdf",
-            extracted: estimate.extractedDrawingFields,
-          } : undefined,
+          extractedDrawing: estimate.extractedDrawingFields
+            ? {
+              fileName: estimate.sourceFileName || "Drawing.pdf",
+              extracted: estimate.extractedDrawingFields,
+            }
+            : undefined,
           quotationForm: {
             leadName: estimate.leadCompanyName || "",
             email: estimate.customerEmail || "",
@@ -119,11 +341,19 @@ export function QuoteHistoryPage() {
             buildingSize: estimate.buildingSize || "",
             jobNumber: estimate.jobNumber || "",
           },
+          sqFt: String(
+            estimate.squareFootage || estimate.sf || pricingRes?.totalSqFt || ""
+          ),
+          buildingSize: estimate.buildingSize || "",
+          pdfFileName: estimate.sourceFileName,
           estimateId: estimate._id,
+          isFromList: true,
         },
       });
     } catch (err) {
-      console.error("Failed to load estimate detail:", err);
+      console.error("Failed to load estimate for preview:", err);
+    } finally {
+      setIsLoadingItem(null);
     }
   };
 
@@ -391,23 +621,20 @@ export function QuoteHistoryPage() {
                     </div>
 
                     {/* Bottom Right Badge & Action Buttons */}
-                    <div className="flex flex-wrap items-center gap-3">
-                      <div className="flex items-center gap-1.5">
-                        <span className={`px-1.5 py-0.5 rounded-xs text-[10px] font-bold tracking-wide uppercase ${
-                          isStorage ? "bg-amber-100 text-amber-900" : "bg-[#dbeafe] text-[#2563eb]"
-                        }`}>
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <div className="flex items-center gap-1.5 mr-1">
+                        <span className={`px-1.5 py-0.5 rounded-xs text-[10px] font-bold tracking-wide uppercase ${isStorage ? "bg-amber-100 text-amber-900" : "bg-[#dbeafe] text-[#2563eb]"
+                          }`}>
                           {isStorage ? "STORAGE COG" : quote.jobType?.toUpperCase() || "PEMB"}
                         </span>
-                        <span className="text-xs text-slate-500 font-normal">
-                          {isStorage ? "Mini storage" : "Vendor blend"}
-                        </span>
+
                       </div>
 
                       <Button
                         type="button"
                         variant="outline"
                         onClick={() => handleDeleteQuote(quote._id)}
-                        className="border border-[#f97316] text-[#f97316] hover:bg-orange-50 h-8 px-3 text-xs font-medium rounded-md bg-white cursor-pointer flex items-center gap-1.5"
+                        className="border border-[#f97316] text-[#f97316] hover:bg-orange-50 h-8 px-2.5 text-xs font-medium rounded-md bg-white cursor-pointer flex items-center gap-1.5"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                         Delete
@@ -416,10 +643,29 @@ export function QuoteHistoryPage() {
                       <Button
                         type="button"
                         onClick={() => handleLoadAndEdit(quote)}
-                        className="bg-[#1e3e66] hover:bg-[#152e4d] text-white h-8 px-3 text-xs font-medium rounded-md cursor-pointer flex items-center gap-1.5"
+                        disabled={isLoadingItem === quote._id}
+                        className="bg-[#1e3e66] hover:bg-[#152e4d] text-white h-8 px-3 text-xs font-medium rounded-md cursor-pointer flex items-center gap-1.5 shadow-xs"
                       >
-                        <ExternalLink className="h-3.5 w-3.5" />
+                        {isLoadingItem === quote._id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        )}
                         Load & Edit
+                      </Button>
+
+                      <Button
+                        type="button"
+                        onClick={() => handlePreviewQuote(quote)}
+                        disabled={isLoadingItem === quote._id}
+                        className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white h-8 px-3.5 text-xs font-semibold rounded-md cursor-pointer flex items-center gap-1.5 shadow-xs"
+                      >
+                        {isLoadingItem === quote._id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Eye className="h-3.5 w-3.5" />
+                        )}
+                        Preview
                       </Button>
                     </div>
                   </div>
