@@ -61,11 +61,10 @@ export function QuotationStickerTool() {
                     navigate("/quotation/extracted-drawing");
                   }
                 }}
-                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${
-                  jobType === "PEMB"
-                    ? "bg-blue-600 text-white shadow-xs"
-                    : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
-                }`}
+                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${jobType === "PEMB"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
+                  }`}
               >
                 PEMB
               </button>
@@ -77,11 +76,10 @@ export function QuotationStickerTool() {
                     navigate("/quotation/storage");
                   }
                 }}
-                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${
-                  jobType === "Storage"
-                    ? "bg-blue-600 text-white shadow-xs"
-                    : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
-                }`}
+                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${jobType === "Storage"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
+                  }`}
               >
                 Storage
               </button>
@@ -100,33 +98,30 @@ export function QuotationStickerTool() {
               <button
                 type="button"
                 onClick={() => setScope("Supply")}
-                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${
-                  scope === "Supply"
-                    ? "bg-blue-600 text-white shadow-xs"
-                    : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
-                }`}
+                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${scope === "Supply"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
+                  }`}
               >
                 Supply
               </button>
               <button
                 type="button"
                 onClick={() => setScope("Install")}
-                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${
-                  scope === "Install"
-                    ? "bg-blue-600 text-white shadow-xs"
-                    : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
-                }`}
+                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${scope === "Install"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
+                  }`}
               >
                 Install
               </button>
               <button
                 type="button"
                 onClick={() => setScope("Both")}
-                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${
-                  scope === "Both"
-                    ? "bg-blue-600 text-white shadow-xs"
-                    : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
-                }`}
+                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${scope === "Both"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
+                  }`}
               >
                 Both
               </button>
@@ -221,7 +216,7 @@ export function QuotationStickerTool() {
                     <div className="flex items-center gap-3">
                       <input
                         type="range"
-                        min="1"
+                        min="3"
                         max="10"
                         step="0.05"
                         value={installCost}
@@ -242,8 +237,8 @@ export function QuotationStickerTool() {
                     <div className="flex items-center gap-3">
                       <input
                         type="range"
-                        min="1"
-                        max="10"
+                        min="7.5"
+                        max="15"
                         step="0.05"
                         value={installSell}
                         onChange={(e) => setInstallSell(parseFloat(e.target.value))}
@@ -266,7 +261,7 @@ export function QuotationStickerTool() {
                   {/* 4. INSTALL COST $/SF (Central / Quicken Blend) */}
                   <div className="p-3 rounded-lg border border-slate-200/80 bg-white space-y-2">
                     <span className="text-xs font-bold tracking-wide text-slate-900 uppercase block">
-                      INSTALL COST $/SF
+                      Vendor Blend
                     </span>
                     <div className="flex items-center gap-2 text-xs font-medium text-slate-800">
                       <span>Central</span>
