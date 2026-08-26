@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { Printer, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useQuotationStore } from "@/modules/quotation/quotation.store";
+import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 import {
   downloadPdfProvider,
   type ExtractShipperResponseData,

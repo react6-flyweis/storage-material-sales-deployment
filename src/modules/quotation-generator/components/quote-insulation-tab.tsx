@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SuccessDialog from "@/components/success-dialog";
-import { useQuotationStore } from "@/modules/quotation/quotation.store";
+import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 import type {
   ExtractShipperResponseData,
   ComputeEstimateRequest,

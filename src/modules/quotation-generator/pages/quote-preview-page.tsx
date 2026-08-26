@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router";
 import { ArrowLeft, Printer, FolderUp, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { useQuotationStore } from "@/modules/quotation/quotation.store";
+import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 import {
   downloadPdfProvider,
   saveEstimateProvider,

@@ -8,7 +8,7 @@ import {
   saveEstimateProvider,
   previewDocumentProvider,
 } from "../estimates.api";
-import { useQuotationStore } from "@/modules/quotation/quotation.store";
+import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 import {
   StoragePreviewDocument,
   type StorageData,

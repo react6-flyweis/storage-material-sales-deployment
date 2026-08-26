@@ -11,7 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useQuotationStore } from "@/modules/quotation/quotation.store";
+import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 
 interface QuotationSidebarProps {
   isOpen?: boolean;

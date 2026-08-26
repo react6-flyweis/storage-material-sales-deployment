@@ -19,7 +19,7 @@ import {
   type ExtractDrawingResponseData,
   type ComputeEstimateRequest,
 } from "../estimates.api";
-import { useQuotationStore } from "@/modules/quotation/quotation.store";
+import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {

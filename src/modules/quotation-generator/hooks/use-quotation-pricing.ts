@@ -1,4 +1,4 @@
-import { useQuotationStore } from "@/modules/quotation/quotation.store";
+import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 import type {
   ExtractDrawingResponseData,
   ExtractShipperResponseData,
