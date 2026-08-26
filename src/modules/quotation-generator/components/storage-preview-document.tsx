@@ -88,34 +88,98 @@ export interface StorageData {
 }
 
 export interface StoragePricing {
+  buildings?: Array<Record<string, unknown>>;
+  doors?: Array<Record<string, unknown>>;
+  extras?: Array<Record<string, unknown>>;
+  totalSqft?: number;
+  totalSqFt?: number;
+  squareFootage?: number;
+  buildingSell?: number;
+  buildingCogs?: number;
   buildingsSubtotal?: number;
+  doorSell?: number;
+  doorCogs?: number;
   doorsSubtotal?: number;
+  extrasSell?: number;
+  extrasCogs?: number;
   extrasSubtotal?: number;
-  freight?: number;
   shipping?: number;
+  freight?: number;
   drawings?: number;
+  installSell?: number;
+  installCost?: number;
+  installSellPerSf?: number;
+  installCostPerSf?: number;
   labor?: number;
+  laborSell?: number;
   installation?: number;
-  matCost?: number;
-  matSell?: number;
-  concrete?: number;
-  insulation?: number;
+  instSell?: number;
+  erection?: number;
+  erectionSell?: number;
+  concrete?:
+    | number
+    | {
+        include?: boolean;
+        sell?: number;
+        appliedSell?: number;
+        cost?: number;
+        costSF?: number;
+        sellSF?: number;
+        marginPct?: number;
+        thickness?: number;
+        psi?: number | null;
+        sowItems?: string[];
+        sowNotes?: string;
+        [key: string]: unknown;
+      };
+  insulation?:
+    | number
+    | {
+        include?: boolean;
+        sell?: number;
+        appliedSell?: number;
+        cost?: number;
+        costSF?: number;
+        sellSF?: number;
+        marginPct?: number;
+        system?: string;
+        systemLabel?: string;
+        rRoof?: string;
+        rWall?: string;
+        [key: string]: unknown;
+      };
   salesTax?: {
     rate?: number;
     amount?: number;
     taxableAmount?: number;
+    taxableBase?: number;
+    include?: boolean;
+    note?: string;
   };
-  totalCost?: number;
-  totCost?: number;
   grandTotal?: number;
   totSell?: number;
   totalSell?: number;
+  totalCost?: number;
+  totalCogs?: number;
+  totCost?: number;
   profit?: number;
   marginPercent?: number | string;
   pricePerSf?: number | string;
   sfPrice?: number | string;
-  totalSqFt?: number;
-  squareFootage?: number;
+  breakdown?: {
+    buildings?: { sell?: number; cogs?: number; profit?: number };
+    doors?: { sell?: number; cogs?: number; profit?: number };
+    install?: { sell?: number; cogs?: number; profit?: number };
+    concrete?: { sell?: number; cogs?: number; profit?: number };
+    insulation?: { sell?: number; cogs?: number; profit?: number };
+    extras?: { sell?: number; cogs?: number; profit?: number };
+    [key: string]: unknown;
+  };
+  subtotal?: {
+    materials?: number;
+    passThrough?: number;
+    [key: string]: unknown;
+  };
   [key: string]: unknown;
 }
 
@@ -197,7 +261,11 @@ export const StoragePreviewDocument = React.forwardRef<HTMLDivElement, StoragePr
     const extras = storageData?.extras || [];
 
     const totalSqFt =
-      Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) ||
+      Number(
+        storagePricing?.totalSqft ||
+          storagePricing?.totalSqFt ||
+          storagePricing?.squareFootage
+      ) ||
       buildings.reduce(
         (acc, b) =>
           acc +
@@ -207,23 +275,35 @@ export const StoragePreviewDocument = React.forwardRef<HTMLDivElement, StoragePr
       );
 
     const bldSell =
-      Number(storagePricing?.buildingsSubtotal ?? storagePricing?.matSell) ||
-      buildings.reduce((acc, b) => acc + Number(b.sellPrice || 0), 0);
+      Number(
+        storagePricing?.buildingSell ??
+          storagePricing?.buildingsSubtotal ??
+          storagePricing?.matSell ??
+          storagePricing?.breakdown?.buildings?.sell
+      ) || buildings.reduce((acc, b) => acc + Number(b.sellPrice || 0), 0);
 
     const doorsSell =
-      Number(storagePricing?.doorsSubtotal) ||
+      Number(
+        storagePricing?.doorSell ??
+          storagePricing?.doorsSubtotal ??
+          storagePricing?.breakdown?.doors?.sell
+      ) ||
       doors.reduce((acc, d) => acc + Number(d.totalSell || d.sale || 0), 0);
 
     const extrasSell =
-      Number(storagePricing?.extrasSubtotal) ||
+      Number(
+        storagePricing?.extrasSell ??
+          storagePricing?.extrasSubtotal ??
+          storagePricing?.breakdown?.extras?.sell
+      ) ||
       extras.reduce(
         (acc, x) => acc + (x.include !== false ? Number(x.sellPrice || x.sale || 0) : 0),
         0
       );
 
     const freightVal = Number(
-      storagePricing?.freight ??
-        storagePricing?.shipping ??
+      storagePricing?.shipping ??
+        storagePricing?.freight ??
         storageData?.shippingDefault?.freightSell ??
         12000
     );
@@ -231,21 +311,57 @@ export const StoragePreviewDocument = React.forwardRef<HTMLDivElement, StoragePr
     const drawingsVal = Number(storagePricing?.drawings ?? 0);
 
     const laborVal = Number(
-      storagePricing?.labor ?? storagePricing?.installation ?? 0
+      storagePricing?.installSell ??
+        storagePricing?.labor ??
+        storagePricing?.installation ??
+        storagePricing?.instSell ??
+        storagePricing?.erection ??
+        storagePricing?.erectionSell ??
+        storagePricing?.laborSell ??
+        storagePricing?.breakdown?.install?.sell ??
+        0
     );
 
-    const concreteVal = concreteInclude
-      ? Number(storagePricing?.concrete ?? 0)
+    const concreteObj =
+      typeof storagePricing?.concrete === "object" && storagePricing?.concrete !== null
+        ? storagePricing.concrete
+        : null;
+    const isConcreteIncluded =
+      concreteInclude !== undefined
+        ? concreteInclude
+        : Boolean(concreteObj?.include);
+    const concreteVal = isConcreteIncluded
+      ? Number(
+          concreteObj?.appliedSell ??
+            concreteObj?.sell ??
+            storagePricing?.breakdown?.concrete?.sell ??
+            (typeof storagePricing?.concrete === "number" ? storagePricing.concrete : 0)
+        )
       : 0;
 
-    const insulationVal = insulationInclude
-      ? Number(storagePricing?.insulation ?? 0)
+    const insulationObj =
+      typeof storagePricing?.insulation === "object" && storagePricing?.insulation !== null
+        ? storagePricing.insulation
+        : null;
+    const isInsulationIncluded =
+      insulationInclude !== undefined
+        ? insulationInclude
+        : Boolean(insulationObj?.include);
+    const insulationVal = isInsulationIncluded
+      ? Number(
+          insulationObj?.appliedSell ??
+            insulationObj?.sell ??
+            storagePricing?.breakdown?.insulation?.sell ??
+            (typeof storagePricing?.insulation === "number" ? storagePricing.insulation : 0)
+        )
       : 0;
 
     const taxObj = storagePricing?.salesTax;
     const effectiveTaxRate = taxRate || taxObj?.rate || 0;
+    const isTaxIncluded =
+      includeTax !== undefined ? includeTax : (taxObj?.include ?? true);
     const taxVal =
-      includeTax && effectiveTaxRate > 0
+      isTaxIncluded && effectiveTaxRate > 0
         ? Number(
             taxObj?.amount ??
               Math.round((bldSell + doorsSell + insulationVal) * (effectiveTaxRate / 100))
@@ -253,7 +369,11 @@ export const StoragePreviewDocument = React.forwardRef<HTMLDivElement, StoragePr
         : 0;
 
     const grandTotal =
-      Number(storagePricing?.grandTotal ?? storagePricing?.totSell ?? storagePricing?.totalSell) ||
+      Number(
+        storagePricing?.grandTotal ??
+          storagePricing?.totSell ??
+          storagePricing?.totalSell
+      ) ||
       bldSell +
         doorsSell +
         extrasSell +
@@ -338,8 +458,8 @@ export const StoragePreviewDocument = React.forwardRef<HTMLDivElement, StoragePr
                 : scope.toLowerCase() === "install"
                 ? "Installation Only"
                 : "Supply, Delivery & Erection"}
-              {concreteInclude ? " · Concrete" : ""}
-              {insulationInclude ? " · Insulation" : ""}
+              {isConcreteIncluded ? " · Concrete" : ""}
+              {isInsulationIncluded ? " · Insulation" : ""}
             </p>
           </div>
         </div>
@@ -481,19 +601,19 @@ export const StoragePreviewDocument = React.forwardRef<HTMLDivElement, StoragePr
                   <span className="font-semibold text-slate-900">{fmt(drawingsVal)}</span>
                 </div>
               )}
-              {concreteInclude && concreteVal > 0 && (
+              {isConcreteIncluded && concreteVal > 0 && (
                 <div className="flex justify-between text-slate-600 border-b border-slate-100 pb-1.5">
                   <span>Concrete Foundation & Slab</span>
                   <span className="font-semibold text-slate-900">{fmt(concreteVal)}</span>
                 </div>
               )}
-              {insulationInclude && insulationVal > 0 && (
+              {isInsulationIncluded && insulationVal > 0 && (
                 <div className="flex justify-between text-slate-600 border-b border-slate-100 pb-1.5">
                   <span>Insulation Package</span>
                   <span className="font-semibold text-slate-900">{fmt(insulationVal)}</span>
                 </div>
               )}
-              {includeTax && taxVal > 0 && (
+              {isTaxIncluded && taxVal > 0 && (
                 <div className="flex justify-between text-amber-800 border-b border-slate-100 pb-1.5 font-medium">
                   <span>Sales Tax ({effectiveTaxRate}% on taxable items)</span>
                   <span className="font-bold text-amber-900">{fmt(taxVal)}</span>
@@ -505,7 +625,7 @@ export const StoragePreviewDocument = React.forwardRef<HTMLDivElement, StoragePr
               </div>
             </div>
             <p className="text-[10px] text-slate-500 mt-2 leading-relaxed">
-              {includeTax && taxVal > 0
+              {isTaxIncluded && taxVal > 0
                 ? `Sales tax of ${effectiveTaxRate}% applied to materials, doors & insulation. Labor/erection is not taxable.`
                 : "Sales tax not included — add rate in tax field if applicable. Labor/erection is not taxable. Freight is itemized above."}
             </p>
@@ -556,13 +676,13 @@ export const StoragePreviewDocument = React.forwardRef<HTMLDivElement, StoragePr
                     <span>Full erection of metal building system</span>
                   </li>
                 )}
-                {concreteInclude && (
+                {isConcreteIncluded && (
                   <li className="flex items-start gap-1.5">
                     <span className="text-[#1e3a8a] font-bold">•</span>
                     <span>Concrete slab, footings & anchor bolts</span>
                   </li>
                 )}
-                {insulationInclude && (
+                {isInsulationIncluded && (
                   <li className="flex items-start gap-1.5">
                     <span className="text-[#1e3a8a] font-bold">•</span>
                     <span>Roof and wall insulation system</span>
@@ -576,13 +696,13 @@ export const StoragePreviewDocument = React.forwardRef<HTMLDivElement, StoragePr
                 EXCLUSIONS
               </h4>
               <ul className="space-y-1 text-slate-600 text-[11px] leading-snug">
-                {!concreteInclude && (
+                {!isConcreteIncluded && (
                   <li className="flex items-start gap-1.5 text-red-700">
                     <span className="text-red-600 font-bold">•</span>
                     <span>Concrete foundations, slabs & anchor bolts</span>
                   </li>
                 )}
-                {!insulationInclude && (
+                {!isInsulationIncluded && (
                   <li className="flex items-start gap-1.5 text-red-700">
                     <span className="text-red-600 font-bold">•</span>
                     <span>Insulation system</span>
