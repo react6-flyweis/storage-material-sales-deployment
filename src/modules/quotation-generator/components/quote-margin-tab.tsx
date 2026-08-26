@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Search, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SuccessDialog from "@/components/success-dialog";
-import { useQuotationStore } from "@/modules/quotation/quotation.store";
+import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 import {
   taxLookupProvider,
   previewMarginProvider,
@@ -47,6 +47,16 @@ export function QuoteMarginTab({
   const [successMessage, setSuccessMessage] = useState("");
   const [taxMessage, setTaxMessage] = useState<string | null>(null);
 
+  interface MarginPreviewAdjusted {
+    totSell?: number;
+    sfPrice?: number;
+    totCost?: number;
+    profit?: number;
+    profPct?: number;
+    [key: string]: unknown;
+  }
+  const [marginPreview, setMarginPreview] = useState<MarginPreviewAdjusted | null>(null);
+
   useEffect(() => {
     if (!extractedShipper?.pricing) return;
     const laborVal = parseFloat(marginLaborOverride) || undefined;
@@ -56,13 +66,26 @@ export function QuoteMarginTab({
       pricingResult: extractedShipper.pricing,
       marginOverride: {
         applied: true,
-        laborSF: laborVal,
-        pct: targetVal,
-        sellFixed: sellVal,
+        laborSF: laborVal ?? null,
+        pct: targetVal ?? null,
+        sellFixed: sellVal ?? null,
       },
-    }).catch((err) => {
-      console.error("Margin preview error:", err);
-    });
+    })
+      .then((res) => {
+        const adjusted =
+          res.data?.preview?.adjusted ||
+          res.preview?.adjusted ||
+          (res.data as Record<string, unknown>)?.adjusted ||
+          (res.data as Record<string, unknown>)?.preview ||
+          res.data ||
+          res;
+        if (adjusted && typeof adjusted === "object") {
+          setMarginPreview(adjusted as MarginPreviewAdjusted);
+        }
+      })
+      .catch((err) => {
+        console.error("Margin preview error:", err);
+      });
   }, [marginLaborOverride, marginTargetMargin, marginFixedSellOverride, extractedShipper?.pricing]);
 
   // Perform tax lookup when user enters ZIP and blurs or clicks Search
@@ -157,52 +180,58 @@ export function QuoteMarginTab({
 
   const pricing = extractedShipper?.pricing;
 
-  // Erection calculations
-  const totalSellVal = pricing?.instSell != null ? pricing.instSell : 584375;
+  // Erection / Labor calculations from API
+  const totalSellVal = pricing?.instSell != null ? pricing.instSell : 0;
   const totalCostVal = pricing?.instCost != null ? pricing.instCost : 0;
   const totalProfitVal = totalSellVal - totalCostVal;
   const marginPercentVal =
     totalSellVal > 0
       ? ((totalProfitVal / totalSellVal) * 100).toFixed(1)
-      : "35.3";
+      : "0.0";
+
+  const displayTotSell = marginPreview?.totSell ?? pricing?.totSell;
+  const displaySfPrice = marginPreview?.sfPrice ?? pricing?.sfPrice;
+  const displayTotCost = marginPreview?.totCost ?? pricing?.totCost;
+  const displayProfit = marginPreview?.profit ?? pricing?.profit;
+  const displayProfPct = marginPreview?.profPct ?? pricing?.profPct;
 
   const totalProjectSell =
-    pricing?.totSell != null
-      ? `$${pricing.totSell.toLocaleString()}`
-      : "$326,563";
+    displayTotSell != null
+      ? `$${Math.round(displayTotSell).toLocaleString()}`
+      : "-";
   const totalProjectProfit =
-    pricing?.profit != null ? `$${pricing.profit.toLocaleString()}` : "$-65,538";
+    displayProfit != null ? `$${Math.round(displayProfit).toLocaleString()}` : "-";
   const totalProjectMargin =
-    pricing?.profPct != null ? `${pricing.profPct}%` : "-20.1%";
+    displayProfPct != null ? `${displayProfPct}%` : "-";
   const matSellText =
     pricing?.matSell != null
-      ? `$${pricing.matSell.toLocaleString()}`
-      : "$199,023";
+      ? `$${Math.round(pricing.matSell).toLocaleString()}`
+      : "-";
   const instSellText =
     pricing?.instSell != null
-      ? `$${pricing.instSell.toLocaleString()}`
-      : "$584,375";
+      ? `$${Math.round(pricing.instSell).toLocaleString()}`
+      : "-";
   const sfPriceText =
-    pricing?.sfPrice != null ? `$${pricing.sfPrice}/SF` : "$4.75/SF";
+    displaySfPrice != null ? `$${displaySfPrice}/SF` : "-";
   const matProfitText =
     pricing?.matCost != null && pricing?.matSell != null
-      ? `$${(pricing.matSell - pricing.matCost).toLocaleString()}`
-      : "$-65,538";
+      ? `$${Math.round(pricing.matSell - pricing.matCost).toLocaleString()}`
+      : "-";
 
   const adjustedSellText =
-    pricing?.totSell != null
-      ? `$${pricing.totSell.toLocaleString()}`
-      : "$219,262";
+    displayTotSell != null
+      ? `$${Math.round(displayTotSell).toLocaleString()}`
+      : "-";
   const totalCostText =
-    pricing?.totCost != null
-      ? `$${pricing.totCost.toLocaleString()}`
-      : "$168,663";
+    displayTotCost != null
+      ? `$${Math.round(displayTotCost).toLocaleString()}`
+      : "-";
   const profitText =
-    pricing?.profit != null
-      ? `$${pricing.profit.toLocaleString()}`
-      : "$50,599";
+    displayProfit != null
+      ? `$${Math.round(displayProfit).toLocaleString()}`
+      : "-";
   const profitMarginText =
-    pricing?.profPct != null ? `${pricing.profPct}% margin` : "23.1% margin";
+    displayProfPct != null ? `${displayProfPct}% margin` : "-";
 
   return (
     <div className="space-y-8">

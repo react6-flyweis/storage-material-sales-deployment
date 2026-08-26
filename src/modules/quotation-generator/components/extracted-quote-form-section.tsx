@@ -20,111 +20,32 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { extractDrawingProvider } from "../estimates.api";
+import {
+  type ExtractedQuoteFormData,
+  defaultExtractedQuoteFormData,
+  mapExtractedDrawingToFormData,
+} from "../utils/extracted-drawing-mapper";
 
-export interface ExtractedQuoteFormData {
-  // Title Block
-  purchaser: string;
-  projectName: string;
-  jobNumber: string;
-  location: string;
-  date: string;
+import type { ExtractDrawingResponseData } from "../estimates.api";
 
-  // Building Dimensions
-  width: string;
-  length: string;
-  eaveHeight: string;
-  sqFootage: string;
-  baySpacing: string;
-  roofSlope: string;
-
-  // Design Loads
-  roofDeadLoad: string;
-  collateralLoad: string;
-  roofLiveLoad: string;
-  roofSnowLoad: string;
-  groundSnowLoad: string;
-  basicWindSpeed: string;
-  windExposure: string;
-  snowExposureFactor: string;
-  intPressureCoeff: string;
-
-  // Seismic, Site & Code
-  occupancyCategory: string;
-  siteClass: string;
-  seismicDesignCat: string;
-  seismicZone: string;
-  sds: string;
-  sd1: string;
-  s1: string;
-  thermalFactor: string;
-  buildingCode: string;
-
-  // Importance Factors & Base Shear
-  windIF: string;
-  snowIF: string;
-  baseShearLong: string;
-  baseShearTrans: string;
-  deflectionLimitCol: string;
-
-  // Building Type & Panels
-  frameType: string;
-  roofPanelColor: string;
-  wallPanel: string;
-  additionalNotes: string;
-}
-
-const defaultValues: ExtractedQuoteFormData = {
-  purchaser: "",
-  projectName: "",
-  jobNumber: "",
-  location: "",
-  date: "",
-
-  width: "",
-  length: "",
-  eaveHeight: "",
-  sqFootage: "",
-  baySpacing: "",
-  roofSlope: "",
-
-  roofDeadLoad: "",
-  collateralLoad: "",
-  roofLiveLoad: "",
-  roofSnowLoad: "",
-  groundSnowLoad: "",
-  basicWindSpeed: "",
-  windExposure: "",
-  snowExposureFactor: "",
-  intPressureCoeff: "",
-
-  occupancyCategory: "",
-  siteClass: "",
-  seismicDesignCat: "",
-  seismicZone: "",
-  sds: "",
-  sd1: "",
-  s1: "",
-  thermalFactor: "",
-  buildingCode: "",
-
-  windIF: "",
-  snowIF: "",
-  baseShearLong: "",
-  baseShearTrans: "",
-  deflectionLimitCol: "",
-
-  frameType: "",
-  roofPanelColor: "",
-  wallPanel: "",
-  additionalNotes: "",
-};
+export type { ExtractedQuoteFormData };
 
 interface ExtractedQuoteFormSectionProps {
   initialValues?: Partial<ExtractedQuoteFormData>;
   pdfFileName?: string;
   rawTextPreview?: string;
   note?: string;
+  isExtracted?: boolean;
   onSubmit?: (data: ExtractedQuoteFormData) => void;
+  onDrawingExtracted?: (data: ExtractDrawingResponseData) => void;
+  onApplyDimensionsOnly?: (dimensions: {
+    width: string;
+    length: string;
+    eaveHeight: string;
+    sqFootage: string;
+    roofSlope: string;
+    baySpacing: string;
+  }) => void;
 }
 
 export function ExtractedQuoteFormSection({
@@ -132,7 +53,10 @@ export function ExtractedQuoteFormSection({
   pdfFileName,
   rawTextPreview,
   note,
+  isExtracted,
   onSubmit,
+  onDrawingExtracted,
+  onApplyDimensionsOnly,
 }: ExtractedQuoteFormSectionProps) {
   const navigate = useNavigate();
   const [fileName, setFileName] = useState(pdfFileName || "");
@@ -143,10 +67,16 @@ export function ExtractedQuoteFormSection({
   const [isReExtracting, setIsReExtracting] = useState(false);
   const [reExtractError, setReExtractError] = useState<string | null>(null);
 
-  const { register, handleSubmit, reset, setValue } =
+  const hasExtractedData = Boolean(
+    isExtracted ||
+    Boolean(fileName && fileName.trim()) ||
+    Boolean(currentRawText && currentRawText.trim())
+  );
+
+  const { register, handleSubmit, reset, setValue, getValues } =
     useForm<ExtractedQuoteFormData>({
       defaultValues: {
-        ...defaultValues,
+        ...defaultExtractedQuoteFormData,
         ...initialValues,
       },
     });
@@ -154,7 +84,7 @@ export function ExtractedQuoteFormSection({
   useEffect(() => {
     if (initialValues) {
       reset({
-        ...defaultValues,
+        ...defaultExtractedQuoteFormData,
         ...initialValues,
       });
     }
@@ -202,19 +132,16 @@ export function ExtractedQuoteFormSection({
             setCurrentRawText(res.data.rawTextPreview || "");
             if (res.data.note) setCurrentNote(res.data.note);
 
-            if (ext.customer) setValue("purchaser", ext.customer);
-            if (ext.project) setValue("projectName", ext.project);
-            if (ext.jobnumber) setValue("jobNumber", ext.jobnumber);
-            if (ext.width) setValue("width", ext.width);
-            if (ext.length) setValue("length", ext.length);
-            if (ext.eave) setValue("eaveHeight", ext.eave);
-            if (ext.sqft) setValue("sqFootage", ext.sqft);
-            if (ext.snow) setValue("roofSnowLoad", ext.snow);
-            if (ext.wind) setValue("basicWindSpeed", ext.wind);
-            if (ext.exposure) setValue("windExposure", ext.exposure);
-            if (ext.slope) setValue("roofSlope", ext.slope);
-            if (ext.dead) setValue("roofDeadLoad", ext.dead);
-            if (ext.collateral) setValue("collateralLoad", ext.collateral);
+            const mapped = mapExtractedDrawingToFormData(ext);
+            (Object.keys(mapped) as Array<keyof ExtractedQuoteFormData>).forEach((key) => {
+              const val = mapped[key];
+              if (val !== undefined) {
+                setValue(key, val);
+              }
+            });
+            if (onDrawingExtracted) {
+              onDrawingExtracted(res.data);
+            }
           } else {
             setReExtractError(res.message || "Failed to extract drawing data.");
           }
@@ -228,6 +155,20 @@ export function ExtractedQuoteFormSection({
     } catch (err) {
       console.error("File read error:", err);
       setIsReExtracting(false);
+    }
+  };
+
+  const handleApplyDimensions = () => {
+    const values = getValues();
+    if (onApplyDimensionsOnly) {
+      onApplyDimensionsOnly({
+        width: values.width,
+        length: values.length,
+        eaveHeight: values.eaveHeight,
+        sqFootage: values.sqFootage,
+        roofSlope: values.roofSlope,
+        baySpacing: values.baySpacing,
+      });
     }
   };
 
@@ -312,29 +253,31 @@ export function ExtractedQuoteFormSection({
               )}
             </div>
 
-            {/* Extracted Information Header & Actions */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-6 px-5">
-              <h2 className="text-sm md:text-base font-extrabold text-slate-900 tracking-wide uppercase">
-                EXTRACTED FROM DRAWING - EDIT ANYTHING BEFORE APPLYING
-              </h2>
+            {hasExtractedData && (
+              <>
+                {/* Extracted Information Header & Actions */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-6 px-5">
+                  <h2 className="text-sm md:text-base font-extrabold text-slate-900 tracking-wide uppercase">
+                    EXTRACTED FROM DRAWING - EDIT ANYTHING BEFORE APPLYING
+                  </h2>
 
-              <div className="flex items-center gap-3">
-                <Button
-                  type="submit"
-                  className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-5 py-2.5 rounded-lg text-xs md:text-sm font-medium cursor-pointer shadow-xs"
-                >
-                  Apply All to Quote & SOW
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsRawTextModalOpen(true)}
-                  className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 px-5 py-2.5 rounded-lg text-xs md:text-sm font-medium cursor-pointer"
-                >
-                  Show raw text
-                </Button>
-              </div>
-            </div>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      type="submit"
+                      className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-5 py-2.5 rounded-lg text-xs md:text-sm font-medium cursor-pointer shadow-xs"
+                    >
+                      Apply All to Quote & SOW
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsRawTextModalOpen(true)}
+                      className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 px-5 py-2.5 rounded-lg text-xs md:text-sm font-medium cursor-pointer"
+                    >
+                      Show raw text
+                    </Button>
+                  </div>
+                </div>
 
             {/* Extracted Data Sections Container */}
             <div className="mt-5 border-t divide-y">
@@ -728,28 +671,32 @@ export function ExtractedQuoteFormSection({
                 </div>
               </div>
             </div>
-
-            {/* Bottom Action Footer */}
+                </>
+              )}
           </CardContent>
-          <CardFooter className="flex flex-col sm:flex-row items-center gap-3 border-t">
-            <Button
-              type="submit"
-              className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-5 py-2.5 rounded-lg text-xs md:text-sm font-semibold cursor-pointer shadow-xs flex items-center gap-1.5"
-            >
-              <Check className="h-4 w-4" />
-              Apply All to Quote & SOW
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              className="bg-slate-600 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg text-xs md:text-sm font-semibold cursor-pointer"
-            >
-              Apply Dimensions Only
-            </Button>
-            <span className="text-xs text-slate-400 font-medium ml-1">
-              Edit any field above before applying
-            </span>
-          </CardFooter>
+
+          {hasExtractedData && (
+            <CardFooter className="flex flex-col sm:flex-row items-center gap-3 border-t">
+              <Button
+                type="submit"
+                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-5 py-2.5 rounded-lg text-xs md:text-sm font-semibold cursor-pointer shadow-xs flex items-center gap-1.5"
+              >
+                <Check className="h-4 w-4" />
+                Apply All to Quote & SOW
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleApplyDimensions}
+                className="bg-slate-600 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg text-xs md:text-sm font-semibold cursor-pointer"
+              >
+                Apply Dimensions Only
+              </Button>
+              <span className="text-xs text-slate-400 font-medium ml-1">
+                Edit any field above before applying
+              </span>
+            </CardFooter>
+          )}
         </Card>
       </form>
 

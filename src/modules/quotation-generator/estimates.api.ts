@@ -9,17 +9,42 @@ export interface ExtractedDrawingData {
   customer?: string;
   project?: string;
   jobnumber?: string;
+  date?: string;
   width?: string;
   length?: string;
   eave?: string;
+  eaveheight?: string;
   sqft?: string;
-  snow?: string;
-  wind?: string;
-  exposure?: string;
+  sqfootage?: string;
+  bay?: string;
   slope?: string;
   dead?: string;
   collateral?: string;
-  [key: string]: string | undefined;
+  live?: string;
+  roofsnow?: string;
+  snow?: string;
+  wind?: string;
+  exposure?: string;
+  snowexp?: string;
+  ipc?: string;
+  risk?: string;
+  siteclass?: string;
+  seismiccat?: string;
+  seismiczone?: string;
+  seismic?: string;
+  sd1?: string;
+  s1?: string;
+  thermal?: string;
+  code?: string;
+  windif?: string;
+  snowif?: string;
+  shearlong?: string;
+  sheartrans?: string;
+  deflcol?: string;
+  frame?: string;
+  roofpanel?: string;
+  wall?: string;
+  notes?: string;
 }
 
 export interface ExtractDrawingResponseData {
@@ -55,6 +80,7 @@ export interface ExtractShipperRequest {
   roof?: "screw-down" | "standing-seam" | string;
   install?: string;
   squareFootage?: number;
+  sf?: number;
   useManualSquareFootage?: boolean;
   blendPct?: number;
   installCostPerSf?: number;
@@ -100,6 +126,8 @@ export interface ShipperPricing {
   sfPrice?: string | number;
   blendLabel?: string;
   vendorBlendSavings?: number;
+  cogsOverrideApplied?: boolean;
+  marginOverrideApplied?: boolean;
   [key: string]: unknown;
 }
 
@@ -109,14 +137,21 @@ export interface ExtractShipperResponseData {
   totalWeightLbs: number;
   squareFootage: number;
   tabSummary: ShipperTabSummary[];
-  parsedCategories?: Record<string, { weight: number; [key: string]: unknown }>;
+  parsedCategories?: Record<string, unknown>;
   coverSheet?: {
     coverName?: string;
     labelMap?: Record<string, string>;
+    preview?: string;
   };
   weightByCategory?: ShipperWeightByCategoryItem[];
   pricing?: ShipperPricing;
-  fullQuote?: Record<string, unknown>;
+  fullQuote?: {
+    grandTotal?: number;
+    pricePerSf?: string | number;
+    grandMargin?: number;
+    [key: string]: unknown;
+  } | null;
+  note?: string;
 }
 
 export interface ExtractShipperResponse {
@@ -132,14 +167,15 @@ export async function extractShipperProvider(
     "/api/sales/estimates/extract-shipper",
     {
       jobType: "PEMB",
-      scope: "both",
+      scope: "supply",
       roof: "screw-down",
-      install: "medium",
+      install: "easy",
       squareFootage: 0,
+      sf: 0,
       useManualSquareFootage: false,
       blendPct: 50,
-      installCostPerSf: 5.85,
-      sellPerSf: 9.0,
+      installCostPerSf: 5.5,
+      sellPerSf: 8.5,
       ...payload,
     }
   );
@@ -181,17 +217,18 @@ export interface ComputeSalesTaxConfig {
 
 export interface ComputeCogsOverrideConfig {
   applied: boolean;
-  costDollar?: number;
-  marginPct?: number;
-  sellDollar?: number;
+  costDollar?: number | null;
+  marginPct?: number | null;
+  sellDollar?: number | null;
+  costPctAdj?: number | null;
   [key: string]: unknown;
 }
 
 export interface ComputeMarginOverrideConfig {
   applied: boolean;
-  laborSF?: number;
-  pct?: number;
-  sellFixed?: number;
+  laborSF?: number | null;
+  pct?: number | null;
+  sellFixed?: number | null;
   [key: string]: unknown;
 }
 
@@ -384,20 +421,48 @@ export interface ExtractStorageCogRequest {
 export interface ExtractStorageCogResponse {
   success?: boolean;
   message?: string;
-  data?: {
-    buildings?: Array<Record<string, unknown>>;
-    doors?: Array<Record<string, unknown>>;
-    extras?: Array<Record<string, unknown>>;
-    shippingDefault?: Record<string, unknown>;
-    project?: Record<string, unknown>;
-    storagePricing?: Record<string, unknown>;
+  project?: {
+    customer?: string;
+    location?: string;
+    date?: string;
+    jobNumber?: string;
+    [key: string]: unknown;
   };
   buildings?: Array<Record<string, unknown>>;
   doors?: Array<Record<string, unknown>>;
   extras?: Array<Record<string, unknown>>;
-  shippingDefault?: Record<string, unknown>;
-  project?: Record<string, unknown>;
+  shippingDefault?: number | Record<string, unknown>;
+  format?: string;
   storagePricing?: Record<string, unknown>;
+  summary?: {
+    buildingCount?: number;
+    totalSqft?: number;
+    subtotalSell?: number;
+    [key: string]: unknown;
+  };
+  data?: {
+    project?: {
+      customer?: string;
+      location?: string;
+      date?: string;
+      jobNumber?: string;
+      [key: string]: unknown;
+    };
+    buildings?: Array<Record<string, unknown>>;
+    doors?: Array<Record<string, unknown>>;
+    extras?: Array<Record<string, unknown>>;
+    shippingDefault?: number | Record<string, unknown>;
+    format?: string;
+    storagePricing?: Record<string, unknown>;
+    summary?: {
+      buildingCount?: number;
+      totalSqft?: number;
+      subtotalSell?: number;
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
 }
 
 export async function extractStorageCogProvider(
@@ -418,11 +483,148 @@ export interface ComputeStorageRequest {
   [key: string]: unknown;
 }
 
+export interface StorageConcretePricing {
+  include?: boolean;
+  thickness?: number | null;
+  psi?: number | null;
+  costSF?: number;
+  marginPct?: number;
+  sellSF?: number;
+  cost?: number;
+  sell?: number;
+  appliedSell?: number;
+  profit?: number;
+  sowItems?: string[];
+  sowNotes?: string;
+}
+
+export interface StorageInsulationPricing {
+  include?: boolean;
+  system?: string;
+  systemLabel?: string;
+  rRoof?: string;
+  rWall?: string;
+  costSF?: number;
+  marginPct?: number;
+  sellSF?: number;
+  cost?: number;
+  sell?: number;
+  appliedSell?: number;
+  profit?: number;
+}
+
+export interface StorageSalesTaxPricing {
+  rate?: number;
+  amount?: number;
+  taxableBase?: number;
+  include?: boolean;
+  note?: string;
+}
+
+export interface StorageBreakdownCategory {
+  sell?: number;
+  cogs?: number;
+  profit?: number;
+}
+
+export interface StoragePricingBreakdown {
+  buildings?: StorageBreakdownCategory;
+  doors?: StorageBreakdownCategory;
+  install?: StorageBreakdownCategory;
+  concrete?: StorageBreakdownCategory;
+  insulation?: StorageBreakdownCategory;
+  extras?: StorageBreakdownCategory;
+}
+
+export interface StoragePricingSubtotal {
+  materials?: number;
+  passThrough?: number;
+}
+
+export interface StorageBuildingPricingItem {
+  name?: string;
+  width?: number;
+  length?: number;
+  loEave?: number;
+  hiEave?: number;
+  eaveHeight?: number;
+  roofPitch?: string;
+  slope?: string;
+  sqft?: number;
+  squareFootage?: number;
+  psf?: number;
+  cogs?: number;
+  cost?: number;
+  markup?: number;
+  sellPrice?: number;
+  roofType?: string;
+  wallPanel?: string;
+  roofPanel?: string;
+  wallColor?: string;
+  doors?: string;
+  sell?: number;
+  sfSell?: string;
+}
+
+export interface StorageDoorPricingItem {
+  type?: string;
+  size?: string;
+  unitCost?: number;
+  costPerUnit?: number;
+  qty?: number;
+  quantity?: number;
+  count?: number;
+  cogs?: number;
+  totalCost?: number;
+  markup?: number;
+  sale?: number;
+  sellPerUnit?: number;
+  totalSell?: number;
+  color?: string;
+  sell?: number;
+}
+
+export interface StoragePricingResult {
+  buildings?: StorageBuildingPricingItem[];
+  doors?: StorageDoorPricingItem[];
+  extras?: Array<Record<string, unknown>>;
+  totalSqft?: number;
+  totalSqFt?: number;
+  squareFootage?: number;
+  buildingSell?: number;
+  buildingCogs?: number;
+  buildingsSubtotal?: number;
+  doorSell?: number;
+  doorCogs?: number;
+  doorsSubtotal?: number;
+  extrasSell?: number;
+  extrasCogs?: number;
+  extrasSubtotal?: number;
+  shipping?: number;
+  freight?: number;
+  drawings?: number;
+  installSell?: number;
+  installCost?: number;
+  installSellPerSf?: number;
+  installCostPerSf?: number;
+  labor?: number;
+  concrete?: StorageConcretePricing;
+  insulation?: StorageInsulationPricing;
+  salesTax?: StorageSalesTaxPricing;
+  grandTotal?: number;
+  pricePerSf?: string | number;
+  profit?: number;
+  totalCogs?: number;
+  marginPercent?: number;
+  breakdown?: StoragePricingBreakdown;
+  subtotal?: StoragePricingSubtotal;
+}
+
 export interface ComputeStorageResponse {
   success?: boolean;
   message?: string;
-  data?: { storagePricing?: Record<string, unknown> };
-  storagePricing?: Record<string, unknown>;
+  data?: { storagePricing?: StoragePricingResult };
+  storagePricing?: StoragePricingResult;
 }
 
 export async function computeStorageProvider(
@@ -446,11 +648,15 @@ export interface PreviewDocumentRequest {
   buildingSize?: string;
   squareFootage?: number;
   jobNumber?: string;
+  jobType?: string;
   pricingResult?: ShipperPricing;
   fullQuote?: Record<string, unknown>;
   extractedDrawingFields?: ExtractedDrawingData;
-  drawingAttachments?: Array<{ name?: string; fileBase64?: string; includeInQuote?: boolean; [key: string]: unknown }>;
+  drawingAttachments?: Array<{ name?: string; fileBase64?: string; includeInQuote?: boolean;[key: string]: unknown }>;
   sections?: string[];
+  storageData?: Record<string, unknown>;
+  storagePricingResult?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
 export interface PreviewDocumentResponse {
@@ -500,10 +706,36 @@ export interface PreviewCogsRequest {
   cogsOverride?: ComputeCogsOverrideConfig;
 }
 
+export interface PreviewCogsData {
+  preview?: {
+    fromShipper?: {
+      cost?: number;
+      sell?: number;
+      margin?: number;
+      sf?: number;
+    };
+    adjusted?: {
+      cost?: number;
+      sell?: number;
+      matMargin?: number;
+      grandSell?: number;
+      grandCost?: number;
+      profit?: number;
+      totalMargin?: number;
+      sfPrice?: string | number;
+      costDiff?: number;
+      sellDiff?: number;
+      [key: string]: unknown;
+    };
+  };
+  [key: string]: unknown;
+}
+
 export interface PreviewCogsResponse {
   success?: boolean;
-  data?: { preview?: { adjusted?: { cost?: number; sell?: number; matMargin?: number; grandSell?: number; totalMargin?: number } } };
-  preview?: { adjusted?: { cost?: number; sell?: number; matMargin?: number; grandSell?: number; totalMargin?: number } };
+  message?: string;
+  data?: PreviewCogsData;
+  preview?: PreviewCogsData["preview"];
 }
 
 export async function previewCogsProvider(

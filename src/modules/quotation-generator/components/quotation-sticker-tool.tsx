@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate, useLocation } from "react-router";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import {
   DropdownMenu,
@@ -11,7 +12,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useQuotationStore } from "@/modules/quotation/quotation.store";
+import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 
 const roofOptions = [
   { value: "screw-down", label: "Screw Down (SD)" },
@@ -19,6 +20,9 @@ const roofOptions = [
 ];
 
 export function QuotationStickerTool() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const {
     jobType,
     setJobType,
@@ -51,23 +55,31 @@ export function QuotationStickerTool() {
             <div className="inline-flex rounded-lg p-0.5 bg-slate-100/80 border border-slate-200/60">
               <button
                 type="button"
-                onClick={() => setJobType("PEMB")}
-                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${
-                  jobType === "PEMB"
-                    ? "bg-blue-600 text-white shadow-xs"
-                    : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
-                }`}
+                onClick={() => {
+                  setJobType("PEMB");
+                  if (location.pathname.includes("/quotation/storage")) {
+                    navigate("/quotation/extracted-drawing");
+                  }
+                }}
+                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${jobType === "PEMB"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
+                  }`}
               >
                 PEMB
               </button>
               <button
                 type="button"
-                onClick={() => setJobType("Storage")}
-                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${
-                  jobType === "Storage"
-                    ? "bg-blue-600 text-white shadow-xs"
-                    : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
-                }`}
+                onClick={() => {
+                  setJobType("Storage");
+                  if (!location.pathname.includes("/quotation/storage")) {
+                    navigate("/quotation/storage");
+                  }
+                }}
+                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${jobType === "Storage"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
+                  }`}
               >
                 Storage
               </button>
@@ -86,33 +98,30 @@ export function QuotationStickerTool() {
               <button
                 type="button"
                 onClick={() => setScope("Supply")}
-                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${
-                  scope === "Supply"
-                    ? "bg-blue-600 text-white shadow-xs"
-                    : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
-                }`}
+                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${scope === "Supply"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
+                  }`}
               >
                 Supply
               </button>
               <button
                 type="button"
                 onClick={() => setScope("Install")}
-                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${
-                  scope === "Install"
-                    ? "bg-blue-600 text-white shadow-xs"
-                    : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
-                }`}
+                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${scope === "Install"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
+                  }`}
               >
                 Install
               </button>
               <button
                 type="button"
                 onClick={() => setScope("Both")}
-                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${
-                  scope === "Both"
-                    ? "bg-blue-600 text-white shadow-xs"
-                    : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
-                }`}
+                className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${scope === "Both"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
+                  }`}
               >
                 Both
               </button>
@@ -131,7 +140,7 @@ export function QuotationStickerTool() {
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="flex items-center justify-between gap-3 px-3.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 font-medium text-slate-800 text-sm shadow-2xs min-w-[200px] cursor-pointer"
+                  className="flex items-center justify-between gap-3 px-3.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 font-medium text-slate-800 text-sm shadow-2xs min-w-50 cursor-pointer"
                 >
                   <span>
                     {roofOptions.find((opt) => opt.value === roofType)?.label || roofType}
@@ -139,7 +148,7 @@ export function QuotationStickerTool() {
                   <ChevronDown className="h-4 w-4 text-slate-500 shrink-0" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-[200px]">
+              <DropdownMenuContent align="start" className="w-50">
                 {roofOptions.map((opt) => (
                   <DropdownMenuItem key={opt.value} onClick={() => setRoofType(opt.value)}>
                     {opt.label}
@@ -207,7 +216,7 @@ export function QuotationStickerTool() {
                     <div className="flex items-center gap-3">
                       <input
                         type="range"
-                        min="1"
+                        min="3"
                         max="10"
                         step="0.05"
                         value={installCost}
@@ -228,8 +237,8 @@ export function QuotationStickerTool() {
                     <div className="flex items-center gap-3">
                       <input
                         type="range"
-                        min="1"
-                        max="10"
+                        min="7.5"
+                        max="15"
                         step="0.05"
                         value={installSell}
                         onChange={(e) => setInstallSell(parseFloat(e.target.value))}
@@ -252,7 +261,7 @@ export function QuotationStickerTool() {
                   {/* 4. INSTALL COST $/SF (Central / Quicken Blend) */}
                   <div className="p-3 rounded-lg border border-slate-200/80 bg-white space-y-2">
                     <span className="text-xs font-bold tracking-wide text-slate-900 uppercase block">
-                      INSTALL COST $/SF
+                      Vendor Blend
                     </span>
                     <div className="flex items-center gap-2 text-xs font-medium text-slate-800">
                       <span>Central</span>

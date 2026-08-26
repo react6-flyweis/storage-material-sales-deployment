@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SuccessDialog from "@/components/success-dialog";
-import { useQuotationStore } from "@/modules/quotation/quotation.store";
+import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 import type {
   ExtractShipperResponseData,
   ComputeEstimateRequest,
@@ -47,7 +47,7 @@ export function QuoteInsulationTab({
   const areaSqFt =
     parseFloat(propSqFt || "") ||
     extractedShipper?.squareFootage ||
-    68750;
+    0;
 
   // Calculation logic
   const totalCogs = areaSqFt * insulationCogsSf;
@@ -110,64 +110,102 @@ export function QuoteInsulationTab({
       />
 
       {/* Main Container Card */}
-      <div className="border border-slate-200 rounded-xl bg-white p-6 shadow-2xs space-y-8">
+      <div className="border border-slate-200 rounded-xl bg-white p-6 shadow-2xs space-y-6">
         {/* Header Section */}
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-base font-bold text-slate-900">
-            <span>🛖</span>
-            <span>Insulation — Cost, Profit & SOW</span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-base font-bold text-slate-900">
+              <span>🛖</span>
+              <span>Insulation — Cost, Profit & SOW</span>
+            </div>
+            <p className="text-xs text-slate-500 font-medium">
+              Priced per total SF · set COGS $/SF then target margin
+            </p>
           </div>
-          <p className="text-xs text-slate-500 font-medium">
-            Priced per SF of building footprint · set COGS $/SF then target margin
-          </p>
+
+          <label className="flex items-center gap-2 cursor-pointer select-none shrink-0">
+            <div
+              className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors ${
+                insulationInclude
+                  ? "bg-[#2B6CB0] text-white"
+                  : "border-2 border-slate-300 bg-white"
+              }`}
+            >
+              {insulationInclude && <Check className="w-3 h-3 stroke-3" />}
+            </div>
+            <input
+              type="checkbox"
+              checked={insulationInclude}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setInsulationInclude(checked);
+                if (onTriggerCompute) {
+                  onTriggerCompute({
+                    insulation: {
+                      include: checked,
+                      system: insulationSystem,
+                      rRoof: insulationRValueRoof,
+                      rWall: insulationRValueWalls,
+                      rValueRoof: insulationRValueRoof,
+                      rValueWalls: insulationRValueWalls,
+                      costSF: insulationCogsSf,
+                      cogsSF: insulationCogsSf,
+                      marginPct: insulationMarginPct,
+                    },
+                  });
+                }
+              }}
+              className="hidden"
+            />
+            <span className="text-[#2B6CB0] font-bold text-xs">Include Insulation</span>
+          </label>
         </div>
 
-        <div className="border-t border-slate-100 pt-6">
+        <div className="border-t border-slate-200 pt-6">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-            {/* Left Column: Insulation System & R-Values (5 cols) */}
-            <div className="md:col-span-4 space-y-5">
+            {/* Left Column: Insulation System & R-Values */}
+            <div className="md:col-span-4 space-y-4">
               {/* Insulation System Selection */}
               <div className="space-y-2">
                 <label className="block text-xs font-bold text-slate-800">
-                  Insulation System
+                  System
                 </label>
-                <div className="space-y-2.5">
+                <div className="space-y-2">
                   {[
-                    "Vinyl-backed (single layer)",
-                    "Double-layer system",
-                    "Spray Foam",
-                  ].map((system) => {
-                    const isSelected = insulationSystem === system;
+                    { id: "Vinyl-backed (single layer)", label: "Vinyl-backed" },
+                    { id: "Double-layer system", label: "Double-layer" },
+                    { id: "Spray Foam", label: "Spray Foam" },
+                  ].map((s) => {
+                    const isSelected =
+                      insulationSystem === s.id ||
+                      (s.id === "Vinyl-backed (single layer)" && insulationSystem.includes("Vinyl-backed")) ||
+                      (s.id === "Double-layer system" && insulationSystem.includes("Double-layer"));
                     return (
                       <button
-                        key={system}
+                        key={s.id}
                         type="button"
                         onClick={() =>
                           setInsulationSystem(
-                            system as
+                            s.id as
                               | "Vinyl-backed (single layer)"
                               | "Double-layer system"
                               | "Spray Foam"
                           )
                         }
-                        className={`w-full py-3 px-4 rounded-xl border text-left text-xs font-bold transition-all flex items-center gap-3 cursor-pointer ${
+                        className={`w-full py-2.5 px-3 rounded-lg border text-left text-xs font-semibold transition-all flex items-center gap-3 cursor-pointer ${
                           isSelected
-                            ? "border-purple-500 bg-purple-50/50 text-slate-900 shadow-2xs"
+                            ? "border-purple-400 bg-purple-50/70 text-slate-900 shadow-2xs"
                             : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                         }`}
                       >
                         <div
-                          className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                          className={`w-3.5 h-3.5 rounded-full flex items-center justify-center ${
                             isSelected
-                              ? "border-purple-600 bg-purple-600"
-                              : "border-slate-300 bg-white"
+                              ? "bg-purple-600"
+                              : "bg-slate-300"
                           }`}
-                        >
-                          {isSelected && (
-                            <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                          )}
-                        </div>
-                        <span>{system}</span>
+                        />
+                        <span>{s.label}</span>
                       </button>
                     );
                   })}
@@ -183,7 +221,7 @@ export function QuoteInsulationTab({
                   <select
                     value={insulationRValueRoof}
                     onChange={(e) => setInsulationRValueRoof(e.target.value)}
-                    className="w-full appearance-none border border-slate-200 rounded-lg px-3.5 py-2 text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-purple-500 cursor-pointer pr-10"
+                    className="w-full appearance-none border border-slate-200 rounded-lg px-3 py-2 text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-purple-500 cursor-pointer pr-10"
                   >
                     <option value="R-10">R-10</option>
                     <option value="R-13">R-13</option>
@@ -204,7 +242,7 @@ export function QuoteInsulationTab({
                   <select
                     value={insulationRValueWalls}
                     onChange={(e) => setInsulationRValueWalls(e.target.value)}
-                    className="w-full appearance-none border border-slate-200 rounded-lg px-3.5 py-2 text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-purple-500 cursor-pointer pr-10"
+                    className="w-full appearance-none border border-slate-200 rounded-lg px-3 py-2 text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-purple-500 cursor-pointer pr-10"
                   >
                     <option value="R-10">R-10</option>
                     <option value="R-13">R-13</option>
@@ -217,7 +255,7 @@ export function QuoteInsulationTab({
               </div>
             </div>
 
-            {/* Middle Column: Sliders (4 cols) */}
+            {/* Middle Column: Sliders */}
             <div className="md:col-span-4 space-y-6 pt-1">
               {/* COGS $/SF (Material + Labor) Slider */}
               <div className="space-y-2">
@@ -240,9 +278,6 @@ export function QuoteInsulationTab({
                     {insulationCogsSf.toFixed(2)}
                   </div>
                 </div>
-                <p className="text-[11px] text-slate-400 font-medium">
-                  Your cost per SF of footprint
-                </p>
               </div>
 
               {/* Target Margin % Slider */}
@@ -261,24 +296,21 @@ export function QuoteInsulationTab({
                     }
                     className="flex-1 accent-emerald-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
                   />
-                  <div className="border border-slate-200 rounded-lg px-3 py-1.5 bg-slate-50 text-xs font-bold text-slate-900 flex items-center gap-1 min-w-16 justify-between">
-                    <span>{insulationMarginPct}</span>
-                    <span className="text-slate-400 font-normal">%</span>
+                  <div className="border border-slate-200 rounded-lg px-3 py-1.5 bg-slate-50 text-xs font-bold text-slate-900 min-w-12 text-center">
+                    {insulationMarginPct}
                   </div>
+                  <span className="text-xs text-slate-600 font-normal">%</span>
                 </div>
-                <p className="text-[11px] text-slate-400 font-medium">
-                  Back-solves sell price from cost + margin
-                </p>
               </div>
             </div>
 
-            {/* Right Column: Live Result Card (4 cols) */}
-            <div className="md:col-span-4 border border-slate-200 rounded-xl bg-slate-50/40 p-5 space-y-5 shadow-2xs">
-              <span className="text-xs font-bold text-slate-800 block">
-                Live Result {!insulationInclude && "(Click 'Apply to Quote & SOW' to include)"}
+            {/* Right Column: Live Result Card */}
+            <div className="md:col-span-4 border border-slate-200 rounded-xl bg-white p-5 space-y-4 shadow-2xs">
+              <span className="text-xs font-bold text-slate-900 block">
+                Live Result
               </span>
 
-              <div className="grid grid-cols-2 gap-y-4 gap-x-6">
+              <div className="grid grid-cols-2 gap-y-5 gap-x-4">
                 {/* SYSTEM */}
                 <div className="space-y-0.5">
                   <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">
@@ -287,17 +319,19 @@ export function QuoteInsulationTab({
                   <span className="text-xs font-bold text-slate-900 block leading-tight">
                     {insulationSystem.includes("Vinyl-backed")
                       ? "Vinyl-Backed"
+                      : insulationSystem.includes("Double-layer")
+                      ? "Double-Layer"
                       : insulationSystem}
                   </span>
                 </div>
 
-                {/* AREA */}
+                {/* MARGIN */}
                 <div className="space-y-0.5">
                   <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">
-                    AREA
+                    MARGIN
                   </span>
                   <span className="text-xs font-bold text-slate-900 block">
-                    {Math.round(areaSqFt).toLocaleString()} SF
+                    {insulationMarginPct}%
                   </span>
                 </div>
 
@@ -316,7 +350,7 @@ export function QuoteInsulationTab({
                   <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">
                     COGS
                   </span>
-                  <span className="text-xs font-extrabold text-orange-600 block">
+                  <span className="text-xs font-bold text-orange-600 block">
                     ${Math.round(totalCogs).toLocaleString()} (${insulationCogsSf.toFixed(2)}/SF)
                   </span>
                 </div>
@@ -326,7 +360,7 @@ export function QuoteInsulationTab({
                   <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">
                     SELL
                   </span>
-                  <span className="text-xs font-extrabold text-blue-600 block">
+                  <span className="text-xs font-bold text-blue-600 block">
                     ${Math.round(totalSell).toLocaleString()} (${sellSf.toFixed(2)}/SF)
                   </span>
                 </div>
@@ -336,7 +370,7 @@ export function QuoteInsulationTab({
                   <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">
                     PROFIT
                   </span>
-                  <span className="text-xs font-extrabold text-emerald-600 block">
+                  <span className="text-xs font-bold text-emerald-600 block">
                     ${Math.round(totalProfit).toLocaleString()}
                   </span>
                 </div>
@@ -347,15 +381,10 @@ export function QuoteInsulationTab({
 
         {/* SOW Inclusions for Insulation */}
         <div className="space-y-4 pt-2">
-          <div className="flex items-center justify-between">
-            <label className="block text-xs font-bold text-slate-800">
-              SOW Inclusions for Insulation
-            </label>
-            <span className="text-[10px] text-slate-400">
-              Click items to include/exclude from SOW & Quote
-            </span>
-          </div>
-          <div className="flex flex-wrap items-center gap-2.5">
+          <label className="block text-xs font-bold text-slate-800">
+            SOW Inclusions for Insulation
+          </label>
+          <div className="flex flex-wrap items-center gap-4">
             {allSowInclusions.map((item, idx) => {
               const isSelected = insulationInclusions.includes(item);
               return (
@@ -363,21 +392,21 @@ export function QuoteInsulationTab({
                   key={idx}
                   type="button"
                   onClick={() => toggleInsulationInclusion(item)}
-                  className={`flex items-center gap-1.5 text-xs rounded-full px-3 py-1.5 transition-all cursor-pointer border ${
+                  className={`flex items-center gap-2 text-xs transition-all cursor-pointer select-none ${
                     isSelected
-                      ? "text-blue-700 bg-blue-50/90 border-blue-300 shadow-2xs font-bold"
-                      : "text-slate-500 bg-slate-100/70 border-slate-200 hover:bg-slate-200/60 font-medium"
+                      ? "text-[#2B6CB0] font-bold"
+                      : "text-slate-500 font-medium hover:text-slate-700"
                   }`}
                 >
-                  <span
+                  <div
                     className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${
                       isSelected
-                        ? "bg-blue-600 text-white"
-                        : "bg-slate-300 text-slate-600 font-bold"
+                        ? "bg-[#2B6CB0] text-white"
+                        : "border border-slate-300 bg-slate-100 text-slate-500"
                     }`}
                   >
-                    {isSelected ? "✓" : "+"}
-                  </span>
+                    {isSelected ? <Check className="w-2.5 h-2.5 stroke-3" /> : "+"}
+                  </div>
                   <span>{item}</span>
                 </button>
               );
@@ -394,7 +423,7 @@ export function QuoteInsulationTab({
               value={insulationNotes}
               onChange={(e) => setInsulationNotes(e.target.value)}
               placeholder="e.g. R-40 roof / R-30 walls in wash bay, exposed vapor barrier in storage area..."
-              className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500 bg-slate-50/50 resize-none"
+              className="w-full border border-slate-200 rounded-lg px-3.5 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500 bg-slate-50/50 resize-none"
             />
           </div>
         </div>
@@ -404,16 +433,16 @@ export function QuoteInsulationTab({
           <Button
             type="button"
             onClick={handleApply}
-            className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-5 py-2.5 rounded-lg text-xs font-semibold cursor-pointer shadow-xs flex items-center gap-1.5"
+            className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-6 py-2.5 rounded-lg text-xs font-bold cursor-pointer shadow-xs flex items-center gap-2"
           >
-            <Check className="h-3.5 w-3.5" />
+            <Check className="h-4 w-4 stroke-[2.5]" />
             Apply to Quote & SOW
           </Button>
           <Button
             type="button"
             variant="outline"
             onClick={handleReset}
-            className="border-slate-300 text-slate-700 px-6 py-2.5 rounded-lg text-xs font-semibold hover:bg-slate-50 cursor-pointer bg-white"
+            className="border-slate-300 text-slate-700 px-8 py-2.5 rounded-lg text-xs font-bold hover:bg-slate-50 cursor-pointer bg-white"
           >
             Reset
           </Button>

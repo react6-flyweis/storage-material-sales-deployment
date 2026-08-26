@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuotationStore } from "@/modules/quotation/quotation.store";
+import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 import { useQuotationPricing, type UseQuotationPricingParams } from "./use-quotation-pricing";
 import type { ShipperWeightByCategoryItem } from "../estimates.api";
 

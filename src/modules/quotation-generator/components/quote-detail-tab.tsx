@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { Printer, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useQuotationStore } from "@/modules/quotation/quotation.store";
+import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 import {
   downloadPdfProvider,
   type ExtractShipperResponseData,
@@ -280,7 +280,7 @@ export function QuoteDetailTab({
       <div className="flex flex-wrap items-center gap-3 pt-2">
         <Button
           type="button"
-          onClick={() => (onQuotePreview ? onQuotePreview() : navigate("/quotation/quote-preview"))}
+          onClick={() => (onQuotePreview ? onQuotePreview() : navigate("/quotation/quote-preview/view"))}
           className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-6 py-2.5 rounded-lg text-xs font-semibold cursor-pointer shadow-xs"
         >
           Quote Preview

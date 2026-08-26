@@ -11,7 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useQuotationStore } from "@/modules/quotation/quotation.store";
+import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 
 interface QuotationSidebarProps {
   isOpen?: boolean;
@@ -31,14 +31,20 @@ export function QuotationSidebar({
   // Compute activeTab from current route location
   const activeTab = location.pathname.includes("/quotation/pricing-rules")
     ? "pricing-rules"
-    : location.pathname.includes("/quotation/quote-history")
+    : location.pathname.includes("/quotation/history") ||
+      location.pathname.includes("/quotation/quote-history")
     ? "quote-history"
+    : location.pathname.includes("/quotation/storage-preview")
+    ? "storage-preview"
     : location.pathname.includes("/quotation/quote-preview")
     ? "quote-preview"
+    : location.pathname.includes("/quotation/storage")
+    ? "storage-cog"
     : location.pathname.includes("/quotation/create")
     ? "custom-quote"
     : location.pathname.includes("/quotation/extracted-drawing") ||
-      location.pathname.includes("/quotation/upload-drawing")
+      location.pathname.includes("/quotation/upload-drawing") ||
+      location.pathname.includes("/quotation/pemb")
     ? "pemb-quote"
     : "pemb-quote";
 
@@ -119,7 +125,8 @@ export function QuotationSidebar({
             <nav className="space-y-1">
               <button
                 onClick={() => {
-                  navigate("/quotation/extracted-drawing");
+                  setJobType("PEMB");
+                  navigate("/quotation/pemb");
                 }}
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-150 text-left cursor-pointer",
@@ -133,29 +140,38 @@ export function QuotationSidebar({
               </button>
 
               <button
-                onClick={() => {}}
+                onClick={() => {
+                  setJobType("Storage");
+                  navigate("/quotation/storage");
+                }}
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-150 text-left cursor-pointer",
-                  "text-slate-300 hover:bg-slate-800/50 hover:text-white"
+                  activeTab === "storage-cog"
+                    ? "bg-[#1d3d63] text-white border border-blue-400/30 shadow-xs"
+                    : "text-slate-300 hover:bg-slate-800/50 hover:text-white"
                 )}
               >
-                <Copy className="h-4 w-4 shrink-0 text-slate-300" />
+                <Copy className="h-4 w-4 shrink-0 text-amber-300" />
                 <span>Storage COG Sheet</span>
               </button>
 
               <button
                 onClick={() => {
-                  navigate("/quotation/quote-preview");
+                  if (jobType === "Storage") {
+                    navigate("/quotation/storage-preview");
+                  } else {
+                    navigate("/quotation/quote-preview");
+                  }
                 }}
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-150 text-left cursor-pointer",
-                  activeTab === "quote-preview"
+                  activeTab === "quote-preview" || activeTab === "storage-preview"
                     ? "bg-[#1d3d63] text-white border border-blue-400/30 shadow-xs"
                     : "text-slate-300 hover:bg-slate-800/50 hover:text-white"
                 )}
               >
                 <CheckSquare className="h-4 w-4 shrink-0 text-slate-300" />
-                <span>Quote Preview</span>
+                <span>{jobType === "Storage" ? "Storage Preview" : "Quote Preview"}</span>
               </button>
 
               <button
@@ -175,7 +191,7 @@ export function QuotationSidebar({
 
               <button
                 onClick={() => {
-                  navigate("/quotation/quote-history");
+                  navigate("/quotation/history");
                 }}
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-150 text-left cursor-pointer",
@@ -220,7 +236,12 @@ export function QuotationSidebar({
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => setJobType("PEMB")}
+                  onClick={() => {
+                    setJobType("PEMB");
+                    if (location.pathname.includes("/quotation/storage")) {
+                      navigate("/quotation/pemb");
+                    }
+                  }}
                   className={cn(
                     "py-2 px-3 rounded-lg text-xs font-bold transition-all text-center border cursor-pointer",
                     jobType === "PEMB"
@@ -232,7 +253,12 @@ export function QuotationSidebar({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setJobType("Storage")}
+                  onClick={() => {
+                    setJobType("Storage");
+                    if (!location.pathname.includes("/quotation/storage")) {
+                      navigate("/quotation/storage");
+                    }
+                  }}
                   className={cn(
                     "py-2 px-3 rounded-lg text-xs font-bold transition-all text-center border cursor-pointer",
                     jobType === "Storage"
