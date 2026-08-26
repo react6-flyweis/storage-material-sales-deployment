@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -46,6 +47,19 @@ import {
 } from "../components/storage-preview-document";
 import { StorageSowPreviewDocument } from "../components/storage-sow-preview-document";
 import { ContractPreviewDocument } from "../components/contract-preview-document";
+import { QuoteConcreteTab } from "../components/quote-concrete-tab";
+import { QuoteInsulationTab } from "../components/quote-insulation-tab";
+
+const tabs = [
+  { id: "breakdown", label: "Breakdown" },
+  { id: "quote", label: "Quote" },
+  { id: "sow", label: "Statement of Work" },
+  { id: "margin", label: "Margin" },
+  { id: "concrete", label: "Concrete" },
+  { id: "insulation", label: "Insulation" },
+  { id: "drawings", label: "Drawings" },
+  { id: "contract", label: "Contract" },
+];
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -93,6 +107,7 @@ export default function StorageQuotePage() {
   );
 
   const {
+    setJobType,
     scope,
     buildingSize: storeBuildingSize,
     setBuildingSize,
@@ -103,17 +118,11 @@ export default function StorageQuotePage() {
     installSell,
     setInstallSell,
     concreteInclude,
-    setConcreteInclude,
     concreteCostSf,
-    setConcreteCostSf,
     concreteMarginPct,
-    setConcreteMarginPct,
     insulationInclude,
-    setInsulationInclude,
     insulationCogsSf,
-    setInsulationCogsSf,
     insulationMarginPct,
-    setInsulationMarginPct,
     taxZip,
     setTaxZip,
     taxRate,
@@ -145,41 +154,79 @@ export default function StorageQuotePage() {
     storageDrawings,
     setStorageDrawings,
     concreteSlabThickness,
-    setConcreteSlabThickness,
+
     concretePsiRating,
-    setConcretePsiRating,
-    concreteNotes,
-    setConcreteNotes,
+
     insulationSystem,
-    setInsulationSystem,
+
     insulationRValueRoof,
-    setInsulationRValueRoof,
+
     insulationRValueWalls,
-    setInsulationRValueWalls,
+
   } = useQuotationStore();
 
-  const storageData = (storeStorageData as StorageData | null) || navState.storageData || null;
-  const storagePricing = (storeStoragePricing as StoragePricing | null) || navState.storagePricing || null;
-  const estimateId = storeStorageEstimateId || navState.estimateId || null;
-  const sourceFileName = storeStorageFileName || navState.sourceFileName || "";
+  const storageData =
+    navState.storageData ||
+    (storeStorageData as StorageData | null) ||
+    null;
+  const storagePricing =
+    navState.storagePricing ||
+    (storeStoragePricing as StoragePricing | null) ||
+    null;
+  const estimateId = navState.estimateId || storeStorageEstimateId || null;
+  const sourceFileName =
+    navState.sourceFileName || storeStorageFileName || "";
   const globalMarkup = storeGlobalMarkup ?? 25;
   const shippingVal = storeShipping ?? 12000;
   const drawingsVal = storeDrawingsCost ?? 0;
-  const customerLeadName = storeCustomerLeadName || navState.customerLeadName || storageData?.project?.customer || "";
-  const customerAddress = storeCustomerAddress || navState.customerAddress || storageData?.project?.location || "";
-  const customerEmail = storeCustomerEmail || navState.customerEmail || "";
-  const jobNumber = storeJobNumber || navState.jobNumber || storageData?.project?.jobNumber || "";
+  const customerLeadName =
+    navState.customerLeadName ||
+    storeCustomerLeadName ||
+    storageData?.project?.customer ||
+    "";
+  const customerAddress =
+    navState.customerAddress ||
+    storeCustomerAddress ||
+    storageData?.project?.location ||
+    "";
+  const customerEmail =
+    navState.customerEmail || storeCustomerEmail || "";
+  const jobNumber =
+    navState.jobNumber ||
+    storeJobNumber ||
+    storageData?.project?.jobNumber ||
+    "";
 
   useEffect(() => {
-    if (navState.storageData && !storeStorageData) setStorageData(navState.storageData as Record<string, unknown>);
-    if (navState.storagePricing && !storeStoragePricing) setStoragePricing(navState.storagePricing as Record<string, unknown>);
-    if (navState.estimateId && !storeStorageEstimateId) setStorageEstimateId(navState.estimateId);
-    if (navState.sourceFileName && !storeStorageFileName) setStorageFileName(navState.sourceFileName);
-    if (navState.customerLeadName && !storeCustomerLeadName) setStorageCustomerLeadName(navState.customerLeadName);
-    if (navState.customerAddress && !storeCustomerAddress) setStorageCustomerAddress(navState.customerAddress);
-    if (navState.customerEmail && !storeCustomerEmail) setStorageCustomerEmail(navState.customerEmail);
-    if (navState.jobNumber && !storeJobNumber) setStorageJobNumber(navState.jobNumber);
-  }, [navState, storeStorageData, storeStoragePricing, storeStorageEstimateId, storeStorageFileName, storeCustomerLeadName, storeCustomerAddress, storeCustomerEmail, storeJobNumber, setStorageData, setStoragePricing, setStorageEstimateId, setStorageFileName, setStorageCustomerLeadName, setStorageCustomerAddress, setStorageCustomerEmail, setStorageJobNumber]);
+    setJobType("Storage");
+    if (installCost === 5.5 || installCost === 5.85) {
+      setInstallCost(2.5);
+    }
+    if (installSell === 8.5 || installSell === 9.0) {
+      setInstallSell(3.25);
+    }
+  }, [setJobType, installCost, installSell, setInstallCost, setInstallSell]);
+
+  useEffect(() => {
+    if (navState.storageData) setStorageData(navState.storageData as Record<string, unknown>);
+    if (navState.storagePricing) setStoragePricing(navState.storagePricing as Record<string, unknown>);
+    if (navState.estimateId) setStorageEstimateId(navState.estimateId);
+    if (navState.sourceFileName) setStorageFileName(navState.sourceFileName);
+    if (navState.customerLeadName) setStorageCustomerLeadName(navState.customerLeadName);
+    if (navState.customerAddress) setStorageCustomerAddress(navState.customerAddress);
+    if (navState.customerEmail) setStorageCustomerEmail(navState.customerEmail);
+    if (navState.jobNumber) setStorageJobNumber(navState.jobNumber);
+  }, [
+    navState,
+    setStorageData,
+    setStoragePricing,
+    setStorageEstimateId,
+    setStorageFileName,
+    setStorageCustomerLeadName,
+    setStorageCustomerAddress,
+    setStorageCustomerEmail,
+    setStorageJobNumber,
+  ]);
 
   const setGlobalMarkup = setStorageGlobalMarkup;
   const setShippingVal = setStorageShipping;
@@ -188,16 +235,11 @@ export default function StorageQuotePage() {
   const setCustomerAddress = setStorageCustomerAddress;
   const setCustomerEmail = setStorageCustomerEmail;
   const setJobNumber = setStorageJobNumber;
-  const setConcreteThickness = (v: 4 | 6) => setConcreteSlabThickness(v === 4 ? '4"' : '6"');
   const concreteThickness: 4 | 6 = concreteSlabThickness === '4"' ? 4 : 6;
   const concretePsi = concretePsiRating;
-  const setConcretePsi = setConcretePsiRating;
   const setSourceFileName = setStorageFileName;
   const insulationRoofR = insulationRValueRoof || "R-19";
-  const setInsulationRoofR = setInsulationRValueRoof;
   const insulationWallR = insulationRValueWalls || "R-13";
-  const setInsulationWallR = setInsulationRValueWalls;
-
   const [searchParams] = useSearchParams();
   const initialLeadId =
     searchParams.get("lead") ||
@@ -852,7 +894,15 @@ export default function StorageQuotePage() {
   const doors = storageData?.doors || [];
   const extras = storageData?.extras || [];
 
-  const totalSqFt = Number(storagePricing?.totalSqFt || storagePricing?.squareFootage || 0);
+  const totalSqFt =
+    Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) ||
+    buildings.reduce(
+      (acc, b) =>
+        acc +
+        (Number(b.sqft || b.squareFootage) ||
+          Number(b.width || 0) * Number(b.length || 0)),
+      0
+    );
   const grandTotal = Number(storagePricing?.grandTotal || storagePricing?.totSell || storagePricing?.totalSell || 0);
   const totalCost = Number(storagePricing?.totalCost || storagePricing?.totCost || 0);
   const totalProfit = Number(storagePricing?.profit || grandTotal - totalCost);
@@ -866,6 +916,19 @@ export default function StorageQuotePage() {
   const laborProfit = installSell - installCost;
   const laborMarginPct =
     installSell > 0 ? (laborProfit / installSell) * 100 : 0;
+  const laborSellTotal =
+    scope.toLowerCase() === "supply"
+      ? 0
+      : Number(
+          storagePricing?.labor ??
+            storagePricing?.installation ??
+            storagePricing?.instSell ??
+            storagePricing?.installSell ??
+            storagePricing?.erection ??
+            storagePricing?.erectionSell ??
+            storagePricing?.laborSell ??
+            totalSqFt * installSell
+        );
 
   return (
     <div className="space-y-5 p-5">
@@ -1031,9 +1094,9 @@ export default function StorageQuotePage() {
 
       {/* Customer & Project Info Collapsible Card */}
       {/* Customer & Project Info Card */}
-      <Card className="border border-slate-200 bg-white rounded-xl shadow-xs overflow-hidden">
+      <Card className="border border-slate-200 pt-0">
         {/* Card Header: Select Lead Section */}
-        <CardHeader className="border-b bg-slate-50/50 p-5">
+        <CardHeader className="border-b bg-slate-50/50 pt-5">
           <div>
             <label className="block text-sm font-semibold text-slate-800 mb-2">
               Select Lead
@@ -1072,7 +1135,7 @@ export default function StorageQuotePage() {
         </CardHeader>
 
         {/* Card Content: Customer & Project Info Form */}
-        <CardContent className="p-6">
+        <CardContent className="">
           {/* Customer & Project Information Header */}
           <div className="flex items-start gap-3 mb-6">
             <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0 mt-0.5">
@@ -1097,115 +1160,115 @@ export default function StorageQuotePage() {
             </div>
           </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 pt-1">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
-                  Customer / Company
-                </label>
-                <Input
-                  value={customerLeadName}
-                  onChange={(e) => setCustomerLeadName(e.target.value)}
-                  placeholder="e.g. Garry Baright"
-                  className="h-9 text-xs bg-slate-50 font-semibold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
-                  Customer Email
-                </label>
-                <Input
-                  type="email"
-                  value={customerEmail}
-                  onChange={(e) => setCustomerEmail(e.target.value)}
-                  placeholder="customer@email.com"
-                  className="h-9 text-xs bg-slate-50"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
-                  Street Address
-                </label>
-                <Input
-                  value={customerAddress}
-                  onChange={(e) => setCustomerAddress(e.target.value)}
-                  placeholder="123 Main St"
-                  className="h-9 text-xs bg-slate-50"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
-                  City, State ZIP
-                </label>
-                <Input
-                  value={customerAddress}
-                  onChange={(e) => setCustomerAddress(e.target.value)}
-                  placeholder="Modena, NY 12548"
-                  className="h-9 text-xs bg-slate-50"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
-                  Building Size
-                </label>
-                <Input
-                  value={storeBuildingSize || (navState.buildingSize as string) || (buildings.length > 0 ? `${buildings.length} Buildings` : "")}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setBuildingSize(val);
-                    const match = val.toLowerCase().match(/(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/);
-                    if (match) {
-                      const computed = parseFloat(match[1]) * parseFloat(match[2]);
-                      if (computed > 0) setSquareFootage(computed);
-                    }
-                  }}
-                  placeholder="e.g. 40x100x14"
-                  className="h-9 text-xs bg-slate-50"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
-                  Square Footage
-                </label>
-                <Input
-                  value={totalSqFt > 0 ? String(totalSqFt) : storeSquareFootage > 0 ? String(storeSquareFootage) : (navState.squareFootage ? String(navState.squareFootage) : "")}
-                  onChange={(e) => setSquareFootage(Number(e.target.value) || 0)}
-                  placeholder="e.g. 4000"
-                  className="h-9 text-xs bg-slate-50"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
-                  Job Number
-                </label>
-                <Input
-                  value={jobNumber}
-                  onChange={(e) => setJobNumber(e.target.value)}
-                  placeholder="8098"
-                  className="h-9 text-xs bg-slate-50"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
-                  Quote Date
-                </label>
-                <Input
-                  defaultValue={new Date().toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                  className="h-9 text-xs bg-slate-50"
-                />
-              </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 pt-1">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                Customer / Company
+              </label>
+              <Input
+                value={customerLeadName}
+                onChange={(e) => setCustomerLeadName(e.target.value)}
+                placeholder="e.g. Garry Baright"
+                className="h-9 text-xs bg-slate-50 font-semibold"
+              />
             </div>
-          </CardContent>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                Customer Email
+              </label>
+              <Input
+                type="email"
+                value={customerEmail}
+                onChange={(e) => setCustomerEmail(e.target.value)}
+                placeholder="customer@email.com"
+                className="h-9 text-xs bg-slate-50"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                Street Address
+              </label>
+              <Input
+                value={customerAddress}
+                onChange={(e) => setCustomerAddress(e.target.value)}
+                placeholder="123 Main St"
+                className="h-9 text-xs bg-slate-50"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                City, State ZIP
+              </label>
+              <Input
+                value={customerAddress}
+                onChange={(e) => setCustomerAddress(e.target.value)}
+                placeholder="Modena, NY 12548"
+                className="h-9 text-xs bg-slate-50"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                Building Size
+              </label>
+              <Input
+                value={storeBuildingSize || (navState.buildingSize as string) || (buildings.length > 0 ? `${buildings.length} Buildings` : "")}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setBuildingSize(val);
+                  const match = val.toLowerCase().match(/(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/);
+                  if (match) {
+                    const computed = parseFloat(match[1]) * parseFloat(match[2]);
+                    if (computed > 0) setSquareFootage(computed);
+                  }
+                }}
+                placeholder="e.g. 40x100x14"
+                className="h-9 text-xs bg-slate-50"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                Square Footage
+              </label>
+              <Input
+                value={totalSqFt > 0 ? String(totalSqFt) : storeSquareFootage > 0 ? String(storeSquareFootage) : (navState.squareFootage ? String(navState.squareFootage) : "")}
+                onChange={(e) => setSquareFootage(Number(e.target.value) || 0)}
+                placeholder="e.g. 4000"
+                className="h-9 text-xs bg-slate-50"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                Job Number
+              </label>
+              <Input
+                value={jobNumber}
+                onChange={(e) => setJobNumber(e.target.value)}
+                placeholder="8098"
+                className="h-9 text-xs bg-slate-50"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                Quote Date
+              </label>
+              <Input
+                defaultValue={new Date().toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+                className="h-9 text-xs bg-slate-50"
+              />
+            </div>
+          </div>
+        </CardContent>
       </Card>
 
       {/* Step 1: COG Sheet Upload */}
@@ -1251,7 +1314,7 @@ export default function StorageQuotePage() {
           {isUploading ? (
             <div className="flex flex-col items-center gap-2 text-blue-600">
               <Loader2 className="h-8 w-8 animate-spin" />
-              <span className="text-xs font-bold">Extracting via Backend API...</span>
+              <span className="text-xs font-bold">Extracting...</span>
             </div>
           ) : (
             <div className="space-y-1">
@@ -1273,572 +1336,626 @@ export default function StorageQuotePage() {
 
       {/* Storage Results Area with Tabs */}
       {storageData && (
-        <div className="space-y-4">
-          {/* Navigation Tabs */}
-          <div className="flex items-center gap-1 border-b border-slate-200 overflow-x-auto pb-px">
-            <button
-              type="button"
-              onClick={() => setActiveTab("breakdown")}
-              className={`px-4 py-2 text-xs font-bold rounded-t-lg transition-colors cursor-pointer border-b-2 ${activeTab === "breakdown"
-                ? "border-blue-600 text-blue-600 bg-white"
-                : "border-transparent text-slate-500 hover:text-slate-900"
-                }`}
-            >
-              📊 Buildings
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("quote")}
-              className={`px-4 py-2 text-xs font-bold rounded-t-lg transition-colors cursor-pointer border-b-2 ${activeTab === "quote"
-                ? "border-blue-600 text-blue-600 bg-white"
-                : "border-transparent text-slate-500 hover:text-slate-900"
-                }`}
-            >
-              Quote
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("sow")}
-              className={`px-4 py-2 text-xs font-bold rounded-t-lg transition-colors cursor-pointer border-b-2 ${activeTab === "sow"
-                ? "border-blue-600 text-blue-600 bg-white"
-                : "border-transparent text-slate-500 hover:text-slate-900"
-                }`}
-            >
-              Statement of Work
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("margin")}
-              className={`px-4 py-2 text-xs font-bold rounded-t-lg transition-colors cursor-pointer border-b-2 ${activeTab === "margin"
-                ? "border-blue-600 text-blue-600 bg-white"
-                : "border-transparent text-slate-500 hover:text-slate-900"
-                }`}
-            >
-              💰 Margin
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("concrete")}
-              className={`px-4 py-2 text-xs font-bold rounded-t-lg transition-colors cursor-pointer border-b-2 ${activeTab === "concrete"
-                ? "border-blue-600 text-blue-600 bg-white"
-                : "border-transparent text-slate-500 hover:text-slate-900"
-                }`}
-            >
-              🪨 Concrete
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("insulation")}
-              className={`px-4 py-2 text-xs font-bold rounded-t-lg transition-colors cursor-pointer border-b-2 ${activeTab === "insulation"
-                ? "border-blue-600 text-blue-600 bg-white"
-                : "border-transparent text-slate-500 hover:text-slate-900"
-                }`}
-            >
-              🧱 Insulation
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("drawings")}
-              className={`px-4 py-2 text-xs font-bold rounded-t-lg transition-colors cursor-pointer border-b-2 ${activeTab === "drawings"
-                ? "border-blue-600 text-blue-600 bg-white"
-                : "border-transparent text-slate-500 hover:text-slate-900"
-                }`}
-            >
-              📐 Drawings
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("contract")}
-              className={`px-4 py-2 text-xs font-bold rounded-t-lg transition-colors cursor-pointer border-b-2 ${activeTab === "contract"
-                ? "border-blue-600 text-blue-600 bg-white"
-                : "border-transparent text-slate-500 hover:text-slate-900"
-                }`}
-            >
-              📄 Contract
-            </button>
-          </div>
+        <Card className="border border-slate-200 bg-white rounded-xl shadow-xs p-5">
+          <Tabs
+            value={activeTab}
+            onValueChange={(val) =>
+              setActiveTab(
+                val as
+                | "breakdown"
+                | "quote"
+                | "sow"
+                | "margin"
+                | "concrete"
+                | "insulation"
+                | "drawings"
+                | "contract"
+              )
+            }
+            className="w-full space-y-6"
+          >
+            <div className="border-b border-slate-200 overflow-x-auto pb-1">
+              <TabsList variant="line" className="h-auto p-0 gap-6 min-w-max">
+                {tabs.map((tab) => (
+                  <TabsTrigger key={tab.id} value={tab.id}>
+                    {tab.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
 
-          {/* TAB 1: BUILDINGS BREAKDOWN */}
-          {activeTab === "breakdown" && (
-            <div className="space-y-4">
-              {/* Buildings Table */}
-              <Card className="p-5 bg-white border border-slate-200 rounded-xl space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                      🏗️ Buildings
-                    </h3>
-                    <p className="text-[11px] text-slate-500">
-                      Edit inline · markup per building or apply global
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleAddBuilding}
-                      className="h-8 text-xs font-semibold cursor-pointer"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      Add Building
-                    </Button>
-                    <span className="text-xs font-bold bg-blue-100 text-blue-900 px-3 py-1 rounded-full">
-                      {buildings.length} bldgs · {totalSqFt.toLocaleString()} SF
-                    </span>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto rounded-lg border border-slate-200">
-                  <table className="w-full text-left text-xs border-collapse min-w-225">
-                    <thead>
-                      <tr className="bg-slate-100/80 text-slate-700 text-[11px] uppercase font-bold border-b border-slate-200">
-                        <th className="p-2.5">Building</th>
-                        <th className="p-2.5 text-right">Width</th>
-                        <th className="p-2.5 text-right">Length</th>
-                        <th className="p-2.5 text-right">Lo Eave</th>
-                        <th className="p-2.5 text-right">Hi Eave</th>
-                        <th className="p-2.5">Slope</th>
-                        <th className="p-2.5 text-right">SF</th>
-                        <th className="p-2.5 text-right">COGS</th>
-                        <th className="p-2.5 text-right">$/SF COGS</th>
-                        <th className="p-2.5 text-right">Markup %</th>
-                        <th className="p-2.5 text-right">Sell</th>
-                        <th className="p-2.5">Wall</th>
-                        <th className="p-2.5">Roof Type</th>
-                        <th className="p-2.5 text-center"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-700">
-                      {buildings.map((b, idx) => {
-                        const bSqft = Number(b.sqft || 0);
-                        const bCogs = Number(b.cost || b.cogs || 0);
-                        const bSell = Number(b.sellPrice || 0);
-                        const psf = bSqft > 0 ? (bCogs / bSqft).toFixed(2) : "0.00";
-                        return (
-                          <tr key={idx} className="hover:bg-slate-50/50">
-                            <td className="p-2">
-                              <Input
-                                value={b.name || ""}
-                                onChange={(e) =>
-                                  handleUpdateBuilding(idx, "name", e.target.value)
-                                }
-                                className="h-8 w-24 text-xs font-semibold"
-                              />
-                            </td>
-                            <td className="p-2 text-right">
-                              <Input
-                                type="number"
-                                value={b.width !== undefined ? b.width : ""}
-                                onChange={(e) =>
-                                  handleUpdateBuilding(
-                                    idx,
-                                    "width",
-                                    parseFloat(e.target.value) || 0
-                                  )
-                                }
-                                className="h-8 w-16 text-right text-xs"
-                              />
-                            </td>
-                            <td className="p-2 text-right">
-                              <Input
-                                type="number"
-                                value={b.length !== undefined ? b.length : ""}
-                                onChange={(e) =>
-                                  handleUpdateBuilding(
-                                    idx,
-                                    "length",
-                                    parseFloat(e.target.value) || 0
-                                  )
-                                }
-                                className="h-8 w-16 text-right text-xs"
-                              />
-                            </td>
-                            <td className="p-2 text-right">
-                              <Input
-                                type="number"
-                                value={b.loEave !== undefined ? b.loEave : (b.eaveHeight || "")}
-                                onChange={(e) =>
-                                  handleUpdateBuilding(
-                                    idx,
-                                    "loEave",
-                                    parseFloat(e.target.value) || 0
-                                  )
-                                }
-                                className="h-8 w-14 text-right text-xs"
-                              />
-                            </td>
-                            <td className="p-2 text-right">
-                              <Input
-                                type="number"
-                                value={b.hiEave !== undefined ? b.hiEave : (b.loEave || "")}
-                                onChange={(e) =>
-                                  handleUpdateBuilding(
-                                    idx,
-                                    "hiEave",
-                                    parseFloat(e.target.value) || 0
-                                  )
-                                }
-                                className="h-8 w-14 text-right text-xs"
-                              />
-                            </td>
-                            <td className="p-2">
-                              <Input
-                                value={b.slope || b.roofPitch || "0.5:12"}
-                                onChange={(e) =>
-                                  handleUpdateBuilding(idx, "slope", e.target.value)
-                                }
-                                className="h-8 w-18 text-xs"
-                              />
-                            </td>
-                            <td className="p-2 text-right font-bold text-slate-800">
-                              {bSqft.toLocaleString()}
-                            </td>
-                            <td className="p-2 text-right font-semibold text-amber-700">
-                              {fmt(bCogs)}
-                            </td>
-                            <td className="p-2 text-right">
-                              <Input
-                                type="number"
-                                step="0.1"
-                                value={b.psf !== undefined ? b.psf : psf}
-                                onChange={(e) =>
-                                  handleUpdateBuilding(
-                                    idx,
-                                    "psf",
-                                    parseFloat(e.target.value) || 0
-                                  )
-                                }
-                                className="h-8 w-18 text-right text-xs"
-                              />
-                            </td>
-                            <td className="p-2 text-right">
-                              <Input
-                                type="number"
-                                value={b.markup !== undefined ? b.markup : 25}
-                                onChange={(e) =>
-                                  handleUpdateBuilding(
-                                    idx,
-                                    "markup",
-                                    parseFloat(e.target.value) || 0
-                                  )
-                                }
-                                className="h-8 w-16 text-right text-xs font-bold text-emerald-700"
-                              />
-                            </td>
-                            <td className="p-2 text-right font-extrabold text-blue-900">
-                              {fmt(bSell)}
-                            </td>
-                            <td className="p-2 text-slate-600 font-medium">
-                              {String(b.wallPanel || b.wallColor || "26ga R-Loc")}
-                            </td>
-                            <td className="p-2">
-                              <select
-                                value={b.roofType || "screw-down"}
-                                onChange={(e) =>
-                                  handleUpdateBuilding(idx, "roofType", e.target.value)
-                                }
-                                className="h-8 rounded border border-slate-200 bg-white px-2 text-xs"
-                              >
-                                <option value="screw-down">Screw-Down</option>
-                                <option value="standing-seam">Standing Seam</option>
-                                <option value="r-panel">R-Panel</option>
-                                <option value="galvalume">Galvalume</option>
-                              </select>
-                            </td>
-                            <td className="p-2 text-center">
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveBuilding(idx)}
-                                className="text-red-500 hover:text-red-700 cursor-pointer p-1"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                    <tfoot>
-                      <tr className="bg-slate-50 font-bold border-t-2 border-slate-200">
-                        <td className="p-2.5">Totals</td>
-                        <td colSpan={5}></td>
-                        <td className="p-2.5 text-right">{totalSqFt.toLocaleString()} SF</td>
-                        <td className="p-2.5 text-right text-amber-700">
-                          {fmt(storagePricing?.buildingsSubtotal ? (storagePricing.buildingsSubtotal * 0.8) : 0)}
-                        </td>
-                        <td></td>
-                        <td></td>
-                        <td className="p-2.5 text-right text-blue-900">
-                          {fmt(storagePricing?.buildingsSubtotal)}
-                        </td>
-                        <td colSpan={3}></td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              </Card>
-
-              {/* Pricing Controls Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* 1. Global Material Markup */}
-                <Card className="p-4 bg-white border border-slate-200 rounded-xl space-y-3">
-                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                    📦 Material Markup %
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="range"
-                      min="0"
-                      max="80"
-                      value={globalMarkup}
-                      onChange={(e) => setGlobalMarkup(parseInt(e.target.value))}
-                      className="w-full accent-blue-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
-                    />
-                    <span className="text-sm font-bold text-blue-900 w-12 text-right">
-                      {globalMarkup}%
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-500">
-                    Adjusts sell price on all buildings.
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleApplyGlobalMarkup}
-                    className="w-full h-8 text-xs font-bold text-blue-700 border-blue-200 hover:bg-blue-50 cursor-pointer"
-                  >
-                    Apply to All Buildings
-                  </Button>
-                </Card>
-
-                {/* 2. Erection / Labor */}
-                <Card className="p-4 bg-emerald-50/40 border border-emerald-200 rounded-xl space-y-3">
-                  <div className="text-[10px] font-bold text-emerald-900 uppercase tracking-wider">
-                    🏗️ Erection / Labor
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[11px] text-slate-600 font-semibold">
-                      <span>Cost $/SF:</span>
-                      <span className="text-amber-700 font-bold">${installCost.toFixed(2)}</span>
+            {/* TAB 1: BUILDINGS BREAKDOWN */}
+            <TabsContent value="breakdown" className="m-0 outline-none">
+              <div className="space-y-4">
+                {/* Buildings Table */}
+                <Card className="p-5 bg-white border border-slate-200 rounded-xl space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <div>
+                      <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                        🏗️ Buildings
+                      </h3>
+                      <p className="text-[11px] text-slate-500">
+                        Edit inline · markup per building or apply global
+                      </p>
                     </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="12"
-                      step="0.25"
-                      value={installCost}
-                      onChange={(e) => setInstallCost(parseFloat(e.target.value))}
-                      className="w-full accent-amber-500 cursor-pointer h-2 bg-slate-200 rounded-lg"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[11px] text-slate-600 font-semibold">
-                      <span>Sell $/SF:</span>
-                      <span className="text-emerald-700 font-bold">${installSell.toFixed(2)}</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="15"
-                      step="0.25"
-                      value={installSell}
-                      onChange={(e) => setInstallSell(parseFloat(e.target.value))}
-                      className="w-full accent-emerald-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
-                    />
-                  </div>
-                  <div className="p-2 bg-white/80 rounded text-[11px] font-bold text-emerald-700 border border-emerald-100 flex justify-between">
-                    <span>Labor Margin:</span>
-                    <span>${laborProfit.toFixed(2)}/SF ({laborMarginPct.toFixed(1)}%)</span>
-                  </div>
-                </Card>
-
-                {/* 3. Shipping & Drawings & Tax */}
-                <Card className="p-4 bg-white border border-slate-200 rounded-xl space-y-2.5">
-                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                    🚚 Shipping & Drawings
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
-                      Shipping / Freight $
-                    </label>
-                    <Input
-                      type="number"
-                      value={shippingVal}
-                      onChange={(e) => setShippingVal(parseFloat(e.target.value) || 0)}
-                      className="h-8 text-xs bg-slate-50 font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
-                      Engineering Drawings $
-                    </label>
-                    <Input
-                      type="number"
-                      value={drawingsVal}
-                      onChange={(e) => setDrawingsVal(parseFloat(e.target.value) || 0)}
-                      className="h-8 text-xs bg-slate-50 font-bold"
-                    />
-                  </div>
-                  <div className="pt-1">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <Input
-                        value={taxZip}
-                        onChange={(e) => setTaxZip(e.target.value)}
-                        placeholder="ZIP"
-                        maxLength={5}
-                        className="h-7 text-xs w-20 text-center font-bold"
-                      />
+                    <div className="flex items-center gap-3">
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={handleTaxLookup}
-                        disabled={isTaxLookingUp}
-                        className="h-7 px-2 text-[11px] font-bold cursor-pointer shrink-0"
+                        onClick={handleAddBuilding}
+                        className="h-8 text-xs font-semibold cursor-pointer"
                       >
-                        {isTaxLookingUp ? <Loader2 className="h-3 w-3 animate-spin" /> : "Lookup"}
+                        <Plus className="h-3.5 w-3.5" />
+                        Add Building
                       </Button>
+                      <span className="text-xs font-bold bg-blue-100 text-blue-900 px-3 py-1 rounded-full">
+                        {buildings.length} bldgs · {totalSqFt.toLocaleString()} SF
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-lg border border-slate-200">
+                    <table className="w-full text-left text-xs border-collapse min-w-225">
+                      <thead>
+                        <tr className="bg-slate-100/80 text-slate-700 text-[11px] uppercase font-bold border-b border-slate-200">
+                          <th className="p-2.5">Building</th>
+                          <th className="p-2.5 text-right">Width</th>
+                          <th className="p-2.5 text-right">Length</th>
+                          <th className="p-2.5 text-right">Lo Eave</th>
+                          <th className="p-2.5 text-right">Hi Eave</th>
+                          <th className="p-2.5">Slope</th>
+                          <th className="p-2.5 text-right">SF</th>
+                          <th className="p-2.5 text-right">COGS</th>
+                          <th className="p-2.5 text-right">$/SF COGS</th>
+                          <th className="p-2.5 text-right">Markup %</th>
+                          <th className="p-2.5 text-right">Sell</th>
+                          <th className="p-2.5">Wall</th>
+                          <th className="p-2.5">Roof Type</th>
+                          <th className="p-2.5 text-center"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-slate-700">
+                        {buildings.map((b, idx) => {
+                          const bSqft = Number(b.sqft || 0);
+                          const bCogs = Number(b.cost || b.cogs || 0);
+                          const bSell = Number(b.sellPrice || 0);
+                          const psf = bSqft > 0 ? (bCogs / bSqft).toFixed(2) : "0.00";
+                          return (
+                            <tr key={idx} className="hover:bg-slate-50/50">
+                              <td className="p-2">
+                                <Input
+                                  value={b.name || ""}
+                                  onChange={(e) =>
+                                    handleUpdateBuilding(idx, "name", e.target.value)
+                                  }
+                                  className="h-8 w-24 text-xs font-semibold"
+                                />
+                              </td>
+                              <td className="p-2 text-right">
+                                <Input
+                                  type="number"
+                                  value={b.width !== undefined ? b.width : ""}
+                                  onChange={(e) =>
+                                    handleUpdateBuilding(
+                                      idx,
+                                      "width",
+                                      parseFloat(e.target.value) || 0
+                                    )
+                                  }
+                                  className="h-8 w-16 text-right text-xs"
+                                />
+                              </td>
+                              <td className="p-2 text-right">
+                                <Input
+                                  type="number"
+                                  value={b.length !== undefined ? b.length : ""}
+                                  onChange={(e) =>
+                                    handleUpdateBuilding(
+                                      idx,
+                                      "length",
+                                      parseFloat(e.target.value) || 0
+                                    )
+                                  }
+                                  className="h-8 w-16 text-right text-xs"
+                                />
+                              </td>
+                              <td className="p-2 text-right">
+                                <Input
+                                  type="number"
+                                  value={b.loEave !== undefined ? b.loEave : (b.eaveHeight || "")}
+                                  onChange={(e) =>
+                                    handleUpdateBuilding(
+                                      idx,
+                                      "loEave",
+                                      parseFloat(e.target.value) || 0
+                                    )
+                                  }
+                                  className="h-8 w-14 text-right text-xs"
+                                />
+                              </td>
+                              <td className="p-2 text-right">
+                                <Input
+                                  type="number"
+                                  value={b.hiEave !== undefined ? b.hiEave : (b.loEave || "")}
+                                  onChange={(e) =>
+                                    handleUpdateBuilding(
+                                      idx,
+                                      "hiEave",
+                                      parseFloat(e.target.value) || 0
+                                    )
+                                  }
+                                  className="h-8 w-14 text-right text-xs"
+                                />
+                              </td>
+                              <td className="p-2">
+                                <Input
+                                  value={b.slope || b.roofPitch || "0.5:12"}
+                                  onChange={(e) =>
+                                    handleUpdateBuilding(idx, "slope", e.target.value)
+                                  }
+                                  className="h-8 w-18 text-xs"
+                                />
+                              </td>
+                              <td className="p-2 text-right font-bold text-slate-800">
+                                {bSqft.toLocaleString()}
+                              </td>
+                              <td className="p-2 text-right font-semibold text-amber-700">
+                                {fmt(bCogs)}
+                              </td>
+                              <td className="p-2 text-right">
+                                <Input
+                                  type="number"
+                                  step="0.1"
+                                  value={b.psf !== undefined ? b.psf : psf}
+                                  onChange={(e) =>
+                                    handleUpdateBuilding(
+                                      idx,
+                                      "psf",
+                                      parseFloat(e.target.value) || 0
+                                    )
+                                  }
+                                  className="h-8 w-18 text-right text-xs"
+                                />
+                              </td>
+                              <td className="p-2 text-right">
+                                <Input
+                                  type="number"
+                                  value={b.markup !== undefined ? b.markup : 25}
+                                  onChange={(e) =>
+                                    handleUpdateBuilding(
+                                      idx,
+                                      "markup",
+                                      parseFloat(e.target.value) || 0
+                                    )
+                                  }
+                                  className="h-8 w-16 text-right text-xs font-bold text-emerald-700"
+                                />
+                              </td>
+                              <td className="p-2 text-right font-extrabold text-blue-900">
+                                {fmt(bSell)}
+                              </td>
+                              <td className="p-2 text-slate-600 font-medium">
+                                {String(b.wallPanel || b.wallColor || "26ga R-Loc")}
+                              </td>
+                              <td className="p-2">
+                                <select
+                                  value={b.roofType || "screw-down"}
+                                  onChange={(e) =>
+                                    handleUpdateBuilding(idx, "roofType", e.target.value)
+                                  }
+                                  className="h-8 rounded border border-slate-200 bg-white px-2 text-xs"
+                                >
+                                  <option value="screw-down">Screw-Down</option>
+                                  <option value="standing-seam">Standing Seam</option>
+                                  <option value="r-panel">R-Panel</option>
+                                  <option value="galvalume">Galvalume</option>
+                                </select>
+                              </td>
+                              <td className="p-2 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveBuilding(idx)}
+                                  className="text-red-500 hover:text-red-700 cursor-pointer p-1"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-slate-50 font-bold border-t-2 border-slate-200">
+                          <td className="p-2.5">Totals</td>
+                          <td colSpan={5}></td>
+                          <td className="p-2.5 text-right">{totalSqFt.toLocaleString()} SF</td>
+                          <td className="p-2.5 text-right text-amber-700">
+                            {fmt(storagePricing?.buildingsSubtotal ? (storagePricing.buildingsSubtotal * 0.8) : 0)}
+                          </td>
+                          <td></td>
+                          <td></td>
+                          <td className="p-2.5 text-right text-blue-900">
+                            {fmt(storagePricing?.buildingsSubtotal)}
+                          </td>
+                          <td colSpan={3}></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </Card>
+
+                {/* Pricing Controls Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2  gap-4">
+                  {/* 1. Global Material Markup */}
+                  <Card className="p-4 bg-white border border-slate-200 rounded-xl space-y-3">
+                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      📦 Material Markup %
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min="0"
+                        max="80"
+                        value={globalMarkup}
+                        onChange={(e) => setGlobalMarkup(parseInt(e.target.value))}
+                        className="w-full accent-blue-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
+                      />
+                      <span className="text-sm font-bold text-blue-900 w-12 text-right">
+                        {globalMarkup}%
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Adjusts sell price on all buildings.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleApplyGlobalMarkup}
+                      className="w-full h-8 text-xs font-bold text-blue-700 border-blue-200 hover:bg-blue-50 cursor-pointer"
+                    >
+                      Apply to All Buildings
+                    </Button>
+                  </Card>
+
+                  {/* 2. Erection / Labor */}
+                  <Card className="p-4 bg-emerald-50/40 border border-emerald-200 rounded-xl space-y-3">
+                    <div className="text-[10px] font-bold text-emerald-900 uppercase tracking-wider">
+                      🏗️ Erection / Labor
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px] text-slate-600 font-semibold">
+                        <span>Cost $/SF:</span>
+                        <span className="text-amber-700 font-bold">${installCost.toFixed(2)}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="12"
+                        step="0.25"
+                        value={installCost}
+                        onChange={(e) => setInstallCost(parseFloat(e.target.value))}
+                        className="w-full accent-amber-500 cursor-pointer h-2 bg-slate-200 rounded-lg"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px] text-slate-600 font-semibold">
+                        <span>Sell $/SF:</span>
+                        <span className="text-emerald-700 font-bold">${installSell.toFixed(2)}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="15"
+                        step="0.25"
+                        value={installSell}
+                        onChange={(e) => setInstallSell(parseFloat(e.target.value))}
+                        className="w-full accent-emerald-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
+                      />
+                    </div>
+                    <div className="p-2 bg-white/80 rounded text-[11px] font-bold text-emerald-700 border border-emerald-100 flex justify-between items-center">
+                      <div>
+                        <span>Labor Total: </span>
+                        <span className="text-emerald-900 font-extrabold">{fmt(laborSellTotal)}</span>
+                      </div>
+                      <span>${laborProfit.toFixed(2)}/SF ({laborMarginPct.toFixed(1)}%)</span>
+                    </div>
+                  </Card>
+
+                  {/* 3. Shipping & Drawings & Tax */}
+                  <Card className="p-4 bg-white border border-slate-200 rounded-xl space-y-2.5">
+                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      🚚 Shipping & Drawings
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
+                        Shipping / Freight $
+                      </label>
                       <Input
                         type="number"
-                        step="0.25"
-                        value={taxRate}
-                        onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
-                        className="h-7 text-xs flex-1 font-bold"
+                        value={shippingVal}
+                        onChange={(e) => setShippingVal(parseFloat(e.target.value) || 0)}
+                        className="h-8 text-xs bg-slate-50 font-bold"
                       />
-                      <span className="text-xs text-slate-500 font-bold">%</span>
                     </div>
-                    <label className="flex items-center gap-1.5 text-[11px] font-semibold text-blue-900 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={includeTax}
-                        onChange={(e) => setIncludeTax(e.target.checked)}
-                        className="h-3.5 w-3.5 rounded accent-blue-600"
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
+                        Engineering Drawings $
+                      </label>
+                      <Input
+                        type="number"
+                        value={drawingsVal}
+                        onChange={(e) => setDrawingsVal(parseFloat(e.target.value) || 0)}
+                        className="h-8 text-xs bg-slate-50 font-bold"
                       />
-                      <span>Include tax on quote</span>
-                    </label>
-                  </div>
-                </Card>
+                    </div>
+                    <div className="pt-1">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Input
+                          value={taxZip}
+                          onChange={(e) => setTaxZip(e.target.value)}
+                          placeholder="ZIP"
+                          maxLength={5}
+                          className="h-7 text-xs w-20 text-center font-bold"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleTaxLookup}
+                          disabled={isTaxLookingUp}
+                          className="h-7 px-2 text-[11px] font-bold cursor-pointer shrink-0"
+                        >
+                          {isTaxLookingUp ? <Loader2 className="h-3 w-3 animate-spin" /> : "Lookup"}
+                        </Button>
+                        <Input
+                          type="number"
+                          step="0.25"
+                          value={taxRate}
+                          onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
+                          className="h-7 text-xs flex-1 font-bold"
+                        />
+                        <span className="text-xs text-slate-500 font-bold">%</span>
+                      </div>
+                      <label className="flex items-center gap-1.5 text-[11px] font-semibold text-blue-900 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={includeTax}
+                          onChange={(e) => setIncludeTax(e.target.checked)}
+                          className="h-3.5 w-3.5 rounded accent-blue-600"
+                        />
+                        <span>Include tax on quote</span>
+                      </label>
+                    </div>
+                  </Card>
 
-                {/* 4. Grand Total Summary Box */}
-                <Card className="p-4 bg-[#1e3a8a] text-white rounded-xl flex flex-col justify-between shadow-md">
-                  <div>
-                    <div className="text-[10px] text-blue-200 uppercase tracking-widest font-bold">
-                      Grand Total
+                  {/* 4. Grand Total Summary Box */}
+                  <Card className="p-4 bg-[#1e3a8a] text-white rounded-xl flex flex-col justify-between shadow-md">
+                    <div>
+                      <div className="text-[10px] text-blue-200 uppercase tracking-widest font-bold">
+                        Grand Total
+                      </div>
+                      <div className="text-2xl font-black mt-1">
+                        {fmt(grandTotal)}
+                      </div>
+                      <div className="text-[11px] text-blue-200 mt-1 font-medium leading-tight">
+                        {fmtDec(sfPrice)}/SF · {totalSqFt.toLocaleString()} total SF
+                      </div>
                     </div>
-                    <div className="text-2xl font-black mt-1">
-                      {fmt(grandTotal)}
+                    <div className="pt-2 border-t border-white/20 mt-2">
+                      <div className="text-emerald-400 font-extrabold text-xs flex items-center justify-between">
+                        <span>💰 {fmt(totalProfit)} profit</span>
+                        <span>{marginPct.toFixed(1)}% margin</span>
+                      </div>
                     </div>
-                    <div className="text-[11px] text-blue-200 mt-1 font-medium leading-tight">
-                      ${sfPrice}/SF · {totalSqFt.toLocaleString()} total SF
-                    </div>
-                  </div>
-                  <div className="pt-2 border-t border-white/20 mt-2">
-                    <div className="text-emerald-400 font-extrabold text-xs flex items-center justify-between">
-                      <span>💰 {fmt(totalProfit)} profit</span>
-                      <span>{marginPct.toFixed(1)}% margin</span>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-
-              {/* Doors & Hardware Table */}
-              <Card className="p-5 bg-white border border-slate-200 rounded-xl space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                      🚪 Doors & Hardware
-                    </h3>
-                    <p className="text-[11px] text-slate-500">
-                      Edit qty, unit cost, markup inline
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleAddDoor}
-                    className="h-8 text-xs font-semibold cursor-pointer"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Add Door Type
-                  </Button>
+                  </Card>
                 </div>
 
-                <div className="overflow-x-auto rounded-lg border border-slate-200">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-slate-100/80 text-slate-700 text-[11px] uppercase font-bold border-b border-slate-200">
-                        <th className="p-2.5">Type</th>
-                        <th className="p-2.5">Size</th>
-                        <th className="p-2.5 text-right">Unit Cost</th>
-                        <th className="p-2.5 text-right">QTY</th>
-                        <th className="p-2.5 text-right">COGS Total</th>
-                        <th className="p-2.5 text-right">Markup %</th>
-                        <th className="p-2.5 text-right">Sale Total</th>
-                        <th className="p-2.5 text-center"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-700">
-                      {doors.map((d, idx) => {
-                        const qty = Number(d.qty || d.quantity || 0);
-                        const uCost = Number(d.unitCost || d.costPerUnit || 0);
-                        const cogsTot = Number(d.cogs || d.totalCost || qty * uCost);
-                        const saleTot = Number(d.sale || d.totalSell || 0);
-                        return (
+                {/* Doors & Hardware Table */}
+                <Card className="p-5 bg-white border border-slate-200 rounded-xl space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <div>
+                      <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                        🚪 Doors & Hardware
+                      </h3>
+                      <p className="text-[11px] text-slate-500">
+                        Edit qty, unit cost, markup inline
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleAddDoor}
+                      className="h-8 text-xs font-semibold cursor-pointer"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Add Door Type
+                    </Button>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-lg border border-slate-200">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-100/80 text-slate-700 text-[11px] uppercase font-bold border-b border-slate-200">
+                          <th className="p-2.5">Type</th>
+                          <th className="p-2.5">Size</th>
+                          <th className="p-2.5 text-right">Unit Cost</th>
+                          <th className="p-2.5 text-right">QTY</th>
+                          <th className="p-2.5 text-right">COGS Total</th>
+                          <th className="p-2.5 text-right">Markup %</th>
+                          <th className="p-2.5 text-right">Sale Total</th>
+                          <th className="p-2.5 text-center"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-slate-700">
+                        {doors.map((d, idx) => {
+                          const qty = Number(d.qty || d.quantity || 0);
+                          const uCost = Number(d.unitCost || d.costPerUnit || 0);
+                          const cogsTot = Number(d.cogs || d.totalCost || qty * uCost);
+                          const saleTot = Number(d.sale || d.totalSell || 0);
+                          return (
+                            <tr key={idx} className="hover:bg-slate-50/50">
+                              <td className="p-2">
+                                <Input
+                                  value={d.type || ""}
+                                  onChange={(e) =>
+                                    handleUpdateDoor(idx, "type", e.target.value)
+                                  }
+                                  className="h-8 w-32 text-xs"
+                                />
+                              </td>
+                              <td className="p-2">
+                                <Input
+                                  value={d.size || ""}
+                                  onChange={(e) =>
+                                    handleUpdateDoor(idx, "size", e.target.value)
+                                  }
+                                  className="h-8 w-24 text-xs font-bold"
+                                />
+                              </td>
+                              <td className="p-2 text-right">
+                                <Input
+                                  type="number"
+                                  value={d.unitCost !== undefined ? d.unitCost : (d.costPerUnit || "")}
+                                  onChange={(e) =>
+                                    handleUpdateDoor(
+                                      idx,
+                                      "unitCost",
+                                      parseFloat(e.target.value) || 0
+                                    )
+                                  }
+                                  className="h-8 w-20 text-right text-xs"
+                                />
+                              </td>
+                              <td className="p-2 text-right">
+                                <Input
+                                  type="number"
+                                  value={d.qty !== undefined ? d.qty : (d.quantity || "")}
+                                  onChange={(e) =>
+                                    handleUpdateDoor(
+                                      idx,
+                                      "qty",
+                                      parseFloat(e.target.value) || 0
+                                    )
+                                  }
+                                  className="h-8 w-16 text-right text-xs font-bold text-blue-700"
+                                />
+                              </td>
+                              <td className="p-2 text-right font-semibold text-amber-700">
+                                {fmt(cogsTot)}
+                              </td>
+                              <td className="p-2 text-right">
+                                <Input
+                                  type="number"
+                                  value={d.markup !== undefined ? d.markup : 25}
+                                  onChange={(e) =>
+                                    handleUpdateDoor(
+                                      idx,
+                                      "markup",
+                                      parseFloat(e.target.value) || 0
+                                    )
+                                  }
+                                  className="h-8 w-16 text-right text-xs font-bold"
+                                />
+                              </td>
+                              <td className="p-2 text-right font-bold text-blue-900">
+                                {fmt(saleTot)}
+                              </td>
+                              <td className="p-2 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveDoor(idx)}
+                                  className="text-red-500 hover:text-red-700 cursor-pointer p-1"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-slate-50 font-bold border-t-2 border-slate-200">
+                          <td colSpan={4} className="p-2.5">Total Doors ({totalDoorsCount} Units)</td>
+                          <td className="p-2.5 text-right text-amber-700">
+                            {fmt(storagePricing?.doorsSubtotal ? storagePricing.doorsSubtotal * 0.8 : 0)}
+                          </td>
+                          <td></td>
+                          <td className="p-2.5 text-right text-blue-900">
+                            {fmt(storagePricing?.doorsSubtotal)}
+                          </td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </Card>
+
+                {/* Options & Add-ons (Extras) Table */}
+                <Card className="p-5 bg-white border border-slate-200 rounded-xl space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <div>
+                      <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                        ⚙️ Options & Add-ons
+                      </h3>
+                      <p className="text-[11px] text-slate-500">
+                        Insulation, concrete, seals, extras — check to include in total
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleAddExtra}
+                      className="h-8 text-xs font-semibold cursor-pointer"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Add Line
+                    </Button>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-lg border border-slate-200">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-100/80 text-slate-700 text-[11px] uppercase font-bold border-b border-slate-200">
+                          <th className="p-2.5">Item</th>
+                          <th className="p-2.5 text-right">COGS $</th>
+                          <th className="p-2.5 text-right">Markup %</th>
+                          <th className="p-2.5 text-right">Sale $</th>
+                          <th className="p-2.5">Note</th>
+                          <th className="p-2.5 text-center">Include</th>
+                          <th className="p-2.5 text-center"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-slate-700">
+                        {extras.map((x, idx) => (
                           <tr key={idx} className="hover:bg-slate-50/50">
                             <td className="p-2">
                               <Input
-                                value={d.type || ""}
+                                value={x.name || x.item || ""}
                                 onChange={(e) =>
-                                  handleUpdateDoor(idx, "type", e.target.value)
+                                  handleUpdateExtra(idx, "name", e.target.value)
                                 }
-                                className="h-8 w-32 text-xs"
-                              />
-                            </td>
-                            <td className="p-2">
-                              <Input
-                                value={d.size || ""}
-                                onChange={(e) =>
-                                  handleUpdateDoor(idx, "size", e.target.value)
-                                }
-                                className="h-8 w-24 text-xs font-bold"
+                                className="h-8 w-44 text-xs font-semibold"
                               />
                             </td>
                             <td className="p-2 text-right">
                               <Input
                                 type="number"
-                                value={d.unitCost !== undefined ? d.unitCost : (d.costPerUnit || "")}
+                                value={x.cogs !== undefined ? x.cogs : (x.cost || "")}
                                 onChange={(e) =>
-                                  handleUpdateDoor(
+                                  handleUpdateExtra(
                                     idx,
-                                    "unitCost",
+                                    "cogs",
                                     parseFloat(e.target.value) || 0
                                   )
                                 }
-                                className="h-8 w-20 text-right text-xs"
+                                className="h-8 w-24 text-right text-xs"
                               />
                             </td>
                             <td className="p-2 text-right">
                               <Input
                                 type="number"
-                                value={d.qty !== undefined ? d.qty : (d.quantity || "")}
+                                value={x.markup !== undefined ? x.markup : 25}
                                 onChange={(e) =>
-                                  handleUpdateDoor(
-                                    idx,
-                                    "qty",
-                                    parseFloat(e.target.value) || 0
-                                  )
-                                }
-                                className="h-8 w-16 text-right text-xs font-bold text-blue-700"
-                              />
-                            </td>
-                            <td className="p-2 text-right font-semibold text-amber-700">
-                              {fmt(cogsTot)}
-                            </td>
-                            <td className="p-2 text-right">
-                              <Input
-                                type="number"
-                                value={d.markup !== undefined ? d.markup : 25}
-                                onChange={(e) =>
-                                  handleUpdateDoor(
+                                  handleUpdateExtra(
                                     idx,
                                     "markup",
                                     parseFloat(e.target.value) || 0
@@ -1848,171 +1965,63 @@ export default function StorageQuotePage() {
                               />
                             </td>
                             <td className="p-2 text-right font-bold text-blue-900">
-                              {fmt(saleTot)}
+                              {fmt(Number(x.sale || x.sellPrice || 0))}
+                            </td>
+                            <td className="p-2">
+                              <Input
+                                value={x.note || ""}
+                                onChange={(e) =>
+                                  handleUpdateExtra(idx, "note", e.target.value)
+                                }
+                                placeholder="Note..."
+                                className="h-8 text-xs"
+                              />
+                            </td>
+                            <td className="p-2 text-center">
+                              <input
+                                type="checkbox"
+                                checked={x.include !== false}
+                                onChange={(e) =>
+                                  handleUpdateExtra(idx, "include", e.target.checked)
+                                }
+                                className="h-4 w-4 rounded accent-blue-600 cursor-pointer"
+                              />
                             </td>
                             <td className="p-2 text-center">
                               <button
                                 type="button"
-                                onClick={() => handleRemoveDoor(idx)}
+                                onClick={() => handleRemoveExtra(idx)}
                                 className="text-red-500 hover:text-red-700 cursor-pointer p-1"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </button>
                             </td>
                           </tr>
-                        );
-                      })}
-                    </tbody>
-                    <tfoot>
-                      <tr className="bg-slate-50 font-bold border-t-2 border-slate-200">
-                        <td colSpan={4} className="p-2.5">Total Doors ({totalDoorsCount} Units)</td>
-                        <td className="p-2.5 text-right text-amber-700">
-                          {fmt(storagePricing?.doorsSubtotal ? storagePricing.doorsSubtotal * 0.8 : 0)}
-                        </td>
-                        <td></td>
-                        <td className="p-2.5 text-right text-blue-900">
-                          {fmt(storagePricing?.doorsSubtotal)}
-                        </td>
-                        <td></td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              </Card>
-
-              {/* Options & Add-ons (Extras) Table */}
-              <Card className="p-5 bg-white border border-slate-200 rounded-xl space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                      ⚙️ Options & Add-ons
-                    </h3>
-                    <p className="text-[11px] text-slate-500">
-                      Insulation, concrete, seals, extras — check to include in total
-                    </p>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-slate-50 font-bold border-t-2 border-slate-200">
+                          <td colSpan={3} className="p-2.5">Options Total (included)</td>
+                          <td className="p-2.5 text-right text-blue-900">
+                            {fmt(storagePricing?.extrasSubtotal)}
+                          </td>
+                          <td colSpan={3}></td>
+                        </tr>
+                      </tfoot>
+                    </table>
                   </div>
+                </Card>
+
+                {/* Bottom Actions */}
+                <div className="flex items-center gap-5 pt-2">
                   <Button
                     type="button"
-                    variant="outline"
-                    onClick={handleAddExtra}
-                    className="h-8 text-xs font-semibold cursor-pointer"
+                    onClick={() => setActiveTab("quote")}
+                    className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-6 py-2.5 rounded-lg text-xs font-bold cursor-pointer shadow-xs"
                   >
-                    <Plus className="h-3.5 w-3.5" />
-                    Add Line
+                    Generate Quote →
                   </Button>
-                </div>
 
-                <div className="overflow-x-auto rounded-lg border border-slate-200">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-slate-100/80 text-slate-700 text-[11px] uppercase font-bold border-b border-slate-200">
-                        <th className="p-2.5">Item</th>
-                        <th className="p-2.5 text-right">COGS $</th>
-                        <th className="p-2.5 text-right">Markup %</th>
-                        <th className="p-2.5 text-right">Sale $</th>
-                        <th className="p-2.5">Note</th>
-                        <th className="p-2.5 text-center">Include</th>
-                        <th className="p-2.5 text-center"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-700">
-                      {extras.map((x, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50/50">
-                          <td className="p-2">
-                            <Input
-                              value={x.name || x.item || ""}
-                              onChange={(e) =>
-                                handleUpdateExtra(idx, "name", e.target.value)
-                              }
-                              className="h-8 w-44 text-xs font-semibold"
-                            />
-                          </td>
-                          <td className="p-2 text-right">
-                            <Input
-                              type="number"
-                              value={x.cogs !== undefined ? x.cogs : (x.cost || "")}
-                              onChange={(e) =>
-                                handleUpdateExtra(
-                                  idx,
-                                  "cogs",
-                                  parseFloat(e.target.value) || 0
-                                )
-                              }
-                              className="h-8 w-24 text-right text-xs"
-                            />
-                          </td>
-                          <td className="p-2 text-right">
-                            <Input
-                              type="number"
-                              value={x.markup !== undefined ? x.markup : 25}
-                              onChange={(e) =>
-                                handleUpdateExtra(
-                                  idx,
-                                  "markup",
-                                  parseFloat(e.target.value) || 0
-                                )
-                              }
-                              className="h-8 w-16 text-right text-xs font-bold"
-                            />
-                          </td>
-                          <td className="p-2 text-right font-bold text-blue-900">
-                            {fmt(Number(x.sale || x.sellPrice || 0))}
-                          </td>
-                          <td className="p-2">
-                            <Input
-                              value={x.note || ""}
-                              onChange={(e) =>
-                                handleUpdateExtra(idx, "note", e.target.value)
-                              }
-                              placeholder="Note..."
-                              className="h-8 text-xs"
-                            />
-                          </td>
-                          <td className="p-2 text-center">
-                            <input
-                              type="checkbox"
-                              checked={x.include !== false}
-                              onChange={(e) =>
-                                handleUpdateExtra(idx, "include", e.target.checked)
-                              }
-                              className="h-4 w-4 rounded accent-blue-600 cursor-pointer"
-                            />
-                          </td>
-                          <td className="p-2 text-center">
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveExtra(idx)}
-                              className="text-red-500 hover:text-red-700 cursor-pointer p-1"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr className="bg-slate-50 font-bold border-t-2 border-slate-200">
-                        <td colSpan={3} className="p-2.5">Options Total (included)</td>
-                        <td className="p-2.5 text-right text-blue-900">
-                          {fmt(storagePricing?.extrasSubtotal)}
-                        </td>
-                        <td colSpan={3}></td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              </Card>
-
-              {/* Bottom Actions */}
-              <div className="flex items-center justify-between pt-2">
-                <Button
-                  type="button"
-                  onClick={() => setActiveTab("quote")}
-                  className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-6 py-2.5 rounded-lg text-xs font-bold cursor-pointer shadow-xs"
-                >
-                  Generate Quote →
-                </Button>
-                <div className="flex items-center gap-2.5">
                   <Button
                     type="button"
                     variant="outline"
@@ -2031,41 +2040,74 @@ export default function StorageQuotePage() {
                   </Button>
                 </div>
               </div>
-            </div>
-          )}
+            </TabsContent>
 
-          {/* TAB 2: QUOTE PREVIEW */}
-          {activeTab === "quote" && (
-            <div className="space-y-4">
-              <StoragePreviewDocument
-                storageData={storageData}
-                storagePricing={storagePricing}
-                scope={scope}
-                customerLeadName={customerLeadName}
-                customerAddress={customerAddress}
-                customerEmail={customerEmail}
-                jobNumber={jobNumber}
-                concreteInclude={concreteInclude}
-                insulationInclude={insulationInclude}
-                includeTax={includeTax}
-                taxRate={taxRate}
-              />
-              <div className="flex items-center justify-between pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setActiveTab("breakdown")}
-                  className="text-xs font-semibold cursor-pointer"
-                >
-                  ← Edit Buildings
-                </Button>
-                <div className="flex items-center gap-2">
+            {/* TAB 2: QUOTE PREVIEW */}
+            <TabsContent value="quote" className="m-0 outline-none">
+              <div className="space-y-4">
+                <StoragePreviewDocument
+                  storageData={storageData}
+                  storagePricing={storagePricing}
+                  scope={scope}
+                  customerLeadName={customerLeadName}
+                  customerAddress={customerAddress}
+                  customerEmail={customerEmail}
+                  jobNumber={jobNumber}
+                  concreteInclude={concreteInclude}
+                  insulationInclude={insulationInclude}
+                  includeTax={includeTax}
+                  taxRate={taxRate}
+                />
+                <div className="flex items-center justify-between pt-2">
                   <Button
                     type="button"
-                    onClick={() => setActiveTab("sow")}
-                    className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white text-xs font-bold cursor-pointer"
+                    variant="outline"
+                    onClick={() => setActiveTab("breakdown")}
+                    className="text-xs font-semibold cursor-pointer"
                   >
-                    View SOW →
+                    ← Edit Buildings
+                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      onClick={() => setActiveTab("sow")}
+                      className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white text-xs font-bold cursor-pointer"
+                    >
+                      View SOW →
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={handleNavigatePreview}
+                      className="bg-[#15803d] hover:bg-[#166534] text-white text-xs font-bold cursor-pointer"
+                    >
+                      🗂 Full Package
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* TAB 3: STATEMENT OF WORK */}
+            <TabsContent value="sow" className="m-0 outline-none">
+              <div className="space-y-4">
+                <StorageSowPreviewDocument
+                  storageData={storageData}
+                  storagePricing={storagePricing}
+                  scope={scope}
+                  customerLeadName={customerLeadName}
+                  customerAddress={customerAddress}
+                  jobNumber={jobNumber}
+                  concreteInclude={concreteInclude}
+                  insulationInclude={insulationInclude}
+                />
+                <div className="flex items-center justify-between pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setActiveTab("quote")}
+                    className="text-xs font-semibold cursor-pointer"
+                  >
+                    ← Quote
                   </Button>
                   <Button
                     type="button"
@@ -2076,432 +2118,187 @@ export default function StorageQuotePage() {
                   </Button>
                 </div>
               </div>
-            </div>
-          )}
+            </TabsContent>
 
-          {/* TAB 3: STATEMENT OF WORK */}
-          {activeTab === "sow" && (
-            <div className="space-y-4">
-              <StorageSowPreviewDocument
-                storageData={storageData}
-                storagePricing={storagePricing}
-                scope={scope}
-                customerLeadName={customerLeadName}
-                customerAddress={customerAddress}
-                jobNumber={jobNumber}
-                concreteInclude={concreteInclude}
-                insulationInclude={insulationInclude}
-              />
-              <div className="flex items-center justify-between pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setActiveTab("quote")}
-                  className="text-xs font-semibold cursor-pointer"
-                >
-                  ← Quote
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleNavigatePreview}
-                  className="bg-[#15803d] hover:bg-[#166534] text-white text-xs font-bold cursor-pointer"
-                >
-                  🗂 Full Package
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 4: MARGIN */}
-          {activeTab === "margin" && (
-            <Card className="p-5 bg-white border border-slate-200 rounded-xl space-y-4">
-              <div>
-                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                  💰 Margin Override
-                </h3>
-                <p className="text-[11px] text-slate-500">
-                  Override the blended project margin — overrides per-building markups
-                </p>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-3">
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase">
-                    Target Overall Margin %
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="range"
-                      min="5"
-                      max="60"
-                      value={globalMarkup}
-                      onChange={(e) => setGlobalMarkup(parseInt(e.target.value))}
-                      className="w-full accent-blue-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
-                    />
-                    <Input
-                      type="number"
-                      value={globalMarkup}
-                      onChange={(e) => setGlobalMarkup(parseInt(e.target.value) || 0)}
-                      className="w-20 text-right font-bold text-xs"
-                    />
-                    <span className="text-xs font-bold text-slate-600">%</span>
-                  </div>
-                  <Button
-                    type="button"
-                    onClick={handleApplyGlobalMarkup}
-                    className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white text-xs font-bold cursor-pointer"
-                  >
-                    Apply Overall Margin
-                  </Button>
-                </div>
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-center">
-                  <span className="text-[10px] text-slate-500 uppercase font-bold">
-                    At this margin:
-                  </span>
-                  <div className="text-2xl font-black text-blue-900 mt-1">
-                    {fmt(grandTotal)}
-                  </div>
-                  <div className="text-xs text-slate-600 font-semibold mt-0.5">
-                    ${sfPrice}/SF · {marginPct.toFixed(1)}% total margin
-                  </div>
-                </div>
-              </div>
-            </Card>
-          )}
-
-          {/* TAB 5: CONCRETE */}
-          {activeTab === "concrete" && (
-            <Card className="p-5 bg-white border border-slate-200 rounded-xl space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <div>
-                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    🪨 Concrete — Cost, Profit & SOW
+            {/* TAB 4: MARGIN */}
+            <TabsContent value="margin" className="m-0 outline-none">
+              <div className="border border-slate-200 rounded-xl bg-white p-6 shadow-2xs space-y-6">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5 uppercase tracking-wider">
+                    <span>💰</span>
+                    <span>Margin Override</span>
                   </h3>
-                  <p className="text-[11px] text-slate-500">
-                    Priced per total SF of all building footprints · defaults to $7.25/SF
-                  </p>
-                </div>
-                <label className="flex items-center gap-2 text-xs font-bold text-blue-900 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={concreteInclude}
-                    onChange={(e) => setConcreteInclude(e.target.checked)}
-                    className="h-4 w-4 rounded accent-blue-600"
-                  />
-                  <span>Include Concrete</span>
-                </label>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-3">
-                  <div className="text-[10px] font-bold text-slate-600 uppercase">
-                    Slab Thickness
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setConcreteThickness(4)}
-                      className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-all cursor-pointer ${concreteThickness === 4
-                        ? "bg-blue-100 border-blue-600 text-blue-900"
-                        : "bg-slate-50 border-slate-200 text-slate-700"
-                        }`}
-                    >
-                      4" Slab
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConcreteThickness(6)}
-                      className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-all cursor-pointer ${concreteThickness === 6
-                        ? "bg-blue-100 border-blue-600 text-blue-900"
-                        : "bg-slate-50 border-slate-200 text-slate-700"
-                        }`}
-                    >
-                      6" Slab
-                    </button>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-1">
-                      PSI Rating
-                    </label>
-                    <select
-                      value={concretePsi}
-                      onChange={(e) => setConcretePsi(e.target.value)}
-                      className="w-full h-8 rounded border border-slate-200 bg-white px-2 text-xs"
-                    >
-                      <option value="3000">3000 PSI</option>
-                      <option value="4000">4000 PSI</option>
-                      <option value="5000">5000 PSI</option>
-                    </select>
-                  </div>
+                  <span className="text-xs text-slate-400 font-medium">
+                    Override The Blended Project Margin — Overrides Per-Building Markups
+                  </span>
                 </div>
 
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-1">
-                      Install Cost $/SF
-                    </label>
-                    <Input
-                      type="number"
-                      step="0.25"
-                      value={concreteCostSf}
-                      onChange={(e) => setConcreteCostSf(parseFloat(e.target.value) || 0)}
-                      className="h-8 text-xs font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-1">
-                      Target Margin %
-                    </label>
-                    <Input
-                      type="number"
-                      step="1"
-                      value={concreteMarginPct}
-                      onChange={(e) => setConcreteMarginPct(parseFloat(e.target.value) || 0)}
-                      className="h-8 text-xs font-bold"
-                    />
-                  </div>
-                </div>
+                <div className="border-t border-slate-200" />
 
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-between">
-                  <div>
-                    <span className="text-[10px] text-slate-500 uppercase font-bold">
-                      Concrete Result ({totalSqFt.toLocaleString()} SF)
-                    </span>
-                    <div className="text-xl font-black text-blue-900 mt-1">
-                      {fmt(storagePricing?.concrete)}
+                {/* Inner Bordered Card */}
+                <div className="border border-slate-200 rounded-2xl p-6 bg-white">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                    {/* Left Column - Controls */}
+                    <div className="space-y-4">
+                      <label className="block text-xs font-bold text-slate-800">
+                        Target Overall Margin %
+                      </label>
+                      <div className="flex items-center gap-4">
+                        <input
+                          type="range"
+                          min="0"
+                          max="60"
+                          value={globalMarkup}
+                          onChange={(e) => setGlobalMarkup(parseInt(e.target.value) || 0)}
+                          className="flex-1 accent-[#1976D2] cursor-pointer h-2 bg-slate-200 rounded-lg"
+                        />
+                        <div className="bg-slate-100 border border-slate-200/80 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-900 flex items-center gap-1 min-w-14 justify-center">
+                          <span>{globalMarkup}</span>
+                          <span className="text-slate-400 font-normal">%</span>
+                        </div>
+                      </div>
+                      <div>
+                        <Button
+                          type="button"
+                          onClick={handleApplyGlobalMarkup}
+                          className="bg-[#1976D2] hover:bg-[#1565C0] text-white text-xs font-semibold px-6 py-2.5 rounded-lg cursor-pointer shadow-xs"
+                        >
+                          Apply Overall Margin
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Right Column - Result Box */}
+                    <div className="bg-[#E9EDF4] rounded-2xl p-8 flex flex-col items-center justify-center text-center space-y-1.5 min-h-[160px]">
+                      <span className="text-xs font-bold tracking-wider text-slate-900 uppercase">
+                        AT THIS MARGIN
+                      </span>
+                      <div className="text-4xl font-extrabold text-slate-900 my-1">
+                        {fmt(grandTotal)}
+                      </div>
+                      <span className="text-xs font-bold tracking-wider text-slate-900 uppercase">
+                        AT {globalMarkup}% MARGIN
+                      </span>
                     </div>
                   </div>
-                  <div className="text-xs text-slate-600 font-semibold">
-                    {concreteThickness}" · {concretePsi} PSI · {concreteMarginPct}% margin
-                  </div>
                 </div>
               </div>
+            </TabsContent>
 
-              <div>
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
-                  Additional Concrete SOW Notes
-                </label>
-                <textarea
-                  value={concreteNotes}
-                  onChange={(e) => setConcreteNotes(e.target.value)}
-                  placeholder="e.g. Pier excavation, 10mm vapor barrier, smooth finish..."
-                  rows={2}
-                  className="w-full p-2.5 rounded-lg border border-slate-200 text-xs bg-slate-50"
-                />
-              </div>
-            </Card>
-          )}
+            {/* TAB 5: CONCRETE */}
+            <TabsContent value="concrete" className="m-0 outline-none">
+              <QuoteConcreteTab
+                sqFt={String(totalSqFt || buildings.reduce((sum, b) => sum + (Number(b.sqft) || 0), 0))}
+                onTriggerCompute={() => triggerApiCompute(storageData)}
+              />
+            </TabsContent>
 
-          {/* TAB 6: INSULATION */}
-          {activeTab === "insulation" && (
-            <Card className="p-5 bg-white border border-slate-200 rounded-xl space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <div>
-                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    🧱 Insulation — Cost, Profit & SOW
-                  </h3>
-                  <p className="text-[11px] text-slate-500">
-                    Priced per total SF · set COGS $/SF then target margin
-                  </p>
-                </div>
-                <label className="flex items-center gap-2 text-xs font-bold text-purple-900 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={insulationInclude}
-                    onChange={(e) => setInsulationInclude(e.target.checked)}
-                    className="h-4 w-4 rounded accent-purple-600"
-                  />
-                  <span>Include Insulation</span>
-                </label>
-              </div>
+            {/* TAB 6: INSULATION */}
+            <TabsContent value="insulation" className="m-0 outline-none">
+              <QuoteInsulationTab
+                sqFt={String(totalSqFt || buildings.reduce((sum, b) => sum + (Number(b.sqft) || 0), 0))}
+                onTriggerCompute={() => triggerApiCompute(storageData)}
+              />
+            </TabsContent>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <div className="text-[10px] font-bold text-slate-600 uppercase">
-                    System
+            {/* TAB 7: DRAWINGS */}
+            <TabsContent value="drawings" className="m-0 outline-none">
+              <Card className="p-5 bg-white border border-slate-200 rounded-xl space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                      📐 Building Drawings & Plans
+                    </h3>
+                    <p className="text-[11px] text-slate-500">
+                      Add layout plans or elevations to include in the quote package
+                    </p>
                   </div>
-                  <div className="space-y-1.5">
-                    {(
-                      [
-                        { id: "Vinyl-backed (single layer)", label: "Vinyl-Backed Batt" },
-                        { id: "Double-layer system", label: "Double-Layer Batt" },
-                        { id: "Spray Foam", label: "Spray Foam" },
-                      ] as const
-                    ).map((s) => (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => setInsulationSystem(s.id)}
-                        className={`w-full py-1.5 px-3 rounded-lg text-xs font-bold border transition-all text-left cursor-pointer ${insulationSystem === s.id
-                          ? "bg-purple-100 border-purple-600 text-purple-900"
-                          : "bg-slate-50 border-slate-200 text-slate-700"
-                          }`}
+                  <label className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer shadow-xs">
+                    + Add Drawings
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        const files = Array.from(e.target.files || []);
+                        files.forEach((file) => {
+                          const reader = new FileReader();
+                          reader.onload = (ev) => {
+                            setStorageDrawings([
+                              ...storageDrawings,
+                              {
+                                name: file.name,
+                                data: ev.target?.result as string,
+                                includeInPackage: true,
+                              },
+                            ]);
+                          };
+                          reader.readAsDataURL(file);
+                        });
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                </div>
+
+                {storageDrawings.length === 0 ? (
+                  <div className="text-center p-8 text-slate-400 text-xs border-2 border-dashed border-slate-200 rounded-xl">
+                    No drawings added yet. Click "+ Add Drawings" to attach layout plans.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {storageDrawings.map((d, i) => (
+                      <div
+                        key={i}
+                        className="border border-slate-200 rounded-lg overflow-hidden bg-slate-50 p-2 text-xs space-y-1.5"
                       >
-                        {s.label}
-                      </button>
+                        <div className="font-bold text-slate-800 truncate">
+                          {d.name}
+                        </div>
+                        <label className="flex items-center gap-1.5 text-[11px] cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={d.includeInPackage}
+                            onChange={(e) => {
+                              const updated = [...storageDrawings];
+                              updated[i].includeInPackage = e.target.checked;
+                              setStorageDrawings(updated);
+                            }}
+                            className="h-3.5 w-3.5 accent-blue-600"
+                          />
+                          <span>Include in quote</span>
+                        </label>
+                      </div>
                     ))}
                   </div>
-                </div>
+                )}
+              </Card>
+            </TabsContent>
 
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-1">
-                      R-Value Roof / Wall
-                    </label>
-                    <div className="flex gap-2">
-                      <Input
-                        value={insulationRoofR}
-                        onChange={(e) => setInsulationRoofR(e.target.value)}
-                        placeholder="R-19"
-                        className="h-8 text-xs font-bold"
-                      />
-                      <Input
-                        value={insulationWallR}
-                        onChange={(e) => setInsulationWallR(e.target.value)}
-                        placeholder="R-13"
-                        className="h-8 text-xs font-bold"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-1">
-                      COGS $/SF / Target Margin %
-                    </label>
-                    <div className="flex gap-2">
-                      <Input
-                        type="number"
-                        step="0.1"
-                        value={insulationCogsSf}
-                        onChange={(e) =>
-                          setInsulationCogsSf(parseFloat(e.target.value) || 0)
-                        }
-                        className="h-8 text-xs font-bold"
-                      />
-                      <Input
-                        type="number"
-                        step="1"
-                        value={insulationMarginPct}
-                        onChange={(e) =>
-                          setInsulationMarginPct(parseFloat(e.target.value) || 0)
-                        }
-                        className="h-8 text-xs font-bold"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-purple-50/50 rounded-xl border border-purple-200 flex flex-col justify-between">
-                  <div>
-                    <span className="text-[10px] text-purple-900 uppercase font-bold">
-                      Insulation Result
-                    </span>
-                    <div className="text-xl font-black text-purple-900 mt-1">
-                      {fmt(storagePricing?.insulation)}
-                    </div>
-                  </div>
-                  <div className="text-xs text-purple-800 font-semibold">
-                    Roof {insulationRoofR} / Wall {insulationWallR} · {insulationMarginPct}% margin
-                  </div>
-                </div>
+            {/* TAB 8: CONTRACT */}
+            <TabsContent value="contract" className="m-0 outline-none">
+              <div className="space-y-4">
+                <ContractPreviewDocument
+                  effectiveDate={new Date().toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                  customerLegalName={customerLeadName || "Customer Legal Entity"}
+                  customerAddress={customerAddress}
+                  totalContractValue={fmt(grandTotal)}
+                  contractType={
+                    scope.toLowerCase() === "both"
+                      ? "Mini Storage Supply, Delivery & Installation"
+                      : "Mini Storage Supply & Delivery Only"
+                  }
+                />
               </div>
-            </Card>
-          )}
-
-          {/* TAB 7: DRAWINGS */}
-          {activeTab === "drawings" && (
-            <Card className="p-5 bg-white border border-slate-200 rounded-xl space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <div>
-                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    📐 Building Drawings & Plans
-                  </h3>
-                  <p className="text-[11px] text-slate-500">
-                    Add layout plans or elevations to include in the quote package
-                  </p>
-                </div>
-                <label className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer shadow-xs">
-                  + Add Drawings
-                  <input
-                    type="file"
-                    accept="image/*,.pdf"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => {
-                      const files = Array.from(e.target.files || []);
-                      files.forEach((file) => {
-                        const reader = new FileReader();
-                        reader.onload = (ev) => {
-                          setStorageDrawings([
-                            ...storageDrawings,
-                            {
-                              name: file.name,
-                              data: ev.target?.result as string,
-                              includeInPackage: true,
-                            },
-                          ]);
-                        };
-                        reader.readAsDataURL(file);
-                      });
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
-              </div>
-
-              {storageDrawings.length === 0 ? (
-                <div className="text-center p-8 text-slate-400 text-xs border-2 border-dashed border-slate-200 rounded-xl">
-                  No drawings added yet. Click "+ Add Drawings" to attach layout plans.
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {storageDrawings.map((d, i) => (
-                    <div
-                      key={i}
-                      className="border border-slate-200 rounded-lg overflow-hidden bg-slate-50 p-2 text-xs space-y-1.5"
-                    >
-                      <div className="font-bold text-slate-800 truncate">
-                        {d.name}
-                      </div>
-                      <label className="flex items-center gap-1.5 text-[11px] cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={d.includeInPackage}
-                          onChange={(e) => {
-                            const updated = [...storageDrawings];
-                            updated[i].includeInPackage = e.target.checked;
-                            setStorageDrawings(updated);
-                          }}
-                          className="h-3.5 w-3.5 accent-blue-600"
-                        />
-                        <span>Include in quote</span>
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-          )}
-
-          {/* TAB 8: CONTRACT */}
-          {activeTab === "contract" && (
-            <div className="space-y-4">
-              <ContractPreviewDocument
-                effectiveDate={new Date().toLocaleDateString("en-US", {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-                customerLegalName={customerLeadName || "Customer Legal Entity"}
-                customerAddress={customerAddress}
-                totalContractValue={fmt(grandTotal)}
-                contractType={
-                  scope.toLowerCase() === "both"
-                    ? "Mini Storage Supply, Delivery & Installation"
-                    : "Mini Storage Supply & Delivery Only"
-                }
-              />
-            </div>
-          )}
-        </div>
+            </TabsContent>
+          </Tabs>
+        </Card>
       )}
     </div>
   );
