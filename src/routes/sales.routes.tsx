@@ -1,4 +1,4 @@
-import type { RouteObject } from "react-router";
+import { Navigate, type RouteObject } from "react-router";
 import { lazy } from "react";
 import { NotFound } from "@/pages/not-found";
 import { RouterErrorFallback } from "@/pages/error-page";
@@ -114,11 +114,11 @@ const NewInquiry = lazy(() => import("@/pages/leads/new-inquiry"));
 const CreateQuotationPage = lazy(
   () => import("@/modules/quotation-generator/pages/create-quotation-page"),
 );
-const UploadDrawingPage = lazy(
-  () => import("@/modules/quotation-generator/pages/upload-drawing-page"),
+const CustomQuote = lazy(
+  () => import("@/modules/quotation-generator/pages/custom-quote"),
 );
-const ExtractedDrawingPage = lazy(
-  () => import("@/modules/quotation-generator/pages/extracted-drawing-page"),
+const PembQuotePage = lazy(
+  () => import("@/modules/quotation-generator/pages/pemb-quote-page"),
 );
 const StorageQuotePage = lazy(
   () => import("@/modules/quotation-generator/pages/storage-quote-page"),
@@ -128,6 +128,9 @@ const StoragePreviewPage = lazy(
 );
 const QuotePreviewPage = lazy(
   () => import("@/modules/quotation-generator/pages/quote-preview-page"),
+);
+const QuotePreviewListPage = lazy(
+  () => import("@/modules/quotation-generator/pages/quote-preview-list-page"),
 );
 const QuoteHistoryPage = lazy(
   () => import("@/modules/quotation-generator/pages/quote-history-page"),
@@ -381,15 +384,16 @@ export const salesRoutes: RouteObject[] = [
             path: "quotation",
             // element: <QuotationLayout />,
             children: [
-              { index: true, element: <CreateQuotationPage /> },
-              { path: "create", element: <CreateQuotationPage /> },
-              { path: "custom", element: <CreateQuotationPage /> },
-              { path: "upload-drawing", element: <UploadDrawingPage /> },
-              { path: "extracted-drawing", element: <ExtractedDrawingPage /> },
-              { path: "storage", element: <StorageQuotePage /> },
+              { index: true, element: <Navigate to="/quotation/pemb" replace={true} /> },
+              { path: "pemb/create", element: <CreateQuotationPage /> },
+              { path: "pemb", element: <PembQuotePage /> },
+
+              { path: "custom", element: <CustomQuote /> },
               { path: "storage-cog", element: <StorageQuotePage /> },
               { path: "storage-preview", element: <StoragePreviewPage /> },
-              { path: "quote-preview", element: <QuotePreviewPage /> },
+              { path: "quote-preview", element: <QuotePreviewListPage /> },
+              { path: "quote-preview/view", element: <QuotePreviewPage /> },
+              { path: "quote-preview/detail", element: <QuotePreviewPage /> },
               { path: "history", element: <QuoteHistoryPage /> },
               { path: "quote-history", element: <QuoteHistoryPage /> },
               { path: "pricing-rules", element: <PricingRulesPage /> },
