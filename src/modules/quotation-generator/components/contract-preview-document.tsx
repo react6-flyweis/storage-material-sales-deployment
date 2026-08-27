@@ -11,6 +11,8 @@ export interface ContractPreviewDocumentProps extends UseQuotationPricingParams 
   effectiveDate?: string;
   customerLegalName?: string;
   customerAddress?: string;
+  customerCityStateZip?: string;
+  customerEmail?: string;
   depositPct?: string;
   totalContractValue?: string;
   contractType?: string;
@@ -18,6 +20,10 @@ export interface ContractPreviewDocumentProps extends UseQuotationPricingParams 
   companyName?: string;
   companyShortName?: string;
   companyDba?: string;
+  companySignerName?: string;
+  companySignerTitle?: string;
+  customerSignerName?: string;
+  scopeDescription?: string;
   governingState?: string;
   governingCounty?: string;
 }
@@ -32,13 +38,18 @@ export const ContractPreviewDocument = React.forwardRef<
     effectiveDate: propEffectiveDate,
     customerLegalName: propCustomerLegalName,
     customerAddress: propCustomerAddress,
-    depositPct = "Forty-percent (40%)",
+    customerCityStateZip: propCustomerCityStateZip,
+    customerEmail: propCustomerEmail,
+    depositPct = "forty-percent (40%)",
     totalContractValue: propTotalContractValue,
     contractType,
     contractTitle,
     companyName = "Steel Investments, LLC",
     companyShortName = "Steel",
-    companyDba = "Steel Investments DBA Storage Materials",
+    companySignerName = "Travis Overhue",
+    companySignerTitle = "Owner",
+    customerSignerName = "TBD",
+    scopeDescription: propScopeDescription,
     governingState = "Delaware",
     governingCounty = "Douglas County, Nebraska",
     ...pricingParams
@@ -58,12 +69,26 @@ export const ContractPreviewDocument = React.forwardRef<
   const customerLegalName =
     propCustomerLegalName ||
     pricingData.customerLeadName ||
-    "Customer";
+    "";
 
   const customerAddress =
     propCustomerAddress ||
     pricingData.customerAddress ||
     "";
+
+  const customerCityStateZip = propCustomerCityStateZip || "";
+
+  const customerEmail =
+    propCustomerEmail ||
+    pricingData.customerEmail ||
+    "";
+
+  const customerDisplayName =
+    customerLegalName ||
+    (customerAddress && customerCityStateZip
+      ? `${customerAddress}, ${customerCityStateZip}`
+      : customerAddress || customerCityStateZip) ||
+    "Customer";
 
   const totalContractValue =
     propTotalContractValue ||
@@ -78,146 +103,173 @@ export const ContractPreviewDocument = React.forwardRef<
         : `${contractType} Agreement`
       : "Fabrication & Supply Agreement");
 
+  const scopeDescription =
+    propScopeDescription ||
+    "Fabrication and supply of pre-engineered metal building materials and systems.";
+
   return (
     <div
       ref={ref}
       id={id || "contract-preview-document"}
       className={cn(
-        "border border-slate-200 rounded-xl p-6 md:p-8 bg-white space-y-6 shadow-2xs text-slate-600 text-xs leading-relaxed print-card",
+        "border border-slate-200 rounded-xl p-6 md:p-10 bg-white space-y-5 shadow-2xs text-slate-900 text-xs leading-relaxed print-card font-serif",
         className
       )}
     >
-      {/* Document Title */}
-      <h2 className="text-base font-extrabold text-slate-900 text-center uppercase tracking-wide">
+      {/* Top Header Title with line matching image */}
+      <div className="text-center pb-3 border-b border-[#1E3A8A]">
+        <h1 className="text-base md:text-lg font-bold text-slate-900 tracking-tight font-serif">
+          {agreementTitle}
+        </h1>
+      </div>
+
+      {/* Sub-header text on left */}
+      <div className="text-xs font-semibold text-slate-900 font-serif">
         {agreementTitle}
-      </h2>
+      </div>
 
-      {/* Contract Content */}
-      <div className="space-y-4 font-normal text-slate-600 text-xs leading-relaxed">
+      {/* Contract Body Paragraphs */}
+      <div className="space-y-4 text-slate-900 text-xs leading-relaxed font-serif">
         <p>
-          This {agreementTitle} ("Agreement"), Dated As Of{" "}
-          <span className="font-semibold text-slate-900">{effectiveDate}</span>{" "}
-          ("Effective Date"), Is Entered Into By And Between {companyName} ("
-          {companyShortName}"), And{" "}
-          <span className="font-semibold text-slate-900">{customerLegalName}</span>{" "}
-          ("Customer").
+          This {agreementTitle} (&quot;Agreement&quot;), dated as of{" "}
+          <span className="font-semibold">{effectiveDate}</span> (&quot;Effective Date&quot;), is
+          entered into by and between {companyName} (&quot;{companyShortName}&quot;), and{" "}
+          <span className="font-semibold">{customerDisplayName}</span> (&quot;Customer&quot;).
         </p>
 
         <p>
-          <strong>Purchase And Sale Of Goods.</strong> Subject To The Terms And Conditions Of
-          This Agreement, Customer Shall Purchase, And {companyShortName} Shall Fabricate And Sell, The Goods
-          Set Forth In Exhibit A. Upon {companyShortName}'s Receipt Of Customer's First Deposit, Customer Agrees
-          To Purchase All Goods Under Exhibit A And Further Agrees That Customer May Not Cancel
-          Or Request Revisions To The Goods.
+          <strong>Purchase and Sale of Goods.</strong> Subject to the terms and conditions of
+          this Agreement, Customer shall purchase, and {companyShortName} shall fabricate and sell, the Goods
+          set forth in Exhibit A. Upon {companyShortName}&apos;s receipt of Customer&apos;s first deposit, Customer agrees
+          to purchase all Goods under Exhibit A and further agrees that Customer may not cancel
+          or request revisions to the Goods.
         </p>
 
         <p>
-          <strong>Engineering Drawings.</strong> {companyShortName} Will Commence Engineering Drawing For The
-          Goods Upon Customer's Payment Of The First Deposit.
+          <strong>Engineering Drawings.</strong> {companyShortName} will commence engineering drawing for the
+          Goods upon Customer&apos;s payment of the first deposit.
         </p>
 
         <p>
-          <strong>Delivery.</strong> The Goods Will Be Delivered To{" "}
+          <strong>Delivery.</strong> The Goods will be delivered to{" "}
           {customerAddress ? (
-            <span className="font-semibold text-slate-900">{customerAddress}</span>
+            <span className="font-semibold">{customerAddress}</span>
           ) : (
-            "The Location Specified By Customer"
+            "the location specified by Customer"
           )}{" "}
-          Using Standard Methods For Packaging And Shipping.
+          using standard methods for packaging and shipping.
+        </p>
+
+        <div className="space-y-1">
+          <p className="font-bold text-slate-900">Price and Payment.</p>
+          <p>
+            <strong>Price.</strong> Customer shall purchase the Goods from {companyShortName} at the price set
+            forth in Exhibit A. The Price may fluctuate due to variations in the cost of raw materials,
+            labor, transport, or overhead expenses.
+          </p>
+        </div>
+
+        <p>
+          <strong>Deposit.</strong> Customer acknowledges and agrees that {companyShortName} requires an
+          upfront, non-refundable deposit of {depositPct} for purposes of procuring materials,
+          payable in two installments: (i) ten-percent (10%) of the Price due upon the Effective Date; and (ii) thirty-percent (30%) due upon engineer approval.
         </p>
 
         <p>
-          <strong>Price And Payment.</strong>
-          <br />
-          Customer Shall Purchase The Goods From {companyShortName} At The Price Set Forth In Exhibit A. The
-          Price May Fluctuate Due To Variations In The Cost Of Raw Materials, Labor, Transport, Or
-          Overhead Expenses.
+          <strong>Payment Terms.</strong> Upon completion of fabrication, {companyShortName} shall invoice
+          Customer for all remaining amounts. Customer shall pay all invoiced amounts at least
+          two (2) days prior to shipment.
         </p>
 
         <p>
-          <strong>Deposit.</strong> Customer Acknowledges And Agrees That {companyShortName} Requires An
-          Upfront, Non-Refundable Deposit Of{" "}
-          <span className="font-semibold text-slate-900">{depositPct}</span> For Purposes Of
-          Procuring Materials, Payable In Two Installments: (i) Ten-Percent (10%) Of The Price
-          Due Upon The Effective Date; And (ii) Thirty-Percent (30%) Due Upon Engineer Approval.
+          <strong>Late Payments.</strong> Customer Shall pay interest on all late payments at 1.5%
+          per month. Customer shall reimburse {companyShortName} for all costs incurred in collecting late
+          payments, including attorneys&apos; fees.
         </p>
 
         <p>
-          <strong>Payment Terms.</strong> Upon Completion Of Fabrication, {companyShortName} Shall Invoice
-          Customer For All Remaining Amounts. Customer Shall Pay All Invoiced Amounts At Least
-          Two (2) Days Prior To Shipment.
+          <strong>Termination.</strong> {companyShortName} may immediately terminate this Agreement if Customer
+          fails to pay any amount when due, or if Customer is in breach of any representation,
+          warranty, or covenant.
         </p>
 
         <p>
-          <strong>Late Payments.</strong> Customer Shall Pay Interest On All Late Payments At 1.5%
-          Per Month. Customer Shall Reimburse {companyShortName} For All Costs Incurred In Collecting Late
-          Payments, Including Attorneys' Fees.
+          <strong>Limited Product Warranty.</strong> {companyShortName} warrants that the Goods shall be free
+          from material defects in workmanship upon delivery. Customer shall notify {companyShortName} within
+          seventy-two (72) hours of any alleged defect.
         </p>
 
         <p>
-          <strong>Termination.</strong> {companyShortName} May Immediately Terminate This Agreement If Customer
-          Fails To Pay Any Amount When Due, Or If Customer Is In Breach Of Any Representation,
-          Warranty, Or Covenant.
+          <strong>Indemnification.</strong> Customer shall indemnify, defend and hold harmless{" "}
+          {companyShortName} and its affiliates from any third-party claims arising from: (i) breach of this
+          Agreement; (ii) negligence or willful misconduct; (iii) any bodily injury or property
+          damage; or (iv) failure to comply with applicable laws.
         </p>
 
         <p>
-          <strong>Limited Product Warranty.</strong> {companyShortName} Warrants That The Goods Shall Be Free
-          From Material Defects In Workmanship Upon Delivery. Customer Shall Notify {companyShortName} Within
-          Seventy-Two (72) Hours Of Any Alleged Defect.
-        </p>
-
-        <p>
-          <strong>Indemnification.</strong> Customer Shall Indemnify, Defend And Hold Harmless{" "}
-          {companyShortName} And Its Affiliates From Any Third-Party Claims Arising From: (i) Breach Of This
-          Agreement; (ii) Negligence Or Willful Misconduct; (iii) Any Bodily Injury Or Property
-          Damage; Or (iv) Failure To Comply With Applicable Laws.
-        </p>
-
-        <p>
-          <strong>Limitation Of Liability.</strong> TO THE MAXIMUM EXTENT PERMITTED BY LAW,{" "}
+          <strong>Limitation of Liability.</strong> TO THE MAXIMUM EXTENT PERMITTED BY LAW,{" "}
           {companyShortName.toUpperCase()} SHALL NOT BE LIABLE FOR CONSEQUENTIAL, INDIRECT, INCIDENTAL, SPECIAL, OR PUNITIVE
           DAMAGES.
         </p>
 
         <p>
-          <strong>Force Majeure.</strong> {companyShortName} Shall Not Be Liable For Any Failure Or Delay In
-          Fulfilling Any Term Of This Agreement When Caused By Circumstances Beyond Its
-          Reasonable Control.
+          <strong>Force Majeure.</strong> {companyShortName} shall not be liable for any failure or delay in
+          fulfilling any term of this Agreement when caused by circumstances beyond its
+          reasonable control.
         </p>
 
         <p>
-          <strong>Governing Law.</strong> This Agreement Shall Be Governed By The Laws Of The State
-          Of {governingState}. Any Disputes Shall Be Brought In The Appropriate Courts Located In{" "}
+          <strong>Governing Law.</strong> This Agreement shall be governed by the Laws of the State
+          of {governingState}. Any disputes shall be brought in the appropriate courts located in{" "}
           {governingCounty}.
         </p>
-
-        <div className="pt-2 border-t border-slate-100 space-y-1">
-          <p className="font-bold text-slate-900">EXHIBIT A — GOODS</p>
-          <p>
-            Total Contract Value:{" "}
-            <span className="font-bold text-slate-900">{totalContractValue}</span>
-          </p>
-        </div>
       </div>
 
-      {/* Dual Signatures */}
-      <div className="pt-8 border-t border-slate-900 grid grid-cols-1 md:grid-cols-2 gap-12 text-xs">
-        <div>
-          <h5 className="font-bold text-slate-900 mb-8">{companyDba}</h5>
-          <div className="border-b border-slate-400 flex justify-between pb-1 text-[10px] text-slate-400 font-medium">
-            <span>Authorized Signature</span>
-            <span>Date</span>
-          </div>
-        </div>
+      {/* EXHIBIT A — GOODS Section */}
+      <div className="pt-4 space-y-1 font-serif text-xs">
+        <p className="font-bold text-slate-900 uppercase">EXHIBIT A — GOODS</p>
+        <p>
+          Total Contract Value:{" "}
+          <span className="font-semibold">{totalContractValue}</span>
+        </p>
+        <p>
+          Scope: <span className="font-normal">{scopeDescription}</span>
+        </p>
+      </div>
 
-        <div>
-          <h5 className="font-bold text-slate-900 mb-8">{customerLegalName}</h5>
-          <div className="border-b border-slate-400 flex justify-between pb-1 text-[10px] text-slate-400 font-medium">
-            <span>Authorized Signature</span>
-            <span>Date</span>
+      {/* SIGNATURES Section */}
+      <div className="pt-6 space-y-6 font-serif text-xs">
+        <p className="font-bold text-slate-900 uppercase tracking-wide">SIGNATURES</p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 pt-2">
+          {/* Company Signatory */}
+          <div className="space-y-6">
+            <p className="font-bold text-slate-900 uppercase">{companyName}</p>
+            <div className="border-b border-slate-900 pt-6 flex justify-between pb-1 text-[10px] text-slate-600 font-sans">
+              <span>Authorized Signature</span>
+              <span>Date</span>
+            </div>
+            <div className="space-y-0.5 text-xs text-slate-800">
+              <p>Name: {companySignerName}</p>
+              <p>Title: {companySignerTitle}</p>
+            </div>
+          </div>
+
+          {/* Customer Signatory */}
+          <div className="space-y-6">
+            <p className="font-bold text-slate-900 uppercase">{customerDisplayName}</p>
+            <div className="border-b border-slate-900 pt-6 flex justify-between pb-1 text-[10px] text-slate-600 font-sans">
+              <span>Authorized Signature</span>
+              <span>Date</span>
+            </div>
+            <div className="space-y-0.5 text-xs text-slate-800">
+              <p>{customerSignerName}</p>
+              <p>{customerEmail || "[E-MAIL ADDRESS]"}</p>
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
 });
+
