@@ -178,7 +178,7 @@ export interface QuotationState {
 
 export const useQuotationStore = create<QuotationState>((set) => ({
   jobType: "PEMB",
-  scope: "Supply",
+  scope: "Install",
   roofType: "screw-down",
   installCost: 5.5,
   installSell: 8.5,
@@ -188,7 +188,7 @@ export const useQuotationStore = create<QuotationState>((set) => ({
   squareFootage: 0,
 
   // Concrete initial state
-  concreteInclude: true,
+  concreteInclude: false,
   concreteCostSf: 7.25,
   concreteMarginPct: 25,
   concreteSlabThickness: '6"',
@@ -384,7 +384,7 @@ export const useQuotationStore = create<QuotationState>((set) => ({
     })),
   resetConcreteSettings: () =>
     set({
-      concreteInclude: true,
+      concreteInclude: false,
       concreteCostSf: 7.25,
       concreteMarginPct: 25,
       concreteSlabThickness: '6"',
