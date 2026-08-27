@@ -117,37 +117,37 @@ export interface StoragePricing {
   erection?: number;
   erectionSell?: number;
   concrete?:
-    | number
-    | {
-        include?: boolean;
-        sell?: number;
-        appliedSell?: number;
-        cost?: number;
-        costSF?: number;
-        sellSF?: number;
-        marginPct?: number;
-        thickness?: number;
-        psi?: number | null;
-        sowItems?: string[];
-        sowNotes?: string;
-        [key: string]: unknown;
-      };
+  | number
+  | {
+    include?: boolean;
+    sell?: number;
+    appliedSell?: number;
+    cost?: number;
+    costSF?: number;
+    sellSF?: number;
+    marginPct?: number;
+    thickness?: number;
+    psi?: number | null;
+    sowItems?: string[];
+    sowNotes?: string;
+    [key: string]: unknown;
+  };
   insulation?:
-    | number
-    | {
-        include?: boolean;
-        sell?: number;
-        appliedSell?: number;
-        cost?: number;
-        costSF?: number;
-        sellSF?: number;
-        marginPct?: number;
-        system?: string;
-        systemLabel?: string;
-        rRoof?: string;
-        rWall?: string;
-        [key: string]: unknown;
-      };
+  | number
+  | {
+    include?: boolean;
+    sell?: number;
+    appliedSell?: number;
+    cost?: number;
+    costSF?: number;
+    sellSF?: number;
+    marginPct?: number;
+    system?: string;
+    systemLabel?: string;
+    rRoof?: string;
+    rWall?: string;
+    [key: string]: unknown;
+  };
   salesTax?: {
     rate?: number;
     amount?: number;
@@ -263,8 +263,8 @@ export const StoragePreviewDocument = React.forwardRef<HTMLDivElement, StoragePr
     const totalSqFt =
       Number(
         storagePricing?.totalSqft ||
-          storagePricing?.totalSqFt ||
-          storagePricing?.squareFootage
+        storagePricing?.totalSqFt ||
+        storagePricing?.squareFootage
       ) ||
       buildings.reduce(
         (acc, b) =>
@@ -277,24 +277,24 @@ export const StoragePreviewDocument = React.forwardRef<HTMLDivElement, StoragePr
     const bldSell =
       Number(
         storagePricing?.buildingSell ??
-          storagePricing?.buildingsSubtotal ??
-          storagePricing?.matSell ??
-          storagePricing?.breakdown?.buildings?.sell
+        storagePricing?.buildingsSubtotal ??
+        storagePricing?.matSell ??
+        storagePricing?.breakdown?.buildings?.sell
       ) || buildings.reduce((acc, b) => acc + Number(b.sellPrice || 0), 0);
 
     const doorsSell =
       Number(
         storagePricing?.doorSell ??
-          storagePricing?.doorsSubtotal ??
-          storagePricing?.breakdown?.doors?.sell
+        storagePricing?.doorsSubtotal ??
+        storagePricing?.breakdown?.doors?.sell
       ) ||
       doors.reduce((acc, d) => acc + Number(d.totalSell || d.sale || 0), 0);
 
     const extrasSell =
       Number(
         storagePricing?.extrasSell ??
-          storagePricing?.extrasSubtotal ??
-          storagePricing?.breakdown?.extras?.sell
+        storagePricing?.extrasSubtotal ??
+        storagePricing?.breakdown?.extras?.sell
       ) ||
       extras.reduce(
         (acc, x) => acc + (x.include !== false ? Number(x.sellPrice || x.sale || 0) : 0),
@@ -303,23 +303,23 @@ export const StoragePreviewDocument = React.forwardRef<HTMLDivElement, StoragePr
 
     const freightVal = Number(
       storagePricing?.shipping ??
-        storagePricing?.freight ??
-        storageData?.shippingDefault?.freightSell ??
-        12000
+      storagePricing?.freight ??
+      storageData?.shippingDefault?.freightSell ??
+      12000
     );
 
     const drawingsVal = Number(storagePricing?.drawings ?? 0);
 
     const laborVal = Number(
       storagePricing?.installSell ??
-        storagePricing?.labor ??
-        storagePricing?.installation ??
-        storagePricing?.instSell ??
-        storagePricing?.erection ??
-        storagePricing?.erectionSell ??
-        storagePricing?.laborSell ??
-        storagePricing?.breakdown?.install?.sell ??
-        0
+      storagePricing?.labor ??
+      storagePricing?.installation ??
+      storagePricing?.instSell ??
+      storagePricing?.erection ??
+      storagePricing?.erectionSell ??
+      storagePricing?.laborSell ??
+      storagePricing?.breakdown?.install?.sell ??
+      0
     );
 
     const concreteObj =
@@ -332,11 +332,11 @@ export const StoragePreviewDocument = React.forwardRef<HTMLDivElement, StoragePr
         : Boolean(concreteObj?.include);
     const concreteVal = isConcreteIncluded
       ? Number(
-          concreteObj?.appliedSell ??
-            concreteObj?.sell ??
-            storagePricing?.breakdown?.concrete?.sell ??
-            (typeof storagePricing?.concrete === "number" ? storagePricing.concrete : 0)
-        )
+        concreteObj?.appliedSell ??
+        concreteObj?.sell ??
+        storagePricing?.breakdown?.concrete?.sell ??
+        (typeof storagePricing?.concrete === "number" ? storagePricing.concrete : 0)
+      )
       : 0;
 
     const insulationObj =
@@ -349,11 +349,11 @@ export const StoragePreviewDocument = React.forwardRef<HTMLDivElement, StoragePr
         : Boolean(insulationObj?.include);
     const insulationVal = isInsulationIncluded
       ? Number(
-          insulationObj?.appliedSell ??
-            insulationObj?.sell ??
-            storagePricing?.breakdown?.insulation?.sell ??
-            (typeof storagePricing?.insulation === "number" ? storagePricing.insulation : 0)
-        )
+        insulationObj?.appliedSell ??
+        insulationObj?.sell ??
+        storagePricing?.breakdown?.insulation?.sell ??
+        (typeof storagePricing?.insulation === "number" ? storagePricing.insulation : 0)
+      )
       : 0;
 
     const taxObj = storagePricing?.salesTax;
@@ -363,26 +363,26 @@ export const StoragePreviewDocument = React.forwardRef<HTMLDivElement, StoragePr
     const taxVal =
       isTaxIncluded && effectiveTaxRate > 0
         ? Number(
-            taxObj?.amount ??
-              Math.round((bldSell + doorsSell + insulationVal) * (effectiveTaxRate / 100))
-          )
+          taxObj?.amount ??
+          Math.round((bldSell + doorsSell + insulationVal) * (effectiveTaxRate / 100))
+        )
         : 0;
 
     const grandTotal =
       Number(
         storagePricing?.grandTotal ??
-          storagePricing?.totSell ??
-          storagePricing?.totalSell
+        storagePricing?.totSell ??
+        storagePricing?.totalSell
       ) ||
       bldSell +
-        doorsSell +
-        extrasSell +
-        freightVal +
-        drawingsVal +
-        laborVal +
-        concreteVal +
-        insulationVal +
-        taxVal;
+      doorsSell +
+      extrasSell +
+      freightVal +
+      drawingsVal +
+      laborVal +
+      concreteVal +
+      insulationVal +
+      taxVal;
 
     const sfPrice = totalSqFt > 0 ? grandTotal / totalSqFt : 0;
     const isSupply = scope.toLowerCase() === "supply";
@@ -456,8 +456,8 @@ export const StoragePreviewDocument = React.forwardRef<HTMLDivElement, StoragePr
               {isSupply
                 ? "Supply & Delivery Only"
                 : scope.toLowerCase() === "install"
-                ? "Installation Only"
-                : "Supply, Delivery & Erection"}
+                  ? "Installation Only"
+                  : "Supply, Delivery & Erection"}
               {isConcreteIncluded ? " · Concrete" : ""}
               {isInsulationIncluded ? " · Insulation" : ""}
             </p>
@@ -691,7 +691,7 @@ export const StoragePreviewDocument = React.forwardRef<HTMLDivElement, StoragePr
               </ul>
             </div>
 
-            <div>
+            {/* <div>
               <h4 className="font-bold text-slate-800 uppercase border-b border-slate-200 pb-1.5 tracking-wider mb-2">
                 EXCLUSIONS
               </h4>
@@ -725,7 +725,7 @@ export const StoragePreviewDocument = React.forwardRef<HTMLDivElement, StoragePr
                   <span>Landscaping, paving & striping</span>
                 </li>
               </ul>
-            </div>
+            </div> */}
           </div>
         </div>
 
