@@ -46,7 +46,7 @@ import {
   type StorageExtraItem,
 } from "../components/storage-preview-document";
 import { StorageSowPreviewDocument } from "../components/storage-sow-preview-document";
-import { ContractPreviewDocument } from "../components/contract-preview-document";
+import { StorageContractPreviewDocument } from "../components/storage-contract-preview-document";
 import { QuoteConcreteTab } from "../components/quote-concrete-tab";
 import { QuoteInsulationTab } from "../components/quote-insulation-tab";
 
@@ -109,6 +109,7 @@ export default function StorageQuotePage() {
   const {
     setJobType,
     scope,
+    setScope,
     buildingSize: storeBuildingSize,
     setBuildingSize,
     squareFootage: storeSquareFootage,
@@ -197,15 +198,20 @@ export default function StorageQuotePage() {
     storageData?.project?.jobNumber ||
     "";
 
+  const isInitializedRef = useRef(false);
   useEffect(() => {
-    setJobType("Storage");
-    if (installCost === 5.5 || installCost === 5.85) {
-      setInstallCost(2.5);
+    if (!isInitializedRef.current) {
+      isInitializedRef.current = true;
+      setJobType("Storage");
+      setScope("Both");
+      if (installCost === 5.5 || installCost === 5.85) {
+        setInstallCost(2.5);
+      }
+      if (installSell === 8.5 || installSell === 9.0) {
+        setInstallSell(3.25);
+      }
     }
-    if (installSell === 8.5 || installSell === 9.0) {
-      setInstallSell(3.25);
-    }
-  }, [setJobType, installCost, installSell, setInstallCost, setInstallSell]);
+  }, [setJobType, setScope, installCost, installSell, setInstallCost, setInstallSell]);
 
   useEffect(() => {
     if (navState.storageData) setStorageData(navState.storageData as Record<string, unknown>);
@@ -663,6 +669,11 @@ export default function StorageQuotePage() {
           include: includeTax,
           zip: taxZip,
         },
+        drawingAttachments: storageDrawings.map((d) => ({
+          name: d.name,
+          fileBase64: d.data,
+          includeInQuote: d.includeInPackage,
+        })),
         status: "draft",
       };
 
@@ -735,25 +746,25 @@ export default function StorageQuotePage() {
   const handleAddBuilding = () => {
     const newBld: StorageBuildingItem = {
       name: `Building ${(storageData?.buildings?.length || 0) + 1}`,
-      width: 50,
-      length: 150,
-      loEave: 14,
-      hiEave: 14,
-      eaveHeight: 14,
-      pitch: "0.5:12",
-      roofPitch: "0.5:12",
-      slope: "0.5:12",
-      sqft: 7500,
-      squareFootage: 7500,
-      psf: 5.5,
-      cogs: 41250,
-      cost: 41250,
+      width: 0,
+      length: 0,
+      loEave: 0,
+      hiEave: 0,
+      eaveHeight: 0,
+      pitch: "",
+      roofPitch: "",
+      slope: "",
+      sqft: 0,
+      squareFootage: 0,
+      psf: 0,
+      cogs: 0,
+      cost: 0,
       markup: globalMarkup,
-      sellPrice: Math.round(41250 * (1 + globalMarkup / 100)),
+      sellPrice: 0,
       roofType: "screw-down",
-      wallPanel: "26ga R-Loc",
-      roofPanel: "26ga Galvalume",
-      wallColor: "Standard",
+      wallPanel: "",
+      roofPanel: "",
+      wallColor: "",
     };
     const updatedData = {
       ...storageData,
@@ -794,20 +805,20 @@ export default function StorageQuotePage() {
 
   const handleAddDoor = () => {
     const newDoor: StorageDoorItem = {
-      type: "Janus 650",
-      size: "9' x 7'",
-      unitCost: 380,
-      costPerUnit: 380,
-      qty: 10,
-      quantity: 10,
-      count: 10,
-      cogs: 3800,
-      totalCost: 3800,
-      markup: 25,
-      sale: Math.round(3800 * 1.25),
-      totalSell: Math.round(3800 * 1.25),
-      sellPerUnit: Math.round(380 * 1.25),
-      color: "Standard",
+      type: "",
+      size: "",
+      unitCost: 0,
+      costPerUnit: 0,
+      qty: 0,
+      quantity: 0,
+      count: 0,
+      cogs: 0,
+      totalCost: 0,
+      markup: globalMarkup,
+      sale: 0,
+      totalSell: 0,
+      sellPerUnit: 0,
+      color: "",
     };
     const updatedData = {
       ...storageData,
@@ -843,14 +854,14 @@ export default function StorageQuotePage() {
 
   const handleAddExtra = () => {
     const newExtra: StorageExtraItem = {
-      name: "Custom Trim / Sealant Line",
-      item: "Custom Trim / Sealant Line",
-      cogs: 500,
-      cost: 500,
-      markup: 25,
-      sale: 625,
-      sellPrice: 625,
-      note: "Standard accessories",
+      name: "",
+      item: "",
+      cogs: 0,
+      cost: 0,
+      markup: globalMarkup,
+      sale: 0,
+      sellPrice: 0,
+      note: "",
       include: true,
     };
     const updatedData = {
@@ -865,6 +876,35 @@ export default function StorageQuotePage() {
     const updated = storageData.extras.filter((_, i) => i !== index);
     const updatedData = { ...storageData, extras: updated };
     setStorageData(updatedData);
+  };
+
+  const handleAddDrawings = (files: File[]) => {
+    if (!files.length) return;
+    const promises = files.map(
+      (file) =>
+        new Promise<{ name: string; data: string; includeInPackage: boolean }>(
+          (resolve) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+              resolve({
+                name: file.name,
+                data: (ev.target?.result as string) || "",
+                includeInPackage: true,
+              });
+            };
+            reader.readAsDataURL(file);
+          }
+        )
+    );
+
+    Promise.all(promises).then((newDrawings) => {
+      setStorageDrawings([...storageDrawings, ...newDrawings]);
+    });
+  };
+
+  const handleRemoveDrawing = (index: number) => {
+    const updated = storageDrawings.filter((_, i) => i !== index);
+    setStorageDrawings(updated);
   };
 
   // Navigate to Storage Preview Page
@@ -885,6 +925,11 @@ export default function StorageQuotePage() {
           insulationInclude,
           includeTax,
           taxRate,
+          drawingAttachments: storageDrawings.map((d) => ({
+            name: d.name,
+            fileBase64: d.data,
+            includeInQuote: d.includeInPackage,
+          })),
         },
       });
     });
@@ -920,15 +965,15 @@ export default function StorageQuotePage() {
     scope.toLowerCase() === "supply"
       ? 0
       : Number(
-          storagePricing?.labor ??
-            storagePricing?.installation ??
-            storagePricing?.instSell ??
-            storagePricing?.installSell ??
-            storagePricing?.erection ??
-            storagePricing?.erectionSell ??
-            storagePricing?.laborSell ??
-            totalSqFt * installSell
-        );
+        storagePricing?.labor ??
+        storagePricing?.installation ??
+        storagePricing?.instSell ??
+        storagePricing?.installSell ??
+        storagePricing?.erection ??
+        storagePricing?.erectionSell ??
+        storagePricing?.laborSell ??
+        totalSqFt * installSell
+      );
 
   return (
     <div className="space-y-5 p-5">
@@ -1619,8 +1664,10 @@ export default function StorageQuotePage() {
 
                   {/* 2. Erection / Labor */}
                   <Card className="p-4 bg-emerald-50/40 border border-emerald-200 rounded-xl space-y-3">
-                    <div className="text-[10px] font-bold text-emerald-900 uppercase tracking-wider">
-                      🏗️ Erection / Labor
+                    <div className="flex items-center justify-between">
+                      <div className="text-[10px] font-bold text-emerald-900 uppercase tracking-wider">
+                        🏗️ Erection / Labor
+                      </div>
                     </div>
                     <div className="space-y-1">
                       <div className="flex justify-between text-[11px] text-slate-600 font-semibold">
@@ -1657,7 +1704,11 @@ export default function StorageQuotePage() {
                         <span>Labor Total: </span>
                         <span className="text-emerald-900 font-extrabold">{fmt(laborSellTotal)}</span>
                       </div>
-                      <span>${laborProfit.toFixed(2)}/SF ({laborMarginPct.toFixed(1)}%)</span>
+                      {scope === "Supply" ? (
+                        <span className="text-slate-500 font-normal">Excluded (Supply Only)</span>
+                      ) : (
+                        <span>${laborProfit.toFixed(2)}/SF ({laborMarginPct.toFixed(1)}%)</span>
+                      )}
                     </div>
                   </Card>
 
@@ -2211,10 +2262,11 @@ export default function StorageQuotePage() {
                       📐 Building Drawings & Plans
                     </h3>
                     <p className="text-[11px] text-slate-500">
-                      Add layout plans or elevations to include in the quote package
+                      Add layout plans or elevations to include in the quote package — checked drawings appear in the PDF
                     </p>
                   </div>
-                  <label className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer shadow-xs">
+                  <label className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer shadow-xs flex items-center gap-1.5">
+                    <Plus className="h-3.5 w-3.5" />
                     + Add Drawings
                     <input
                       type="file"
@@ -2223,20 +2275,7 @@ export default function StorageQuotePage() {
                       className="hidden"
                       onChange={(e) => {
                         const files = Array.from(e.target.files || []);
-                        files.forEach((file) => {
-                          const reader = new FileReader();
-                          reader.onload = (ev) => {
-                            setStorageDrawings([
-                              ...storageDrawings,
-                              {
-                                name: file.name,
-                                data: ev.target?.result as string,
-                                includeInPackage: true,
-                              },
-                            ]);
-                          };
-                          reader.readAsDataURL(file);
-                        });
+                        if (files.length) handleAddDrawings(files);
                         e.target.value = "";
                       }}
                     />
@@ -2244,43 +2283,93 @@ export default function StorageQuotePage() {
                 </div>
 
                 {storageDrawings.length === 0 ? (
-                  <div className="text-center p-8 text-slate-400 text-xs border-2 border-dashed border-slate-200 rounded-xl">
-                    No drawings added yet. Click "+ Add Drawings" to attach layout plans.
+                  <div className="text-center py-12 px-4 text-slate-400 text-xs border-2 border-dashed border-slate-200 rounded-xl space-y-2">
+                    <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-500">
+                      📐
+                    </div>
+                    <div className="font-semibold text-slate-600">No drawings added yet</div>
+                    <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                      Click "+ Add Drawings" to attach layout plans, elevations or architectural specs. Images or PDFs will append to the full quote package.
+                    </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {storageDrawings.map((d, i) => (
-                      <div
-                        key={i}
-                        className="border border-slate-200 rounded-lg overflow-hidden bg-slate-50 p-2 text-xs space-y-1.5"
-                      >
-                        <div className="font-bold text-slate-800 truncate">
-                          {d.name}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {storageDrawings.map((d, i) => {
+                      const isImage = d.data?.startsWith("data:image");
+                      return (
+                        <div
+                          key={i}
+                          className={`relative border rounded-xl overflow-hidden bg-white shadow-2xs transition-all ${d.includeInPackage ? "border-blue-500 ring-1 ring-blue-500/20" : "border-slate-200 opacity-70"
+                            }`}
+                        >
+                          <div className="h-36 bg-slate-100 flex items-center justify-center overflow-hidden border-b border-slate-100">
+                            {isImage ? (
+                              <img src={d.data} alt={d.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="flex flex-col items-center gap-1 text-slate-500 p-3 text-center">
+                                <FileSpreadsheet className="h-8 w-8 text-blue-600" />
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700">PDF Document</span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="p-3 space-y-2">
+                            <div className="font-bold text-xs text-slate-800 truncate" title={d.name}>
+                              {d.name}
+                            </div>
+                            <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                              <label className="flex items-center gap-1.5 text-[11px] font-medium text-slate-700 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={d.includeInPackage}
+                                  onChange={(e) => {
+                                    const updated = [...storageDrawings];
+                                    updated[i].includeInPackage = e.target.checked;
+                                    setStorageDrawings(updated);
+                                  }}
+                                  className="h-3.5 w-3.5 accent-blue-600 rounded cursor-pointer"
+                                />
+                                <span>Include in package</span>
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveDrawing(i)}
+                                className="text-slate-400 hover:text-red-600 p-1 rounded-full hover:bg-red-50 transition-colors cursor-pointer"
+                                title="Remove drawing"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                        <label className="flex items-center gap-1.5 text-[11px] cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={d.includeInPackage}
-                            onChange={(e) => {
-                              const updated = [...storageDrawings];
-                              updated[i].includeInPackage = e.target.checked;
-                              setStorageDrawings(updated);
-                            }}
-                            className="h-3.5 w-3.5 accent-blue-600"
-                          />
-                          <span>Include in quote</span>
-                        </label>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
+
+                <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setActiveTab("breakdown")}
+                    className="text-xs font-semibold cursor-pointer"
+                  >
+                    ← Back to Breakdown
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleNavigatePreview}
+                    className="bg-[#15803d] hover:bg-[#166534] text-white text-xs font-bold px-4 py-2 rounded-lg cursor-pointer flex items-center gap-1.5 shadow-xs"
+                  >
+                    <span>🗂 Preview Package</span>
+                  </Button>
+                </div>
               </Card>
             </TabsContent>
 
             {/* TAB 8: CONTRACT */}
             <TabsContent value="contract" className="m-0 outline-none">
               <div className="space-y-4">
-                <ContractPreviewDocument
+                <StorageContractPreviewDocument
                   effectiveDate={new Date().toLocaleDateString("en-US", {
                     year: "numeric",
                     month: "long",
@@ -2289,6 +2378,7 @@ export default function StorageQuotePage() {
                   customerLegalName={customerLeadName || "Customer Legal Entity"}
                   customerAddress={customerAddress}
                   totalContractValue={fmt(grandTotal)}
+                  scope={scope}
                   contractType={
                     scope.toLowerCase() === "both"
                       ? "Mini Storage Supply, Delivery & Installation"
