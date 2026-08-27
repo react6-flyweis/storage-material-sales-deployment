@@ -305,6 +305,8 @@ export function QuoteContractTab({
           effectiveDate={effectiveDate}
           customerLegalName={customerLegalName}
           customerAddress={customerAddress}
+          customerCityStateZip={customerCityStateZip}
+          customerEmail={customerEmail}
           depositPct={depositPct}
           totalContractValue={totalContractValue}
           contractType={contractType}
