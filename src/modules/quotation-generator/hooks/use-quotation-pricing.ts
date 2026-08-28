@@ -2,7 +2,14 @@ import { useQuotationStore } from "@/modules/quotation-generator/quotation.store
 import type {
   ExtractDrawingResponseData,
   ExtractShipperResponseData,
+  FullQuoteData,
 } from "../estimates.api";
+import {
+  formatCurrency2,
+  formatNumber2,
+  formatPercent2,
+  formatSfPrice2,
+} from "../utils/quote-formatting";
 
 export interface UseQuotationPricingParams {
   extractedShipper?: ExtractShipperResponseData;
@@ -10,6 +17,7 @@ export interface UseQuotationPricingParams {
   buildingSize?: string;
   quotationForm?: Record<string, string>;
   extractedDrawing?: ExtractDrawingResponseData;
+  fullQuote?: FullQuoteData | null;
 }
 
 export function useQuotationPricing({
@@ -18,6 +26,7 @@ export function useQuotationPricing({
   buildingSize,
   quotationForm,
   extractedDrawing,
+  fullQuote: propFullQuote,
 }: UseQuotationPricingParams = {}) {
   const {
     jobType,
@@ -69,7 +78,11 @@ export function useQuotationPricing({
     });
   const expDate = "30 Days from Issue";
 
+  const fullQuote = propFullQuote || extractedShipper?.fullQuote;
+  const pricing = extractedShipper?.pricing || fullQuote?.pricing;
+
   const effectiveSqFt =
+    pricing?.sf ||
     parseFloat(String(sqFt || "")) ||
     extractedShipper?.squareFootage ||
     storeSqFt ||
@@ -80,92 +93,111 @@ export function useQuotationPricing({
     (extractedDrawing?.extracted?.width
       ? `${extractedDrawing.extracted.width}×${extractedDrawing.extracted.length}×${extractedDrawing.extracted.eave || ""}`
       : effectiveSqFt
-      ? `${effectiveSqFt.toLocaleString()} SF ${jobType}`
+      ? `${formatNumber2(effectiveSqFt)} SF ${jobType}`
       : `${jobType} Building`);
 
-  const pricing = extractedShipper?.pricing;
-
   const matPriceVal = pricing?.matSell ?? pricing?.matCost;
-  const matCostFormatted =
-    matPriceVal != null ? `$${Math.round(matPriceVal).toLocaleString()}` : "-";
+  const matCostFormatted = formatCurrency2(matPriceVal);
 
   const freightVal = pricing?.freight;
-  const freightFormatted =
-    freightVal != null ? `$${Math.round(freightVal).toLocaleString()}` : "-";
+  const freightFormatted = formatCurrency2(freightVal, "$0.00");
+
+  const instCostVal = pricing?.instCost;
+  const instCostFormatted = formatCurrency2(instCostVal, "$0.00");
 
   const instSellVal = pricing?.instSell;
-  const instSellFormatted =
-    instSellVal != null ? `$${Math.round(instSellVal).toLocaleString()}` : "-";
+  const instSellFormatted = formatCurrency2(instSellVal, "$0.00");
+
+  const totCostVal = pricing?.totCost;
+  const totCostFormatted = formatCurrency2(totCostVal);
+
+  const totSellVal = pricing?.totSell;
+  const totSellFormatted = formatCurrency2(totSellVal);
 
   const buildingSubtotalVal =
-    pricing?.totSell ??
-    (matPriceVal != null || freightVal != null || instSellVal != null
-      ? (matPriceVal ?? 0) + (freightVal ?? 0) + (instSellVal ?? 0)
-      : undefined);
-  const buildingSubtotalFormatted =
-    buildingSubtotalVal != null
-      ? `$${Math.round(buildingSubtotalVal).toLocaleString()}`
-      : "-";
+    fullQuote?.buildingSubtotal ??
+    pricing?.totSell;
+  const buildingSubtotalFormatted = formatCurrency2(buildingSubtotalVal);
 
-  // Concrete calculation
-  const concreteTotalCost = effectiveSqFt * (concreteCostSf || 0);
-  const concreteMarginDecimal = (concreteMarginPct || 0) / 100;
+  // Concrete from API fullQuote (no local fallback calculation)
+  const concreteTotalCost = fullQuote?.concrete?.cost ?? 0;
+  const concreteMarginDecimal =
+    ((fullQuote?.concrete?.marginPct ?? concreteMarginPct) || 0) / 100;
   const concreteSellPrice =
-    concreteMarginDecimal < 1
-      ? concreteTotalCost / (1 - concreteMarginDecimal)
-      : concreteTotalCost;
+    fullQuote?.concrete?.appliedSell ??
+    fullQuote?.concrete?.sell ??
+    0;
+  const concreteProfit = fullQuote?.concrete?.profit ?? 0;
   const concreteFormatted =
-    concreteSellPrice > 0
-      ? `$${Math.round(concreteSellPrice).toLocaleString()}`
-      : "-";
-  const slabThicknessDisplay = concreteSlabThickness || "";
-  const psiRatingDisplay = concretePsiRating || "";
+    concreteSellPrice > 0 ? formatCurrency2(concreteSellPrice) : "-";
+  const concreteCostFormatted =
+    concreteTotalCost > 0 ? formatCurrency2(concreteTotalCost) : "-";
+  const concreteProfitFormatted =
+    concreteProfit > 0 ? formatCurrency2(concreteProfit) : "-";
+  const slabThicknessDisplay =
+    fullQuote?.concrete?.thickness != null
+      ? String(fullQuote.concrete.thickness)
+      : concreteSlabThickness || "";
+  const psiRatingDisplay =
+    fullQuote?.concrete?.psi != null
+      ? String(fullQuote.concrete.psi)
+      : concretePsiRating || "";
 
-  // Insulation calculation
-  const insulationTotalCost = effectiveSqFt * (insulationCogsSf || 0);
-  const insulationMarginDecimal = (insulationMarginPct || 0) / 100;
+  // Insulation from API fullQuote (no local fallback calculation)
+  const insulationTotalCost = fullQuote?.insulation?.cost ?? 0;
+  const insulationMarginDecimal =
+    ((fullQuote?.insulation?.marginPct ?? insulationMarginPct) || 0) / 100;
   const insulationSellPrice =
-    insulationMarginDecimal < 1
-      ? insulationTotalCost / (1 - insulationMarginDecimal)
-      : insulationTotalCost;
+    fullQuote?.insulation?.appliedSell ??
+    fullQuote?.insulation?.sell ??
+    0;
+  const insulationProfit = fullQuote?.insulation?.profit ?? 0;
   const insulationFormatted =
-    insulationSellPrice > 0
-      ? `$${Math.round(insulationSellPrice).toLocaleString()}`
-      : "-";
-  const roofRValueDisplay = insulationRValueRoof || "";
-  const wallsRValueDisplay = insulationRValueWalls || "";
+    insulationSellPrice > 0 ? formatCurrency2(insulationSellPrice) : "-";
+  const insulationCostFormatted =
+    insulationTotalCost > 0 ? formatCurrency2(insulationTotalCost) : "-";
+  const insulationProfitFormatted =
+    insulationProfit > 0 ? formatCurrency2(insulationProfit) : "-";
+  const roofRValueDisplay =
+    fullQuote?.insulation?.rRoof || insulationRValueRoof || "";
+  const wallsRValueDisplay =
+    fullQuote?.insulation?.rWall || insulationRValueWalls || "";
 
-  // Sales Tax calculation (tax materials + insulation, labor is not taxed)
-  const taxableBase =
-    (matPriceVal ?? 0) + (insulationInclude ? insulationSellPrice : 0);
-  const taxRateVal = taxRate || 0;
-  const salesTaxVal = Math.round(taxableBase * (taxRateVal / 100));
-  const salesTaxFormatted = `$${salesTaxVal.toLocaleString()}`;
+  // Sales Tax from API fullQuote (no local fallback calculation)
+  const taxableBase = fullQuote?.salesTax?.taxableBase;
+  const taxRateVal = fullQuote?.salesTax?.rate ?? taxRate ?? 0;
+  const salesTaxVal = fullQuote?.salesTax?.amount ?? 0;
+  const salesTaxFormatted = formatCurrency2(salesTaxVal, "$0.00");
 
-  // Grand Total calculation
-  const grandTotalVal =
-    (buildingSubtotalVal ?? 0) +
-    (concreteInclude ? concreteSellPrice : 0) +
-    (insulationInclude ? insulationSellPrice : 0) +
-    (includeTax ? salesTaxVal : 0);
+  // Grand Total from API fullQuote (no local fallback calculation)
+  const grandTotalVal = fullQuote?.grandTotal ?? buildingSubtotalVal ?? pricing?.totSell;
   const grandTotalFormatted =
-    grandTotalVal > 0 ? `$${Math.round(grandTotalVal).toLocaleString()}` : "-";
+    grandTotalVal != null && grandTotalVal > 0 ? formatCurrency2(grandTotalVal) : "-";
 
-  const grandSfPrice =
-    effectiveSqFt > 0 && grandTotalVal > 0
-      ? (grandTotalVal / effectiveSqFt).toFixed(2)
-      : pricing?.sfPrice ?? "-";
+  // Total Profit from API fullQuote (no local fallback calculation)
+  const totalProfitVal = fullQuote?.totalProfit ?? pricing?.profit;
+  const totalProfitFormatted =
+    totalProfitVal != null ? formatCurrency2(totalProfitVal) : "-";
+
+  // Grand Margin from API fullQuote (no local fallback calculation)
+  const grandMarginVal = fullQuote?.grandMargin ?? pricing?.profPct;
+  const grandMarginFormatted =
+    grandMarginVal != null ? formatPercent2(grandMarginVal) : "-";
+
+  // Price Per SF from API fullQuote (no local fallback calculation)
+  const rawPricePerSf = fullQuote?.pricePerSf ?? pricing?.sfPrice;
   const pricePerSfFormatted =
-    typeof grandSfPrice === "number" || !String(grandSfPrice).startsWith("$")
-      ? `$${grandSfPrice}`
-      : grandSfPrice;
+    rawPricePerSf != null ? formatSfPrice2(rawPricePerSf) : "-";
 
-  const totalWeight =
-    extractedShipper?.totalWeightLbs ?? pricing?.totWt;
+  const buildingSfPrice = pricing?.sfPrice;
+  const buildingSfPriceFormatted =
+    buildingSfPrice != null ? formatSfPrice2(buildingSfPrice) : "-";
+
+  const totalWeight = pricing?.totWt ?? extractedShipper?.totalWeightLbs;
   const weightDisplay =
     totalWeight != null
       ? typeof totalWeight === "number"
-        ? `${totalWeight.toLocaleString()} Lbs`
+        ? `${formatNumber2(totalWeight)} Lbs`
         : `${totalWeight}`
       : "-";
   const trucks = pricing?.trucks ?? 1;
@@ -251,20 +283,30 @@ export function useQuotationPricing({
     expDate,
     effectiveSqFt,
     displayBuildingSize,
+    fullQuote,
     pricing,
     matPriceVal,
     matCostFormatted,
     freightVal,
     freightFormatted,
+    instCostVal,
+    instCostFormatted,
     instSellVal,
     instSellFormatted,
+    totCostVal,
+    totCostFormatted,
+    totSellVal,
+    totSellFormatted,
     buildingSubtotalVal,
     buildingSubtotalFormatted,
     concreteCostSf,
     concreteMarginPct,
     concreteTotalCost,
     concreteSellPrice,
+    concreteProfit,
     concreteFormatted,
+    concreteCostFormatted,
+    concreteProfitFormatted,
     slabThicknessDisplay,
     psiRatingDisplay,
     concreteInclude,
@@ -274,7 +316,10 @@ export function useQuotationPricing({
     insulationMarginPct,
     insulationTotalCost,
     insulationSellPrice,
+    insulationProfit,
     insulationFormatted,
+    insulationCostFormatted,
+    insulationProfitFormatted,
     roofRValueDisplay,
     wallsRValueDisplay,
     insulationInclude,
@@ -288,8 +333,14 @@ export function useQuotationPricing({
     includeTax,
     grandTotalVal,
     grandTotalFormatted,
-    grandSfPrice,
+    totalProfitVal,
+    totalProfitFormatted,
+    grandMarginVal,
+    grandMarginFormatted,
+    rawPricePerSf,
     pricePerSfFormatted,
+    buildingSfPrice,
+    buildingSfPriceFormatted,
     totalWeight,
     weightDisplay,
     trucks,
