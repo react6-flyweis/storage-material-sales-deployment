@@ -121,8 +121,6 @@ export function useQuotationPricing({
 
   // Concrete from API fullQuote (no local fallback calculation)
   const concreteTotalCost = fullQuote?.concrete?.cost ?? 0;
-  const concreteMarginDecimal =
-    ((fullQuote?.concrete?.marginPct ?? concreteMarginPct) || 0) / 100;
   const concreteSellPrice =
     fullQuote?.concrete?.appliedSell ??
     fullQuote?.concrete?.sell ??
@@ -145,8 +143,6 @@ export function useQuotationPricing({
 
   // Insulation from API fullQuote (no local fallback calculation)
   const insulationTotalCost = fullQuote?.insulation?.cost ?? 0;
-  const insulationMarginDecimal =
-    ((fullQuote?.insulation?.marginPct ?? insulationMarginPct) || 0) / 100;
   const insulationSellPrice =
     fullQuote?.insulation?.appliedSell ??
     fullQuote?.insulation?.sell ??
