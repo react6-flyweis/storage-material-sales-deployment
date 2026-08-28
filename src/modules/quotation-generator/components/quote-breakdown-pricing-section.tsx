@@ -392,8 +392,8 @@ export function QuoteBreakdownPricingSection({
         if (res) {
           const data = res.data || res;
           const weightByCategory = data.weightByCategory || res.weightByCategory;
-          const pricing = data.pricing || res.pricing;
           const fullQuote = data.fullQuote || res.fullQuote;
+          const pricing = data.pricing || res.pricing || fullQuote?.pricing;
           if (weightByCategory || pricing || fullQuote) {
             setShipperData((prev) =>
               prev
@@ -472,6 +472,34 @@ export function QuoteBreakdownPricingSection({
     };
   }, [executeCompute, shipperData?.parsedCategories]);
 
+  const handleSelectSf = useCallback(
+    (selectedSf: number) => {
+      setSqFt(String(selectedSf));
+      setIsManualSqFt(true);
+      setShipperData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          squareFootage: selectedSf,
+          squareFootageMeta: prev.squareFootageMeta
+            ? {
+              ...prev.squareFootageMeta,
+              source: "manual",
+              selected: selectedSf,
+              inputSf: selectedSf,
+            }
+            : {
+              source: "manual",
+              selected: selectedSf,
+              inputSf: selectedSf,
+            },
+        };
+      });
+      executeCompute({ squareFootage: selectedSf, sf: selectedSf, useManualSquareFootage: true });
+    },
+    [executeCompute]
+  );
+
   const handleFileSelect = async (selected: FileItem | null, rawFile?: File | null) => {
     setFile(selected);
     if (rawFile) {
@@ -534,9 +562,9 @@ export function QuoteBreakdownPricingSection({
       {/* File Specs Upload Dropzone with Parsing State */}
       <FileDropzoneCard
         dropText="Drop your Xshipper file here"
-        subDropText="Or click to browse .xlsx files"
+        subDropText="Or click to browse excel files"
         extraInfoText="All tabs read automatically — Columns & Rafters, Purlins, Sheeting, etc."
-        accept=".xlsx, .xls"
+        accept=".xlsx, .xls, .ods"
         fileIcon="xlsx"
         selectedFile={file}
         onFileSelect={handleFileSelect}
@@ -583,6 +611,8 @@ export function QuoteBreakdownPricingSection({
                 onQuotePreview={handleNavigateToPreview}
                 onSaveDraft={handleSaveDraft}
                 isSavingDraft={isSavingDraft}
+                onSelectSf={handleSelectSf}
+                isManualSqFt={isManualSqFt}
               />
             </TabsContent>
 
@@ -603,6 +633,7 @@ export function QuoteBreakdownPricingSection({
                 onQuotePreview={handleNavigateToPreview}
                 onSaveDraft={handleSaveDraft}
                 isSavingDraft={isSavingDraft}
+                onBackToBreakdown={() => setActiveTab("breakdown")}
               />
             </TabsContent>
 
@@ -612,6 +643,10 @@ export function QuoteBreakdownPricingSection({
                 buildingSize={buildingSize}
                 sqFt={sqFt}
                 extractedShipper={shipperData}
+                quotationForm={quotationForm}
+                extractedDrawing={extractedDrawing}
+                pdfFileName={pdfFileName}
+                estimateId={estimateId || undefined}
                 onBackToBreakdown={() => setActiveTab("breakdown")}
                 onQuotePreview={handleNavigateToPreview}
               />
@@ -658,6 +693,8 @@ export function QuoteBreakdownPricingSection({
                 quotationForm={quotationForm}
                 extractedDrawing={extractedDrawing}
                 sqFt={sqFt}
+                pdfFileName={pdfFileName}
+                estimateId={estimateId || undefined}
                 onBackToBreakdown={() => setActiveTab("breakdown")}
                 onQuotePreview={handleNavigateToPreview}
               />

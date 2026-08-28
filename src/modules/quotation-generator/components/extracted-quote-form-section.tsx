@@ -108,9 +108,15 @@ export function ExtractedQuoteFormSection({
     }
   }, [note]);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const [isDragging, setIsDragging] = useState(false);
+
+  const processFile = async (file: File) => {
     if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith(".pdf") && file.type !== "application/pdf") {
+      setReExtractError("Please upload a PDF file (.pdf).");
+      return;
+    }
 
     setFileName(file.name);
     setIsReExtracting(true);
@@ -155,6 +161,45 @@ export function ExtractedQuoteFormSection({
     } catch (err) {
       console.error("File read error:", err);
       setIsReExtracting(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processFile(file);
+    }
+    e.target.value = "";
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragEnter = (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (isReExtracting) return;
+
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      processFile(file);
     }
   };
 
@@ -211,7 +256,17 @@ export function ExtractedQuoteFormSection({
               </p>
 
               {/* Upload Drop Zone */}
-              <label className="relative border-2 border-dashed border-blue-400 bg-[#EAF7F0] hover:bg-[#E2F4EB] rounded-xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-colors">
+              <label
+                onDragOver={handleDragOver}
+                onDragEnter={handleDragEnter}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`relative border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-colors ${
+                  isDragging
+                    ? "border-blue-600 bg-[#d8f3e5] ring-2 ring-blue-400"
+                    : "border-blue-400 bg-[#EAF7F0] hover:bg-[#E2F4EB]"
+                }`}
+              >
                 <input
                   type="file"
                   accept=".pdf"

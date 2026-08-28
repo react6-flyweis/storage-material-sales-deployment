@@ -4,15 +4,31 @@ import { Button } from "@/components/ui/button";
 import SuccessDialog from "@/components/success-dialog";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 import {
-  taxLookupProvider,
   previewMarginProvider,
+  taxLookupProvider,
   type ExtractShipperResponseData,
   type ComputeEstimateRequest,
 } from "../estimates.api";
+import {
+  formatCurrency2,
+  formatPercent2,
+  formatSfPrice2,
+} from "../utils/quote-formatting";
 
 interface QuoteMarginTabProps {
   extractedShipper?: ExtractShipperResponseData;
   onTriggerCompute?: (overrides?: Partial<ComputeEstimateRequest>) => void;
+}
+
+interface MarginPreviewAdjusted {
+  totSell?: number;
+  totCost?: number;
+  profit?: number;
+  profPct?: string | number;
+  sfPrice?: string | number;
+  instSell?: number;
+  instCost?: number;
+  [key: string]: unknown;
 }
 
 export function QuoteMarginTab({
@@ -24,14 +40,12 @@ export function QuoteMarginTab({
     setInstallCost,
     installSell,
     setInstallSell,
-    taxZip,
-    setTaxZip,
     taxRate,
     setTaxRate,
     includeTax,
     setIncludeTax,
-    isTaxLoading,
-    setIsTaxLoading,
+    taxZip,
+    setTaxZip,
     marginLaborOverride,
     setMarginLaborOverride,
     marginTargetMargin,
@@ -42,36 +56,49 @@ export function QuoteMarginTab({
     resetMarginSettings,
   } = useQuotationStore();
 
+  const [isTaxLoading, setIsTaxLoading] = useState(false);
+  const [taxMessage, setTaxMessage] = useState<string | null>(null);
+
   // Success dialog state
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
-  const [taxMessage, setTaxMessage] = useState<string | null>(null);
 
-  interface MarginPreviewAdjusted {
-    totSell?: number;
-    sfPrice?: number;
-    totCost?: number;
-    profit?: number;
-    profPct?: number;
-    [key: string]: unknown;
-  }
+  const fullQuote = extractedShipper?.fullQuote;
+  const pricing = extractedShipper?.pricing || fullQuote?.pricing;
+
+  // Margin preview API state
+  const apiMarginPreview = fullQuote?.marginPreview?.adjusted;
   const [marginPreview, setMarginPreview] = useState<MarginPreviewAdjusted | null>(null);
+  const activeMarginPreview = marginPreview || apiMarginPreview || null;
 
   useEffect(() => {
-    if (!extractedShipper?.pricing) return;
+    if (!pricing) return;
+    const hasOverride = Boolean(
+      marginLaborOverride ||
+      marginTargetMargin ||
+      marginFixedSellOverride
+    );
+
+    if (!hasOverride) {
+      return;
+    }
+
+    let isMounted = true;
     const laborVal = parseFloat(marginLaborOverride) || undefined;
     const targetVal = parseFloat(marginTargetMargin) || undefined;
     const sellVal = parseFloat(marginFixedSellOverride) || undefined;
+
     previewMarginProvider({
-      pricingResult: extractedShipper.pricing,
+      pricingResult: pricing,
       marginOverride: {
-        applied: true,
+        applied: false,
         laborSF: laborVal ?? null,
         pct: targetVal ?? null,
         sellFixed: sellVal ?? null,
       },
     })
       .then((res) => {
+        if (!isMounted) return;
         const adjusted =
           res.data?.preview?.adjusted ||
           res.preview?.adjusted ||
@@ -86,7 +113,11 @@ export function QuoteMarginTab({
       .catch((err) => {
         console.error("Margin preview error:", err);
       });
-  }, [marginLaborOverride, marginTargetMargin, marginFixedSellOverride, extractedShipper?.pricing]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [marginLaborOverride, marginTargetMargin, marginFixedSellOverride, pricing]);
 
   // Perform tax lookup when user enters ZIP and blurs or clicks Search
   const handleTaxLookup = async () => {
@@ -167,6 +198,7 @@ export function QuoteMarginTab({
 
   const handleReset = () => {
     resetMarginSettings();
+    setMarginPreview(null);
     setSuccessMessage("Overrides have been reset to default values!");
     setSuccessDialogOpen(true);
     if (onTriggerCompute) {
@@ -178,60 +210,78 @@ export function QuoteMarginTab({
     }
   };
 
-  const pricing = extractedShipper?.pricing;
+  // Direct API values (no local calculation fallback)
+  const laborSellVal =
+    activeMarginPreview?.instSell ??
+    pricing?.instSell ??
+    0;
+  const laborCostVal =
+    activeMarginPreview?.instCost ??
+    pricing?.instCost ??
+    0;
 
-  // Erection / Labor calculations from API
-  const totalSellVal = pricing?.instSell != null ? pricing.instSell : 0;
-  const totalCostVal = pricing?.instCost != null ? pricing.instCost : 0;
-  const totalProfitVal = totalSellVal - totalCostVal;
-  const marginPercentVal =
-    totalSellVal > 0
-      ? ((totalProfitVal / totalSellVal) * 100).toFixed(1)
-      : "0.0";
+  const originalSellVal =
+    fullQuote?.marginPreview?.originalSell ??
+    pricing?.totSell;
 
-  const displayTotSell = marginPreview?.totSell ?? pricing?.totSell;
-  const displaySfPrice = marginPreview?.sfPrice ?? pricing?.sfPrice;
-  const displayTotCost = marginPreview?.totCost ?? pricing?.totCost;
-  const displayProfit = marginPreview?.profit ?? pricing?.profit;
-  const displayProfPct = marginPreview?.profPct ?? pricing?.profPct;
+  const displayTotSell =
+    activeMarginPreview?.totSell ??
+    fullQuote?.buildingSubtotal ??
+    pricing?.totSell;
 
-  const totalProjectSell =
-    displayTotSell != null
-      ? `$${Math.round(displayTotSell).toLocaleString()}`
-      : "-";
-  const totalProjectProfit =
-    displayProfit != null ? `$${Math.round(displayProfit).toLocaleString()}` : "-";
-  const totalProjectMargin =
-    displayProfPct != null ? `${displayProfPct}%` : "-";
-  const matSellText =
-    pricing?.matSell != null
-      ? `$${Math.round(pricing.matSell).toLocaleString()}`
-      : "-";
-  const instSellText =
-    pricing?.instSell != null
-      ? `$${Math.round(pricing.instSell).toLocaleString()}`
-      : "-";
-  const sfPriceText =
-    displaySfPrice != null ? `$${displaySfPrice}/SF` : "-";
-  const matProfitText =
-    pricing?.matCost != null && pricing?.matSell != null
-      ? `$${Math.round(pricing.matSell - pricing.matCost).toLocaleString()}`
-      : "-";
+  const displaySfPrice =
+    activeMarginPreview?.sfPrice ??
+    fullQuote?.pricePerSf ??
+    pricing?.sfPrice;
 
-  const adjustedSellText =
-    displayTotSell != null
-      ? `$${Math.round(displayTotSell).toLocaleString()}`
-      : "-";
-  const totalCostText =
-    displayTotCost != null
-      ? `$${Math.round(displayTotCost).toLocaleString()}`
-      : "-";
-  const profitText =
-    displayProfit != null
-      ? `$${Math.round(displayProfit).toLocaleString()}`
-      : "-";
-  const profitMarginText =
-    displayProfPct != null ? `${displayProfPct}% margin` : "-";
+  const displayTotCost =
+    activeMarginPreview?.totCost ??
+    pricing?.totCost;
+
+  const displayProfit =
+    activeMarginPreview?.profit ??
+    fullQuote?.totalProfit ??
+    pricing?.profit;
+
+  const displayProfPct =
+    activeMarginPreview?.profPct ??
+    fullQuote?.grandMargin ??
+    pricing?.profPct;
+
+  const grandTotalDisplay =
+    fullQuote?.grandTotal != null
+      ? formatCurrency2(fullQuote.grandTotal)
+      : formatCurrency2(displayTotSell);
+
+  const grandProfitDisplay =
+    fullQuote?.totalProfit != null
+      ? formatCurrency2(fullQuote.totalProfit)
+      : formatCurrency2(displayProfit);
+
+  const grandMarginDisplay =
+    fullQuote?.grandMargin != null
+      ? formatPercent2(fullQuote.grandMargin)
+      : formatPercent2(displayProfPct);
+
+  const grandSfPriceDisplay =
+    fullQuote?.pricePerSf != null
+      ? formatSfPrice2(fullQuote.pricePerSf)
+      : formatSfPrice2(displaySfPrice);
+
+  const totalProjectSell = grandTotalDisplay;
+  const totalProjectProfit = grandProfitDisplay;
+  const totalProjectMargin = grandMarginDisplay;
+
+  const matSellText = formatCurrency2(pricing?.matSell);
+  const matCostText = formatCurrency2(pricing?.matCost);
+  const instSellText = formatCurrency2(laborSellVal, "$0.00");
+  const sfPriceText = `${grandSfPriceDisplay}/SF`;
+
+  const originalSellText = formatCurrency2(originalSellVal);
+  const adjustedSellText = formatCurrency2(displayTotSell);
+  const totalCostText = formatCurrency2(displayTotCost);
+  const profitText = formatCurrency2(displayProfit);
+  const profitMarginText = `${formatPercent2(displayProfPct)} building margin`;
 
   return (
     <div className="space-y-8">
@@ -266,6 +316,10 @@ export function QuoteMarginTab({
             <p className="text-xs text-slate-400 font-medium">
               Blended material markup ({pricing?.blendLabel || "50% Vendor blend"})
             </p>
+            <div className="text-xs text-slate-600 space-y-1">
+              <p>Material Sell: <span className="font-bold text-slate-900">{matSellText}</span></p>
+              <p>Material Cost: <span className="font-semibold text-slate-700">{matCostText}</span></p>
+            </div>
           </div>
 
           {/* Card 2: Erection / Labor */}
@@ -314,7 +368,11 @@ export function QuoteMarginTab({
             </div>
 
             <p className="text-[11px] text-emerald-700 font-semibold pt-1">
-              ${totalSellVal.toLocaleString()} sell · ${totalProfitVal.toLocaleString()} profit · {marginPercentVal}% margin
+              Sell: {formatCurrency2(laborSellVal, "$0.00")}
+              · Cost: {formatCurrency2(laborCostVal, "$0.00")}
+              · Profit: {formatCurrency2(laborSellVal - laborCostVal, "$0.00")}
+              {' '}
+              ({((laborSellVal - laborCostVal) / laborSellVal * 100).toFixed(2)}%)
             </p>
           </div>
 
@@ -327,11 +385,10 @@ export function QuoteMarginTab({
 
             <div className="text-xs font-bold text-emerald-400 flex items-center gap-1">
               <span>💰</span>
-              <span>{totalProjectProfit} profit · {totalProjectMargin} margin</span>
+              <span>{totalProjectProfit} profit · {totalProjectMargin} margin (incl. tax)</span>
             </div>
 
             <div className="text-[11px] text-blue-100 space-y-1 pt-1 font-medium leading-relaxed">
-              <p>Mat {matProfitText} · Install ${totalProfitVal.toLocaleString()}</p>
               <p>Mat: {matSellText} · Install: {instSellText} · {sfPriceText}</p>
             </div>
           </div>
@@ -437,7 +494,7 @@ export function QuoteMarginTab({
                 className="flex-1 accent-blue-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
               />
               <span className="px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-md text-xs font-semibold text-slate-600">
-                {marginLaborOverride ? `$${marginLaborOverride}` : "Auto"}
+                {marginLaborOverride ? `$${Number(marginLaborOverride).toFixed(2)}` : "Auto"}
               </span>
             </div>
             <p className="text-[10px] text-slate-400">
@@ -455,12 +512,13 @@ export function QuoteMarginTab({
                 type="range"
                 min="0"
                 max="100"
+                step="0.5"
                 value={marginTargetMargin || 0}
                 onChange={(e) => setMarginTargetMargin(e.target.value)}
                 className="flex-1 accent-emerald-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
               />
               <span className="px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-md text-xs font-semibold text-slate-600">
-                {marginTargetMargin ? `${marginTargetMargin}%` : "Auto"}
+                {marginTargetMargin ? `${Number(marginTargetMargin).toFixed(2)}%` : "Auto"}
               </span>
             </div>
             <p className="text-[10px] text-slate-400">
@@ -526,7 +584,7 @@ export function QuoteMarginTab({
             <span className="text-[10px] font-bold tracking-wider text-slate-500 uppercase block">
               ORIGINAL SELL
             </span>
-            <div className="text-xl font-extrabold text-slate-900">{adjustedSellText}</div>
+            <div className="text-xl font-extrabold text-slate-900">{originalSellText}</div>
             <p className="text-xs text-slate-500 font-medium">Before override</p>
           </div>
         </div>

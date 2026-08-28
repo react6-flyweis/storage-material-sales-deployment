@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router";
 import { ArrowLeft, FolderUp, Loader2, RefreshCw, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,9 @@ import {
   type StoragePricing,
 } from "../components/storage-preview-document";
 import { StorageSowPreviewDocument } from "../components/storage-sow-preview-document";
-import { ContractPreviewDocument } from "../components/contract-preview-document";
+import { StorageContractPreviewDocument } from "../components/storage-contract-preview-document";
+import { StorageDrawingPreviewDocument } from "../components/storage-drawing-preview-document";
+
 
 function fmt(n?: number | string | null): string {
   const num = Number(n) || 0;
@@ -40,6 +42,8 @@ export function StoragePreviewPage() {
     storageCustomerAddress: storeCustomerAddress,
     storageCustomerEmail: storeCustomerEmail,
     storageJobNumber: storeJobNumber,
+    storageDrawings,
+    setStorageDrawings,
   } = useQuotationStore();
 
   const navState = (location.state || {}) as {
@@ -56,7 +60,22 @@ export function StoragePreviewPage() {
     insulationInclude?: boolean;
     includeTax?: boolean;
     taxRate?: number;
+    drawingAttachments?: Array<{ name?: string; fileBase64?: string; data?: string; includeInQuote?: boolean }>;
+    drawings?: Array<{ name?: string; fileBase64?: string; data?: string; includeInQuote?: boolean }>;
   };
+
+  useEffect(() => {
+    const navDrawings = navState.drawingAttachments || navState.drawings;
+    if (navDrawings?.length && (!storageDrawings || storageDrawings.length === 0)) {
+      setStorageDrawings(
+        navDrawings.map((d) => ({
+          name: d.name || "Drawing",
+          data: d.fileBase64 || d.data || "",
+          includeInPackage: d.includeInQuote !== false,
+        }))
+      );
+    }
+  }, [navState.drawingAttachments, navState.drawings, storageDrawings, setStorageDrawings]);
 
   const storageData =
     (storeStorageData as StorageData | null) || navState.storageData;
@@ -106,9 +125,6 @@ export function StoragePreviewPage() {
   );
   const totalSellFormatted = fmt(grandTotal);
 
-  // File state for PDF dropzone
-  const [selectedPdf, setSelectedPdf] = useState<{ name: string; url?: string } | null>(null);
-
   const handleScrollToPreview = () => {
     previewSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
@@ -124,6 +140,13 @@ export function StoragePreviewPage() {
   const handleDownloadPdf = async () => {
     setIsDownloadingPdf(true);
     try {
+      const activeDrawings = storageDrawings.filter((d) => d.includeInPackage !== false);
+      const drawingAttachments = activeDrawings.map((d) => ({
+        name: d.name,
+        fileBase64: d.data?.includes(",") ? d.data.split(",")[1] : d.data,
+        includeInQuote: true,
+      }));
+
       const payload = {
         jobType: "Storage",
         estimateId: estimateId || undefined,
@@ -175,10 +198,8 @@ export function StoragePreviewPage() {
           include: navState.includeTax,
           rate: navState.taxRate,
         },
-        drawingAttachments: selectedPdf
-          ? [{ name: selectedPdf.name, includeInQuote: true }]
-          : [],
-        sections: selectedPdf
+        drawingAttachments,
+        sections: drawingAttachments.length > 0
           ? ["quote", "sow", "contract", "drawings"]
           : ["quote", "sow", "contract"],
         format: "pdf",
@@ -243,6 +264,7 @@ export function StoragePreviewPage() {
   const handleSaveToHistory = async () => {
     setIsSavingEstimate(true);
     try {
+      const activeDrawings = storageDrawings.filter((d) => d.includeInPackage !== false);
       const res = await saveEstimateProvider(
         {
           _id: estimateId || undefined,
@@ -256,6 +278,11 @@ export function StoragePreviewPage() {
           sourceFileName: navState.sourceFileName || "Storage_COG.xlsx",
           storageData: storageData as Record<string, unknown>,
           storagePricingResult: storagePricing as Record<string, unknown>,
+          drawingAttachments: activeDrawings.map((d) => ({
+            name: d.name,
+            fileBase64: d.data,
+            includeInQuote: true,
+          })),
           status: "draft",
         },
         estimateId || undefined
@@ -278,6 +305,7 @@ export function StoragePreviewPage() {
   const handleRefreshPreview = async () => {
     setIsRefreshing(true);
     try {
+      const activeDrawings = storageDrawings.filter((d) => d.includeInPackage !== false);
       await previewDocumentProvider({
         jobType: "Storage",
         leadCompanyName: customerLeadName,
@@ -288,6 +316,12 @@ export function StoragePreviewPage() {
         pricingResult: storagePricing as Record<string, unknown>,
         storagePricingResult: storagePricing as Record<string, unknown>,
         storageData: storageData as Record<string, unknown>,
+        drawingAttachments: activeDrawings.map((d) => ({
+          name: d.name,
+          fileBase64: d.data,
+          includeInQuote: true,
+        })),
+        sections: activeDrawings.length > 0 ? ["quote", "sow", "contract", "drawings"] : ["quote", "sow", "contract"],
       });
     } catch (err) {
       console.warn("Refresh preview notice:", err);
@@ -300,16 +334,36 @@ export function StoragePreviewPage() {
     e.preventDefault();
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
-      const url = URL.createObjectURL(file);
-      setSelectedPdf({ name: file.name, url });
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setStorageDrawings([
+          ...storageDrawings,
+          {
+            name: file.name,
+            data: (ev.target?.result as string) || "",
+            includeInPackage: true,
+          },
+        ]);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      const url = URL.createObjectURL(file);
-      setSelectedPdf({ name: file.name, url });
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setStorageDrawings([
+          ...storageDrawings,
+          {
+            name: file.name,
+            data: (ev.target?.result as string) || "",
+            includeInPackage: true,
+          },
+        ]);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -384,19 +438,19 @@ export function StoragePreviewPage() {
                 Storage Layout & Unit Mix Drawings
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Drag building layout or unit mix PDF here — it attaches to the final quotation package
+                Drag building layout or unit mix PDF/Image here — attaches to final quotation package
               </p>
             </div>
 
             <div className="flex items-center gap-3">
-              {selectedPdf && (
+              {storageDrawings.length > 0 && (
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setSelectedPdf(null)}
+                  onClick={() => setStorageDrawings([])}
                   className="border-slate-300 text-slate-700 hover:bg-slate-50 px-4 py-2 text-xs font-semibold rounded-lg cursor-pointer bg-white"
                 >
-                  Clear File
+                  Clear All ({storageDrawings.length})
                 </Button>
               )}
               <Button
@@ -418,7 +472,8 @@ export function StoragePreviewPage() {
             <label className="cursor-pointer flex flex-col items-center">
               <input
                 type="file"
-                accept=".pdf"
+                accept="image/*,.pdf"
+                multiple
                 onChange={handleFileSelect}
                 className="hidden"
               />
@@ -426,23 +481,23 @@ export function StoragePreviewPage() {
                 <FolderUp className="h-6 w-6" />
               </div>
 
-              {selectedPdf ? (
+              {storageDrawings.length > 0 ? (
                 <div className="space-y-1">
                   <div className="text-sm font-bold text-slate-800 flex items-center justify-center gap-1.5">
                     <span>✓</span>
-                    <span>{selectedPdf.name}</span>
+                    <span>{storageDrawings.length} drawing(s) attached</span>
                   </div>
                   <p className="text-xs text-slate-500 font-medium">
-                    Attached — Included in full print package
+                    Click to add more layout plans or elevations
                   </p>
                 </div>
               ) : (
                 <div className="space-y-1">
                   <div className="text-sm font-bold text-slate-800">
-                    Drop Storage Layout PDF here or click to browse
+                    Drop Storage Layout Drawings here or click to browse
                   </div>
                   <p className="text-xs text-slate-500 font-medium">
-                    Unit mix layouts, anchor bolt plans & elevations
+                    Unit mix layouts, anchor bolt plans, elevations (PDF or Images)
                   </p>
                 </div>
               )}
@@ -482,13 +537,42 @@ export function StoragePreviewPage() {
         />
 
         {/* 3. Contract Agreement Document */}
-        <ContractPreviewDocument
+        <StorageContractPreviewDocument
           effectiveDate={quoteDate}
           customerLegalName={customerLeadName}
           customerAddress={customerAddress}
           totalContractValue={totalSellFormatted}
+          scope={scope}
           contractType={scope?.toLowerCase() === "both" ? "Mini Storage Supply, Delivery & Erection" : "Mini Storage Supply & Delivery Only"}
         />
+
+        {/* 4. Attached Drawings & Layout Plans Documents */}
+        {(() => {
+          const activeDrawings = storageDrawings.filter((d) => d.includeInPackage !== false);
+          if (activeDrawings.length === 0) {
+            return (
+              <StorageDrawingPreviewDocument
+                customerLeadName={customerLeadName}
+                customerAddress={customerAddress}
+                jobNumber={jobNumber}
+                quoteDate={quoteDate}
+              />
+            );
+          }
+          return activeDrawings.map((drawing, idx) => (
+            <StorageDrawingPreviewDocument
+              key={idx}
+              drawing={drawing}
+              drawingIndex={idx + 1}
+              totalDrawings={activeDrawings.length}
+              customerLeadName={customerLeadName}
+              customerAddress={customerAddress}
+              jobNumber={jobNumber}
+              quoteDate={quoteDate}
+            />
+          ));
+        })()}
+
       </div>
     </div>
   );

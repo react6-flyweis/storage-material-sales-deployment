@@ -1,7 +1,12 @@
 import { useState } from "react";
-import { Sparkles, Check, RotateCcw, Edit3, Save } from "lucide-react";
+import { Sparkles, Check, RotateCcw, Edit3, Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { ExtractShipperResponseData } from "../estimates.api";
+import {
+  downloadPdfProvider,
+  type ExtractShipperResponseData,
+  type ExtractDrawingResponseData,
+  type PreviewDocumentRequest,
+} from "../estimates.api";
 import { useSowDocument } from "../hooks/use-sow-document";
 import { SowPreviewDocument } from "./sow-preview-document";
 
@@ -9,6 +14,10 @@ interface QuoteSowTabProps {
   buildingSize?: string;
   sqFt?: string | number;
   extractedShipper?: ExtractShipperResponseData;
+  quotationForm?: Record<string, string>;
+  extractedDrawing?: ExtractDrawingResponseData;
+  pdfFileName?: string;
+  estimateId?: string;
   onBackToBreakdown?: () => void;
   onQuotePreview?: () => void;
 }
@@ -17,12 +26,16 @@ export function QuoteSowTab({
   buildingSize = "",
   sqFt = "",
   extractedShipper,
+  quotationForm,
+  extractedDrawing,
+  estimateId,
   onBackToBreakdown,
   onQuotePreview,
 }: QuoteSowTabProps) {
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isDownloadingSow, setIsDownloadingSow] = useState(false);
 
   const sow = useSowDocument({
     extractedShipper,
@@ -37,6 +50,45 @@ export function QuoteSowTab({
     setAiFeedback(`✨ Added "${newPrompt}" to Scope of Work inclusions!`);
     setAiPrompt("");
     setTimeout(() => setAiFeedback(null), 4000);
+  };
+
+  const handleDownloadSowPdf = async () => {
+    setIsDownloadingSow(true);
+    const customerName = sow.pricingData.customerLeadName || "Customer";
+    try {
+      const payload: PreviewDocumentRequest = {
+        leadCompanyName: customerName,
+        customerEmail: quotationForm?.email || sow.pricingData.customerEmail,
+        streetAddress: sow.pricingData.customerAddress,
+        cityStateZip: sow.pricingData.customerAddress,
+        buildingSize: sow.pricingData.displayBuildingSize,
+        squareFootage: sow.pricingData.effectiveSqFt,
+        jobNumber: quotationForm?.jobNumber || extractedDrawing?.extracted?.jobnumber || "",
+        pricingResult: extractedShipper?.pricing,
+        fullQuote:
+          extractedShipper?.fullQuote ||
+          (extractedShipper?.pricing as Record<string, unknown> | undefined),
+        extractedDrawingFields: extractedDrawing?.extracted,
+        drawingAttachments: [],
+        sections: ["sow"],
+      };
+
+      const res = await downloadPdfProvider(payload, estimateId || undefined);
+      const pdfData = res.data || res;
+
+      if (pdfData?.fileBase64) {
+        const a = document.createElement("a");
+        a.href = `data:${pdfData.mimeType || "application/pdf"};base64,${pdfData.fileBase64}`;
+        a.download =
+          pdfData.fileName ||
+          `SOW_${customerName.replace(/\s+/g, "_")}.pdf`;
+        a.click();
+      }
+    } catch (err) {
+      console.error("Failed to download SOW PDF, opening print dialog:", err);
+    } finally {
+      setIsDownloadingSow(false);
+    }
   };
 
   return (
@@ -127,7 +179,7 @@ export function QuoteSowTab({
         isEditing={isEditing}
         sow={sow}
       />
-      
+
       <div className="flex flex-wrap items-center gap-3 pt-2">
         <Button
           type="button"
@@ -141,11 +193,10 @@ export function QuoteSowTab({
           type="button"
           variant="outline"
           onClick={() => setIsEditing(!isEditing)}
-          className={`px-5 py-2.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer ${
-            isEditing
+          className={`px-5 py-2.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer ${isEditing
               ? "border-emerald-600 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
               : "border-amber-400 bg-amber-50/50 hover:bg-amber-100/60 text-amber-900"
-          }`}
+            }`}
         >
           {isEditing ? (
             <>
@@ -165,10 +216,18 @@ export function QuoteSowTab({
         <Button
           type="button"
           variant="outline"
-          onClick={() => window.print()}
-          className="border-slate-300 text-slate-700 px-6 py-2.5 rounded-lg text-xs font-semibold hover:bg-slate-50 cursor-pointer bg-white"
+          onClick={handleDownloadSowPdf}
+          disabled={isDownloadingSow}
+          className="border-slate-300 text-slate-700 hover:bg-slate-50 px-6 py-2.5 rounded-lg text-xs font-semibold cursor-pointer bg-white flex items-center gap-1.5"
         >
-          Print SOW
+          {isDownloadingSow ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <span>Downloading...</span>
+            </>
+          ) : (
+            <span>SOW Only (PDF)</span>
+          )}
         </Button>
       </div>
     </div>

@@ -56,10 +56,14 @@ export default function CreateQuotationPage() {
   const activeLeadId = selectedLeadId || leads[0]?._id || "";
 
   // Fetch detailed info for selected lead
-  const { data: leadDetailData, isLoading: isDetailLoading } = useLeadDetailQuery(
-    activeLeadId,
-    Boolean(activeLeadId)
-  );
+  const {
+    data: leadDetailData,
+    isLoading: isDetailLoading,
+    isFetching: isDetailFetching,
+  } = useLeadDetailQuery(activeLeadId, Boolean(activeLeadId));
+
+  const isAutofillLoading =
+    isLeadsLoading || (Boolean(activeLeadId) && (isDetailLoading || isDetailFetching));
 
   const formattedToday = new Date().toLocaleDateString("en-US", {
     month: "long",
@@ -115,7 +119,7 @@ export default function CreateQuotationPage() {
       const email = customer?.email || lookupItem?.customerId?.email || "";
       const street = lead?.location || lookupItem?.location || "";
 
-      let bSize = lead?.buildingType || lookupItem?.buildingType || "";
+      let bSize = "";
       if (lead?.width && lead?.length && lead?.height) {
         bSize = `${lead.width}x${lead.length}x${lead.height}`;
       } else if (lead?.width && lead?.length) {
@@ -127,13 +131,6 @@ export default function CreateQuotationPage() {
         sqftStr = String(lead.sqft);
       } else if (lead?.width && lead?.length) {
         sqftStr = String(Number(lead.width) * Number(lead.length));
-      }
-
-      if (!sqftStr && bSize) {
-        const match = bSize.toLowerCase().match(/(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/);
-        if (match) {
-          sqftStr = String(parseFloat(match[1]) * parseFloat(match[2]));
-        }
       }
 
       const jobId = lead?.jobId || lookupItem?.jobId || "";
@@ -150,15 +147,8 @@ export default function CreateQuotationPage() {
         `${lookupItem.customerId?.firstName || ""} ${lookupItem.customerId?.lastName || ""}`.trim() ||
         lookupItem.projectName;
 
-      const bSize = lookupItem.buildingType || "";
-      let sqftStr = "";
-
-      if (bSize) {
-        const match = bSize.toLowerCase().match(/(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/);
-        if (match) {
-          sqftStr = String(parseFloat(match[1]) * parseFloat(match[2]));
-        }
-      }
+      const bSize = "";
+      const sqftStr = "";
 
       setValue("leadName", name);
       setValue("email", lookupItem.customerId?.email || "");
@@ -396,9 +386,17 @@ export default function CreateQuotationPage() {
             <div className="flex justify-center mt-10">
               <Button
                 type="submit"
-                className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-12 py-2.5 rounded text-sm font-medium cursor-pointer"
+                disabled={isAutofillLoading}
+                className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-12 py-2.5 rounded text-sm font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Next
+                {isAutofillLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  "Next"
+                )}
               </Button>
             </div>
           </CardContent>

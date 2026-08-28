@@ -1,9 +1,14 @@
 import { useState } from "react";
-import { ArrowLeft, ChevronDown } from "lucide-react";
+import { ArrowLeft, ChevronDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SuccessDialog from "@/components/success-dialog";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
-import type { ExtractShipperResponseData, ExtractDrawingResponseData } from "../estimates.api";
+import {
+  downloadPdfProvider,
+  type ExtractShipperResponseData,
+  type ExtractDrawingResponseData,
+  type PreviewDocumentRequest,
+} from "../estimates.api";
 import { useQuotationPricing } from "../hooks/use-quotation-pricing";
 import { ContractPreviewDocument } from "./contract-preview-document";
 
@@ -12,6 +17,8 @@ interface QuoteContractTabProps {
   quotationForm?: Record<string, string>;
   extractedDrawing?: ExtractDrawingResponseData;
   sqFt?: string | number;
+  pdfFileName?: string;
+  estimateId?: string;
   onBackToBreakdown?: () => void;
   onQuotePreview?: () => void;
 }
@@ -21,6 +28,8 @@ export function QuoteContractTab({
   quotationForm,
   extractedDrawing,
   sqFt,
+  pdfFileName,
+  estimateId,
   onBackToBreakdown,
   onQuotePreview,
 }: QuoteContractTabProps) {
@@ -86,6 +95,10 @@ export function QuoteContractTab({
   const [depositPct, setDepositPct] = useState("Forty-percent (40%)");
   const [totalContractValue, setTotalContractValue] = useState(defaultTotalContractValue);
 
+  // Download states
+  const [isGeneratingPackage, setIsGeneratingPackage] = useState(false);
+  const [isDownloadingContract, setIsDownloadingContract] = useState(false);
+
   // Success dialog state
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
@@ -103,14 +116,97 @@ export function QuoteContractTab({
     setSuccessDialogOpen(true);
   };
 
-  const handleGenerateFullPackage = () => {
-    setSuccessMessage("Generating Full Quote Package PDF...");
-    setSuccessDialogOpen(true);
+  const handlePrint = (title?: string) => {
+    const originalTitle = document.title;
+    if (title) {
+      document.title = title;
+    }
+    window.print();
+    document.title = originalTitle;
   };
 
-  const handleContractOnlyPdf = () => {
-    setSuccessMessage("Downloading Contract Only PDF...");
-    setSuccessDialogOpen(true);
+  const handleGenerateFullPackage = async () => {
+    setIsGeneratingPackage(true);
+    try {
+      const payload: PreviewDocumentRequest = {
+        leadCompanyName: customerLegalName || pricingData.customerLeadName,
+        customerEmail: customerEmail || pricingData.customerEmail,
+        streetAddress: customerAddress || pricingData.customerAddress,
+        cityStateZip: customerCityStateZip || pricingData.customerAddress,
+        buildingSize: pricingData.displayBuildingSize,
+        squareFootage: pricingData.effectiveSqFt,
+        jobNumber: quotationForm?.jobNumber || extractedDrawing?.extracted?.jobnumber || "",
+        pricingResult: extractedShipper?.pricing,
+        fullQuote:
+          extractedShipper?.fullQuote ||
+          (extractedShipper?.pricing as Record<string, unknown> | undefined),
+        extractedDrawingFields: extractedDrawing?.extracted,
+        drawingAttachments: pdfFileName ? [{ name: pdfFileName, includeInQuote: true }] : [],
+        sections: pdfFileName
+          ? ["quote", "sow", "contract", "drawings"]
+          : ["quote", "sow", "contract"],
+      };
+
+      const res = await downloadPdfProvider(payload, estimateId || undefined);
+      const pdfData = res.data || res;
+
+      if (pdfData?.fileBase64) {
+        const a = document.createElement("a");
+        a.href = `data:${pdfData.mimeType || "application/pdf"};base64,${pdfData.fileBase64}`;
+        a.download =
+          pdfData.fileName ||
+          `Quote_Package_${(customerLegalName || "Customer").replace(/\s+/g, "_")}.pdf`;
+        a.click();
+      } else {
+        handlePrint(`Quote_Package_${customerLegalName || "Customer"}`);
+      }
+    } catch (err) {
+      console.error("Failed to download full package PDF, opening print dialog:", err);
+      handlePrint(`Quote_Package_${customerLegalName || "Customer"}`);
+    } finally {
+      setIsGeneratingPackage(false);
+    }
+  };
+
+  const handleContractOnlyPdf = async () => {
+    setIsDownloadingContract(true);
+    try {
+      const payload: PreviewDocumentRequest = {
+        leadCompanyName: customerLegalName || pricingData.customerLeadName,
+        customerEmail: customerEmail || pricingData.customerEmail,
+        streetAddress: customerAddress || pricingData.customerAddress,
+        cityStateZip: customerCityStateZip || pricingData.customerAddress,
+        buildingSize: pricingData.displayBuildingSize,
+        squareFootage: pricingData.effectiveSqFt,
+        jobNumber: quotationForm?.jobNumber || extractedDrawing?.extracted?.jobnumber || "",
+        pricingResult: extractedShipper?.pricing,
+        fullQuote:
+          extractedShipper?.fullQuote ||
+          (extractedShipper?.pricing as Record<string, unknown> | undefined),
+        extractedDrawingFields: extractedDrawing?.extracted,
+        drawingAttachments: [],
+        sections: ["contract"],
+      };
+
+      const res = await downloadPdfProvider(payload, estimateId || undefined);
+      const pdfData = res.data || res;
+
+      if (pdfData?.fileBase64) {
+        const a = document.createElement("a");
+        a.href = `data:${pdfData.mimeType || "application/pdf"};base64,${pdfData.fileBase64}`;
+        a.download =
+          pdfData.fileName ||
+          `Contract_${(customerLegalName || "Agreement").replace(/\s+/g, "_")}.pdf`;
+        a.click();
+      } else {
+        handlePrint(`Contract_${customerLegalName || "Agreement"}`);
+      }
+    } catch (err) {
+      console.error("Failed to download contract PDF, opening print dialog:", err);
+      handlePrint(`Contract_${customerLegalName || "Agreement"}`);
+    } finally {
+      setIsDownloadingContract(false);
+    }
   };
 
   return (
@@ -157,17 +253,33 @@ export function QuoteContractTab({
             <Button
               type="button"
               onClick={handleGenerateFullPackage}
-              className="bg-[#1E3A8A] hover:bg-[#1D4ED8] text-white text-xs font-semibold rounded-lg px-4 py-1.5 cursor-pointer h-8 shadow-2xs"
+              disabled={isGeneratingPackage}
+              className="bg-[#1E3A8A] hover:bg-[#1D4ED8] text-white text-xs font-semibold rounded-lg px-4 py-1.5 cursor-pointer h-8 shadow-2xs flex items-center gap-1.5"
             >
-              Generate Full Quote Package
+              {isGeneratingPackage ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span>Generating Package...</span>
+                </>
+              ) : (
+                <span>Generate Full Quote Package</span>
+              )}
             </Button>
             <Button
               type="button"
               variant="outline"
               onClick={handleContractOnlyPdf}
-              className="border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-semibold rounded-lg px-3.5 py-1.5 cursor-pointer h-8 bg-white"
+              disabled={isDownloadingContract}
+              className="border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-semibold rounded-lg px-3.5 py-1.5 cursor-pointer h-8 bg-white flex items-center gap-1.5"
             >
-              Contract Only (PDF)
+              {isDownloadingContract ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span>Downloading...</span>
+                </>
+              ) : (
+                <span>Contract Only (PDF)</span>
+              )}
             </Button>
           </div>
         </div>
@@ -181,38 +293,35 @@ export function QuoteContractTab({
             </label>
             <input
               type="text"
-              placeholder="Auto-filled from customer info above"
               value={customerLegalName}
               onChange={(e) => setCustomerLegalName(e.target.value)}
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
             />
           </div>
 
           {/* Customer Address */}
           <div className="space-y-1.5">
             <label className="block text-xs font-bold text-slate-800">
-              Customer Address
+              Customer Address (Street)
             </label>
             <input
               type="text"
-              placeholder="Street Address"
               value={customerAddress}
               onChange={(e) => setCustomerAddress(e.target.value)}
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
             />
           </div>
 
-          {/* Customer City, State ZIP */}
+          {/* City, State, Zip */}
           <div className="space-y-1.5">
             <label className="block text-xs font-bold text-slate-800">
-              Customer City, State ZIP
+              City, State, Zip
             </label>
             <input
               type="text"
-              placeholder="City, State, ZIP"
               value={customerCityStateZip}
               onChange={(e) => setCustomerCityStateZip(e.target.value)}
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
             />
           </div>
 
@@ -242,7 +351,7 @@ export function QuoteContractTab({
             />
           </div>
 
-          {/* Contract Type */}
+          {/* Contract Type Dropdown */}
           <div className="space-y-1.5">
             <label className="block text-xs font-bold text-slate-800">
               Contract Type
@@ -305,6 +414,8 @@ export function QuoteContractTab({
           effectiveDate={effectiveDate}
           customerLegalName={customerLegalName}
           customerAddress={customerAddress}
+          customerCityStateZip={customerCityStateZip}
+          customerEmail={customerEmail}
           depositPct={depositPct}
           totalContractValue={totalContractValue}
           contractType={contractType}

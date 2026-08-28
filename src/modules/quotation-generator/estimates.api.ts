@@ -87,6 +87,101 @@ export interface ExtractShipperRequest {
   sellPerSf?: number;
 }
 
+export interface FullQuoteConcrete {
+  include?: boolean;
+  thickness?: string | number | null;
+  psi?: string | number | null;
+  costSF?: number;
+  marginPct?: number;
+  sellSF?: number;
+  cost?: number;
+  sell?: number;
+  appliedSell?: number;
+  profit?: number;
+  sowItems?: string[];
+  sowNotes?: string;
+  [key: string]: unknown;
+}
+
+export interface FullQuoteInsulation {
+  include?: boolean;
+  system?: string;
+  systemLabel?: string;
+  rRoof?: string;
+  rWall?: string;
+  costSF?: number;
+  marginPct?: number;
+  sellSF?: number;
+  cost?: number;
+  sell?: number;
+  appliedSell?: number;
+  profit?: number;
+  [key: string]: unknown;
+}
+
+export interface FullQuoteSalesTax {
+  rate?: number;
+  amount?: number;
+  taxableBase?: number;
+  include?: boolean;
+  note?: string;
+  [key: string]: unknown;
+}
+
+export interface FullQuoteCogsPreview {
+  fromShipper?: {
+    cost?: number;
+    sell?: number;
+    margin?: number;
+    sf?: number;
+    [key: string]: unknown;
+  };
+  adjusted?: {
+    cost?: number;
+    sell?: number;
+    matMargin?: number;
+    grandSell?: number;
+    grandCost?: number;
+    profit?: number;
+    totalMargin?: number;
+    sfPrice?: string | number;
+    costDiff?: number;
+    sellDiff?: number;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+export interface FullQuoteMarginPreview {
+  originalSell?: number;
+  adjusted?: {
+    totSell?: number;
+    totCost?: number;
+    profit?: number;
+    profPct?: string | number;
+    sfPrice?: string | number;
+    instSell?: number;
+    instCost?: number;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+export interface FullQuoteData {
+  pricing?: ShipperPricing;
+  concrete?: FullQuoteConcrete;
+  insulation?: FullQuoteInsulation;
+  salesTax?: FullQuoteSalesTax;
+  buildingSubtotal?: number;
+  grandTotal?: number;
+  pricePerSf?: string | number;
+  totalProfit?: number;
+  grandMargin?: number;
+  cogsPreview?: FullQuoteCogsPreview;
+  marginPreview?: FullQuoteMarginPreview;
+  [key: string]: unknown;
+}
+
 export interface ShipperTabSummary {
   sheetName: string;
   category: string;
@@ -98,16 +193,19 @@ export interface ShipperWeightByCategoryItem {
   weightLbs: number;
   rate?: number;
   price?: number;
+  notes?: string;
+  [key: string]: unknown;
 }
 
 export interface ShipperPricingRow {
   cat: string;
   label: string;
-  wt: number;
+  wt: number | null;
   rate: string | number;
   price: number;
   tag?: string;
   notes?: string;
+  [key: string]: unknown;
 }
 
 export interface ShipperPricing {
@@ -124,10 +222,29 @@ export interface ShipperPricing {
   profit?: number;
   profPct?: string | number;
   sfPrice?: string | number;
+  sf?: number;
+  quicken?: number;
+  jobType?: string;
+  scope?: string;
+  roof?: string;
+  install?: string;
+  isSS?: boolean;
+  blendPct?: number;
   blendLabel?: string;
   vendorBlendSavings?: number;
+  rowSubtotalBeforeBlend?: number;
+  vendorBlendAdjustment?: number;
   cogsOverrideApplied?: boolean;
   marginOverrideApplied?: boolean;
+  [key: string]: unknown;
+}
+
+export interface SquareFootageMeta {
+  source?: "weight_formula" | "cover_sheet" | "manual" | string;
+  fromWeight?: number;
+  selected?: number;
+  coverDerivedSqft?: number;
+  inputSf?: number;
   [key: string]: unknown;
 }
 
@@ -136,6 +253,7 @@ export interface ExtractShipperResponseData {
   sheetCount: number;
   totalWeightLbs: number;
   squareFootage: number;
+  squareFootageMeta?: SquareFootageMeta | null;
   tabSummary: ShipperTabSummary[];
   parsedCategories?: Record<string, unknown>;
   coverSheet?: {
@@ -145,12 +263,7 @@ export interface ExtractShipperResponseData {
   };
   weightByCategory?: ShipperWeightByCategoryItem[];
   pricing?: ShipperPricing;
-  fullQuote?: {
-    grandTotal?: number;
-    pricePerSf?: string | number;
-    grandMargin?: number;
-    [key: string]: unknown;
-  } | null;
+  fullQuote?: FullQuoteData | null;
   note?: string;
 }
 
@@ -255,7 +368,7 @@ export interface ComputeEstimateRequest {
 export interface ComputeEstimateResponseData {
   weightByCategory?: ShipperWeightByCategoryItem[];
   pricing?: ShipperPricing;
-  fullQuote?: Record<string, unknown>;
+  fullQuote?: FullQuoteData;
   [key: string]: unknown;
 }
 
@@ -265,7 +378,7 @@ export interface ComputeEstimateResponse {
   data?: ComputeEstimateResponseData;
   weightByCategory?: ShipperWeightByCategoryItem[];
   pricing?: ShipperPricing;
-  fullQuote?: Record<string, unknown>;
+  fullQuote?: FullQuoteData;
 }
 
 export async function computeEstimateProvider(
@@ -324,7 +437,7 @@ export interface SaveEstimatePayload extends Record<string, unknown> {
   parsedCategories?: Record<string, unknown>;
   tabSummary?: ShipperTabSummary[];
   pricingResult?: ShipperPricing;
-  fullQuoteResult?: Record<string, unknown>;
+  fullQuoteResult?: FullQuoteData | Record<string, unknown>;
   extractedDrawingFields?: ExtractedDrawingData;
   concreteAddon?: ComputeConcreteConfig;
   insulationAddon?: ComputeInsulationConfig;
@@ -650,7 +763,7 @@ export interface PreviewDocumentRequest {
   jobNumber?: string;
   jobType?: string;
   pricingResult?: ShipperPricing;
-  fullQuote?: Record<string, unknown>;
+  fullQuote?: FullQuoteData | Record<string, unknown>;
   extractedDrawingFields?: ExtractedDrawingData;
   drawingAttachments?: Array<{ name?: string; fileBase64?: string; includeInQuote?: boolean;[key: string]: unknown }>;
   sections?: string[];

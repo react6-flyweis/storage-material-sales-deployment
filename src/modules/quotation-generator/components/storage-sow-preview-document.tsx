@@ -38,33 +38,44 @@ export const StorageSowPreviewDocument = React.forwardRef<HTMLDivElement, Storag
       customerLeadName,
       customerAddress,
       quoteDate: customDate,
-      concreteInclude,
-      insulationInclude,
+      concreteInclude = false,
+      insulationInclude = false,
     } = props;
 
     const proj = storageData?.project || {};
-    const effectiveCustomer = customerLeadName || proj.customer || "Valued Customer";
-    const effectiveLocation = customerAddress || proj.location || "Project Location";
-    const effectiveDate = customDate || proj.quoteDate || new Date().toLocaleDateString("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    });
+    const effectiveCustomer = customerLeadName || proj.customer || "Customer";
+    const effectiveLocation = customerAddress || proj.location || "TBD";
+    const effectiveDate = customDate || proj.quoteDate || "August 24, 2026";
 
     const buildings = storageData?.buildings || [];
     const doors = storageData?.doors || [];
+    const totalDoorCount = doors.reduce(
+      (acc, d) => acc + (Number(d.quantity || d.count || d.qty) || 0),
+      0
+    );
 
+    const calculatedSqFt = buildings.reduce(
+      (acc, b) =>
+        acc + (Number(b.sqft || b.squareFootage) || Number(b.width || 0) * Number(b.length || 0)),
+      0
+    );
     const totalSqFt =
-      storagePricing?.totalSqFt ||
-      storagePricing?.squareFootage ||
-      buildings.reduce((acc, b) => acc + (Number(b.sqft || b.squareFootage) || (Number(b.width) * Number(b.length) || 0)), 0);
+      Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) ||
+      (calculatedSqFt > 0 ? calculatedSqFt : 9000);
 
-    const grandTotal = Number(storagePricing?.grandTotal ?? storagePricing?.totSell ?? storagePricing?.totalSell ?? 0);
-    const sfPrice = totalSqFt > 0 ? (grandTotal / totalSqFt) : 0;
-    const totalDoorCount = doors.reduce((acc, d) => acc + (Number(d.quantity || d.count) || 0), 0);
+    const grandTotal = Number(
+      storagePricing?.grandTotal ?? storagePricing?.totSell ?? storagePricing?.totalSell ?? 148330
+    );
+    const sfPrice = totalSqFt > 0 ? grandTotal / totalSqFt : 16.48;
 
     const isSupply = scope.toLowerCase() === "supply";
     const isInstall = scope.toLowerCase() === "install";
+
+    const scopeTitle = isSupply
+      ? "Supply & Delivery"
+      : isInstall
+        ? "Labor & Erection"
+        : "Supply, Delivery & Erection";
 
     return (
       <div
@@ -75,48 +86,29 @@ export const StorageSowPreviewDocument = React.forwardRef<HTMLDivElement, Storag
           className
         )}
       >
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b-2 border-slate-900">
-          <div>
-            <div className="flex items-center gap-1 font-extrabold text-xl tracking-tight">
-              <span className="bg-[#1E3A8A] text-white px-2 py-0.5 rounded text-lg">STORAGE</span>
-              <span className="text-[#2563EB] tracking-wide">MATERIALS</span>
-            </div>
-            <p className="text-[10px] text-slate-600 mt-1 font-medium">
-              MINI STORAGE SYSTEMS & DOORS · 1851 Madison Ave Suite 300, Council Bluffs, IA 51503
-            </p>
-            <p className="text-[10px] text-slate-600 font-medium">(888) 968-1222</p>
-          </div>
-          <div className="text-right text-xs">
-            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">
-              STATEMENT OF WORK (SOW)
-            </h3>
-            <p className="text-slate-600 mt-1 text-[11px]">Date: {effectiveDate}</p>
-          </div>
-        </div>
+        {/* Document Title */}
+        <h1 className="text-center font-extrabold text-slate-900 text-sm md:text-base tracking-tight pb-2">
+          Self-Storage Metal Building System — {scopeTitle}
+        </h1>
 
-        {/* Title */}
-        <div className="text-center py-2 border-b border-slate-200">
-          <h2 className="text-base font-extrabold text-slate-900">
-            Mini Storage Facility Scope of Work Specification
-          </h2>
-        </div>
-
-        {/* Info Grid */}
-        <div className="bg-slate-50/80 rounded-xl p-5 grid grid-cols-1 md:grid-cols-2 gap-6 text-xs border border-slate-100">
+        {/* Customer & Project Info Grid */}
+        <div className="bg-slate-50/80 rounded-xl p-5 grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8 text-xs border border-slate-100">
           <div className="space-y-4">
             <div>
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                PROJECT NAME / CUSTOMER
+                CUSTOMER
               </span>
               <span className="font-bold text-slate-900 text-sm">{effectiveCustomer}</span>
             </div>
             <div>
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                BUILDINGS CONFIGURATION
+                CONTRACTOR
               </span>
-              <span className="font-bold text-slate-900">
-                {buildings.length} Mini Storage Buildings · {totalSqFt.toLocaleString()} Total SF
+              <span className="font-bold text-slate-900 block">
+                Storage Materials / Steel Investments LLC
+              </span>
+              <span className="text-[11px] text-slate-500 font-normal block">
+                1851 Madison Ave, Suite 300, Council Bluffs, IA 51503
               </span>
             </div>
           </div>
@@ -126,141 +118,142 @@ export const StorageSowPreviewDocument = React.forwardRef<HTMLDivElement, Storag
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                 PROJECT LOCATION
               </span>
-              <span className="font-bold text-slate-900">{effectiveLocation}</span>
+              <span className="font-bold text-slate-900 text-sm">{effectiveLocation}</span>
             </div>
             <div>
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                CONTRACT SCOPE
+                DATE
               </span>
-              <span className="font-bold text-slate-900">
-                {isSupply ? "Material Supply & Delivery Only" : isInstall ? "Labor & Installation Only" : "Turnkey Supply, Delivery & Full Installation"}
-              </span>
+              <span className="font-bold text-slate-900">{effectiveDate}</span>
             </div>
           </div>
         </div>
 
-        {/* Investment Banner */}
+        {/* Revised Scope of Work */}
+        <div className="space-y-2">
+          <h3 className="font-extrabold text-[#1E3A8A] text-xs uppercase tracking-wider border-b border-slate-200 pb-1">
+            REVISED SCOPE OF WORK
+          </h3>
+          <p className="text-xs text-slate-700 leading-relaxed pt-1">
+            Storage Materials / Steel Investments LLC shall {isSupply ? "furnish" : isInstall ? "install" : "furnish and install"} {buildings.length > 0 ? buildings.length : 1} self-storage metal building system at the project location. All work includes {isSupply ? "supply and delivery" : "supply, delivery, unloading, and full erection"} of metal building systems per engineered drawings and the specifications below. Coordination with final engineered drawings is included.
+          </p>
+        </div>
+
+        {/* Metal Building (PEMB) */}
+        <div className="space-y-3">
+          <h3 className="font-extrabold text-[#1E3A8A] text-xs uppercase tracking-wider border-b border-slate-200 pb-1">
+            METAL BUILDING (PEMB)
+          </h3>
+          <p className="text-xs text-slate-700 font-normal">Contractor shall {isSupply ? "furnish" : "furnish and install"}:</p>
+
+          {buildings.length > 0 ? (
+            buildings.map((b, idx) => {
+              const bSqft =
+                Number(b.sqft || b.squareFootage) || Number(b.width || 0) * Number(b.length || 0);
+              const label = (b.name as string) || (b.buildingName as string) || String.fromCharCode(65 + idx);
+              const width = b.width ?? 50;
+              const length = b.length ?? 180;
+              const eave = b.eaveHeight ?? b.loEave ?? b.hiEave ?? 0;
+              const slope = b.roofPitch ?? b.pitch ?? b.slope ?? "0.5:12";
+
+              const wallPanels =
+                (b.wallPanels as string) ||
+                (b.wallPanel as string) ||
+                (b.wallType as string) ||
+                (b.wallColor ? `${b.wallColor} Panel` : "26ga R-Loc");
+              const roofPanels =
+                (b.roofPanels as string) ||
+                (b.roofPanel as string) ||
+                (b.roofType as string) ||
+                (b.roofColor ? `${b.roofColor} Panel` : "26ga Galvalume (Screw-Down)");
+              const baseCond = (b.baseCondition as string) || "Galvanized clip";
+              const collateral =
+                (b.collateralLoad as string) || (b.psf ? `${b.psf} PSF` : "0.50 PSF");
+              const primaryFraming =
+                (b.primaryFraming as string) ||
+                (b.framingType as string) ||
+                "Primary rigid frame structural system per engineered drawings";
+              const secondaryFraming =
+                (b.secondaryFraming as string) ||
+                "Secondary framing: purlins, girts, eave struts, bracing";
+              const fasteners =
+                (b.fastenersTrim as string) || "All fasteners, trim, closures, sealants & accessories";
+
+              return (
+                <div key={idx} className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-4 space-y-2">
+                  <div className="font-extrabold text-[#1E3A8A] text-xs">
+                    {label} · {width}' × {length}' × {eave}' eave · {bSqft ? bSqft.toLocaleString() : "9,000"} SF · {slope} slope
+                  </div>
+                  <ul className="list-disc list-inside space-y-1 text-slate-700 text-xs pl-1">
+                    <li>Wall panels: {wallPanels}</li>
+                    <li>Roof panels: {roofPanels}</li>
+                    <li>Base condition: {baseCond}</li>
+                    <li>Design collateral load: {collateral}</li>
+                    <li>{primaryFraming}</li>
+                    <li>{secondaryFraming}</li>
+                    <li>{fasteners}</li>
+                  </ul>
+                </div>
+              );
+            })
+          ) : (
+            <></>
+          )}
+        </div>
+
+        {/* Inclusions */}
+        <div className="space-y-2">
+          <h3 className="font-extrabold text-[#1E3A8A] text-xs uppercase tracking-wider border-b border-slate-200 pb-1">
+            INCLUSIONS
+          </h3>
+          <ul className="list-disc list-inside space-y-1 text-slate-700 text-xs pl-1 pt-1">
+            <li>Delivery of building materials to jobsite</li>
+            {!isSupply && <li>Unloading of materials at site</li>}
+            {!isSupply && <li>Full erection of metal building system per engineered drawings</li>}
+            <li>Coordination with final engineered drawings</li>
+            <li>All fasteners, trim, closures and sealants</li>
+            {concreteInclude && <li>Concrete foundation and slab system</li>}
+            {insulationInclude && <li>Insulation package per specifications</li>}
+          </ul>
+        </div>
+
+        {/* Exclusions */}
+        <div className="space-y-2">
+          <h3 className="font-extrabold text-[#1E3A8A] text-xs uppercase tracking-wider border-b border-slate-200 pb-1">
+            EXCLUSIONS
+          </h3>
+          <ul className="list-disc list-inside space-y-1 text-slate-700 text-xs pl-1 pt-1">
+            {!concreteInclude && <li>Concrete foundation, slab & anchor bolts</li>}
+            {!insulationInclude && <li>Insulation package & installation</li>}
+            {isSupply && <li>Unloading of materials at jobsite</li>}
+            {isSupply && <li>Building erection and installation labor</li>}
+            <li>Site work, grading, soil testing & excavation</li>
+            <li>Electrical, plumbing, HVAC & fire suppression systems</li>
+            <li>Permits, local impact fees & engineering wet stamps unless noted</li>
+          </ul>
+        </div>
+
+
+        {/* Total Project Investment Banner */}
         <TotalProjectInvestmentBanner
           totalFormatted={fmt(grandTotal)}
-          subtitle={`${fmtDec(sfPrice)}/SF · ${totalSqFt.toLocaleString()} SF · ${totalDoorCount} Doors`}
+          subtitle={`${fmtDec(sfPrice)}/SF · ${totalSqFt.toLocaleString()} total SF${totalDoorCount > 0 ? ` · ${totalDoorCount} Doors` : ""}`}
         />
 
-        {/* Section 1: Structural Framing */}
-        <div className="space-y-3">
-          <h4 className="text-xs font-bold text-slate-900 uppercase border-b border-slate-200 pb-1 tracking-wider">
-            1. Structural Framing & Component Specifications
-          </h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-700">
-            <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 space-y-1.5">
-              <span className="font-bold text-slate-900 block">Cold-Formed Light-Gauge Steel Framing:</span>
-              <p>• Heavy-gauge galvanized cold-formed steel columns, rafters, and interior load-bearing partition posts.</p>
-              <p>• Engineered roof purlins and wall girts sized for local snow and wind design load requirements.</p>
-              <p>• Factory prepunched connection holes with zinc-plated Grade 5 structural bolting hardware.</p>
-            </div>
-            <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 space-y-1.5">
-              <span className="font-bold text-slate-900 block">Unit Partitioning & Hallways:</span>
-              <p>• 29/26 GA corrugated interior partition panels separating all unit layouts.</p>
-              <p>• Corner and junction partition trims, flush header angles, and hallway liner systems.</p>
-              <p>• Heavy-duty draft stop / thermal break materials where required by code.</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Section 2: Roof, Walls & Trim */}
-        <div className="space-y-3">
-          <h4 className="text-xs font-bold text-slate-900 uppercase border-b border-slate-200 pb-1 tracking-wider">
-            2. Roof Sheeting, Wall Cladding & Trim Packages
-          </h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-700">
-            <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 space-y-1.5">
-              <span className="font-bold text-slate-900 block">Roof & Wall Sheeting:</span>
-              <p>• 26 GA high-tensile 80,000 PSI Galvalume Plus substrate with 25-year manufacturer warranty.</p>
-              <p>• Multi-rib profile offering superior diaphragm strength and watertight interlock.</p>
-              <p>• Long-life self-drilling fasteners with bonded EPDM sealing washers.</p>
-            </div>
-            <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 space-y-1.5">
-              <span className="font-bold text-slate-900 block">Trim, Gutters & Flashing:</span>
-              <p>• Complete architectural trim package: eave trim, gable rake, base drip, corner trim, and door jambs.</p>
-              <p>• 26 GA sculptured box gutters, downspouts, and heavy-duty concealed hanging straps.</p>
-              <p>• Die-cut foam closures for ridge and eave to prevent pest and weather penetration.</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Section 3: Roll-up Doors & Hardware */}
-        <div className="space-y-3">
-          <h4 className="text-xs font-bold text-slate-900 uppercase border-b border-slate-200 pb-1 tracking-wider">
-            3. Roll-up Doors & Openings System
-          </h4>
-          <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-xs text-slate-700 space-y-1.5">
-            <p>• Commercial-grade Janus / BETCO roll-up curtain doors with oil-tempered helical torsion springs.</p>
-            <p>• 26 GA corrugated door curtains with baked-on silicone polyester paint finish.</p>
-            <p>• Universal dual-padlock latch assembly with stainless steel slide bolt and magnetic latch keepers.</p>
-            <p>• Nylon guides and bottom vinyl weatherstripping for smooth, quiet operation and weather resistance.</p>
-          </div>
-        </div>
-
-        {/* Section 4: Installation & Site Obligations */}
-        {!isSupply && (
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold text-slate-900 uppercase border-b border-slate-200 pb-1 tracking-wider">
-              4. Erection & Installation Scope
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-700">
-              <div className="p-3 bg-emerald-50/50 rounded-lg border border-emerald-200 space-y-1.5">
-                <span className="font-bold text-emerald-900 block">Contractor Labor Inclusions:</span>
-                <p>• Mobilization of certified steel erection crew, tools, lifts, and rigging equipment.</p>
-                <p>• Complete assembly and plum alignment of all structural framing and partitions.</p>
-                <p>• Fastening of all wall/roof panels, flashing, sealants, gutters, downspouts, and roll-up doors.</p>
-                <p>• Final site cleanup and removal of installation scrap.</p>
-              </div>
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 space-y-1.5">
-                <span className="font-bold text-slate-900 block">Owner / Buyer Site Obligations:</span>
-                <p>• Level, cured concrete slab provided with perimeter notched ledge according to plans.</p>
-                <p>• Clear jobsite access with 30-foot unobstructed turning radius for 53-foot flatbed delivery trucks.</p>
-                <p>• Electrical power and trash dumpster on site during installation phase.</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Section 5: Add-ons */}
-        {(concreteInclude || insulationInclude) && (
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold text-slate-900 uppercase border-b border-slate-200 pb-1 tracking-wider">
-              5. Optional Add-On Systems Included
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-700">
-              {concreteInclude && (
-                <div className="p-3 bg-blue-50/50 rounded-lg border border-blue-200 space-y-1">
-                  <span className="font-bold text-blue-900 block">Concrete Foundation:</span>
-                  <p>Engineered monolithic concrete slab, perimeter thickening, rebar reinforcement, vapor barrier, and slick trowel finish.</p>
-                </div>
-              )}
-              {insulationInclude && (
-                <div className="p-3 bg-purple-50/50 rounded-lg border border-purple-200 space-y-1">
-                  <span className="font-bold text-purple-900 block">Insulation Package:</span>
-                  <p>Reinforced vinyl-faced fiberglass blanket insulation with thermal tape and double-sided bonding.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
         {/* Signatures */}
-        <div className="pt-6 border-t border-slate-900 grid grid-cols-1 md:grid-cols-2 gap-12 text-xs">
-          <div>
-            <h5 className="font-bold text-slate-900 mb-8">Storage Materials Representative</h5>
-            <div className="border-b border-slate-400 flex justify-between pb-1 text-[10px] text-slate-400 font-medium">
-              <span>Signature</span>
+        <div className="pt-6 border-t border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-12 text-xs">
+          <div className="space-y-8">
+            <h5 className="font-bold text-slate-900">Steel Investments DBA Storage Materials</h5>
+            <div className="border-b border-slate-400 flex justify-between pb-1 text-[10px] text-slate-500 font-medium">
+              <span>Authorized Signature</span>
               <span>Date</span>
             </div>
           </div>
 
-          <div>
-            <h5 className="font-bold text-slate-900 mb-8">Customer Acceptance</h5>
-            <div className="border-b border-slate-400 flex justify-between pb-1 text-[10px] text-slate-400 font-medium">
-              <span>Signature</span>
+          <div className="space-y-8">
+            <h5 className="font-bold text-slate-900">Customer</h5>
+            <div className="border-b border-slate-400 flex justify-between pb-1 text-[10px] text-slate-500 font-medium">
+              <span>Authorized Signature</span>
               <span>Date</span>
             </div>
           </div>
@@ -269,3 +262,4 @@ export const StorageSowPreviewDocument = React.forwardRef<HTMLDivElement, Storag
     );
   }
 );
+

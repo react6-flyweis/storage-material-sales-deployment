@@ -1,35 +1,55 @@
-import { Link } from "react-router";
-import { Edit3, ArrowRight } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  Loader2,
+  Edit3,
+  AlertTriangle,
+} from "lucide-react";
+import { Link } from "react-router";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 import type { ExtractShipperResponseData } from "../estimates.api";
+import {
+  formatCurrency2,
+  formatNumber2,
+  formatPercent2,
+  formatSfPrice2,
+  formatRate2,
+} from "../utils/quote-formatting";
 
 interface QuoteBreakdownTabProps {
-  onViewQuote?: () => void;
-  onViewSow?: () => void;
-  onQuotePreview?: () => void;
+  onViewQuote: () => void;
+  onViewSow: () => void;
+  onQuotePreview: () => void;
   onSaveDraft?: () => void;
   isSavingDraft?: boolean;
   extractedShipper?: ExtractShipperResponseData;
+  onSelectSf?: (sf: number) => void;
+  isManualSqFt?: boolean;
 }
 
 function getCategoryBadgeStyle(cat?: string, label?: string): string {
   const c = (cat || label || "").toLowerCase();
 
-  if (c.includes("primary") || c.includes("rigid") || c.includes("main")) {
-    return "bg-blue-600 text-white shadow-2xs border border-blue-700";
+  if (c.includes("primary") || c.includes("rigid") || c.includes("endwall")) {
+    return "bg-[#1E3A8A] text-white shadow-2xs border border-blue-900";
   }
-  if (c.includes("secondary") || c.includes("cold") || c.includes("purlin") || c.includes("girt")) {
+  if (c.includes("secondary") || c.includes("purlin") || c.includes("girt") || c.includes("eave")) {
+    return "bg-[#059669] text-white shadow-2xs border border-emerald-700";
+  }
+  if (c.includes("opening") || c.includes("door") || c.includes("jamb") || c.includes("header")) {
+    return "bg-[#D97706] text-white shadow-2xs border border-amber-700";
+  }
+  if (c.includes("sheeting") || c.includes("roof") || c.includes("wall") || c.includes("panel")) {
+    return "bg-[#7C3AED] text-white shadow-2xs border border-purple-700";
+  }
+  if (c.includes("trim") || c.includes("flashing") || c.includes("gutter") || c.includes("downspout")) {
+    return "bg-[#DC2626] text-white shadow-2xs border border-red-700";
+  }
+  if (c.includes("hardware") || c.includes("fastener") || c.includes("bolt") || c.includes("accessories")) {
     return "bg-slate-700 text-white shadow-2xs border border-slate-800";
   }
-  if (c.includes("sheeting") || c.includes("panel") || c.includes("roof") || c.includes("wall") || c.includes("trim")) {
-    return "bg-amber-600 text-white shadow-2xs border border-amber-700";
-  }
-  if (c.includes("accessory") || c.includes("fastener") || c.includes("screw") || c.includes("hardware") || c.includes("door")) {
-    return "bg-emerald-600 text-white shadow-2xs border border-emerald-700";
-  }
-  if (c.includes("concrete") || c.includes("slab") || c.includes("foundation")) {
-    return "bg-purple-600 text-white shadow-2xs border border-purple-700";
+  if (c.includes("concrete")) {
+    return "bg-amber-700 text-white shadow-2xs border border-amber-800";
   }
   if (c.includes("insulation")) {
     return "bg-indigo-600 text-white shadow-2xs border border-indigo-700";
@@ -45,22 +65,58 @@ export function QuoteBreakdownTab({
   onSaveDraft,
   isSavingDraft,
   extractedShipper,
+  onSelectSf,
+  isManualSqFt,
 }: QuoteBreakdownTabProps) {
   const { scope } = useQuotationStore();
-  const pricing = extractedShipper?.pricing;
+  const [isSfBannerDismissed, setIsSfBannerDismissed] = useState(false);
 
-  const totalSell = pricing?.totSell != null ? `$${pricing.totSell.toLocaleString()}` : "-";
-  const matCost = pricing?.matCost != null ? `$${pricing.matCost.toLocaleString()}` : "-";
-  const profit = pricing?.profit != null ? `$${pricing.profit.toLocaleString()}` : "-";
-  const profPct = pricing?.profPct != null ? `${pricing.profPct}% margin` : "-";
-  const sfPrice = pricing?.sfPrice != null ? `$${pricing.sfPrice}` : "-";
-  const sqFt = extractedShipper?.squareFootage ? extractedShipper.squareFootage.toLocaleString() : "-";
-  const totalWeight = extractedShipper?.totalWeightLbs || pricing?.totWt;
-  const weightDisplay = totalWeight != null ? (totalWeight > 1000 ? `${(totalWeight / 1000).toFixed(1)}K` : `${totalWeight}`) : "-";
+  const fullQuote = extractedShipper?.fullQuote;
+  const pricing = extractedShipper?.pricing || fullQuote?.pricing;
+
+  const totalSell = formatCurrency2(pricing?.totSell ?? fullQuote?.buildingSubtotal);
+  const matCost = formatCurrency2(pricing?.matCost);
+  const profit = formatCurrency2(pricing?.profit ?? fullQuote?.totalProfit);
+  const profPct =
+    pricing?.profPct != null
+      ? `${formatPercent2(pricing.profPct)} margin`
+      : fullQuote?.grandMargin != null
+        ? `${formatPercent2(fullQuote.grandMargin)} margin`
+        : "-";
+  const sfPrice = formatSfPrice2(pricing?.sfPrice ?? fullQuote?.pricePerSf);
+  const effectiveSqFt = pricing?.sf || extractedShipper?.squareFootage;
+  const sqFt = effectiveSqFt ? formatNumber2(effectiveSqFt) : "-";
+  const totalWeight = pricing?.totWt ?? extractedShipper?.totalWeightLbs;
+  const weightDisplay = totalWeight != null ? `${formatNumber2(totalWeight)} lbs` : "-";
   const trucks = pricing?.trucks != null ? pricing.trucks : "-";
-  const vendorBlendSavings = pricing?.vendorBlendSavings != null ? `$${pricing.vendorBlendSavings.toLocaleString()}` : "-";
-  const blendLabel = pricing?.blendLabel || "Vendor blend";
+  const vendorBlendSavings = formatCurrency2(pricing?.vendorBlendSavings);
+  const blendLabel = pricing?.blendLabel || "50% Quicken blend";
   const fileName = extractedShipper?.fileName || "";
+
+  // Square Footage metadata from backend
+  const sfMeta = extractedShipper?.squareFootageMeta;
+  const weightSf = Number(sfMeta?.fromWeight || sfMeta?.selected || 0);
+  const coverSf = Number(sfMeta?.coverDerivedSqft || 0);
+  const hasSfMismatch =
+    !isManualSqFt &&
+    !isSfBannerDismissed &&
+    weightSf > 0 &&
+    coverSf > 0 &&
+    weightSf !== coverSf;
+  const diffPct =
+    hasSfMismatch
+      ? (Math.abs(weightSf - coverSf) / Math.max(weightSf, coverSf)) * 100
+      : 0;
+
+  let sfSubtitle = `${sqFt} SF`;
+  if (sfMeta?.source === "weight_formula") {
+    sfSubtitle += ` (from weight: ${formatNumber2(sfMeta.fromWeight ?? totalWeight ?? 0)} / 9)`;
+  } else if (sfMeta?.source === "manual" || isManualSqFt) {
+    sfSubtitle += " (manual override)";
+  }
+  if (sfMeta?.coverDerivedSqft) {
+    sfSubtitle += ` · cover sheet SF: ${formatNumber2(sfMeta.coverDerivedSqft)}`;
+  }
 
   const rows = pricing?.rows;
 
@@ -68,11 +124,52 @@ export function QuoteBreakdownTab({
     scope?.toLowerCase() === "supply"
       ? "Supply Only"
       : scope?.toLowerCase() === "install"
-      ? "Install Only"
-      : "Supply & Install";
+        ? "Install Only"
+        : "Supply & Install";
 
   return (
     <div className="space-y-6">
+      {/* SF Mismatch Choice Banner at top of breakdown */}
+      {hasSfMismatch && (
+        <div className="bg-amber-50/90 border border-amber-300 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
+          <div className="flex items-start sm:items-center gap-2.5">
+            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5 sm:mt-0" />
+            <div className="text-slate-800">
+              <span className="font-bold text-amber-900">SF Mismatch Detected:</span>{" "}
+              Weight formula gives <strong className="text-slate-900">{formatNumber2(weightSf)} SF</strong> while cover sheet gives <strong className="text-slate-900">{formatNumber2(coverSf)} SF</strong> ({diffPct.toFixed(1)}% difference). Choose which SF to use for pricing.
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => onSelectSf?.(weightSf)}
+              className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white text-xs px-3 py-1.5 h-auto font-semibold cursor-pointer"
+            >
+              Use Weight SF
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => onSelectSf?.(coverSf)}
+              className="border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs px-3 py-1.5 h-auto font-semibold cursor-pointer"
+            >
+              Use Cover SF
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setIsSfBannerDismissed(true)}
+              className="text-slate-600 hover:text-slate-900 text-xs px-2.5 py-1.5 h-auto cursor-pointer"
+            >
+              Keep Current
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Summary KPI Metric Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {/* TOTAL SELL */}
@@ -141,7 +238,7 @@ export function QuoteBreakdownTab({
         <div>
           <h3 className="text-base font-bold text-slate-900">Weight + Price by Category</h3>
           <p className="text-xs text-slate-500">
-            {fileName ? `${fileName} - ${sqFt} SF - ${totalWeight ? totalWeight.toLocaleString() : "-"} lbs` : "No shipper file loaded"}
+            {fileName ? `${fileName} · ${sfSubtitle} · ${weightDisplay}` : "No shipper file loaded"}
           </p>
         </div>
         <Button
@@ -178,13 +275,13 @@ export function QuoteBreakdownTab({
                     </span>
                   </td>
                   <td className="p-3 font-semibold text-slate-900">
-                    {r.wt != null ? Number(r.wt).toLocaleString() : "-"}
+                    {r.wt != null ? formatNumber2(r.wt) : "-"}
                   </td>
                   <td className="p-3 text-slate-600">
-                    {typeof r.rate === "number" ? `$${r.rate}/lb` : r.rate || "-"}
+                    {formatRate2(r.rate)}
                   </td>
                   <td className="p-3 font-bold text-slate-900">
-                    {r.price != null ? `$${Math.round(r.price).toLocaleString()}` : "-"}
+                    {r.price != null ? formatCurrency2(r.price) : "-"}
                   </td>
                   <td className="p-3 text-slate-500">{r.notes || "-"}</td>
                 </tr>
@@ -198,7 +295,7 @@ export function QuoteBreakdownTab({
                     </span>
                   </td>
                   <td className="p-3 font-semibold text-slate-900">
-                    {tab.weightLbs != null ? tab.weightLbs.toLocaleString() : "-"}
+                    {tab.weightLbs != null ? formatNumber2(tab.weightLbs) : "-"}
                   </td>
                   <td className="p-3 text-slate-600">-</td>
                   <td className="p-3 font-bold text-slate-900">-</td>
@@ -213,15 +310,49 @@ export function QuoteBreakdownTab({
               </tr>
             )}
 
-            {/* Subtotals & Cost Rows */}
+            {/* Category subtotal (before blend) Row */}
+            <tr className="hover:bg-slate-50/60 transition-colors border-t border-slate-200">
+              <td className="p-3 text-slate-700">Category subtotal (before blend)</td>
+              <td className="p-3"></td>
+              <td className="p-3"></td>
+              <td className="p-3 font-semibold text-slate-900">
+                {pricing?.rowSubtotalBeforeBlend != null
+                  ? formatCurrency2(pricing.rowSubtotalBeforeBlend)
+                  : "-"}
+              </td>
+              <td className="p-3 text-slate-500">Sum of visible category prices</td>
+            </tr>
+
+            {/* Vendor Blend Adjustment Row */}
+            <tr className="hover:bg-slate-50/60 transition-colors">
+              <td className="p-3 text-slate-700">Vendor blend adjustment</td>
+              <td className="p-3"></td>
+              <td className="p-3 text-slate-700">{pricing?.blendLabel || blendLabel}</td>
+              <td className="p-3 font-semibold text-slate-900">
+                {pricing?.vendorBlendAdjustment != null
+                  ? formatCurrency2(pricing.vendorBlendAdjustment)
+                  : "-"}
+              </td>
+              <td className="p-3 text-slate-500">Quicken/Central blended cost delta</td>
+            </tr>
+
+            {/* Material total (after blend) Row */}
             <tr className="bg-slate-50/90 font-bold border-t border-slate-200">
-              <td className="p-3 text-slate-900 font-bold">Material total</td>
+              <td className="p-3 text-slate-900 font-bold">Material total (after blend)</td>
               <td className="p-3 text-slate-900 font-bold">
-                {totalWeight != null ? `${Number(totalWeight).toLocaleString()} lbs` : "-"}
+                {totalWeight != null ? `${formatNumber2(totalWeight)} lbs` : "-"}
               </td>
               <td className="p-3"></td>
               <td className="p-3 text-slate-900 font-bold">{matCost}</td>
-              <td className="p-3"></td>
+              <td className="p-3 text-xs font-normal text-slate-500">
+                {pricing?.rowSubtotalBeforeBlend != null && pricing?.vendorBlendAdjustment != null
+                  ? `Before blend ${formatCurrency2(pricing.rowSubtotalBeforeBlend)} ${
+                      pricing.vendorBlendAdjustment < 0
+                        ? `- ${formatCurrency2(Math.abs(pricing.vendorBlendAdjustment))}`
+                        : `+ ${formatCurrency2(pricing.vendorBlendAdjustment)}`
+                    }`
+                  : ""}
+              </td>
             </tr>
 
             <tr>
@@ -229,40 +360,44 @@ export function QuoteBreakdownTab({
               <td className="p-3"></td>
               <td className="p-3"></td>
               <td className="p-3 font-semibold text-slate-900">
-                {pricing?.freight != null ? `$${Math.round(pricing.freight).toLocaleString()}` : "$0"}
+                {formatCurrency2(pricing?.freight, "$0.00")}
               </td>
               <td className="p-3"></td>
             </tr>
 
-            <tr>
-              <td className="p-3 text-slate-700">Install cost</td>
-              <td className="p-3"></td>
-              <td className="p-3"></td>
-              <td className="p-3 font-semibold text-slate-900">
-                {pricing?.instCost != null ? `$${Math.round(pricing.instCost).toLocaleString()}` : "$0"}
-              </td>
-              <td className="p-3"></td>
-            </tr>
+            {scope?.toLowerCase() !== "supply" && (
+              <>
+                <tr>
+                  <td className="p-3 text-slate-700">Install cost</td>
+                  <td className="p-3"></td>
+                  <td className="p-3"></td>
+                  <td className="p-3 font-semibold text-slate-900">
+                    {formatCurrency2(pricing?.instCost, "$0.00")}
+                  </td>
+                  <td className="p-3"></td>
+                </tr>
 
-            <tr className="bg-slate-50/90 font-bold border-t border-b border-slate-200">
-              <td className="p-3 text-slate-900 font-bold">Total cost</td>
-              <td className="p-3"></td>
-              <td className="p-3"></td>
-              <td className="p-3 text-slate-900 font-bold">
-                {pricing?.totCost != null ? `$${Math.round(pricing.totCost).toLocaleString()}` : "-"}
-              </td>
-              <td className="p-3"></td>
-            </tr>
+                <tr className="bg-slate-50/90 font-bold border-t border-b border-slate-200">
+                  <td className="p-3 text-slate-900 font-bold">Total cost</td>
+                  <td className="p-3"></td>
+                  <td className="p-3"></td>
+                  <td className="p-3 text-slate-900 font-bold">
+                    {formatCurrency2(pricing?.totCost)}
+                  </td>
+                  <td className="p-3"></td>
+                </tr>
 
-            <tr>
-              <td className="p-3 text-slate-700">Install sell</td>
-              <td className="p-3"></td>
-              <td className="p-3"></td>
-              <td className="p-3 font-semibold text-slate-900">
-                {pricing?.instSell != null ? `$${Math.round(pricing.instSell).toLocaleString()}` : "$0"}
-              </td>
-              <td className="p-3"></td>
-            </tr>
+                <tr>
+                  <td className="p-3 text-slate-700">Install sell</td>
+                  <td className="p-3"></td>
+                  <td className="p-3"></td>
+                  <td className="p-3 font-semibold text-slate-900">
+                    {formatCurrency2(pricing?.instSell, "$0.00")}
+                  </td>
+                  <td className="p-3"></td>
+                </tr>
+              </>
+            )}
 
             {/* Final SELL PRICE Row */}
             <tr className="bg-slate-100/90 font-bold border-t-2 border-slate-300">
@@ -276,42 +411,48 @@ export function QuoteBreakdownTab({
         </table>
       </div>
 
-      {/* Footer Action Buttons */}
-      <div className="flex flex-wrap items-center gap-3 pt-4">
-        <Button
-          type="button"
-          onClick={onViewQuote}
-          className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-5 py-2.5 rounded-lg text-xs font-semibold cursor-pointer shadow-xs"
-        >
-          View Quote
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onViewSow}
-          className="border-slate-300 text-slate-800 px-5 py-2.5 rounded-lg text-xs font-semibold hover:bg-slate-50 cursor-pointer"
-        >
-          View SOW
-        </Button>
+      {/* Action Buttons Row */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Button
+            type="button"
+            onClick={onViewQuote}
+            className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-4 py-2 rounded-lg text-xs font-semibold cursor-pointer shadow-xs flex items-center gap-1.5"
+          >
+            View Quote
+          </Button>
+
+          <Button
+            type="button"
+            onClick={onViewSow}
+            variant="outline"
+            className="border-slate-300 text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-lg text-xs font-semibold cursor-pointer bg-white flex items-center gap-1.5"
+          >
+            View SOW
+          </Button>
+
+          <Button
+            type="button"
+            onClick={onQuotePreview}
+            className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-6 py-2.5 rounded-lg text-xs font-semibold cursor-pointer shadow-xs"
+          >
+            Quote Preview
+          </Button>
+        </div>
+
         {onSaveDraft && (
           <Button
             type="button"
-            variant="outline"
             onClick={onSaveDraft}
             disabled={isSavingDraft}
-            className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 px-5 py-2.5 rounded-lg text-xs font-semibold cursor-pointer bg-white"
+            className="bg-[#16A34A] hover:bg-[#15803D] text-white px-6 py-2.5 rounded-lg text-xs font-semibold cursor-pointer shadow-xs flex items-center gap-2"
           >
-            {isSavingDraft ? "Saving Draft..." : "Save Draft"}
+            {isSavingDraft && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {isSavingDraft ? "Saving..." : "Save to History"}
           </Button>
         )}
-        <Button
-          type="button"
-          onClick={onQuotePreview || onViewQuote}
-          className="bg-[#10B981] hover:bg-[#059669] text-white px-5 py-2.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
-        >
-          Quote Preview <ArrowRight className="h-4 w-4" />
-        </Button>
       </div>
     </div>
   );
 }
+

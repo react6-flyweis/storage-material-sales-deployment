@@ -8,6 +8,11 @@ import {
   type ExtractShipperResponseData,
   type ComputeEstimateRequest,
 } from "../estimates.api";
+import {
+  formatCurrency2,
+  formatPercent2,
+  formatSfPrice2,
+} from "../utils/quote-formatting";
 
 interface QuoteCogsTabProps {
   extractedShipper?: ExtractShipperResponseData;
@@ -41,7 +46,6 @@ export function QuoteCogsTab({
   onTriggerCompute,
 }: QuoteCogsTabProps) {
   const {
-    cogsOverrideApplied,
     cogsCostInput,
     setCogsCostInput,
     cogsCostAdjustPercent,
@@ -58,28 +62,51 @@ export function QuoteCogsTab({
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
 
+  const fullQuote = extractedShipper?.fullQuote;
+  const pricing = extractedShipper?.pricing || fullQuote?.pricing;
+
   // API Preview state
+  const apiFromShipper = fullQuote?.cogsPreview?.fromShipper;
+  const apiAdjusted = fullQuote?.cogsPreview?.adjusted;
+
   const [fromShipperData, setFromShipperData] = useState<CogsPreviewFromShipper | null>(null);
   const [previewData, setPreviewData] = useState<CogsPreviewAdjusted | null>(null);
   const [isFetchingPreview, setIsFetchingPreview] = useState(false);
 
+  const activeFromShipper = fromShipperData || apiFromShipper || null;
+  const activePreview = previewData || apiAdjusted || null;
+
   useEffect(() => {
-    if (!extractedShipper?.pricing) return;
+    if (!pricing) return;
+    const hasInput = Boolean(
+      cogsCostInput ||
+      cogsFixedSellPrice ||
+      cogsCostAdjustPercent !== 0 ||
+      cogsMaterialMargin !== 0
+    );
+
+    if (!hasInput) {
+      return;
+    }
+
+    let isMounted = true;
     const costVal = parseFloat(cogsCostInput) || undefined;
     const sellVal = parseFloat(cogsFixedSellPrice) || undefined;
 
-    setIsFetchingPreview(true);
-    previewCogsProvider({
-      pricingResult: extractedShipper.pricing,
-      cogsOverride: {
-        applied: false,
-        costDollar: costVal ?? null,
-        marginPct: cogsMaterialMargin,
-        sellDollar: sellVal ?? null,
-        costPctAdj: cogsCostAdjustPercent,
-      },
-    })
-      .then((res) => {
+    const fetchPreview = async () => {
+      setIsFetchingPreview(true);
+      try {
+        const res = await previewCogsProvider({
+          pricingResult: pricing,
+          cogsOverride: {
+            applied: false,
+            costDollar: costVal ?? null,
+            marginPct: cogsMaterialMargin,
+            sellDollar: sellVal ?? null,
+            costPctAdj: cogsCostAdjustPercent,
+          },
+        });
+        if (!isMounted) return;
         const preview = res.data?.preview || res.preview;
         if (preview?.fromShipper) {
           setFromShipperData(preview.fromShipper);
@@ -96,103 +123,94 @@ export function QuoteCogsTab({
             setPreviewData(adjusted as CogsPreviewAdjusted);
           }
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error("COGS preview API error:", err);
-      })
-      .finally(() => {
-        setIsFetchingPreview(false);
-      });
-  }, [cogsCostInput, cogsCostAdjustPercent, cogsMaterialMargin, cogsFixedSellPrice, extractedShipper?.pricing]);
+      } finally {
+        if (isMounted) {
+          setIsFetchingPreview(false);
+        }
+      }
+    };
 
-  const pricing = extractedShipper?.pricing;
-  const sqFtVal = fromShipperData?.sf || extractedShipper?.squareFootage || 1;
+    fetchPreview();
 
-  // Base shipper values from API (Material + Freight)
+    return () => {
+      isMounted = false;
+    };
+  }, [cogsCostInput, cogsCostAdjustPercent, cogsMaterialMargin, cogsFixedSellPrice, pricing]);
+
+  // Base shipper values from API
   const baseCogs =
-    fromShipperData?.cost != null
-      ? fromShipperData.cost
-      : pricing?.matCost != null
-      ? (pricing.matCost + (pricing.freight || 0))
-      : pricing?.totCost != null
-      ? pricing.totCost
-      : 0;
+    activeFromShipper?.cost != null
+      ? activeFromShipper.cost
+      : pricing?.totCost ?? 0;
 
   const baseSell =
-    fromShipperData?.sell != null
-      ? fromShipperData.sell
-      : pricing?.matSell != null
-      ? pricing.matSell
-      : pricing?.totSell != null
-      ? pricing.totSell
-      : 0;
+    activeFromShipper?.sell != null
+      ? activeFromShipper.sell
+      : pricing?.totSell ?? 0;
 
   const baseMarginText =
-    fromShipperData?.margin != null
-      ? `${fromShipperData.margin}%`
+    activeFromShipper?.margin != null
+      ? formatPercent2(activeFromShipper.margin)
       : pricing?.profPct != null
-      ? `${pricing.profPct}%`
+      ? formatPercent2(pricing.profPct)
       : "-";
 
   const sfPriceText =
-    baseCogs > 0 && sqFtVal > 0
-      ? `$${(baseCogs / sqFtVal).toFixed(2)} cost / $${(baseSell / sqFtVal).toFixed(2)} sell`
+    activePreview?.sfPrice != null
+      ? `${formatSfPrice2(activePreview.sfPrice)}/SF`
       : pricing?.sfPrice != null
-      ? `$${pricing.sfPrice}/SF`
+      ? `${formatSfPrice2(pricing.sfPrice)}/SF`
       : "-";
 
-  // Display values driven by API preview or pricing
+  // Display values driven by API preview or pricing (no local fallback calculation)
   const displayCogs =
-    previewData?.cost != null
-      ? previewData.cost
-      : parseFloat(cogsCostInput) || baseCogs;
+    activePreview?.cost != null
+      ? activePreview.cost
+      : baseCogs;
 
   const costDiff =
-    previewData?.costDiff != null
-      ? previewData.costDiff
-      : displayCogs - baseCogs;
+    activePreview?.costDiff != null
+      ? activePreview.costDiff
+      : 0;
 
   const displayMatSell =
-    previewData?.sell != null
-      ? previewData.sell
-      : (cogsOverrideApplied && pricing?.matSell != null ? pricing.matSell : baseSell);
+    activePreview?.sell != null
+      ? activePreview.sell
+      : (pricing?.matSell ?? baseSell);
 
   const displayTotalSell =
-    previewData?.grandSell != null
-      ? previewData.grandSell
-      : previewData?.sell != null
-      ? previewData.sell
-      : (cogsOverrideApplied && pricing?.totSell != null ? pricing.totSell : displayMatSell);
+    activePreview?.grandSell != null
+      ? activePreview.grandSell
+      : activePreview?.sell != null
+      ? activePreview.sell
+      : (pricing?.totSell ?? displayMatSell);
 
   const displayProfit =
-    previewData?.profit != null
-      ? previewData.profit
-      : previewData?.grandSell != null && previewData?.cost != null
-      ? previewData.grandSell - previewData.cost
-      : (cogsOverrideApplied && pricing?.profit != null ? pricing.profit : displayTotalSell - displayCogs);
+    activePreview?.profit != null
+      ? activePreview.profit
+      : (pricing?.profit ?? 0);
 
   const matMarginPct =
-    previewData?.matMargin != null
-      ? Number(previewData.matMargin).toFixed(1)
-      : Number(cogsMaterialMargin).toFixed(1);
+    activePreview?.matMargin != null
+      ? Number(activePreview.matMargin).toFixed(2)
+      : Number(cogsMaterialMargin).toFixed(2);
 
   const overallMarginPct =
-    previewData?.totalMargin != null
-      ? Number(previewData.totalMargin).toFixed(1)
-      : previewData?.matMargin != null
-      ? Number(previewData.matMargin).toFixed(1)
+    activePreview?.totalMargin != null
+      ? Number(activePreview.totalMargin).toFixed(2)
+      : activePreview?.matMargin != null
+      ? Number(activePreview.matMargin).toFixed(2)
       : pricing?.profPct != null
-      ? String(pricing.profPct)
-      : (displayTotalSell > 0 ? ((displayProfit / displayTotalSell) * 100).toFixed(1) : "0.0");
+      ? Number(pricing.profPct).toFixed(2)
+      : "0.00";
 
-  const displaySfPrice =
-    previewData?.sfPrice != null
-      ? String(previewData.sfPrice)
-      : pricing?.sfPrice != null
-      ? String(pricing.sfPrice)
-      : sqFtVal > 0 && displayTotalSell > 0
-      ? (displayTotalSell / sqFtVal).toFixed(2)
-      : "-";
+  const rawDisplaySfPrice =
+    activePreview?.sfPrice != null
+      ? activePreview.sfPrice
+      : pricing?.sfPrice ?? "-";
+  const displaySfPrice = formatSfPrice2(rawDisplaySfPrice);
 
   const handleApply = () => {
     setCogsOverrideApplied(true);
@@ -261,7 +279,7 @@ export function QuoteCogsTab({
               COGS
             </span>
             <span className="text-sm md:text-base font-extrabold text-slate-900">
-              {baseCogs > 0 ? `$${Math.round(baseCogs).toLocaleString()}` : "-"}
+              {baseCogs > 0 ? formatCurrency2(baseCogs) : "-"}
             </span>
           </div>
 
@@ -270,7 +288,7 @@ export function QuoteCogsTab({
               COMPUTED SELL
             </span>
             <span className="text-sm md:text-base font-extrabold text-blue-600">
-              {baseSell > 0 ? `$${Math.round(baseSell).toLocaleString()}` : "-"}
+              {baseSell > 0 ? formatCurrency2(baseSell) : "-"}
             </span>
           </div>
 
@@ -312,7 +330,7 @@ export function QuoteCogsTab({
                 type="number"
                 step="500"
                 min="0"
-                placeholder={baseCogs > 0 ? `e.g. ${Math.round(baseCogs)}` : "New Cost Total ($)"}
+                placeholder={baseCogs > 0 ? `e.g. ${baseCogs.toFixed(2)}` : "New Cost Total ($)"}
                 value={cogsCostInput}
                 onChange={(e) => {
                   const val = e.target.value;
@@ -320,7 +338,7 @@ export function QuoteCogsTab({
                   const num = parseFloat(val);
                   if (!isNaN(num) && baseCogs > 0) {
                     const pct = ((num - baseCogs) / baseCogs) * 100;
-                    setCogsCostAdjustPercent(parseFloat(pct.toFixed(1)));
+                    setCogsCostAdjustPercent(parseFloat(pct.toFixed(2)));
                   }
                 }}
                 className="w-full border-2 border-orange-400 rounded-lg px-3 py-2 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
@@ -337,20 +355,20 @@ export function QuoteCogsTab({
                   type="range"
                   min="-30"
                   max="50"
-                  step="1"
+                  step="0.5"
                   value={cogsCostAdjustPercent}
                   onChange={(e) => {
                     const pct = parseFloat(e.target.value);
                     setCogsCostAdjustPercent(pct);
                     if (baseCogs > 0) {
-                      const newCost = Math.round(baseCogs * (1 + pct / 100));
-                      setCogsCostInput(newCost.toString());
+                      const newCost = (baseCogs * (1 + pct / 100)).toFixed(2);
+                      setCogsCostInput(newCost);
                     }
                   }}
                   className="flex-1 accent-orange-500 cursor-pointer h-2 bg-slate-200 rounded-lg"
                 />
                 <span className="text-xs font-bold text-orange-600 min-w-12 text-right">
-                  {cogsCostAdjustPercent >= 0 ? `+${cogsCostAdjustPercent}%` : `${cogsCostAdjustPercent}%`}
+                  {cogsCostAdjustPercent >= 0 ? `+${cogsCostAdjustPercent.toFixed(1)}%` : `${cogsCostAdjustPercent.toFixed(1)}%`}
                 </span>
               </div>
               <p className="text-[10px] text-slate-400 font-medium">
@@ -359,7 +377,7 @@ export function QuoteCogsTab({
 
               {baseCogs > 0 && cogsCostInput && (
                 <div className="bg-[#FFF8ED] border border-[#FCD34D] rounded-md px-3 py-2 text-xs font-medium text-[#92400E]">
-                  ${Math.round(baseCogs).toLocaleString()} → ${Math.round(displayCogs).toLocaleString()} ({costDiff >= 0 ? `+$${Math.round(costDiff).toLocaleString()}` : `-$${Math.round(Math.abs(costDiff)).toLocaleString()}`})
+                  {formatCurrency2(baseCogs)} → {formatCurrency2(displayCogs)} ({costDiff >= 0 ? `+${formatCurrency2(costDiff)}` : `-${formatCurrency2(Math.abs(costDiff))}`})
                 </div>
               )}
             </div>
@@ -392,7 +410,7 @@ export function QuoteCogsTab({
                   }}
                   className="flex-1 accent-blue-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
                 />
-                <div className="border border-slate-300 rounded-md px-3 py-1 bg-white text-xs font-bold text-slate-900 flex items-center gap-1.5 min-w-[4rem] justify-between shadow-2xs">
+                <div className="border border-slate-300 rounded-md px-3 py-1 bg-white text-xs font-bold text-slate-900 flex items-center gap-1.5 min-w-16 justify-between shadow-2xs">
                   <input
                     type="number"
                     step="0.5"
@@ -429,7 +447,7 @@ export function QuoteCogsTab({
                   const costBase = parseFloat(cogsCostInput) || baseCogs;
                   if (!isNaN(sellNum) && sellNum > 0 && costBase > 0) {
                     const impliedMargin = Math.min(60, Math.max(0, ((sellNum - costBase) / sellNum) * 100));
-                    setCogsMaterialMargin(parseFloat(impliedMargin.toFixed(1)));
+                    setCogsMaterialMargin(parseFloat(impliedMargin.toFixed(2)));
                   }
                 }}
                 className="w-full border border-blue-500 rounded-lg px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white font-medium"
@@ -461,10 +479,10 @@ export function QuoteCogsTab({
               ADJUSTED COGS
             </span>
             <div className="text-xl font-extrabold text-slate-900">
-              ${Math.round(displayCogs).toLocaleString()}
+              {formatCurrency2(displayCogs)}
             </div>
             <p className="text-[11px] text-slate-400 font-medium">
-              +{costDiff >= 0 ? `$${Math.round(costDiff).toLocaleString()}` : `-$${Math.round(Math.abs(costDiff)).toLocaleString()}`} vs shipper
+              {costDiff >= 0 ? `+${formatCurrency2(costDiff)}` : `-${formatCurrency2(Math.abs(costDiff))}`} vs shipper
             </p>
           </div>
 
@@ -474,10 +492,10 @@ export function QuoteCogsTab({
               MATERIAL SELL
             </span>
             <div className="text-xl font-extrabold text-emerald-600">
-              ${Math.round(displayMatSell).toLocaleString()}
+              {formatCurrency2(displayMatSell)}
             </div>
             <p className="text-[11px] text-slate-400 font-medium">
-              {matMarginPct}% mat margin · {costDiff >= 0 ? `-$${Math.round(Math.abs(costDiff)).toLocaleString()}` : `+$${Math.round(Math.abs(costDiff)).toLocaleString()}`}
+              {matMarginPct}% mat margin · {costDiff >= 0 ? `-${formatCurrency2(Math.abs(costDiff))}` : `+${formatCurrency2(Math.abs(costDiff))}`}
             </p>
           </div>
 
@@ -487,10 +505,10 @@ export function QuoteCogsTab({
               TOTAL SELL
             </span>
             <div className="text-xl font-extrabold text-slate-900">
-              ${Math.round(displayTotalSell).toLocaleString()}
+              {formatCurrency2(displayTotalSell)}
             </div>
             <p className="text-[11px] text-slate-400 font-medium">
-              {displaySfPrice !== "-" ? (displaySfPrice.startsWith("$") ? `${displaySfPrice}/SF` : `$${displaySfPrice}/SF`) : "-"} · incl. install
+              {displaySfPrice}/SF · incl. install
             </p>
           </div>
 
@@ -500,7 +518,7 @@ export function QuoteCogsTab({
               TOTAL PROFIT
             </span>
             <div className="text-xl font-extrabold text-emerald-600">
-              ${Math.round(displayProfit).toLocaleString()}
+              {formatCurrency2(displayProfit)}
             </div>
             <p className="text-[11px] text-slate-400 font-medium">
               {overallMarginPct}% overall margin

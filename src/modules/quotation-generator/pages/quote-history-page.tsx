@@ -15,6 +15,12 @@ import {
   type SaveEstimatePayload,
 } from "../estimates.api";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
+import {
+  formatCurrency2,
+  formatPercent2,
+  formatSfPrice2,
+  formatNumber2,
+} from "../utils/quote-formatting";
 
 export function QuoteHistoryPage() {
   const navigate = useNavigate();
@@ -589,7 +595,7 @@ export function QuoteHistoryPage() {
                         <span>·</span>
                         <span>{quote.scope?.toUpperCase() || "SUPPLY"}</span>
                         <span>·</span>
-                        <span>{effectiveSqFt.toLocaleString()} SF</span>
+                        <span>{formatNumber2(effectiveSqFt)} SF</span>
                         <span>·</span>
                         <span>{displayBuilding}</span>
                         <span>·</span>
@@ -606,17 +612,17 @@ export function QuoteHistoryPage() {
                     {/* Top Right Price Metrics Stack */}
                     <div className="text-right leading-tight space-y-0.5">
                       <div className="text-sm font-bold text-[#2563eb]">
-                        ${totSell.toLocaleString()}
+                        {formatCurrency2(totSell)}
                       </div>
                       <div className="text-[11px] font-normal text-slate-500">
-                        ${sfPrice}/SF
+                        {formatSfPrice2(sfPrice)}/SF
                       </div>
                       <div className="flex items-center justify-end gap-1 text-xs font-semibold text-[#16a34a]">
                         <span>💰</span>
-                        <span>${prof.toLocaleString()}</span>
+                        <span>{formatCurrency2(prof)}</span>
                       </div>
                       <div className="text-xs font-semibold text-[#16a34a]">
-                        {typeof marginPct === "number" ? marginPct.toFixed(1) : marginPct}%
+                        {formatPercent2(marginPct)}
                       </div>
                     </div>
 
