@@ -7,6 +7,11 @@ import type {
   ExtractShipperResponseData,
   ComputeEstimateRequest,
 } from "../estimates.api";
+import {
+  formatCurrency2,
+  formatNumber2,
+  formatPercent2,
+} from "../utils/quote-formatting";
 
 interface QuoteConcreteTabProps {
   extractedShipper?: ExtractShipperResponseData;
@@ -41,19 +46,20 @@ export function QuoteConcreteTab({
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
 
+  const fullQuote = extractedShipper?.fullQuote;
+
   // Base building footprint
   const areaSqFt =
     parseFloat(propSqFt || "") ||
     extractedShipper?.squareFootage ||
     0;
 
-  // Calculation logic
-  const totalCost = areaSqFt * concreteCostSf;
-  const marginDecimal = concreteMarginPct / 100;
+  // Concrete values directly from API fullQuote (no local fallback calculation)
+  const totalCost = fullQuote?.concrete?.cost ?? 0;
   const totalSell =
-    marginDecimal < 1 ? totalCost / (1 - marginDecimal) : totalCost;
-  const sellCostSf = areaSqFt > 0 ? totalSell / areaSqFt : 0;
-  const totalProfit = totalSell - totalCost;
+    fullQuote?.concrete?.appliedSell ?? fullQuote?.concrete?.sell ?? 0;
+  const sellCostSf = fullQuote?.concrete?.sellSF ?? 0;
+  const totalProfit = fullQuote?.concrete?.profit ?? 0;
 
   const handleApply = () => {
     setConcreteInclude(true);
@@ -69,6 +75,8 @@ export function QuoteConcreteTab({
           marginPct: concreteMarginPct,
           slabThickness: concreteSlabThickness,
           psiRating: concretePsiRating,
+          thickness: concreteSlabThickness,
+          psi: concretePsiRating,
         },
       });
     }
@@ -245,6 +253,7 @@ export function QuoteConcreteTab({
                     type="range"
                     min="0"
                     max="50"
+                    step="0.5"
                     value={concreteMarginPct}
                     onChange={(e) => setConcreteMarginPct(parseFloat(e.target.value))}
                     className="flex-1 accent-emerald-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
@@ -280,7 +289,7 @@ export function QuoteConcreteTab({
                     MARGIN
                   </span>
                   <span className="text-xs font-bold text-slate-900 block">
-                    {concreteMarginPct}%
+                    {formatPercent2(concreteMarginPct)}
                   </span>
                 </div>
 
@@ -290,7 +299,7 @@ export function QuoteConcreteTab({
                     AREA
                   </span>
                   <span className="text-xs font-bold text-slate-900 block">
-                    {Math.round(areaSqFt).toLocaleString()} SF
+                    {formatNumber2(areaSqFt)} SF
                   </span>
                 </div>
 
@@ -300,7 +309,7 @@ export function QuoteConcreteTab({
                     COST
                   </span>
                   <span className="text-xs font-bold text-orange-600 block">
-                    ${Math.round(totalCost).toLocaleString()} (${concreteCostSf.toFixed(2)}/SF)
+                    {formatCurrency2(totalCost)} (${concreteCostSf.toFixed(2)}/SF)
                   </span>
                 </div>
 
@@ -310,7 +319,7 @@ export function QuoteConcreteTab({
                     SELL
                   </span>
                   <span className="text-xs font-bold text-blue-600 block">
-                    ${Math.round(totalSell).toLocaleString()} (${sellCostSf.toFixed(2)}/SF)
+                    {formatCurrency2(totalSell)} (${sellCostSf.toFixed(2)}/SF)
                   </span>
                 </div>
 
@@ -320,7 +329,7 @@ export function QuoteConcreteTab({
                     PROFIT
                   </span>
                   <span className="text-xs font-bold text-emerald-600 block">
-                    ${Math.round(totalProfit).toLocaleString()}
+                    {formatCurrency2(totalProfit)}
                   </span>
                 </div>
               </div>
