@@ -1,8 +1,7 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { useAuthStore } from "@/modules/auth/auth.store";
-import { createAdminSocket, type Socket } from "@/lib/socket";
+import { useSocket } from "@/context/useSocket";
 import { getLeadProjectName } from "@/modules/leads/leads.utils";
 import LeadAssignedDialog from "./lead-assigned-dialog";
 import FollowUpReminderDialog from "./follow-up-reminder-dialog";
@@ -56,8 +55,7 @@ interface FollowUpReminderPayload {
 export function LeadSocketListener() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const accessToken = useAuthStore((state) => state.accessToken);
-  const socketRef = useRef<Socket | null>(null);
+  const { socket } = useSocket();
 
   // State for creation / assignment dialog
   const [assignedLead, setAssignedLead] = useState<LeadListSocketPayload | null>(null);
@@ -74,18 +72,7 @@ export function LeadSocketListener() {
 
   // Set up socket listener
   useEffect(() => {
-    if (!accessToken) return;
-
-    // Connect to /admin namespace using websocket transport
-    const socket = createAdminSocket(accessToken);
     if (!socket) return;
-
-    socketRef.current = socket;
-
-    socket.on("connect", () => {
-      console.log("Connected to /admin socket namespace for Lead List events");
-      socket.emit("join_user_room");
-    });
 
     const handleLeadCreated = (payload: LeadListSocketPayload) => {
       console.log("Socket: lead_list_created event received", payload);
@@ -216,10 +203,8 @@ export function LeadSocketListener() {
       socket.off("lead_list_updated", handleLeadUpdated);
       socket.off("followup:reminder", handleFollowUpReminder);
       socket.off("customer_online_status", handleCustomerOnlineStatus);
-      socket.disconnect();
-      socketRef.current = null;
     };
-  }, [accessToken, queryClient, navigate]);
+  }, [socket, queryClient, navigate]);
 
   // Navigate to created lead details and close dialog
 

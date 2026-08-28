@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuthStore } from "@/modules/auth/auth.store";
+import { useChatUnreadCountQuery } from "@/modules/team-chat/team-chat.hooks";
 
 // icons
 import dashboardIcon from "@/assets/icons/sidebar/dashboard.svg";
@@ -288,6 +289,9 @@ export function Sidebar({
   const location = useLocation();
   const navigate = useNavigate();
   const currentUser = useAuthStore((state) => state.user);
+  const { data: unreadData } = useChatUnreadCountQuery();
+  const unreadCount = unreadData?.count ?? unreadData?.total ?? 0;
+
   const [hoveredGroup, setHoveredGroup] = useState<{
     label: string;
     top: number;
@@ -443,6 +447,8 @@ export function Sidebar({
                 .map((group) => {
                   const iconSrc = group.icon as string;
                   const isActive = activeGroup.id === group.id;
+                  const isCommunication = group.id === "messages";
+                  const showBadge = isCommunication && unreadCount > 0;
 
                   return (
                     <button
@@ -475,6 +481,11 @@ export function Sidebar({
                           alt={group.label}
                           className="max-w-5 max-h-5 object-contain"
                         />
+                        {showBadge && (
+                          <span className="absolute -top-1 -right-1 z-60 bg-red-500 text-white text-[10px] font-bold rounded-full h-4.5 min-w-4.5 px-1 flex items-center justify-center shadow-xs">
+                            {unreadCount > 99 ? "99+" : unreadCount}
+                          </span>
+                        )}
                       </div>
                     </button>
                   );
@@ -565,8 +576,13 @@ export function Sidebar({
                     )
                   }
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between gap-2">
                     <span>{activeGroup.label}</span>
+                    {activeGroup.id === "messages" && unreadCount > 0 && (
+                      <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-xs">
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </span>
+                    )}
                   </div>
                 </NavLink>
               )}
