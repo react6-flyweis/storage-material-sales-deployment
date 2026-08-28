@@ -7,6 +7,10 @@ import type {
   ExtractShipperResponseData,
   ComputeEstimateRequest,
 } from "../estimates.api";
+import {
+  formatCurrency2,
+  formatPercent2,
+} from "../utils/quote-formatting";
 
 interface QuoteInsulationTabProps {
   extractedShipper?: ExtractShipperResponseData;
@@ -16,7 +20,6 @@ interface QuoteInsulationTabProps {
 
 export function QuoteInsulationTab({
   extractedShipper,
-  sqFt: propSqFt,
   onTriggerCompute,
 }: QuoteInsulationTabProps) {
   const {
@@ -43,19 +46,14 @@ export function QuoteInsulationTab({
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
 
-  // Base building footprint
-  const areaSqFt =
-    parseFloat(propSqFt || "") ||
-    extractedShipper?.squareFootage ||
-    0;
+  const fullQuote = extractedShipper?.fullQuote;
 
-  // Calculation logic
-  const totalCogs = areaSqFt * insulationCogsSf;
-  const marginDecimal = insulationMarginPct / 100;
+  // Insulation values directly from API fullQuote (no local fallback calculation)
+  const totalCogs = fullQuote?.insulation?.cost ?? 0;
   const totalSell =
-    marginDecimal < 1 ? totalCogs / (1 - marginDecimal) : totalCogs;
-  const sellSf = areaSqFt > 0 ? totalSell / areaSqFt : 0;
-  const totalProfit = totalSell - totalCogs;
+    fullQuote?.insulation?.appliedSell ?? fullQuote?.insulation?.sell ?? 0;
+  const sellSf = fullQuote?.insulation?.sellSF ?? 0;
+  const totalProfit = fullQuote?.insulation?.profit ?? 0;
 
   const handleApply = () => {
     setInsulationInclude(true);
@@ -70,6 +68,8 @@ export function QuoteInsulationTab({
           system: insulationSystem,
           rValueRoof: insulationRValueRoof,
           rValueWalls: insulationRValueWalls,
+          rRoof: insulationRValueRoof,
+          rWall: insulationRValueWalls,
           costSF: insulationCogsSf,
           cogsSF: insulationCogsSf,
           marginPct: insulationMarginPct,
@@ -163,59 +163,42 @@ export function QuoteInsulationTab({
 
         <div className="border-t border-slate-200 pt-6">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-            {/* Left Column: Insulation System & R-Values */}
+            {/* Left Column: System & R-Values */}
             <div className="md:col-span-4 space-y-4">
-              {/* Insulation System Selection */}
-              <div className="space-y-2">
+              {/* Insulation System Dropdown */}
+              <div className="space-y-1.5">
                 <label className="block text-xs font-bold text-slate-800">
-                  System
+                  Insulation System
                 </label>
-                <div className="space-y-2">
-                  {[
-                    { id: "Vinyl-backed (single layer)", label: "Vinyl-backed" },
-                    { id: "Double-layer system", label: "Double-layer" },
-                    { id: "Spray Foam", label: "Spray Foam" },
-                  ].map((s) => {
-                    const isSelected =
-                      insulationSystem === s.id ||
-                      (s.id === "Vinyl-backed (single layer)" && insulationSystem.includes("Vinyl-backed")) ||
-                      (s.id === "Double-layer system" && insulationSystem.includes("Double-layer"));
-                    return (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() =>
-                          setInsulationSystem(
-                            s.id as
-                              | "Vinyl-backed (single layer)"
-                              | "Double-layer system"
-                              | "Spray Foam"
-                          )
-                        }
-                        className={`w-full py-2.5 px-3 rounded-lg border text-left text-xs font-semibold transition-all flex items-center gap-3 cursor-pointer ${
-                          isSelected
-                            ? "border-purple-400 bg-purple-50/70 text-slate-900 shadow-2xs"
-                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                        }`}
-                      >
-                        <div
-                          className={`w-3.5 h-3.5 rounded-full flex items-center justify-center ${
-                            isSelected
-                              ? "bg-purple-600"
-                              : "bg-slate-300"
-                          }`}
-                        />
-                        <span>{s.label}</span>
-                      </button>
-                    );
-                  })}
+                <div className="relative">
+                  <select
+                    value={insulationSystem}
+                    onChange={(e) =>
+                      setInsulationSystem(
+                        e.target.value as
+                          | "Vinyl-backed (single layer)"
+                          | "Double-layer system"
+                          | "Spray Foam"
+                      )
+                    }
+                    className="w-full appearance-none border border-slate-200 rounded-lg px-3 py-2 text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-1 focus:ring-purple-500 cursor-pointer pr-10"
+                  >
+                    <option value="Vinyl-backed (single layer)">
+                      Vinyl-backed (single layer)
+                    </option>
+                    <option value="Double-layer system">
+                      Double-layer system
+                    </option>
+                    <option value="Spray Foam">Spray Foam</option>
+                  </select>
+                  <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
                 </div>
               </div>
 
-              {/* R-Value - Roof Dropdown */}
+              {/* Roof R-Value Dropdown */}
               <div className="space-y-1.5">
                 <label className="block text-xs font-bold text-slate-800">
-                  R-Value — Roof
+                  Roof R-Value
                 </label>
                 <div className="relative">
                   <select
@@ -228,15 +211,16 @@ export function QuoteInsulationTab({
                     <option value="R-19">R-19</option>
                     <option value="R-25">R-25</option>
                     <option value="R-30">R-30</option>
+                    <option value="R-38">R-38</option>
                   </select>
                   <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
                 </div>
               </div>
 
-              {/* R-Value - Walls Dropdown */}
+              {/* Walls R-Value Dropdown */}
               <div className="space-y-1.5">
                 <label className="block text-xs font-bold text-slate-800">
-                  R-Value — Walls
+                  Walls R-Value
                 </label>
                 <div className="relative">
                   <select
@@ -290,6 +274,7 @@ export function QuoteInsulationTab({
                     type="range"
                     min="0"
                     max="50"
+                    step="0.5"
                     value={insulationMarginPct}
                     onChange={(e) =>
                       setInsulationMarginPct(parseFloat(e.target.value))
@@ -331,7 +316,7 @@ export function QuoteInsulationTab({
                     MARGIN
                   </span>
                   <span className="text-xs font-bold text-slate-900 block">
-                    {insulationMarginPct}%
+                    {formatPercent2(insulationMarginPct)}
                   </span>
                 </div>
 
@@ -351,7 +336,7 @@ export function QuoteInsulationTab({
                     COGS
                   </span>
                   <span className="text-xs font-bold text-orange-600 block">
-                    ${Math.round(totalCogs).toLocaleString()} (${insulationCogsSf.toFixed(2)}/SF)
+                    {formatCurrency2(totalCogs)} (${insulationCogsSf.toFixed(2)}/SF)
                   </span>
                 </div>
 
@@ -361,7 +346,7 @@ export function QuoteInsulationTab({
                     SELL
                   </span>
                   <span className="text-xs font-bold text-blue-600 block">
-                    ${Math.round(totalSell).toLocaleString()} (${sellSf.toFixed(2)}/SF)
+                    {formatCurrency2(totalSell)} (${sellSf.toFixed(2)}/SF)
                   </span>
                 </div>
 
@@ -371,7 +356,7 @@ export function QuoteInsulationTab({
                     PROFIT
                   </span>
                   <span className="text-xs font-bold text-emerald-600 block">
-                    ${Math.round(totalProfit).toLocaleString()}
+                    {formatCurrency2(totalProfit)}
                   </span>
                 </div>
               </div>
