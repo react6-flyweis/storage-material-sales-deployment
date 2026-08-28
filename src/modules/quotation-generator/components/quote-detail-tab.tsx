@@ -28,6 +28,7 @@ interface QuoteDetailTabProps {
   onQuotePreview?: () => void;
   onSaveDraft?: () => void;
   isSavingDraft?: boolean;
+  onBackToBreakdown?: () => void;
 }
 
 export function QuoteDetailTab({
@@ -45,6 +46,7 @@ export function QuoteDetailTab({
   onQuotePreview,
   onSaveDraft,
   isSavingDraft,
+  onBackToBreakdown
 }: QuoteDetailTabProps) {
   const navigate = useNavigate();
   const {
@@ -246,7 +248,7 @@ export function QuoteDetailTab({
               className="w-full accent-blue-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
             />
             <p className="text-[11px] text-emerald-600 font-semibold">
-              Labor profit ${(installSell - installCost).toFixed(2)}/SF ({installSell > 0 ? (((installSell - installCost) / installSell) * 100).toFixed(1) : "0.0"}%)
+              Labor profit ${(installSell - installCost).toFixed(2)}/SF ({installSell > 0 ? (((installSell - installCost) / installSell) * 100).toFixed(2) : "0.00"}%)
             </p>
           </div>
         </div>
@@ -277,7 +279,16 @@ export function QuoteDetailTab({
       </div>
 
       {/* Action Buttons */}
+
       <div className="flex flex-wrap items-center gap-3 pt-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onBackToBreakdown}
+          className="border-slate-300 text-slate-800 px-5 py-2.5 rounded-lg text-xs font-semibold hover:bg-slate-50 cursor-pointer bg-white"
+        >
+          ← Back to Breakdown
+        </Button>
         <Button
           type="button"
           onClick={() => (onQuotePreview ? onQuotePreview() : navigate("/quotation/quote-preview/view"))}
