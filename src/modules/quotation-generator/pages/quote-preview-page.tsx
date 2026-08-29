@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router";
 import { ArrowLeft, Printer, FolderUp, Loader2, FileSearch } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,11 +9,11 @@ import {
   saveEstimateProvider,
   type ExtractDrawingResponseData,
   type ExtractShipperResponseData,
+  type PreviewDocumentRequest,
 } from "../estimates.api";
 import { useQuotationPricing } from "../hooks/use-quotation-pricing";
-import { QuotePreviewDocument } from "../components/quote-preview-document";
-import { SowPreviewDocument } from "../components/sow-preview-document";
-import { ContractPreviewDocument } from "../components/contract-preview-document";
+import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
+import { ServerDocumentPreview } from "../components/server-document-preview";
 
 export function QuotePreviewPage() {
   const navigate = useNavigate();
@@ -38,7 +38,40 @@ export function QuotePreviewPage() {
     navState.estimateId || null
   );
 
-  const { jobType, scope } = useQuotationStore();
+  const {
+    jobType,
+    scope,
+    roofType,
+    installCost,
+    installSell,
+    blendPercentage,
+    installDifficulty,
+    concreteInclude,
+    concreteCostSf,
+    concreteMarginPct,
+    concreteSlabThickness,
+    concretePsiRating,
+    concreteNotes,
+    concreteInclusions,
+    insulationInclude,
+    insulationSystem,
+    insulationRValueRoof,
+    insulationRValueWalls,
+    insulationCogsSf,
+    insulationMarginPct,
+    taxZip,
+    taxRate,
+    includeTax,
+    cogsOverrideApplied,
+    cogsCostInput,
+    cogsCostAdjustPercent,
+    cogsMaterialMargin,
+    cogsFixedSellPrice,
+    marginOverrideApplied,
+    marginLaborOverride,
+    marginTargetMargin,
+    marginFixedSellOverride,
+  } = useQuotationStore();
 
   const pricingData = useQuotationPricing({
     extractedShipper: navState.extractedShipper,
@@ -71,6 +104,75 @@ export function QuotePreviewPage() {
     name: initialPdfName,
   });
 
+  // Server document preview payload
+  const previewPayload: PreviewDocumentRequest = useMemo(
+    () => ({
+      estimateId: estimateId || undefined,
+      jobType: "PEMB",
+      leadCompanyName: customerLeadName,
+      customerEmail,
+      streetAddress: customerAddress,
+      cityStateZip: customerAddress,
+      buildingSize: displayBuildingSize,
+      squareFootage: effectiveSqFt,
+      jobNumber:
+        navState.quotationForm?.jobNumber ||
+        navState.extractedDrawing?.extracted?.jobnumber ||
+        "",
+      pricingResult: navState.extractedShipper?.pricing,
+      fullQuote:
+        navState.extractedShipper?.fullQuote ||
+        (navState.extractedShipper?.pricing as Record<string, unknown> | undefined),
+      extractedDrawingFields: navState.extractedDrawing?.extracted,
+      contract: {
+        customer: customerLeadName,
+        address: customerAddress,
+        city: customerAddress,
+        email: customerEmail,
+        date: quoteDate,
+        deposit: "forty-percent (40%)",
+        type:
+          scope?.toLowerCase() === "both"
+            ? "both"
+            : scope?.toLowerCase() === "install"
+            ? "install"
+            : "supply",
+        value: totalSellFormatted,
+      },
+      drawingAttachments: selectedPdf
+        ? [{ name: selectedPdf.name, includeInQuote: true }]
+        : [],
+      sections: selectedPdf
+        ? ["quote", "sow", "contract", "drawings"]
+        : ["quote", "sow", "contract"],
+    }),
+    [
+      estimateId,
+      customerLeadName,
+      customerEmail,
+      customerAddress,
+      displayBuildingSize,
+      effectiveSqFt,
+      navState.quotationForm?.jobNumber,
+      navState.extractedDrawing?.extracted,
+      navState.extractedShipper?.pricing,
+      navState.extractedShipper?.fullQuote,
+      quoteDate,
+      scope,
+      totalSellFormatted,
+      selectedPdf,
+    ]
+  );
+
+  const {
+    html: serverPreviewHtml,
+    isLoading: isPreviewLoading,
+    error: previewError,
+    refetch: refetchPreview,
+  } = useServerDocumentPreview({
+    payload: previewPayload,
+  });
+
   const handleScrollToPreview = () => {
     previewSectionRef.current?.scrollIntoView({
       behavior: "smooth",
@@ -92,7 +194,9 @@ export function QuotePreviewPage() {
   const handleDownloadPdf = async () => {
     setIsDownloadingPdf(true);
     try {
-      const payload = {
+      const payload: PreviewDocumentRequest = {
+        estimateId: estimateId || undefined,
+        jobType: "PEMB",
         leadCompanyName: customerLeadName,
         customerEmail,
         streetAddress: customerAddress,
@@ -109,6 +213,21 @@ export function QuotePreviewPage() {
           (navState.extractedShipper?.pricing as
             | Record<string, unknown>
             | undefined),
+        contract: {
+          customer: customerLeadName,
+          address: customerAddress,
+          city: customerAddress,
+          email: customerEmail,
+          date: quoteDate,
+          deposit: "forty-percent (40%)",
+          type:
+            scope?.toLowerCase() === "both"
+              ? "both"
+              : scope?.toLowerCase() === "install"
+              ? "install"
+              : "supply",
+          value: totalSellFormatted,
+        },
         extractedDrawingFields: navState.extractedDrawing?.extracted,
         drawingAttachments: selectedPdf
           ? [{ name: selectedPdf.name, includeInQuote: true }]
@@ -140,6 +259,12 @@ export function QuotePreviewPage() {
   const handleSaveToHistory = async () => {
     setIsSavingEstimate(true);
     try {
+      const cogsCostVal = parseFloat(cogsCostInput) || undefined;
+      const cogsSellVal = parseFloat(cogsFixedSellPrice) || undefined;
+      const marginLaborVal = parseFloat(marginLaborOverride) || undefined;
+      const marginTargetVal = parseFloat(marginTargetMargin) || undefined;
+      const marginSellVal = parseFloat(marginFixedSellOverride) || undefined;
+
       const res = await saveEstimateProvider(
         {
           _id: estimateId || undefined,
@@ -150,6 +275,7 @@ export function QuotePreviewPage() {
               : (scope || "Both").toLowerCase() === "install"
               ? "Install"
               : "Both",
+          roofType,
           leadCompanyName: customerLeadName,
           customerEmail,
           streetAddress: navState.quotationForm?.street || "",
@@ -158,6 +284,10 @@ export function QuotePreviewPage() {
           buildingSize: displayBuildingSize,
           squareFootage: effectiveSqFt,
           sf: effectiveSqFt,
+          blendPct: blendPercentage,
+          installLevel: installDifficulty || "easy",
+          installCostPerSf: installCost,
+          sellPerSf: installSell,
           jobNumber:
             navState.quotationForm?.jobNumber ||
             navState.extractedDrawing?.extracted?.jobnumber ||
@@ -168,6 +298,7 @@ export function QuotePreviewPage() {
             "",
           parsedCategories: navState.extractedShipper?.parsedCategories,
           tabSummary: navState.extractedShipper?.tabSummary,
+          breakdownRows: navState.extractedShipper?.pricing?.rows,
           pricingResult: navState.extractedShipper?.pricing,
           fullQuoteResult:
             navState.extractedShipper?.fullQuote ||
@@ -175,6 +306,54 @@ export function QuotePreviewPage() {
               | Record<string, unknown>
               | undefined),
           extractedDrawingFields: navState.extractedDrawing?.extracted,
+          concreteAddon: {
+            include: concreteInclude,
+            costSF: concreteCostSf,
+            marginPct: concreteMarginPct,
+            thickness: concreteSlabThickness,
+            psi: concretePsiRating,
+            slabThickness: concreteSlabThickness,
+            psiRating: concretePsiRating,
+            sowNotes: concreteNotes,
+            sowItems: concreteInclusions,
+          },
+          insulationAddon: {
+            include: insulationInclude,
+            costSF: insulationCogsSf,
+            cogsSF: insulationCogsSf,
+            marginPct: insulationMarginPct,
+            system: insulationSystem,
+            rRoof: insulationRValueRoof,
+            rWall: insulationRValueWalls,
+            rValueRoof: insulationRValueRoof,
+            rValueWalls: insulationRValueWalls,
+          },
+          salesTax: {
+            rate: taxRate,
+            include: includeTax,
+            zip: taxZip,
+          },
+          cogsOverride: cogsOverrideApplied
+            ? {
+                applied: true,
+                costDollar: cogsCostVal ?? null,
+                marginPct: cogsMaterialMargin,
+                sellDollar: cogsSellVal ?? null,
+                costPctAdj: cogsCostAdjustPercent,
+              }
+            : {
+                applied: false,
+              },
+          marginOverride: marginOverrideApplied
+            ? {
+                applied: true,
+                laborSF: marginLaborVal ?? null,
+                pct: marginTargetVal ?? null,
+                sellFixed: marginSellVal ?? null,
+              }
+            : {
+                applied: false,
+              },
           status: "draft",
         },
         estimateId || undefined
@@ -230,11 +409,11 @@ export function QuotePreviewPage() {
         <div className="flex items-center gap-3">
           <Button
             type="button"
-            onClick={() => navigate("/quotation/quote-preview")}
-            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 cursor-pointer shadow-xs"
+            onClick={() => navigate(-1)}
+            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2  text-sm font-semibold flex items-center gap-2 cursor-pointer shadow-xs"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Preview List
+            Back 
           </Button>
           <div>
             <h1 className="text-2xl font-bold text-slate-900 leading-tight">
@@ -369,39 +548,20 @@ export function QuotePreviewPage() {
           </div>
         </Card>
 
-        <QuotePreviewDocument
-          ref={previewSectionRef}
-          id="preview-section"
-          sqFt={navState.sqFt}
-          buildingSize={navState.buildingSize}
-          extractedShipper={navState.extractedShipper}
-          quotationForm={navState.quotationForm}
-          extractedDrawing={navState.extractedDrawing}
-        />
-
-        <SowPreviewDocument
-          isEditing={false}
-          extractedShipper={navState.extractedShipper}
-          sqFt={navState.sqFt}
-          buildingSize={navState.buildingSize}
-          quotationForm={navState.quotationForm}
-          extractedDrawing={navState.extractedDrawing}
-        />
-
-        <ContractPreviewDocument
-          effectiveDate={quoteDate}
-          customerLegalName={customerLeadName}
-          customerAddress={customerAddress}
-          totalContractValue={totalSellFormatted}
-          contractType={
-            scope?.toLowerCase() === "both"
-              ? "Supply, Delivery & Erection"
-              : "Supply & Delivery Only"
-          }
-        />
+        <div ref={previewSectionRef} id="preview-section">
+          <ServerDocumentPreview
+            html={serverPreviewHtml}
+            isLoading={isPreviewLoading}
+            error={previewError}
+            onRetry={refetchPreview}
+            title={`Quote Package — ${customerLeadName || "Full Assembled Package"}`}
+            minHeight={800}
+          />
+        </div>
       </div>
     </div>
   );
 }
 
 export default QuotePreviewPage;
+
