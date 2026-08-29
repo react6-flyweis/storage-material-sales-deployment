@@ -35,18 +35,18 @@ import {
   saveEstimateProvider,
   taxLookupProvider,
   type SaveEstimatePayload,
+  type PreviewDocumentRequest,
 } from "../estimates.api";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
+import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
+import { ServerDocumentPreview } from "../components/server-document-preview";
 import {
-  StoragePreviewDocument,
   type StorageData,
   type StoragePricing,
   type StorageBuildingItem,
   type StorageDoorItem,
   type StorageExtraItem,
 } from "../components/storage-preview-document";
-import { StorageSowPreviewDocument } from "../components/storage-sow-preview-document";
-import { StorageContractPreviewDocument } from "../components/storage-contract-preview-document";
 import { QuoteConcreteTab } from "../components/quote-concrete-tab";
 import { QuoteInsulationTab } from "../components/quote-insulation-tab";
 
@@ -975,8 +975,149 @@ export default function StorageQuotePage() {
         totalSqFt * installSell
       );
 
+  const storageBasePayload: PreviewDocumentRequest = useMemo(
+    () => ({
+      jobType: "Storage",
+      estimateId: estimateId || undefined,
+      scope:
+        (scope || "Both").toLowerCase() === "supply"
+          ? "Supply"
+          : (scope || "Both").toLowerCase() === "install"
+          ? "Install"
+          : "Both",
+      leadCompanyName: customerLeadName || "Customer",
+      customerEmail,
+      streetAddress: customerAddress,
+      cityStateZip: customerAddress,
+      jobNumber: jobNumber || "8098",
+      buildingSize:
+        storageData?.buildings?.map((b) => `${b.width}x${b.length}`).join(", ") ||
+        "Storage Complex",
+      squareFootage:
+        Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) ||
+        storageData?.buildings?.reduce(
+          (acc, b) =>
+            acc +
+            (Number(b.sqft || b.squareFootage) ||
+              Number(b.width || 0) * Number(b.length || 0)),
+          0
+        ) ||
+        0,
+      sf:
+        Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) ||
+        storageData?.buildings?.reduce(
+          (acc, b) =>
+            acc +
+            (Number(b.sqft || b.squareFootage) ||
+              Number(b.width || 0) * Number(b.length || 0)),
+          0
+        ) ||
+        0,
+      pricingResult: storagePricing as Record<string, unknown>,
+      storagePricingResult: storagePricing as Record<string, unknown>,
+      storagePricing: storagePricing as Record<string, unknown>,
+      storageData: storageData as Record<string, unknown>,
+      concreteAddon: {
+        include: concreteInclude,
+      },
+      insulationAddon: {
+        include: insulationInclude,
+      },
+      salesTax: {
+        include: includeTax,
+        rate: taxRate,
+      },
+      contract: {
+        customer: customerLeadName || "Customer Legal Entity",
+        address: customerAddress || "",
+        city: customerAddress || "",
+        email: customerEmail || "",
+        date: new Date().toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        }),
+        deposit: "forty-percent (40%)",
+        type:
+          scope.toLowerCase() === "both"
+            ? "Mini Storage Supply, Delivery & Installation"
+            : "Mini Storage Supply & Delivery Only",
+        value: fmt(grandTotal),
+      },
+    }),
+    [
+      estimateId,
+      scope,
+      customerLeadName,
+      customerEmail,
+      customerAddress,
+      jobNumber,
+      storageData,
+      storagePricing,
+      concreteInclude,
+      insulationInclude,
+      includeTax,
+      taxRate,
+      grandTotal,
+    ]
+  );
+
+  const quotePreviewPayload: PreviewDocumentRequest = useMemo(
+    () => ({
+      ...storageBasePayload,
+      sections: ["quote"],
+    }),
+    [storageBasePayload]
+  );
+
+  const sowPreviewPayload: PreviewDocumentRequest = useMemo(
+    () => ({
+      ...storageBasePayload,
+      sections: ["sow"],
+    }),
+    [storageBasePayload]
+  );
+
+  const contractPreviewPayload: PreviewDocumentRequest = useMemo(
+    () => ({
+      ...storageBasePayload,
+      sections: ["contract"],
+    }),
+    [storageBasePayload]
+  );
+
+  const {
+    html: storageQuotePreviewHtml,
+    isLoading: isStorageQuotePreviewLoading,
+    error: storageQuotePreviewError,
+    refetch: refetchStorageQuotePreview,
+  } = useServerDocumentPreview({
+    payload: quotePreviewPayload,
+    enabled: activeTab === "quote",
+  });
+
+  const {
+    html: storageSowPreviewHtml,
+    isLoading: isStorageSowPreviewLoading,
+    error: storageSowPreviewError,
+    refetch: refetchStorageSowPreview,
+  } = useServerDocumentPreview({
+    payload: sowPreviewPayload,
+    enabled: activeTab === "sow",
+  });
+
+  const {
+    html: storageContractPreviewHtml,
+    isLoading: isStorageContractPreviewLoading,
+    error: storageContractPreviewError,
+    refetch: refetchStorageContractPreview,
+  } = useServerDocumentPreview({
+    payload: contractPreviewPayload,
+    enabled: activeTab === "contract",
+  });
+
   return (
-    <div className="space-y-5 p-5">
+    <div className="p-5 space-y-6">
       {/* Top Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -2096,18 +2237,13 @@ export default function StorageQuotePage() {
             {/* TAB 2: QUOTE PREVIEW */}
             <TabsContent value="quote" className="m-0 outline-none">
               <div className="space-y-4">
-                <StoragePreviewDocument
-                  storageData={storageData}
-                  storagePricing={storagePricing}
-                  scope={scope}
-                  customerLeadName={customerLeadName}
-                  customerAddress={customerAddress}
-                  customerEmail={customerEmail}
-                  jobNumber={jobNumber}
-                  concreteInclude={concreteInclude}
-                  insulationInclude={insulationInclude}
-                  includeTax={includeTax}
-                  taxRate={taxRate}
+                <ServerDocumentPreview
+                  html={storageQuotePreviewHtml}
+                  isLoading={isStorageQuotePreviewLoading}
+                  error={storageQuotePreviewError}
+                  onRetry={refetchStorageQuotePreview}
+                  title={`Storage Quote Document — ${customerLeadName || "Estimate Preview"}`}
+                  minHeight={750}
                 />
                 <div className="flex items-center justify-between pt-2">
                   <Button
@@ -2141,15 +2277,13 @@ export default function StorageQuotePage() {
             {/* TAB 3: STATEMENT OF WORK */}
             <TabsContent value="sow" className="m-0 outline-none">
               <div className="space-y-4">
-                <StorageSowPreviewDocument
-                  storageData={storageData}
-                  storagePricing={storagePricing}
-                  scope={scope}
-                  customerLeadName={customerLeadName}
-                  customerAddress={customerAddress}
-                  jobNumber={jobNumber}
-                  concreteInclude={concreteInclude}
-                  insulationInclude={insulationInclude}
+                <ServerDocumentPreview
+                  html={storageSowPreviewHtml}
+                  isLoading={isStorageSowPreviewLoading}
+                  error={storageSowPreviewError}
+                  onRetry={refetchStorageSowPreview}
+                  title={`Storage Statement of Work — ${customerLeadName || "Customer"}`}
+                  minHeight={750}
                 />
                 <div className="flex items-center justify-between pt-2">
                   <Button
@@ -2369,21 +2503,13 @@ export default function StorageQuotePage() {
             {/* TAB 8: CONTRACT */}
             <TabsContent value="contract" className="m-0 outline-none">
               <div className="space-y-4">
-                <StorageContractPreviewDocument
-                  effectiveDate={new Date().toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                  customerLegalName={customerLeadName || "Customer Legal Entity"}
-                  customerAddress={customerAddress}
-                  totalContractValue={fmt(grandTotal)}
-                  scope={scope}
-                  contractType={
-                    scope.toLowerCase() === "both"
-                      ? "Mini Storage Supply, Delivery & Installation"
-                      : "Mini Storage Supply & Delivery Only"
-                  }
+                <ServerDocumentPreview
+                  html={storageContractPreviewHtml}
+                  isLoading={isStorageContractPreviewLoading}
+                  error={storageContractPreviewError}
+                  onRetry={refetchStorageContractPreview}
+                  title={`Storage Contract Agreement — ${customerLeadName || "Agreement"}`}
+                  minHeight={750}
                 />
               </div>
             </TabsContent>
