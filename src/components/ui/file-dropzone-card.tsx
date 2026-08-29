@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Upload, X, FileSpreadsheet } from "lucide-react";
+import { Upload, X, FileSpreadsheet, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface FileItem {
@@ -19,6 +19,8 @@ export interface FileDropzoneCardProps {
   selectedFile: FileItem | null;
   onFileSelect: (file: FileItem | null, rawFile?: File | null) => void;
   className?: string;
+  isLoading?: boolean;
+  loadingText?: string;
 }
 
 export function FileDropzoneCard({
@@ -33,6 +35,8 @@ export function FileDropzoneCard({
   selectedFile,
   onFileSelect,
   className,
+  isLoading = false,
+  loadingText,
 }: FileDropzoneCardProps) {
   const [isDragging, setIsDragging] = useState(false);
 
@@ -52,6 +56,7 @@ export function FileDropzoneCard({
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
+    if (isLoading) return;
 
     const file = e.dataTransfer.files?.[0];
     if (file) {
@@ -101,13 +106,20 @@ export function FileDropzoneCard({
           type="file"
           accept={accept}
           onChange={handleFileInput}
+          disabled={isLoading}
           className="hidden"
         />
         <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center text-white mb-3 shadow-xs">
-          <Upload className="h-6 w-6" />
+          {isLoading ? (
+            <Loader2 className="h-6 w-6 animate-spin" />
+          ) : (
+            <Upload className="h-6 w-6" />
+          )}
         </div>
-        <p className="text-sm font-semibold text-slate-800">{dropText}</p>
-        {subDropText && (
+        <p className="text-sm font-semibold text-slate-800">
+          {isLoading ? (loadingText || "Parsing & extracting data...") : dropText}
+        </p>
+        {subDropText && !isLoading && (
           <p className="text-xs text-slate-500 mt-1">{subDropText}</p>
         )}
         {extraInfoText && (

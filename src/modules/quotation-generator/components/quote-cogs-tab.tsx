@@ -77,38 +77,40 @@ export function QuoteCogsTab({
   const [previewData, setPreviewData] = useState<CogsPreviewAdjusted | null>(null);
   const [isFetchingPreview, setIsFetchingPreview] = useState(false);
 
-  // Only use apiAdjusted if an override was previously applied and saved
-  const activeFromShipper = fromShipperData || (cogsOverrideApplied ? apiFromShipper : null);
+  // Active fromShipper: use fetched preview or API initial data directly
+  const activeFromShipper = fromShipperData || apiFromShipper || null;
   const activePreview = previewData || (cogsOverrideApplied ? apiAdjusted : null);
 
-  // Base shipper values directly from computed pricing & fullQuote (matching Breakdown Tab)
+  // Base shipper values directly from fromShipper (with fallbacks to computed pricing & fullQuote)
   const baseCogs =
-    pricing?.matCost ??
     activeFromShipper?.cost ??
+    pricing?.matCost ??
     0;
 
   const baseSell =
-    pricing?.matSell ??
     activeFromShipper?.sell ??
+    pricing?.matSell ??
     0;
 
   const baseSf =
+    activeFromShipper?.sf ||
     pricing?.sf ||
     extractedShipper?.squareFootage ||
-    activeFromShipper?.sf ||
     0;
 
   const baseMatMargin =
-    baseSell > 0 && baseCogs > 0
-      ? ((baseSell - baseCogs) / baseSell) * 100
-      : activeFromShipper?.margin != null
+    activeFromShipper?.margin != null
       ? Number(activeFromShipper.margin)
+      : baseSell > 0 && baseCogs > 0
+      ? ((baseSell - baseCogs) / baseSell) * 100
       : pricing?.profPct != null
       ? Number(pricing.profPct)
       : 0;
 
   const baseMarginText =
-    baseMatMargin > 0
+    activeFromShipper?.margin != null
+      ? formatPercent2(activeFromShipper.margin)
+      : baseMatMargin > 0
       ? formatPercent2(baseMatMargin)
       : pricing?.profPct != null
       ? formatPercent2(pricing.profPct)
