@@ -42,7 +42,7 @@ interface CogsPreviewAdjusted {
 }
 
 export function QuoteCogsTab({
-  extractedShipper,
+  extractedShipper: propExtractedShipper,
   onTriggerCompute,
 }: QuoteCogsTabProps) {
   const {
@@ -54,9 +54,13 @@ export function QuoteCogsTab({
     setCogsMaterialMargin,
     cogsFixedSellPrice,
     setCogsFixedSellPrice,
+    cogsOverrideApplied,
     setCogsOverrideApplied,
     resetCogsSettings,
+    pembExtractedShipper,
   } = useQuotationStore();
+
+  const extractedShipper = propExtractedShipper || pembExtractedShipper || undefined;
 
   // Dialog state
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
@@ -73,25 +77,79 @@ export function QuoteCogsTab({
   const [previewData, setPreviewData] = useState<CogsPreviewAdjusted | null>(null);
   const [isFetchingPreview, setIsFetchingPreview] = useState(false);
 
-  const activeFromShipper = fromShipperData || apiFromShipper || null;
-  const activePreview = previewData || apiAdjusted || null;
+  // Only use apiAdjusted if an override was previously applied and saved
+  const activeFromShipper = fromShipperData || (cogsOverrideApplied ? apiFromShipper : null);
+  const activePreview = previewData || (cogsOverrideApplied ? apiAdjusted : null);
+
+  // Base shipper values directly from computed pricing & fullQuote (matching Breakdown Tab)
+  const baseCogs =
+    pricing?.matCost ??
+    activeFromShipper?.cost ??
+    0;
+
+  const baseSell =
+    pricing?.matSell ??
+    activeFromShipper?.sell ??
+    0;
+
+  const baseSf =
+    pricing?.sf ||
+    extractedShipper?.squareFootage ||
+    activeFromShipper?.sf ||
+    0;
+
+  const baseMatMargin =
+    baseSell > 0 && baseCogs > 0
+      ? ((baseSell - baseCogs) / baseSell) * 100
+      : activeFromShipper?.margin != null
+      ? Number(activeFromShipper.margin)
+      : pricing?.profPct != null
+      ? Number(pricing.profPct)
+      : 0;
+
+  const baseMarginText =
+    baseMatMargin > 0
+      ? formatPercent2(baseMatMargin)
+      : pricing?.profPct != null
+      ? formatPercent2(pricing.profPct)
+      : "-";
+
+  const effectiveMatMargin =
+    cogsMaterialMargin > 0
+      ? cogsMaterialMargin
+      : baseMatMargin > 0
+      ? parseFloat(baseMatMargin.toFixed(1))
+      : 0;
+
+  const calculatedSfPrice =
+    fullQuote?.pricePerSf ??
+    pricing?.sfPrice ??
+    (baseSell > 0 && baseSf > 0 ? baseSell / baseSf : null);
+
+  const sfPriceText =
+    calculatedSfPrice != null
+      ? `${formatSfPrice2(calculatedSfPrice)}/SF`
+      : "-";
+
+  const hasOverride = Boolean(
+    cogsCostInput ||
+    cogsCostAdjustPercent !== 0 ||
+    cogsFixedSellPrice ||
+    (cogsMaterialMargin > 0 && Math.abs(cogsMaterialMargin - baseMatMargin) > 0.01)
+  );
 
   useEffect(() => {
     if (!pricing) return;
-    const hasInput = Boolean(
-      cogsCostInput ||
-      cogsFixedSellPrice ||
-      cogsCostAdjustPercent !== 0 ||
-      cogsMaterialMargin !== 0
-    );
 
-    if (!hasInput) {
+    if (!hasOverride) {
+      setPreviewData(null);
       return;
     }
 
     let isMounted = true;
     const costVal = parseFloat(cogsCostInput) || undefined;
     const sellVal = parseFloat(cogsFixedSellPrice) || undefined;
+    const marginVal = cogsMaterialMargin > 0 ? cogsMaterialMargin : (baseMatMargin > 0 ? baseMatMargin : undefined);
 
     const fetchPreview = async () => {
       setIsFetchingPreview(true);
@@ -101,7 +159,7 @@ export function QuoteCogsTab({
           cogsOverride: {
             applied: false,
             costDollar: costVal ?? null,
-            marginPct: cogsMaterialMargin,
+            marginPct: marginVal ?? null,
             sellDollar: sellVal ?? null,
             costPctAdj: cogsCostAdjustPercent,
           },
@@ -113,15 +171,8 @@ export function QuoteCogsTab({
         }
         if (preview?.adjusted) {
           setPreviewData(preview.adjusted);
-        } else {
-          const adjusted =
-            (res.data as Record<string, unknown>)?.adjusted ||
-            (res.data as Record<string, unknown>)?.preview ||
-            res.data ||
-            res;
-          if (adjusted && typeof adjusted === "object") {
-            setPreviewData(adjusted as CogsPreviewAdjusted);
-          }
+        } else if (res.data && typeof res.data === "object" && "adjusted" in res.data) {
+          setPreviewData((res.data as { adjusted: CogsPreviewAdjusted }).adjusted);
         }
       } catch (err) {
         console.error("COGS preview API error:", err);
@@ -137,79 +188,65 @@ export function QuoteCogsTab({
     return () => {
       isMounted = false;
     };
-  }, [cogsCostInput, cogsCostAdjustPercent, cogsMaterialMargin, cogsFixedSellPrice, pricing]);
+  }, [
+    hasOverride,
+    cogsCostInput,
+    cogsCostAdjustPercent,
+    cogsMaterialMargin,
+    cogsFixedSellPrice,
+    pricing,
+    baseMatMargin,
+  ]);
 
-  // Base shipper values from API
-  const baseCogs =
-    activeFromShipper?.cost != null
-      ? activeFromShipper.cost
-      : pricing?.totCost ?? 0;
-
-  const baseSell =
-    activeFromShipper?.sell != null
-      ? activeFromShipper.sell
-      : pricing?.totSell ?? 0;
-
-  const baseMarginText =
-    activeFromShipper?.margin != null
-      ? formatPercent2(activeFromShipper.margin)
-      : pricing?.profPct != null
-      ? formatPercent2(pricing.profPct)
-      : "-";
-
-  const sfPriceText =
-    activePreview?.sfPrice != null
-      ? `${formatSfPrice2(activePreview.sfPrice)}/SF`
-      : pricing?.sfPrice != null
-      ? `${formatSfPrice2(pricing.sfPrice)}/SF`
-      : "-";
-
-  // Display values driven by API preview or pricing (no local fallback calculation)
+  // Display values: use activePreview when override is present, fallback to fullQuote & pricing (matching Breakdown Tab)
   const displayCogs =
-    activePreview?.cost != null
-      ? activePreview.cost
-      : baseCogs;
+    activePreview?.cost ??
+    baseCogs;
 
   const costDiff =
-    activePreview?.costDiff != null
-      ? activePreview.costDiff
-      : 0;
+    activePreview?.costDiff ??
+    (displayCogs !== baseCogs ? displayCogs - baseCogs : 0);
 
   const displayMatSell =
-    activePreview?.sell != null
-      ? activePreview.sell
-      : (pricing?.matSell ?? baseSell);
+    activePreview?.sell ??
+    pricing?.matSell ??
+    baseSell;
+
+  const sellDiff =
+    activePreview?.sellDiff ??
+    (displayMatSell !== baseSell ? displayMatSell - baseSell : 0);
 
   const displayTotalSell =
-    activePreview?.grandSell != null
-      ? activePreview.grandSell
-      : activePreview?.sell != null
-      ? activePreview.sell
-      : (pricing?.totSell ?? displayMatSell);
+    activePreview?.grandSell ??
+    fullQuote?.buildingSubtotal ??
+    pricing?.totSell ??
+    displayMatSell;
 
   const displayProfit =
-    activePreview?.profit != null
-      ? activePreview.profit
-      : (pricing?.profit ?? 0);
+    activePreview?.profit ??
+    fullQuote?.totalProfit ??
+    pricing?.profit ??
+    0;
 
   const matMarginPct =
     activePreview?.matMargin != null
       ? Number(activePreview.matMargin).toFixed(2)
-      : Number(cogsMaterialMargin).toFixed(2);
+      : Number(effectiveMatMargin).toFixed(2);
 
   const overallMarginPct =
     activePreview?.totalMargin != null
       ? Number(activePreview.totalMargin).toFixed(2)
-      : activePreview?.matMargin != null
-      ? Number(activePreview.matMargin).toFixed(2)
+      : fullQuote?.grandMargin != null
+      ? Number(fullQuote.grandMargin).toFixed(2)
       : pricing?.profPct != null
       ? Number(pricing.profPct).toFixed(2)
       : "0.00";
 
   const rawDisplaySfPrice =
-    activePreview?.sfPrice != null
-      ? activePreview.sfPrice
-      : pricing?.sfPrice ?? "-";
+    activePreview?.sfPrice ??
+    fullQuote?.pricePerSf ??
+    pricing?.sfPrice ??
+    "-";
   const displaySfPrice = formatSfPrice2(rawDisplaySfPrice);
 
   const handleApply = () => {
@@ -221,11 +258,12 @@ export function QuoteCogsTab({
     if (onTriggerCompute) {
       const costVal = parseFloat(cogsCostInput) || undefined;
       const sellVal = parseFloat(cogsFixedSellPrice) || undefined;
+      const marginVal = cogsMaterialMargin > 0 ? cogsMaterialMargin : (baseMatMargin > 0 ? baseMatMargin : undefined);
       onTriggerCompute({
         cogsOverride: {
           applied: true,
           costDollar: costVal ?? null,
-          marginPct: cogsMaterialMargin,
+          marginPct: marginVal ?? null,
           sellDollar: sellVal ?? null,
           costPctAdj: cogsCostAdjustPercent,
         },
@@ -402,7 +440,7 @@ export function QuoteCogsTab({
                   min="0"
                   max="60"
                   step="0.5"
-                  value={cogsMaterialMargin}
+                  value={effectiveMatMargin}
                   onChange={(e) => {
                     const m = parseFloat(e.target.value);
                     setCogsMaterialMargin(m);
@@ -416,7 +454,7 @@ export function QuoteCogsTab({
                     step="0.5"
                     min="0"
                     max="100"
-                    value={cogsMaterialMargin}
+                    value={effectiveMatMargin}
                     onChange={(e) => {
                       const m = parseFloat(e.target.value) || 0;
                       setCogsMaterialMargin(m);
@@ -461,7 +499,7 @@ export function QuoteCogsTab({
       <div className="border border-slate-200 rounded-xl bg-slate-50/70 p-6 space-y-6 shadow-2xs">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-bold text-slate-500 tracking-wider uppercase block">
-            LIVE RESULT (API)
+            LIVE RESULT
           </span>
           {isFetchingPreview && (
             <div className="flex items-center gap-1.5 text-xs text-blue-600 font-medium animate-pulse">
@@ -495,7 +533,7 @@ export function QuoteCogsTab({
               {formatCurrency2(displayMatSell)}
             </div>
             <p className="text-[11px] text-slate-400 font-medium">
-              {matMarginPct}% mat margin · {costDiff >= 0 ? `-${formatCurrency2(Math.abs(costDiff))}` : `+${formatCurrency2(Math.abs(costDiff))}`}
+              {matMarginPct}% mat margin · {sellDiff >= 0 ? `+${formatCurrency2(sellDiff)}` : `-${formatCurrency2(Math.abs(sellDiff))}`} vs shipper
             </p>
           </div>
 
