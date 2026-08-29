@@ -184,8 +184,10 @@ export interface FullQuoteData {
 
 export interface ShipperTabSummary {
   sheetName: string;
-  category: string;
+  category?: string;
   weightLbs: number;
+  skipped?: boolean;
+  [key: string]: unknown;
 }
 
 export interface ShipperWeightByCategoryItem {
@@ -232,6 +234,7 @@ export interface ShipperPricing {
   blendPct?: number;
   blendLabel?: string;
   vendorBlendSavings?: number;
+  vendorBlendSavingsExact?: number;
   rowSubtotalBeforeBlend?: number;
   vendorBlendAdjustment?: number;
   cogsOverrideApplied?: boolean;
@@ -299,10 +302,15 @@ export interface ComputeConcreteConfig {
   include: boolean;
   costSF?: number;
   marginPct?: number;
-  thickness?: number | string;
-  psi?: number | string;
+  thickness?: number | string | null;
+  psi?: number | string | null;
   slabThickness?: string;
   psiRating?: string;
+  sellSF?: number;
+  cost?: number;
+  sell?: number;
+  appliedSell?: number;
+  profit?: number;
   sowItems?: string[];
   sowNotes?: string;
   [key: string]: unknown;
@@ -311,6 +319,7 @@ export interface ComputeConcreteConfig {
 export interface ComputeInsulationConfig {
   include: boolean;
   system?: string;
+  systemLabel?: string;
   rRoof?: string;
   rWall?: string;
   rValueRoof?: string;
@@ -318,12 +327,20 @@ export interface ComputeInsulationConfig {
   costSF?: number;
   cogsSF?: number;
   marginPct?: number;
+  sellSF?: number;
+  cost?: number;
+  sell?: number;
+  appliedSell?: number;
+  profit?: number;
   [key: string]: unknown;
 }
 
 export interface ComputeSalesTaxConfig {
   rate: number;
   include: boolean;
+  amount?: number;
+  taxableBase?: number;
+  note?: string;
   zip?: string;
   [key: string]: unknown;
 }
@@ -422,8 +439,11 @@ export async function taxLookupProvider(
 // ----------------------------------------------------------------------------
 export interface SaveEstimatePayload extends Record<string, unknown> {
   _id?: string;
+  createdBy?: string;
+  leadId?: string | null;
   jobType?: string;
   scope?: string;
+  roofType?: string;
   leadCompanyName?: string;
   customerEmail?: string;
   streetAddress?: string;
@@ -433,20 +453,48 @@ export interface SaveEstimatePayload extends Record<string, unknown> {
   sf?: number;
   useManualSquareFootage?: boolean;
   jobNumber?: string;
+  quoteDate?: string;
+  installCostPerSf?: number;
+  sellPerSf?: number;
   sourceFileName?: string;
+  extractedDrawingFields?: ExtractedDrawingData;
+  blendPct?: number;
+  installLevel?: string;
+  installDifficulty?: string;
   parsedCategories?: Record<string, unknown>;
   tabSummary?: ShipperTabSummary[];
+  breakdownRows?: ShipperPricingRow[];
   pricingResult?: ShipperPricing;
-  fullQuoteResult?: FullQuoteData | Record<string, unknown>;
-  extractedDrawingFields?: ExtractedDrawingData;
+  storageData?: Record<string, unknown> | null;
+  storagePricingResult?: Record<string, unknown> | null;
   concreteAddon?: ComputeConcreteConfig;
   insulationAddon?: ComputeInsulationConfig;
   salesTax?: ComputeSalesTaxConfig;
-  cogsOverride?: ComputeCogsOverrideConfig;
-  marginOverride?: ComputeMarginOverrideConfig;
-  storageData?: Record<string, unknown>;
-  storagePricingResult?: Record<string, unknown>;
+  cogsOverride?: ComputeCogsOverrideConfig | null;
+  marginOverride?: ComputeMarginOverrideConfig | null;
+  contractDetails?: Record<string, unknown> | null;
+  drawingAttachments?: Array<{ name: string; includeInQuote?: boolean; [key: string]: unknown }>;
+  additionalInfo?: string;
+  fullQuoteResult?: FullQuoteData | Record<string, unknown>;
+  weightByCategory?: ShipperWeightByCategoryItem[];
+  totalWeightLbs?: number;
+  trucksRequired?: number;
+  materialCost?: number;
+  freightCost?: number;
+  totalCOGS?: number;
+  installCost?: number;
+  totalSell?: number;
+  profit?: number;
+  marginPercent?: number;
+  pricePerSf?: number | string;
+  vendorBlendSavings?: number;
+  statementOfWork?: string[];
+  exclusions?: string[];
   status?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  grandTotal?: number;
+  buildingSubtotal?: number;
 }
 
 export interface SaveEstimateResponse {
@@ -499,6 +547,15 @@ export async function getEstimateByIdProvider(
   id: string
 ): Promise<SaveEstimateResponse> {
   const response = await apiClient.get<SaveEstimateResponse>(
+    `/api/sales/estimates/${encodeURIComponent(id)}`
+  );
+  return response.data;
+}
+
+export async function deleteEstimateProvider(
+  id: string
+): Promise<{ success: boolean; message?: string }> {
+  const response = await apiClient.delete<{ success: boolean; message?: string }>(
     `/api/sales/estimates/${encodeURIComponent(id)}`
   );
   return response.data;
@@ -753,31 +810,61 @@ export async function computeStorageProvider(
 // ----------------------------------------------------------------------------
 // DOCUMENT PREVIEW & PDF DOWNLOAD
 // ----------------------------------------------------------------------------
+export interface PreviewContractPayload {
+  customer?: string;
+  address?: string;
+  city?: string;
+  email?: string;
+  date?: string;
+  deposit?: string;
+  type?: string;
+  value?: string;
+  [key: string]: unknown;
+}
+
 export interface PreviewDocumentRequest {
+  estimateId?: string;
   leadCompanyName?: string;
   customerEmail?: string;
   streetAddress?: string;
   cityStateZip?: string;
   buildingSize?: string;
   squareFootage?: number;
+  sf?: number;
   jobNumber?: string;
   jobType?: string;
-  pricingResult?: ShipperPricing;
+  scope?: string;
+  pricingResult?: ShipperPricing | Record<string, unknown>;
   fullQuote?: FullQuoteData | Record<string, unknown>;
+  contract?: PreviewContractPayload | Record<string, unknown>;
   extractedDrawingFields?: ExtractedDrawingData;
-  drawingAttachments?: Array<{ name?: string; fileBase64?: string; includeInQuote?: boolean;[key: string]: unknown }>;
+  drawingAttachments?: Array<{ name?: string; fileBase64?: string; data?: string; includeInQuote?: boolean; [key: string]: unknown }>;
   sections?: string[];
   storageData?: Record<string, unknown>;
   storagePricingResult?: Record<string, unknown>;
+  storagePricing?: Record<string, unknown>;
+  concreteAddon?: { include?: boolean; [key: string]: unknown };
+  insulationAddon?: { include?: boolean; [key: string]: unknown };
+  salesTax?: { include?: boolean; rate?: number; [key: string]: unknown };
+  [key: string]: unknown;
+}
+
+export interface PreviewDocumentResponseData {
+  quoteHtml?: string | null;
+  sowHtml?: string | null;
+  contractHtml?: string | null;
+  assembledHtml?: string | null;
   [key: string]: unknown;
 }
 
 export interface PreviewDocumentResponse {
   success?: boolean;
   message?: string;
-  data?: { assembledHtml?: string; quoteHtml?: string };
-  assembledHtml?: string;
-  quoteHtml?: string;
+  data?: PreviewDocumentResponseData;
+  assembledHtml?: string | null;
+  quoteHtml?: string | null;
+  sowHtml?: string | null;
+  contractHtml?: string | null;
 }
 
 export async function previewDocumentProvider(
