@@ -1,22 +1,17 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router";
-import { ArrowLeft, FolderUp, Loader2, RefreshCw, Download } from "lucide-react";
+import { ArrowLeft, FolderUp, Loader2, RefreshCw, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
   downloadPdfProvider,
   saveEstimateProvider,
-  previewDocumentProvider,
+  type PreviewDocumentRequest,
 } from "../estimates.api";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
-import {
-  StoragePreviewDocument,
-  type StorageData,
-  type StoragePricing,
-} from "../components/storage-preview-document";
-import { StorageSowPreviewDocument } from "../components/storage-sow-preview-document";
-import { StorageContractPreviewDocument } from "../components/storage-contract-preview-document";
-import { StorageDrawingPreviewDocument } from "../components/storage-drawing-preview-document";
+import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
+import { ServerDocumentPreview } from "../components/server-document-preview";
+import type { StorageData, StoragePricing } from "../components/storage-preview-document";
 
 
 function fmt(n?: number | string | null): string {
@@ -302,27 +297,120 @@ export function StoragePreviewPage() {
     }
   };
 
+  const activeDrawings = useMemo(
+    () => (storageDrawings || []).filter((d) => d.includeInPackage !== false),
+    [storageDrawings]
+  );
+
+  const previewPayload: PreviewDocumentRequest = useMemo(
+    () => ({
+      jobType: "Storage",
+      estimateId: estimateId || undefined,
+      scope:
+        (scope || "Both").toLowerCase() === "supply"
+          ? "Supply"
+          : (scope || "Both").toLowerCase() === "install"
+          ? "Install"
+          : "Both",
+      leadCompanyName: customerLeadName || "Customer",
+      customerEmail,
+      streetAddress: customerAddress,
+      cityStateZip: customerAddress,
+      jobNumber: jobNumber || "8098",
+      buildingSize:
+        storageData?.buildings?.map((b) => `${b.width}x${b.length}`).join(", ") ||
+        "Storage Complex",
+      squareFootage:
+        Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) ||
+        storageData?.buildings?.reduce(
+          (acc, b) =>
+            acc +
+            (Number(b.sqft || b.squareFootage) ||
+              Number(b.width || 0) * Number(b.length || 0)),
+          0
+        ) ||
+        0,
+      sf:
+        Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) ||
+        storageData?.buildings?.reduce(
+          (acc, b) =>
+            acc +
+            (Number(b.sqft || b.squareFootage) ||
+              Number(b.width || 0) * Number(b.length || 0)),
+          0
+        ) ||
+        0,
+      pricingResult: storagePricing as Record<string, unknown>,
+      storagePricingResult: storagePricing as Record<string, unknown>,
+      storagePricing: storagePricing as Record<string, unknown>,
+      storageData: storageData as Record<string, unknown>,
+      concreteAddon: {
+        include: concreteInclude,
+      },
+      insulationAddon: {
+        include: insulationInclude,
+      },
+      salesTax: {
+        include: includeTax,
+        rate: taxRate,
+      },
+      contract: {
+        customer: customerLeadName,
+        address: customerAddress,
+        city: customerAddress,
+        email: customerEmail,
+        date: quoteDate,
+        deposit: "forty-percent (40%)",
+        type:
+          scope?.toLowerCase() === "both"
+            ? "both"
+            : scope?.toLowerCase() === "install"
+            ? "install"
+            : "supply",
+        value: totalSellFormatted,
+      },
+      drawingAttachments: activeDrawings.map((d) => ({
+        name: d.name,
+        fileBase64: d.data?.includes(",") ? d.data.split(",")[1] : d.data,
+        includeInQuote: true,
+      })),
+      sections:
+        activeDrawings.length > 0
+          ? ["quote", "sow", "contract", "drawings"]
+          : ["quote", "sow", "contract"],
+    }),
+    [
+      estimateId,
+      scope,
+      customerLeadName,
+      customerEmail,
+      customerAddress,
+      jobNumber,
+      storageData,
+      storagePricing,
+      concreteInclude,
+      insulationInclude,
+      includeTax,
+      taxRate,
+      quoteDate,
+      totalSellFormatted,
+      activeDrawings,
+    ]
+  );
+
+  const {
+    html: serverPreviewHtml,
+    isLoading: isPreviewLoading,
+    error: previewError,
+    refetch: refetchPreview,
+  } = useServerDocumentPreview({
+    payload: previewPayload,
+  });
+
   const handleRefreshPreview = async () => {
     setIsRefreshing(true);
     try {
-      const activeDrawings = storageDrawings.filter((d) => d.includeInPackage !== false);
-      await previewDocumentProvider({
-        jobType: "Storage",
-        leadCompanyName: customerLeadName,
-        customerEmail,
-        streetAddress: customerAddress,
-        cityStateZip: customerAddress,
-        jobNumber,
-        pricingResult: storagePricing as Record<string, unknown>,
-        storagePricingResult: storagePricing as Record<string, unknown>,
-        storageData: storageData as Record<string, unknown>,
-        drawingAttachments: activeDrawings.map((d) => ({
-          name: d.name,
-          fileBase64: d.data,
-          includeInQuote: true,
-        })),
-        sections: activeDrawings.length > 0 ? ["quote", "sow", "contract", "drawings"] : ["quote", "sow", "contract"],
-      });
+      await refetchPreview();
     } catch (err) {
       console.warn("Refresh preview notice:", err);
     } finally {
@@ -367,6 +455,10 @@ export function StoragePreviewPage() {
     }
   };
 
+  const handleClearAll = () => {
+    setStorageDrawings([]);
+  };
+
   return (
     <div className="space-y-6 p-6">
       {/* Top Action Header Bar */}
@@ -375,33 +467,32 @@ export function StoragePreviewPage() {
           <Button
             type="button"
             onClick={() => navigate(-1)}
-            variant="outline"
-            className="border-primary text-primary cursor-pointer font-semibold text-xs flex items-center gap-1.5"
+            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 cursor-pointer shadow-xs"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Edit
+            Back
           </Button>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-slate-900 leading-tight">
-                Storage Quote Preview
-              </h1>
-            </div>
+            <h1 className="text-2xl font-bold text-slate-900 leading-tight">
+              Storage Quote Preview
+            </h1>
+            <p className="text-xs text-slate-500 mt-0.5 font-medium">
+              Mini Storage Assembled Package — Quote · SOW · Contract · Layout Plans
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-3">
           <Button
             type="button"
             variant="outline"
             onClick={handleRefreshPreview}
-            disabled={isRefreshing}
-            className="border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-semibold cursor-pointer"
+            disabled={isRefreshing || isPreviewLoading}
+            className="border-slate-300 text-slate-700 hover:bg-slate-50 px-3.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer bg-white"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+            <RefreshCw className={`h-4 w-4 ${isRefreshing || isPreviewLoading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
-
           <Button
             type="button"
             onClick={handleDownloadPdf}
@@ -411,11 +502,10 @@ export function StoragePreviewPage() {
             {isDownloadingPdf ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Download className="h-4 w-4" />
+              <Printer className="h-4 w-4" />
             )}
-            {isDownloadingPdf ? "Generating PDF..." : "Download PDF"}
+            {isDownloadingPdf ? "Generating PDF..." : "Generate & Print PDF"}
           </Button>
-
           <Button
             type="button"
             onClick={handleSaveToHistory}
@@ -428,42 +518,40 @@ export function StoragePreviewPage() {
         </div>
       </div>
 
-      {/* Main Content Container */}
+      {/* Main Content Area */}
       <div className="space-y-6 w-full max-w-5xl print:max-w-none print:w-full">
-        {/* Building layout plans Card */}
+        {/* Building drawings & plans Card */}
         <Card className="p-6 bg-white border border-slate-200 shadow-xs rounded-xl no-print">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
             <div>
               <h2 className="text-lg font-bold text-slate-900">
-                Storage Layout & Unit Mix Drawings
+                Building drawings & layout plans
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Drag building layout or unit mix PDF/Image here — attaches to final quotation package
+                Upload layout plans or elevations — they will be included in the server preview & final PDF.
               </p>
             </div>
 
             <div className="flex items-center gap-3">
-              {storageDrawings.length > 0 && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setStorageDrawings([])}
-                  className="border-slate-300 text-slate-700 hover:bg-slate-50 px-4 py-2 text-xs font-semibold rounded-lg cursor-pointer bg-white"
-                >
-                  Clear All ({storageDrawings.length})
-                </Button>
-              )}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleClearAll}
+                className="border-slate-300 text-slate-700 hover:bg-slate-50 px-4 py-2 text-xs font-semibold rounded-lg cursor-pointer bg-white"
+              >
+                Clear All ({storageDrawings.length})
+              </Button>
               <Button
                 type="button"
                 onClick={handleScrollToPreview}
                 className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2 text-xs font-semibold rounded-lg cursor-pointer shadow-xs flex items-center gap-1.5"
               >
-                View Assembled Documents ↓
+                Preview assembled PDF ↓
               </Button>
             </div>
           </div>
 
-          {/* PDF Dropzone Box */}
+          {/* PDF / Image Dropzone Box */}
           <div
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleFileDrop}
@@ -472,8 +560,7 @@ export function StoragePreviewPage() {
             <label className="cursor-pointer flex flex-col items-center">
               <input
                 type="file"
-                accept="image/*,.pdf"
-                multiple
+                accept=".pdf,image/*"
                 onChange={handleFileSelect}
                 className="hidden"
               />
@@ -488,13 +575,13 @@ export function StoragePreviewPage() {
                     <span>{storageDrawings.length} drawing(s) attached</span>
                   </div>
                   <p className="text-xs text-slate-500 font-medium">
-                    Click to add more layout plans or elevations
+                    Click to browse or drop more drawings (PDF or Images)
                   </p>
                 </div>
               ) : (
                 <div className="space-y-1">
                   <div className="text-sm font-bold text-slate-800">
-                    Drop Storage Layout Drawings here or click to browse
+                    Drop drawings or layout plans here or click to browse
                   </div>
                   <p className="text-xs text-slate-500 font-medium">
                     Unit mix layouts, anchor bolt plans, elevations (PDF or Images)
@@ -505,73 +592,17 @@ export function StoragePreviewPage() {
           </div>
         </Card>
 
-        {/* 1. Storage Quote Preview Document */}
-        <StoragePreviewDocument
-          ref={previewSectionRef}
-          id="preview-section"
-          storageData={storageData}
-          storagePricing={storagePricing}
-          scope={scope}
-          customerLeadName={customerLeadName}
-          customerAddress={customerAddress}
-          customerEmail={customerEmail}
-          jobNumber={jobNumber}
-          quoteDate={quoteDate}
-          concreteInclude={concreteInclude}
-          insulationInclude={insulationInclude}
-          includeTax={includeTax}
-          taxRate={taxRate}
-        />
-
-        {/* 2. Storage SOW Preview Document */}
-        <StorageSowPreviewDocument
-          storageData={storageData}
-          storagePricing={storagePricing}
-          scope={scope}
-          customerLeadName={customerLeadName}
-          customerAddress={customerAddress}
-          jobNumber={jobNumber}
-          quoteDate={quoteDate}
-          concreteInclude={concreteInclude}
-          insulationInclude={insulationInclude}
-        />
-
-        {/* 3. Contract Agreement Document */}
-        <StorageContractPreviewDocument
-          effectiveDate={quoteDate}
-          customerLegalName={customerLeadName}
-          customerAddress={customerAddress}
-          totalContractValue={totalSellFormatted}
-          scope={scope}
-          contractType={scope?.toLowerCase() === "both" ? "Mini Storage Supply, Delivery & Erection" : "Mini Storage Supply & Delivery Only"}
-        />
-
-        {/* 4. Attached Drawings & Layout Plans Documents */}
-        {(() => {
-          const activeDrawings = storageDrawings.filter((d) => d.includeInPackage !== false);
-          if (activeDrawings.length === 0) {
-            return (
-              <StorageDrawingPreviewDocument
-                customerLeadName={customerLeadName}
-                customerAddress={customerAddress}
-                jobNumber={jobNumber}
-                quoteDate={quoteDate}
-              />
-            );
-          }
-          return activeDrawings.map((drawing, idx) => (
-            <StorageDrawingPreviewDocument
-              key={idx}
-              drawing={drawing}
-              drawingIndex={idx + 1}
-              totalDrawings={activeDrawings.length}
-              customerLeadName={customerLeadName}
-              customerAddress={customerAddress}
-              jobNumber={jobNumber}
-              quoteDate={quoteDate}
-            />
-          ));
-        })()}
+        {/* Server Assembled Storage Preview Document */}
+        <div ref={previewSectionRef} id="preview-section">
+          <ServerDocumentPreview
+            html={serverPreviewHtml}
+            isLoading={isPreviewLoading}
+            error={previewError}
+            onRetry={refetchPreview}
+            title={`Storage Package — ${customerLeadName || "Full Assembled Package"}`}
+            minHeight={800}
+          />
+        </div>
 
       </div>
     </div>
