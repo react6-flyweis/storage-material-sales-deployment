@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { Printer, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,8 @@ import {
   type PreviewDocumentRequest,
 } from "../estimates.api";
 import { useQuotationPricing } from "../hooks/use-quotation-pricing";
-import { QuotePreviewDocument } from "./quote-preview-document";
+import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
+import { ServerDocumentPreview } from "./server-document-preview";
 
 interface QuoteDetailTabProps {
   sqFt: string;
@@ -76,6 +77,47 @@ export function QuoteDetailTab({
     buildingSize,
     quotationForm,
     extractedDrawing,
+  });
+
+  const previewPayload: PreviewDocumentRequest = useMemo(
+    () => ({
+      estimateId: estimateId || undefined,
+      jobType: "PEMB",
+      leadCompanyName: customerLeadName,
+      customerEmail,
+      streetAddress: customerAddress,
+      cityStateZip: customerAddress,
+      buildingSize: displayBuildingSize,
+      squareFootage: effectiveSqFt,
+      jobNumber: quotationForm?.jobNumber || extractedDrawing?.extracted?.jobnumber || "",
+      pricingResult: extractedShipper?.pricing,
+      fullQuote: extractedShipper?.fullQuote || (extractedShipper?.pricing as Record<string, unknown> | undefined),
+      extractedDrawingFields: extractedDrawing?.extracted,
+      drawingAttachments: pdfFileName ? [{ name: pdfFileName, includeInQuote: true }] : [],
+      sections: ["quote"],
+    }),
+    [
+      estimateId,
+      customerLeadName,
+      customerEmail,
+      customerAddress,
+      displayBuildingSize,
+      effectiveSqFt,
+      quotationForm?.jobNumber,
+      extractedDrawing?.extracted,
+      extractedShipper?.pricing,
+      extractedShipper?.fullQuote,
+      pdfFileName,
+    ]
+  );
+
+  const {
+    html: serverPreviewHtml,
+    isLoading: isPreviewLoading,
+    error: previewError,
+    refetch: refetchPreview,
+  } = useServerDocumentPreview({
+    payload: previewPayload,
   });
 
   const handlePrint = () => {
@@ -254,13 +296,14 @@ export function QuoteDetailTab({
         </div>
       </div>
 
-      {/* Printable Estimate Card Box */}
-      <QuotePreviewDocument
-        sqFt={sqFt}
-        buildingSize={buildingSize}
-        extractedShipper={extractedShipper}
-        quotationForm={quotationForm}
-        extractedDrawing={extractedDrawing}
+      {/* Printable Estimate Server Preview Box */}
+      <ServerDocumentPreview
+        html={serverPreviewHtml}
+        isLoading={isPreviewLoading}
+        error={previewError}
+        onRetry={refetchPreview}
+        title={`Quote Document — ${customerLeadName || "Estimate Preview"}`}
+        minHeight={750}
       />
 
       {/* Additional Information Textarea */}
