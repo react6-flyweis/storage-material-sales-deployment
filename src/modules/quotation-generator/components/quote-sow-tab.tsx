@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Sparkles, Check, RotateCcw, Edit3, Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,7 +8,8 @@ import {
   type PreviewDocumentRequest,
 } from "../estimates.api";
 import { useSowDocument } from "../hooks/use-sow-document";
-import { SowPreviewDocument } from "./sow-preview-document";
+import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
+import { ServerDocumentPreview } from "./server-document-preview";
 
 interface QuoteSowTabProps {
   buildingSize?: string;
@@ -41,6 +42,51 @@ export function QuoteSowTab({
     extractedShipper,
     sqFt,
     buildingSize,
+    quotationForm,
+    extractedDrawing,
+  });
+
+  const previewPayload: PreviewDocumentRequest = useMemo(
+    () => ({
+      estimateId: estimateId || undefined,
+      jobType: "PEMB",
+      leadCompanyName: sow.pricingData.customerLeadName || "Customer",
+      customerEmail: quotationForm?.email || sow.pricingData.customerEmail,
+      streetAddress: sow.pricingData.customerAddress,
+      cityStateZip: sow.pricingData.customerAddress,
+      buildingSize: sow.pricingData.displayBuildingSize,
+      squareFootage: sow.pricingData.effectiveSqFt,
+      jobNumber: quotationForm?.jobNumber || extractedDrawing?.extracted?.jobnumber || "",
+      pricingResult: extractedShipper?.pricing,
+      fullQuote:
+        extractedShipper?.fullQuote ||
+        (extractedShipper?.pricing as Record<string, unknown> | undefined),
+      extractedDrawingFields: extractedDrawing?.extracted,
+      drawingAttachments: [],
+      sections: ["sow"],
+    }),
+    [
+      estimateId,
+      sow.pricingData.customerLeadName,
+      sow.pricingData.customerEmail,
+      sow.pricingData.customerAddress,
+      sow.pricingData.displayBuildingSize,
+      sow.pricingData.effectiveSqFt,
+      quotationForm?.jobNumber,
+      quotationForm?.email,
+      extractedDrawing?.extracted,
+      extractedShipper?.pricing,
+      extractedShipper?.fullQuote,
+    ]
+  );
+
+  const {
+    html: serverPreviewHtml,
+    isLoading: isPreviewLoading,
+    error: previewError,
+    refetch: refetchPreview,
+  } = useServerDocumentPreview({
+    payload: previewPayload,
   });
 
   const handleApplyAiPrompt = () => {
@@ -175,9 +221,14 @@ export function QuoteSowTab({
         </div>
       )}
 
-      <SowPreviewDocument
-        isEditing={isEditing}
-        sow={sow}
+      {/* Statement of Work Server Preview Box */}
+      <ServerDocumentPreview
+        html={serverPreviewHtml}
+        isLoading={isPreviewLoading}
+        error={previewError}
+        onRetry={refetchPreview}
+        title={`Statement of Work — ${sow.pricingData.customerLeadName || "Customer"}`}
+        minHeight={750}
       />
 
       <div className="flex flex-wrap items-center gap-3 pt-2">

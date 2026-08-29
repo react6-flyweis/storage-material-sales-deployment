@@ -89,7 +89,7 @@ export function QuoteBreakdownTab({
   const totalWeight = pricing?.totWt ?? extractedShipper?.totalWeightLbs;
   const weightDisplay = totalWeight != null ? `${formatNumber2(totalWeight)} lbs` : "-";
   const trucks = pricing?.trucks != null ? pricing.trucks : "-";
-  const vendorBlendSavings = formatCurrency2(pricing?.vendorBlendSavings);
+  const vendorBlendSavings = formatCurrency2(pricing?.vendorBlendSavingsExact);
   const blendLabel = pricing?.blendLabel || "50% Quicken blend";
   const fileName = extractedShipper?.fileName || "";
 

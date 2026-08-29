@@ -16,4 +16,4 @@ export * from "./storage-sow-preview-document";
 export * from "./contract-preview-document";
 export * from "./storage-contract-preview-document";
 export * from "./storage-drawing-preview-document";
-
+export * from "./server-document-preview";
