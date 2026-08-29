@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router";
-import { FileSpreadsheet } from "lucide-react";
+import { FileSpreadsheet, Loader2, CheckCircle2 } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { FileDropzoneCard, type FileItem } from "@/components/ui/file-dropzone-card";
@@ -340,12 +340,13 @@ export function QuoteBreakdownPricingSection({
 
       setIsComputing(true);
       try {
+        const storeState = useQuotationStore.getState();
         const parsedSqFt = parseFloat(sqFt) || shipperData.squareFootage || 0;
-        const cogsCostVal = parseFloat(cogsCostInput) || undefined;
-        const cogsSellVal = parseFloat(cogsFixedSellPrice) || undefined;
-        const marginLaborVal = parseFloat(marginLaborOverride) || undefined;
-        const marginTargetVal = parseFloat(marginTargetMargin) || undefined;
-        const marginSellVal = parseFloat(marginFixedSellOverride) || undefined;
+        const cogsCostVal = parseFloat(storeState.cogsCostInput) || undefined;
+        const cogsSellVal = parseFloat(storeState.cogsFixedSellPrice) || undefined;
+        const marginLaborVal = parseFloat(storeState.marginLaborOverride) || undefined;
+        const marginTargetVal = parseFloat(storeState.marginTargetMargin) || undefined;
+        const marginSellVal = parseFloat(storeState.marginFixedSellOverride) || undefined;
 
         const payload: ComputeEstimateRequest = {
           parsedCategories: shipperData.parsedCategories,
@@ -392,9 +393,9 @@ export function QuoteBreakdownPricingSection({
             ? {
               applied: true,
               costDollar: cogsCostVal ?? null,
-              marginPct: cogsMaterialMargin,
+              marginPct: storeState.cogsMaterialMargin,
               sellDollar: cogsSellVal ?? null,
-              costPctAdj: cogsCostAdjustPercent,
+              costPctAdj: storeState.cogsCostAdjustPercent,
             }
             : {
               applied: false,
@@ -465,14 +466,7 @@ export function QuoteBreakdownPricingSection({
       includeTax,
       taxZip,
       cogsOverrideApplied,
-      cogsCostInput,
-      cogsCostAdjustPercent,
-      cogsMaterialMargin,
-      cogsFixedSellPrice,
       marginOverrideApplied,
-      marginLaborOverride,
-      marginTargetMargin,
-      marginFixedSellOverride,
       setIsComputing,
       setShipperData,
     ]
@@ -569,22 +563,44 @@ export function QuoteBreakdownPricingSection({
     <Card className="p-6 md:p-8 bg-white border border-slate-200 shadow-xs rounded-xl space-y-6">
       {/* Step 2 Header */}
       <CardHeader className="p-0 pb-2">
-        <div className="flex items-center gap-3.5">
-          <div className="w-9 h-9 rounded-full bg-emerald-100/80 text-emerald-600 flex items-center justify-center shrink-0">
-            <FileSpreadsheet className="h-4 w-4" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3.5">
+            <div className="w-9 h-9 rounded-full bg-emerald-100/80 text-emerald-600 flex items-center justify-center shrink-0">
+              <FileSpreadsheet className="h-4 w-4" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-900 leading-tight">
+                Step 2 — Upload Xshipper file (excel)
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                All tabs read automatically — Columns & Rafters, Purlins, Sheeting, etc.
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-base font-bold text-slate-900 leading-tight">
-              Step 2 — Upload Xshipper file (excel)
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              All tabs read automatically — Columns & Rafters, Purlins, Sheeting, etc.
-            </p>
+
+          {/* Simple Static Status Indicator (Zero Layout Shift) */}
+          <div className="flex items-center self-start sm:self-auto h-7">
+            {isParsing ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600 shrink-0" />
+                <span>Extracting data...</span>
+              </span>
+            ) : isComputing ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600 shrink-0" />
+                <span>Computing...</span>
+              </span>
+            ) : shipperData ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50/90 border border-emerald-200 rounded-lg">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>Pricing computed</span>
+              </span>
+            ) : null}
           </div>
         </div>
       </CardHeader>
 
-      {/* File Specs Upload Dropzone with Parsing State */}
+      {/* File Specs Upload Dropzone with Static Parsing State */}
       <FileDropzoneCard
         dropText="Drop your Xshipper file here"
         subDropText="Or click to browse excel files"
@@ -593,21 +609,9 @@ export function QuoteBreakdownPricingSection({
         fileIcon="xlsx"
         selectedFile={file}
         onFileSelect={handleFileSelect}
+        isLoading={isParsing}
+        loadingText="Parsing Excel sheets and extracting material breakdown pricing..."
       />
-
-      {isParsing && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center text-xs text-blue-700 flex items-center justify-center gap-2 animate-pulse">
-          <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-          <span>Parsing Excel sheets and extracting material breakdown pricing...</span>
-        </div>
-      )}
-
-      {isComputing && !isParsing && (
-        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 text-center text-xs text-indigo-700 flex items-center justify-center gap-2 animate-pulse">
-          <div className="w-3.5 h-3.5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-          <span>Re-computing pricing estimates...</span>
-        </div>
-      )}
 
       {/* Tabs Navigation using Shadcn UI Tabs: Conditionally displayed when shipper data is extracted */}
       {Boolean(
