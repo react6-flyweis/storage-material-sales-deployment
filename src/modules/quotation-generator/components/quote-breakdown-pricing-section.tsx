@@ -99,12 +99,16 @@ export function QuoteBreakdownPricingSection({
     concreteMarginPct,
     concreteSlabThickness,
     concretePsiRating,
+    concreteNotes,
+    concreteInclusions,
     insulationInclude,
     insulationSystem,
     insulationRValueRoof,
     insulationRValueWalls,
     insulationCogsSf,
     insulationMarginPct,
+    insulationNotes,
+    insulationInclusions,
     taxZip,
     taxRate,
     includeTax,
@@ -181,6 +185,8 @@ export function QuoteBreakdownPricingSection({
     setIsSavingDraft(true);
     try {
       const parsedSqFt = parseFloat(sqFt) || shipperData.squareFootage || 0;
+      const effectiveCostPerSf = installCost > 0 ? installCost : (jobType === "Storage" ? 2.5 : 5.5);
+      const effectiveSellPerSf = installSell > 0 ? installSell : (jobType === "Storage" ? 3.25 : 8.5);
       const cogsCostVal = parseFloat(cogsCostInput) || undefined;
       const cogsSellVal = parseFloat(cogsFixedSellPrice) || undefined;
       const marginLaborVal = parseFloat(marginLaborOverride) || undefined;
@@ -192,6 +198,7 @@ export function QuoteBreakdownPricingSection({
           _id: estimateId || undefined,
           jobType,
           scope: normalizeScope(scope),
+          roofType: normalizeRoof(roofType),
           leadCompanyName: quotationForm?.leadName || extractedDrawing?.extracted?.customer || "",
           customerEmail: quotationForm?.email || "",
           streetAddress: quotationForm?.street || "",
@@ -202,8 +209,13 @@ export function QuoteBreakdownPricingSection({
           useManualSquareFootage: isManualSqFt,
           jobNumber: quotationForm?.jobNumber || extractedDrawing?.extracted?.jobnumber || "",
           sourceFileName: pdfFileName || shipperData.fileName || "",
+          blendPct: blendPercentage,
+          installLevel: installDifficulty || "easy",
+          installCostPerSf: effectiveCostPerSf,
+          sellPerSf: effectiveSellPerSf,
           parsedCategories: shipperData.parsedCategories,
           tabSummary: shipperData.tabSummary,
+          breakdownRows: shipperData.pricing?.rows,
           pricingResult: shipperData.pricing,
           fullQuoteResult: shipperData.fullQuote || (shipperData.pricing as Record<string, unknown> | undefined),
           extractedDrawingFields: extractedDrawing?.extracted,
@@ -215,6 +227,8 @@ export function QuoteBreakdownPricingSection({
             psi: concretePsiRating,
             slabThickness: concreteSlabThickness,
             psiRating: concretePsiRating,
+            sowNotes: concreteNotes,
+            sowItems: concreteInclusions,
           },
           insulationAddon: {
             include: insulationInclude,
@@ -226,6 +240,8 @@ export function QuoteBreakdownPricingSection({
             rWall: insulationRValueWalls,
             rValueRoof: insulationRValueRoof,
             rValueWalls: insulationRValueWalls,
+            sowNotes: insulationNotes,
+            sowItems: insulationInclusions,
           },
           salesTax: {
             rate: taxRate,
@@ -274,6 +290,11 @@ export function QuoteBreakdownPricingSection({
     shipperData,
     jobType,
     scope,
+    roofType,
+    blendPercentage,
+    installDifficulty,
+    installCost,
+    installSell,
     quotationForm,
     extractedDrawing,
     buildingSize,
@@ -285,12 +306,16 @@ export function QuoteBreakdownPricingSection({
     concreteMarginPct,
     concreteSlabThickness,
     concretePsiRating,
+    concreteNotes,
+    concreteInclusions,
     insulationInclude,
     insulationCogsSf,
     insulationMarginPct,
     insulationSystem,
     insulationRValueRoof,
     insulationRValueWalls,
+    insulationNotes,
+    insulationInclusions,
     taxRate,
     includeTax,
     taxZip,
@@ -550,7 +575,7 @@ export function QuoteBreakdownPricingSection({
           </div>
           <div>
             <h2 className="text-base font-bold text-slate-900 leading-tight">
-              Step 2 — Upload Xshipper file (.xlsx)
+              Step 2 — Upload Xshipper file (excel)
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
               All tabs read automatically — Columns & Rafters, Purlins, Sheeting, etc.
