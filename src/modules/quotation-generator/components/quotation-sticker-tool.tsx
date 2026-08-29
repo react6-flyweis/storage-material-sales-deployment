@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, RotateCcw } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +13,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
+import { formatCurrency2 } from "../utils/quote-formatting";
 
 const roofOptions = [
   { value: "screw-down", label: "Screw Down (SD)" },
@@ -36,6 +37,7 @@ export function QuotationStickerTool() {
     setInstallSell,
     blendPercentage,
     setBlendPercentage,
+    pembExtractedShipper,
   } = useQuotationStore();
 
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
@@ -43,8 +45,29 @@ export function QuotationStickerTool() {
   const laborProfit = installSell - installCost;
   const laborMarginPct = installSell > 0 ? (laborProfit / installSell) * 100 : 0;
 
+  // Exact dynamic savings calculation from extracted shipper pricing
+  const fullQuote = pembExtractedShipper?.fullQuote;
+  const pricing = pembExtractedShipper?.pricing || fullQuote?.pricing;
+  const exactSavings = pricing?.vendorBlendSavingsExact ?? pricing?.vendorBlendSavings;
+  const savingsDisplay =
+    exactSavings != null
+      ? formatCurrency2(exactSavings)
+      : formatCurrency2((blendPercentage / 100) * 950);
+
+  const handleReset = () => {
+    setJobType("PEMB");
+    setScope("Install");
+    setRoofType("screw-down");
+    setInstallCost(5.5);
+    setInstallSell(8.5);
+    setBlendPercentage(50);
+    if (location.pathname.includes("/quotation/storage")) {
+      navigate("/quotation/extracted-drawing");
+    }
+  };
+
   return (
-    <div className="sticky top-0 z-30 bg-white border-b border-slate-200 shadow px-4 py-3 mb-6 transition-all">
+    <div className="sticky top-0 z-30 bg-white border-b border-slate-200 shadow px-4 py-3 mb-6">
       <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-y-4 gap-x-6 text-sm">
         {/* JOB TYPE SECTION */}
         <div className="flex items-center gap-6">
@@ -160,8 +183,9 @@ export function QuotationStickerTool() {
 
           {/* Divider */}
           <div className="h-10 w-px bg-slate-200 self-end mb-1 hidden lg:block" />
+
           {/* RIGHT SECTION: ADJUSTMENTS & MARGIN */}
-          <div className="flex items-center gap-5">
+          <div className="flex items-center gap-4">
             {/* Adjustments Section with Popover */}
             <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
               <PopoverTrigger asChild>
@@ -197,7 +221,18 @@ export function QuotationStickerTool() {
                 className="w-[320px] p-4 bg-white rounded-xl shadow-xl border border-slate-200 text-slate-900"
               >
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                  <h3 className="font-semibold text-base text-slate-900">Adjustments</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-base text-slate-900">Adjustments</h3>
+                    <button
+                      type="button"
+                      onClick={handleReset}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100/80 rounded-md transition-colors cursor-pointer"
+                      title="Reset Adjustments to defaults"
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                      {/* <span>Reset</span> */}
+                    </button>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setIsPopoverOpen(false)}
@@ -216,7 +251,7 @@ export function QuotationStickerTool() {
                     <div className="flex items-center gap-3">
                       <input
                         type="range"
-                        min="3"
+                        min="1"
                         max="10"
                         step="0.05"
                         value={installCost}
@@ -237,7 +272,7 @@ export function QuotationStickerTool() {
                     <div className="flex items-center gap-3">
                       <input
                         type="range"
-                        min="7.5"
+                        min="1"
                         max="15"
                         step="0.05"
                         value={installSell}
@@ -280,10 +315,20 @@ export function QuotationStickerTool() {
                         {blendPercentage}% blend
                       </div>
                       <div className="text-xs font-bold text-slate-900">
-                        $475 saved vs Central
+                        {savingsDisplay} saved vs Central
                       </div>
                     </div>
                   </div>
+
+                  {/* 5. RESET ACTION */}
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/80 rounded-lg border border-slate-200/80 transition-colors cursor-pointer"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    <span>Reset to Defaults</span>
+                  </button>
                 </div>
               </PopoverContent>
             </Popover>
@@ -293,10 +338,21 @@ export function QuotationStickerTool() {
               <span className="text-xs font-semibold text-slate-800 leading-tight">
                 Labor Margin
               </span>
-              <span className={`text-xs font-semibold leading-tight mt-0.5 ${laborProfit < 0 ? "text-red-600" : "text-emerald-600"}`}>
+              <span className={`text-xs font-semibold leading-tight mt-0.5 tabular-nums ${laborProfit < 0 ? "text-red-600" : "text-emerald-600"}`}>
                 ${laborProfit.toFixed(2)}/SF profit · {laborMarginPct.toFixed(1)}% margin
               </span>
             </div>
+
+            {/* Reset Button in Header */}
+            <button
+              type="button"
+              onClick={handleReset}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/80 border border-slate-200/80 rounded-lg transition-colors cursor-pointer shadow-2xs"
+              title="Reset Adjustments"
+            >
+              <RotateCcw className="h-3.5 w-3.5 text-slate-500" />
+              {/* <span>Reset</span> */}
+            </button>
           </div>
         </div>
 
@@ -304,4 +360,5 @@ export function QuotationStickerTool() {
     </div>
   );
 }
+
 
