@@ -305,7 +305,7 @@ export const StoragePreviewDocument = React.forwardRef<HTMLDivElement, StoragePr
       storagePricing?.shipping ??
       storagePricing?.freight ??
       storageData?.shippingDefault?.freightSell ??
-      12000
+      0
     );
 
     const drawingsVal = Number(storagePricing?.drawings ?? 0);
