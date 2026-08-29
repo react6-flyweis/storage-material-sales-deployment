@@ -177,7 +177,7 @@ export default function StorageQuotePage() {
   const estimateId = navState.estimateId || storeStorageEstimateId || null;
   const sourceFileName =
     navState.sourceFileName || storeStorageFileName || "";
-  const globalMarkup = storeGlobalMarkup ?? 25;
+  const globalMarkup = storeGlobalMarkup ?? 0;
   const shippingVal = storeShipping ?? 0;
   const drawingsVal = storeDrawingsCost ?? 0;
   const customerLeadName =
