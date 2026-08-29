@@ -50,27 +50,62 @@ export function useQuotationPricing({
     insulationRValueWalls,
     insulationNotes,
     insulationInclusions,
+    pembLeadName,
+    pembStreet,
+    pembCityStateZip,
+    pembEmail,
+    pembQuoteDate,
+    pembExtractedDrawing,
+    pembExtractedShipper,
+    storageCustomerLeadName,
+    storageCustomerAddress,
+    storageCustomerEmail,
   } = useQuotationStore();
 
   const customerLeadName =
     quotationForm?.leadName ||
+    quotationForm?.leadCompanyName ||
+    quotationForm?.purchaser ||
+    quotationForm?.customer ||
     extractedDrawing?.extracted?.customer ||
+    pembExtractedDrawing?.extracted?.customer ||
     extractedShipper?.coverSheet?.labelMap?.customer ||
+    pembExtractedShipper?.coverSheet?.labelMap?.customer ||
+    pembLeadName ||
+    storageCustomerLeadName ||
     "Customer";
 
   const customerAddress =
     quotationForm?.cityStateZip ||
     quotationForm?.street ||
+    quotationForm?.location ||
+    quotationForm?.address ||
+    extractedShipper?.coverSheet?.labelMap?.location ||
     extractedShipper?.coverSheet?.labelMap?.project ||
+    pembExtractedShipper?.coverSheet?.labelMap?.location ||
+    pembCityStateZip ||
+    pembStreet ||
+    storageCustomerAddress ||
     "Council Bluffs, IA 51503";
 
-  const customerEmail = quotationForm?.email || "customer@gmail.com";
+  const customerEmail =
+    quotationForm?.email ||
+    pembEmail ||
+    storageCustomerEmail ||
+    "customer@gmail.com";
+
   const projectName =
     quotationForm?.projectName ||
+    quotationForm?.project ||
     extractedDrawing?.extracted?.project ||
-    "Customer Project";
+    pembExtractedDrawing?.extracted?.project ||
+    extractedShipper?.coverSheet?.labelMap?.project ||
+    pembExtractedShipper?.coverSheet?.labelMap?.project ||
+    (customerLeadName && customerLeadName !== "Customer" ? `${customerLeadName} Project` : "Customer Project");
+
   const quoteDate =
     quotationForm?.quoteDate ||
+    pembQuoteDate ||
     new Date().toLocaleDateString("en-US", {
       month: "long",
       day: "numeric",
