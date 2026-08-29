@@ -103,25 +103,45 @@ export function QuotePreviewListPage() {
 
       // Standard / PEMB quote preview
       const pricingRes = estimate.pricingResult as Record<string, unknown> | undefined;
+      const effectiveSqFt = Number(
+        estimate.squareFootage || estimate.sf || pricingRes?.totalSqFt || pricingRes?.sf || 0
+      );
+
+      const pricingObj = ((estimate.pricingResult || {}) as Record<string, unknown>);
+      if (!pricingObj.rows && estimate.breakdownRows) {
+        pricingObj.rows = estimate.breakdownRows;
+      }
+
+      const formattedQuoteDate = estimate.quoteDate
+        ? new Date(estimate.quoteDate).toLocaleDateString("en-US", {
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+          })
+        : "";
 
       navigate("/quotation/quote-preview/view", {
         state: {
           extractedShipper: {
             fileName: estimate.sourceFileName || "Shipper.xlsx",
-            totalWeightLbs: (pricingRes?.totWt as number) || 0,
-            squareFootage: estimate.squareFootage || estimate.sf || 0,
+            sheetCount: estimate.tabSummary?.length || 1,
+            totalWeightLbs: Number(estimate.totalWeightLbs || (pricingRes?.totWt as number) || 0),
+            squareFootage: effectiveSqFt,
             parsedCategories: estimate.parsedCategories,
             tabSummary: estimate.tabSummary,
-            pricing: estimate.pricingResult,
+            pricing: pricingObj,
             fullQuote:
               estimate.fullQuoteResult ||
-              (estimate.pricingResult as Record<string, unknown> | undefined),
+              (pricingObj as Record<string, unknown> | undefined),
           },
           extractedDrawing: estimate.extractedDrawingFields
             ? {
-              fileName: estimate.sourceFileName || "Drawing.pdf",
-              extracted: estimate.extractedDrawingFields,
-            }
+                fileName: estimate.sourceFileName || "Drawing.pdf",
+                textItemCount: 0,
+                filledCount: 0,
+                extracted: estimate.extractedDrawingFields,
+                rawTextPreview: "",
+              }
             : undefined,
           quotationForm: {
             leadName: estimate.leadCompanyName || "",
@@ -130,10 +150,9 @@ export function QuotePreviewListPage() {
             cityStateZip: estimate.cityStateZip || "",
             buildingSize: estimate.buildingSize || "",
             jobNumber: estimate.jobNumber || "",
+            quoteDate: formattedQuoteDate,
           },
-          sqFt: String(
-            estimate.squareFootage || estimate.sf || pricingRes?.totalSqFt || ""
-          ),
+          sqFt: String(effectiveSqFt || ""),
           buildingSize: estimate.buildingSize || "",
           pdfFileName: estimate.sourceFileName,
           estimateId: estimate._id,
@@ -286,20 +305,24 @@ export function QuotePreviewListPage() {
                 quote.storagePricingResult) as
                 | Record<string, unknown>
                 | undefined;
+              const fullQuote = quote.fullQuoteResult as Record<string, unknown> | undefined;
+
               const totSell =
                 Number(
+                  quote.grandTotal ??
+                  quote.totalSell ??
+                  fullQuote?.grandTotal ??
                   pricingRes?.totSell ??
-                  pricingRes?.grandTotal ??
-                  quote.totalSell
+                  pricingRes?.grandTotal
                 ) || 0;
-              const prof = Number(pricingRes?.profit) || 0;
+              const prof = Number(quote.profit ?? fullQuote?.totalProfit ?? pricingRes?.profit) || 0;
               const marginPct =
-                Number(pricingRes?.profPct ?? pricingRes?.marginPercent) || 23.1;
+                Number(quote.marginPercent ?? fullQuote?.grandMargin ?? pricingRes?.profPct ?? pricingRes?.marginPercent) || 0;
               const effectiveSqFt = Number(
-                quote.squareFootage || quote.sf || pricingRes?.totalSqFt || 0
+                quote.squareFootage || quote.sf || pricingRes?.totalSqFt || pricingRes?.sf || 0
               );
               const sfPrice =
-                Number(pricingRes?.sfPrice ?? pricingRes?.pricePerSf) ||
+                Number(quote.pricePerSf ?? fullQuote?.pricePerSf ?? pricingRes?.sfPrice ?? pricingRes?.pricePerSf) ||
                 (totSell && effectiveSqFt
                   ? (totSell / effectiveSqFt).toFixed(2)
                   : 0);
@@ -312,6 +335,14 @@ export function QuotePreviewListPage() {
                 }`
                 : quote.buildingSize || "Building";
 
+              const formattedDate = quote.quoteDate || quote.createdAt
+                ? new Date(quote.quoteDate || quote.createdAt || "").toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })
+                : "";
+
               return (
                 <div
                   key={quote._id || String(quote.jobNumber || Math.random())}
@@ -321,7 +352,7 @@ export function QuotePreviewListPage() {
                   <div className="flex flex-col justify-between space-y-1.5 min-w-0">
                     <div>
                       <h3 className="text-sm font-bold text-slate-900 leading-snug">
-                        {quote.leadCompanyName || "Council Bluffs, IA 51503"}
+                        {quote.leadCompanyName || "Customer Quote"}
                       </h3>
                       <div className="text-xs text-slate-500 font-normal mt-1 flex flex-wrap items-center gap-1">
                         <span>{quote.status?.toUpperCase() || "DRAFT"}</span>
@@ -332,11 +363,12 @@ export function QuotePreviewListPage() {
                         <span>·</span>
                         <span>{displayBuilding}</span>
                         <span>·</span>
-                        <span>{quote.cityStateZip || "IA"}</span>
+                        <span>{quote.cityStateZip || quote.streetAddress || "Location"}</span>
                       </div>
                     </div>
                     <div className="text-xs font-semibold text-[#2563eb] pt-1">
                       Job #{quote.jobNumber || "Draft"} · {quote.sourceFileName || (isStorage ? "Storage_COG.xlsx" : "Drawing.pdf")}
+                      {formattedDate ? ` · ${formattedDate}` : ""}
                     </div>
                   </div>
 
