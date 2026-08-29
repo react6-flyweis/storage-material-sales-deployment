@@ -177,8 +177,8 @@ export default function StorageQuotePage() {
   const estimateId = navState.estimateId || storeStorageEstimateId || null;
   const sourceFileName =
     navState.sourceFileName || storeStorageFileName || "";
-  const globalMarkup = storeGlobalMarkup ?? 25;
-  const shippingVal = storeShipping ?? 12000;
+  const globalMarkup = storeGlobalMarkup ?? 0;
+  const shippingVal = storeShipping ?? 0;
   const drawingsVal = storeDrawingsCost ?? 0;
   const customerLeadName =
     navState.customerLeadName ||
@@ -545,7 +545,7 @@ export default function StorageQuotePage() {
       const shipVal =
         typeof responsePayload.shippingDefault === "number"
           ? responsePayload.shippingDefault
-          : Number((responsePayload.shippingDefault as Record<string, unknown>)?.freightCost) || 12000;
+          : Number((responsePayload.shippingDefault as Record<string, unknown>)?.freightCost) || 0;
       setShippingVal(shipVal);
 
       const proj = responsePayload.project || {};
