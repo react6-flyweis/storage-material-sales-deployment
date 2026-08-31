@@ -105,29 +105,57 @@ export async function getCommunicationTimelineProvider(
 
 export type CreateFollowUpPayload = {
   leadId: string;
-  customerId: string;
+  customerId?: string;
   followUpDate: string; // ISO string
-  modeOfContact: string;
+  modeOfContact: "sms" | "call" | "email" | string;
   notes?: string;
   priority?: string;
+  reminderMinutes?: number;
+};
+
+export type EditFollowUpPayload = {
+  followUpDate?: string;
+  notes?: string;
+  priority?: string;
+  modeOfContact?: "sms" | "call" | "email" | string;
+  reminderMinutes?: number;
 };
 
 export type CreateFollowUpResponse = {
   success: boolean;
   message: string;
   data: {
-    followupId: string;
+    followupId?: string;
+    followUp?: Record<string, unknown>;
   };
 };
 
 export async function createFollowUpProvider(
   payload: CreateFollowUpPayload,
 ): Promise<CreateFollowUpResponse> {
-  const response = await apiClient.post<CreateFollowUpResponse>(
-    "/api/sales/followups",
+  try {
+    const response = await apiClient.post<CreateFollowUpResponse>(
+      "/api/follow-up/create",
+      payload,
+    );
+    return response.data;
+  } catch {
+    const response = await apiClient.post<CreateFollowUpResponse>(
+      "/api/sales/followups",
+      payload,
+    );
+    return response.data;
+  }
+}
+
+export async function editFollowUpProvider(
+  followUpId: string,
+  payload: EditFollowUpPayload,
+): Promise<CreateFollowUpResponse> {
+  const response = await apiClient.put<CreateFollowUpResponse>(
+    `/api/follow-up/edit/${followUpId}`,
     payload,
   );
-
   return response.data;
 }
 
