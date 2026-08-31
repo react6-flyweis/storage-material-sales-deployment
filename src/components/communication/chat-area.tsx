@@ -26,6 +26,7 @@ interface ChatAreaProps {
   onSendMessage: () => void;
   onBackClick?: () => void;
   onInfoClick?: () => void;
+  onFollowUp?: () => void;
 }
 
 export default function ChatArea({
@@ -36,6 +37,7 @@ export default function ChatArea({
   onSendMessage,
   onBackClick,
   onInfoClick,
+  onFollowUp,
 }: ChatAreaProps) {
   if (!selectedChat) {
     return (
@@ -67,6 +69,7 @@ export default function ChatArea({
             type={selectedChat.type}
             onVideoCall={() => console.log("Video call")}
             onInfo={onInfoClick}
+            onFollowUp={onFollowUp}
           />
         </div>
       )}
