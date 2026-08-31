@@ -9,7 +9,9 @@ import {
   type UpcomingFollowUpsResponse,
   createFollowUpProvider,
   completeFollowUpProvider,
+  editFollowUpProvider,
   type CreateFollowUpPayload,
+  type EditFollowUpPayload,
 } from "./followups.api";
 
 export function useUpcomingFollowUpsQuery() {
@@ -41,6 +43,36 @@ export function useCreateFollowUpMutation() {
       void queryClient.invalidateQueries({
         queryKey: ["sales", "followups", "communication-timeline"],
       });
+      void queryClient.invalidateQueries({
+        queryKey: ["sales", "leads"],
+      });
+    },
+  });
+}
+
+export function useEditFollowUpMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      followUpId,
+      payload,
+    }: {
+      followUpId: string;
+      payload: EditFollowUpPayload;
+    }) => editFollowUpProvider(followUpId, payload),
+    onSuccess: (response) => {
+      if (!response?.success) return;
+
+      void queryClient.invalidateQueries({
+        queryKey: ["sales", "followups", "upcoming"],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["sales", "followups", "communication-timeline"],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["sales", "leads"],
+      });
     },
   });
 }
@@ -58,6 +90,9 @@ export function useCompleteFollowUpMutation() {
       });
       void queryClient.invalidateQueries({
         queryKey: ["sales", "followups", "communication-timeline"],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["sales", "leads"],
       });
     },
   });
