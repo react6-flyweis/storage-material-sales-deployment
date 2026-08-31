@@ -6,6 +6,7 @@ interface ChatHeaderProps {
   avatar?: string;
   onVideoCall?: () => void;
   onInfo?: () => void;
+  onFollowUp?: () => void;
   type: "department" | "contact";
 }
 
@@ -17,6 +18,7 @@ export default function ChatHeader({
   avatar,
   onVideoCall,
   onInfo,
+  onFollowUp,
   type,
 }: ChatHeaderProps) {
   return (
@@ -43,6 +45,14 @@ export default function ChatHeader({
         </div>
       </div>
       <div className="flex items-center gap-2">
+        {onFollowUp && (
+          <button
+            onClick={onFollowUp}
+            className="px-2.5 py-1 text-xs border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-md transition-colors font-medium"
+          >
+            Follow-up
+          </button>
+        )}
         {onVideoCall && (
           <button
             onClick={onVideoCall}
