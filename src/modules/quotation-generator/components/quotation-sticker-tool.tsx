@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate, useLocation } from "react-router";
 import { ChevronDown, ChevronUp, RotateCcw } from "lucide-react";
 import {
   DropdownMenu,
@@ -21,9 +20,6 @@ const roofOptions = [
 ];
 
 export function QuotationStickerTool() {
-  const navigate = useNavigate();
-  const location = useLocation();
-
   const {
     jobType,
     setJobType,
@@ -61,9 +57,6 @@ export function QuotationStickerTool() {
     setInstallCost(5.5);
     setInstallSell(8.5);
     setBlendPercentage(50);
-    if (location.pathname.includes("/quotation/storage")) {
-      navigate("/quotation/extracted-drawing");
-    }
   };
 
   return (
@@ -78,12 +71,7 @@ export function QuotationStickerTool() {
             <div className="inline-flex rounded-lg p-0.5 bg-slate-100/80 border border-slate-200/60">
               <button
                 type="button"
-                onClick={() => {
-                  setJobType("PEMB");
-                  if (location.pathname.includes("/quotation/storage")) {
-                    navigate("/quotation/extracted-drawing");
-                  }
-                }}
+                onClick={() => setJobType("PEMB")}
                 className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${jobType === "PEMB"
                   ? "bg-blue-600 text-white shadow-xs"
                   : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
@@ -93,12 +81,7 @@ export function QuotationStickerTool() {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setJobType("Storage");
-                  if (!location.pathname.includes("/quotation/storage")) {
-                    navigate("/quotation/storage");
-                  }
-                }}
+                onClick={() => setJobType("Storage")}
                 className={`px-4 py-1.5 rounded-md font-semibold text-sm transition-all cursor-pointer ${jobType === "Storage"
                   ? "bg-blue-600 text-white shadow-xs"
                   : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/50"
