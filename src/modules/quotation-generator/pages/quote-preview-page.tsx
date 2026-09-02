@@ -1,6 +1,6 @@
 import { useState, useRef, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router";
-import { ArrowLeft, Printer, FolderUp, Loader2, FileSearch } from "lucide-react";
+import { ArrowLeft, Printer, FolderUp, Loader2, FileSearch, Send, FileCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
@@ -14,6 +14,10 @@ import {
 import { useQuotationPricing } from "../hooks/use-quotation-pricing";
 import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
 import { ServerDocumentPreview } from "../components/server-document-preview";
+import { QuotationApprovalBanner } from "../components/quotation-approval-banner";
+import { SubmitApprovalModal } from "../components/submit-approval-modal";
+import { SendQuotationModal } from "../components/send-quotation-modal";
+import type { QuotationApprovalInfo, WorkflowStatus } from "@/modules/quotations/quotations.api";
 
 export function QuotePreviewPage() {
   const navigate = useNavigate();
@@ -32,11 +36,30 @@ export function QuotePreviewPage() {
     additionalNotes?: string;
     pdfFileName?: string;
     estimateId?: string;
+    workflowStatus?: WorkflowStatus;
+    approval?: QuotationApprovalInfo;
+    versionNumber?: number;
   };
 
   const [estimateId, setEstimateId] = useState<string | null>(
     navState.estimateId || null
   );
+
+  // Approval & Workflow State
+  const [workflowStatus] = useState<WorkflowStatus | string>(
+    navState.workflowStatus || navState.approval?.status || "draft"
+  );
+  const [approvalInfo] = useState<QuotationApprovalInfo | null>(
+    navState.approval || { status: "not_submitted" }
+  );
+  const [versionNumber] = useState<number>(
+    navState.versionNumber || 1
+  );
+
+  // Modals state
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [showSendModal, setShowSendModal] = useState(false);
+  const [isSubmittingApproval] = useState(false);
 
   const {
     jobType,
@@ -103,6 +126,16 @@ export function QuotePreviewPage() {
   } | null>({
     name: initialPdfName,
   });
+
+
+
+  const isApproved = approvalInfo?.status === "approved" || workflowStatus === "approved";
+  const isStaleApproved =
+    isApproved &&
+    approvalInfo?.approvedVersionNumber !== undefined &&
+    approvalInfo?.approvedVersionNumber !== null &&
+    approvalInfo.approvedVersionNumber !== versionNumber;
+  const canSend = isApproved && !isStaleApproved;
 
   // Server document preview payload
   const previewPayload: PreviewDocumentRequest = useMemo(
@@ -410,7 +443,7 @@ export function QuotePreviewPage() {
           <Button
             type="button"
             onClick={() => navigate(-1)}
-            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2  text-sm font-semibold flex items-center gap-2 cursor-pointer shadow-xs"
+            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2 text-sm font-semibold flex items-center gap-2 cursor-pointer shadow-xs"
           >
             <ArrowLeft className="h-4 w-4" />
             Back 
@@ -425,7 +458,39 @@ export function QuotePreviewPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Submit for Approval Button (when draft/rejected/stale) */}
+          {(!isApproved || isStaleApproved) && (
+            <Button
+              type="button"
+              onClick={() => setShowSubmitModal(true)}
+              className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
+            >
+              <FileCheck className="h-4 w-4" />
+              Submit for Approval
+            </Button>
+          )}
+
+          {/* Send to Customer Button (enabled when approved) */}
+          <Button
+            type="button"
+            onClick={() => setShowSendModal(true)}
+            disabled={!canSend}
+            title={
+              !canSend
+                ? "Quotation must be approved by Admin before sending to customer"
+                : "Send quotation package to customer"
+            }
+            className={`px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs ${
+              canSend
+                ? "bg-[#16A34A] hover:bg-[#15803D] text-white"
+                : "bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed"
+            }`}
+          >
+            <Send className="h-4 w-4" />
+            Send to Customer
+          </Button>
+
           <Button
             type="button"
             onClick={handleDownloadPdf}
@@ -443,13 +508,23 @@ export function QuotePreviewPage() {
             type="button"
             onClick={handleSaveToHistory}
             disabled={isSavingEstimate}
-            className="bg-[#16A34A] hover:bg-[#15803D] text-white px-5 py-2.5 rounded-lg text-xs font-bold cursor-pointer shadow-xs flex items-center gap-1.5"
+            className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2.5 rounded-lg text-xs font-bold cursor-pointer shadow-xs flex items-center gap-1.5"
           >
             {isSavingEstimate && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {isSavingEstimate ? "Saving..." : "Save to History"}
           </Button>
         </div>
       </div>
+
+      {/* Approval Status & Workflow Banner */}
+      <QuotationApprovalBanner
+        workflowStatus={workflowStatus}
+        approval={approvalInfo}
+        versionNumber={versionNumber}
+        onSubmitForApproval={() => setShowSubmitModal(true)}
+        onSendToCustomer={() => setShowSendModal(true)}
+        isSubmitting={isSubmittingApproval}
+      />
 
       {!hasData && (
         <Card className="p-8 text-center bg-blue-50/50 border border-blue-200 rounded-xl mb-4">
@@ -559,9 +634,29 @@ export function QuotePreviewPage() {
           />
         </div>
       </div>
+
+      {/* Approval & Send Modals */}
+      <SubmitApprovalModal
+        open={showSubmitModal}
+        onOpenChange={setShowSubmitModal}
+        quotationId={estimateId || undefined}
+        quotationTitle={`Quote Package - ${customerLeadName}`}
+        versionNumber={versionNumber}
+        totalAmount={totalSellFormatted}
+      />
+
+      <SendQuotationModal
+        open={showSendModal}
+        onOpenChange={setShowSendModal}
+        quotationId={estimateId || undefined}
+        customerEmail={customerEmail}
+        customerName={customerLeadName}
+        approvalStatus={approvalInfo?.status || workflowStatus}
+        versionNumber={versionNumber}
+        approvedVersionNumber={approvalInfo?.approvedVersionNumber}
+      />
     </div>
   );
 }
 
 export default QuotePreviewPage;
-
