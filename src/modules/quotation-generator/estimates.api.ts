@@ -491,6 +491,24 @@ export interface SaveEstimatePayload extends Record<string, unknown> {
   statementOfWork?: string[];
   exclusions?: string[];
   status?: string;
+  versionNumber?: number;
+  workflowStatus?: "draft" | "pending_approval" | "approved" | "rejected" | "sent" | string;
+  quoteNumber?: string;
+  approval?: {
+    status: "not_submitted" | "pending_approval" | "approved" | "rejected" | string;
+    submittedBy?: unknown;
+    submittedAt?: string | null;
+    reviewedBy?: unknown;
+    reviewedAt?: string | null;
+    rejectionReason?: string | null;
+    approvedVersionNumber?: number | null;
+    history?: Array<{
+      status: string;
+      note?: string;
+      by?: unknown;
+      at?: string | null;
+    }>;
+  };
   createdAt?: string;
   updatedAt?: string;
   grandTotal?: number;
@@ -522,6 +540,35 @@ export async function saveEstimateProvider(
   });
   return response.data;
 }
+
+export async function submitEstimateApprovalProvider(
+  estimateId: string,
+  note?: string
+) {
+  const response = await apiClient.post<{
+    success: boolean;
+    message?: string;
+    data?: SaveEstimatePayload;
+  }>(`/api/quotations/${encodeURIComponent(estimateId)}/submit-approval`, { note });
+  return response.data;
+}
+
+export async function sendEstimateProvider(
+  estimateId: string,
+  payload?: { email?: string; notes?: string }
+) {
+  const response = await apiClient.post<{
+    success: boolean;
+    message?: string;
+    data?: {
+      emailProvider?: "sendgrid" | "smtp_fallback" | string;
+      estimate?: SaveEstimatePayload;
+      [key: string]: unknown;
+    };
+  }>(`/api/quotations/${encodeURIComponent(estimateId)}/send`, payload || {});
+  return response.data;
+}
+
 
 // ----------------------------------------------------------------------------
 // ESTIMATES HISTORY & LIBRARY
