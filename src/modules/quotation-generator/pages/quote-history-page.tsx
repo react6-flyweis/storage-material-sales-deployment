@@ -705,8 +705,46 @@ export function QuoteHistoryPage() {
                       <h3 className="text-sm font-bold text-slate-900 leading-snug">
                         {quote.leadCompanyName || "Customer Quote"}
                       </h3>
-                      <div className="text-xs text-slate-500 font-normal mt-1 flex flex-wrap items-center gap-1">
-                        <span>{quote.status?.toUpperCase() || "DRAFT"}</span>
+                      <div className="text-xs text-slate-500 font-normal mt-1 flex flex-wrap items-center gap-1.5">
+                        {(() => {
+                          const wfStatus =
+                            quote.workflowStatus ||
+                            quote.approval?.status ||
+                            quote.status ||
+                            "draft";
+                          switch (wfStatus) {
+                            case "pending_approval":
+                              return (
+                                <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px]">
+                                  Pending Approval
+                                </span>
+                              );
+                            case "approved":
+                              return (
+                                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">
+                                  Approved
+                                </span>
+                              );
+                            case "rejected":
+                              return (
+                                <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold text-[10px]" title={quote.approval?.rejectionReason || "Approval Rejected"}>
+                                  Rejected
+                                </span>
+                              );
+                            case "sent":
+                              return (
+                                <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold text-[10px]">
+                                  Sent
+                                </span>
+                              );
+                            default:
+                              return (
+                                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold text-[10px]">
+                                  Draft
+                                </span>
+                              );
+                          }
+                        })()}
                         <span>·</span>
                         <span>{quote.scope?.toUpperCase() || "SUPPLY"}</span>
                         <span>·</span>
