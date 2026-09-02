@@ -1,9 +1,60 @@
 import { apiClient } from "@/modules/auth/auth.api";
 
+export type ApprovalStatus =
+  | "not_submitted"
+  | "pending_approval"
+  | "approved"
+  | "rejected";
+
+export type WorkflowStatus =
+  | "draft"
+  | "pending_approval"
+  | "approved"
+  | "rejected"
+  | "sent";
+
+export type QuotationApprovalHistoryItem = {
+  status: ApprovalStatus | string;
+  note?: string;
+  by?:
+    | string
+    | {
+        _id?: string;
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+      }
+    | null;
+  at?: string | null;
+};
+
+export type QuotationApprovalInfo = {
+  status: ApprovalStatus;
+  submittedBy?: {
+    _id?: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+  } | string | null;
+  submittedAt?: string | null;
+  reviewedBy?: {
+    _id?: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+  } | string | null;
+  reviewedAt?: string | null;
+  rejectionReason?: string | null;
+  approvedVersionNumber?: number | null;
+  history?: QuotationApprovalHistoryItem[];
+};
+
 export type QuotationItem = {
   _id: string;
   quoteNumber?: string | null;
   versionNumber?: number;
+  workflowStatus?: WorkflowStatus;
+  approval?: QuotationApprovalInfo;
   status?: string | null;
   finalPrice?: number | null;
   leadId?: {
@@ -98,7 +149,32 @@ export type CreateQuotationPayload = {
 export type CreateQuotationResponse = {
   success: boolean;
   message: string;
-  data?: unknown;
+  data?: QuotationItem | unknown;
+};
+
+export type SubmitApprovalPayload = {
+  note?: string;
+};
+
+export type SubmitApprovalResponse = {
+  success: boolean;
+  message: string;
+  data?: QuotationItem;
+};
+
+export type SendQuotationPayload = {
+  email?: string;
+  notes?: string;
+};
+
+export type SendQuotationResponse = {
+  success: boolean;
+  message: string;
+  data?: {
+    emailProvider?: "sendgrid" | "smtp_fallback" | string;
+    quotation?: QuotationItem;
+    [key: string]: unknown;
+  };
 };
 
 export async function getQuotationsProvider(page = 1, limit = 20) {
@@ -110,6 +186,13 @@ export async function getQuotationsProvider(page = 1, limit = 20) {
   return response.data;
 }
 
+export async function getQuotationByIdProvider(quotationId: string) {
+  const response = await apiClient.get<{ success: boolean; data: QuotationItem }>(
+    `/api/quotations/${encodeURIComponent(quotationId)}`
+  );
+  return response.data;
+}
+
 export async function createQuotationProvider(payload: CreateQuotationPayload) {
   const response = await apiClient.post<CreateQuotationResponse>(
     "/api/quotations",
@@ -118,3 +201,39 @@ export async function createQuotationProvider(payload: CreateQuotationPayload) {
 
   return response.data;
 }
+
+export async function updateQuotationProvider(
+  quotationId: string,
+  payload: Partial<CreateQuotationPayload>
+) {
+  const response = await apiClient.put<CreateQuotationResponse>(
+    `/api/quotations/${encodeURIComponent(quotationId)}`,
+    payload
+  );
+  return response.data;
+}
+
+export async function submitQuotationForApprovalProvider(
+  quotationId: string,
+  note?: string
+) {
+  const response = await apiClient.post<SubmitApprovalResponse>(
+    `/api/quotations/${encodeURIComponent(quotationId)}/submit-approval`,
+    { note }
+  );
+
+  return response.data;
+}
+
+export async function sendQuotationProvider(
+  quotationId: string,
+  payload?: SendQuotationPayload
+) {
+  const response = await apiClient.post<SendQuotationResponse>(
+    `/api/quotations/${encodeURIComponent(quotationId)}/send`,
+    payload || {}
+  );
+
+  return response.data;
+}
+
