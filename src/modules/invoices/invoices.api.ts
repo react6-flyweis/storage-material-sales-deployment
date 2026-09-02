@@ -10,6 +10,49 @@ export const InvoiceStatus = {
 
 export type InvoiceStatus = typeof InvoiceStatus[keyof typeof InvoiceStatus];
 
+export const ApprovalStatus = {
+  NOT_SUBMITTED: "not_submitted",
+  PENDING_APPROVAL: "pending_approval",
+  APPROVED: "approved",
+  REJECTED: "rejected",
+} as const;
+
+export type ApprovalStatus =
+  (typeof ApprovalStatus)[keyof typeof ApprovalStatus];
+
+export const WorkflowStatus = {
+  NOT_SUBMITTED: "not_submitted",
+  DRAFT: "draft",
+  PENDING_APPROVAL: "pending_approval",
+  APPROVED: "approved",
+  REJECTED: "rejected",
+  SENT: "sent",
+  PAID: "paid",
+  OVERDUE: "overdue",
+  CANCELLED: "cancelled",
+} as const;
+
+export type WorkflowStatus =
+  (typeof WorkflowStatus)[keyof typeof WorkflowStatus];
+
+export type ApprovalHistoryItem = {
+  status: ApprovalStatus | string;
+  note?: string | null;
+  by?: InvoiceReferencePerson | string | null;
+  at?: string | null;
+};
+
+export type InvoiceApproval = {
+  status?: ApprovalStatus | string | null;
+  submittedBy?: InvoiceReferencePerson | string | null;
+  submittedAt?: string | null;
+  reviewedBy?: InvoiceReferencePerson | string | null;
+  reviewedAt?: string | null;
+  rejectionReason?: string | null;
+  approvedRevision?: number | null;
+  history?: ApprovalHistoryItem[] | null;
+};
+
 type InvoiceReferencePerson = {
   _id?: string;
   name?: string | null;
@@ -55,6 +98,9 @@ export type InvoiceDocument = {
   depositAmount?: number | null;
   totalAmount?: number | null;
   status?: InvoiceStatus | string | null;
+  revision?: number | null;
+  approval?: InvoiceApproval | null;
+  workflowStatus?: WorkflowStatus | string | null;
   lineItems?: InvoiceLineItem[] | null;
   createdBy?: InvoiceReferencePerson | string | null;
   paidBy?: InvoiceReferencePerson | string | null;
@@ -108,7 +154,10 @@ export type InvoiceListItem = {
   projectName: string;
   dueDate: string;
   amount: number;
-  status: InvoiceStatus;
+  status: InvoiceStatus | string;
+  workflowStatus?: WorkflowStatus | string;
+  approval?: InvoiceApproval;
+  revision?: number;
   invoice: InvoiceDocument;
 };
 
@@ -126,7 +175,7 @@ export type InvoicesListResponse = {
 export type InvoiceListParams = {
   startDate?: string;
   endDate?: string;
-  status?: InvoiceStatus | "";
+  status?: InvoiceStatus | ApprovalStatus | string;
   leadId?: string;
   search?: string;
   page?: number;
@@ -292,7 +341,7 @@ export async function markInvoicePaidProvider(invoiceId: string) {
 export type InvoiceExportParams = {
   startDate?: string;
   endDate?: string;
-  status?: InvoiceStatus | "";
+  status?: InvoiceStatus | ApprovalStatus | string;
   leadId?: string;
   search?: string;
   format: "pdf" | "excel";
@@ -306,4 +355,25 @@ export async function exportInvoicesProvider(params: InvoiceExportParams) {
 
   return response.data;
 }
+
+export type SubmitApprovalResponse = {
+  success: boolean;
+  message: string;
+  data?: {
+    invoice: InvoiceDocument;
+  };
+};
+
+export async function submitInvoiceForApprovalProvider(
+  invoiceId: string,
+  payload?: { note?: string },
+) {
+  const response = await apiClient.post<SubmitApprovalResponse>(
+    `/api/invoices/${invoiceId}/submit-approval`,
+    payload || {},
+  );
+
+  return response.data;
+}
+
 
