@@ -36,7 +36,12 @@ import {
   useInvoiceStatsQuery,
   useInvoicesQuery,
 } from "@/modules/invoices/invoices.hooks";
-import { InvoiceStatus, exportInvoicesProvider } from "@/modules/invoices/invoices.api";
+import {
+  InvoiceStatus,
+  ApprovalStatus,
+  exportInvoicesProvider,
+} from "@/modules/invoices/invoices.api";
+import { WorkflowStatusBadge } from "@/components/invoice/approval-modals";
 import type { DateRange } from "react-day-picker";
 
 type SelectedClient = {
@@ -46,29 +51,20 @@ type SelectedClient = {
   customerId: string;
 };
 
-const statusOptions: Array<{ value: "All" | InvoiceStatus; label: string }> = [
+const statusOptions: Array<{
+  value: "All" | InvoiceStatus | ApprovalStatus;
+  label: string;
+}> = [
   { value: "All", label: "All" },
+  { value: ApprovalStatus.PENDING_APPROVAL, label: "Pending Approval" },
+  { value: ApprovalStatus.APPROVED, label: "Approved" },
+  { value: ApprovalStatus.REJECTED, label: "Rejected" },
   { value: InvoiceStatus.DRAFT, label: "Draft" },
   { value: InvoiceStatus.SENT, label: "Sent" },
   { value: InvoiceStatus.PAID, label: "Paid" },
   { value: InvoiceStatus.OVERDUE, label: "Overdue" },
   { value: InvoiceStatus.CANCELLED, label: "Cancelled" },
 ];
-
-const statusBadgeStyles: Record<
-  InvoiceStatus,
-  { bg: string; text: string; label: string }
-> = {
-  [InvoiceStatus.DRAFT]: { bg: "bg-slate-600", text: "text-white", label: "Draft" },
-  [InvoiceStatus.SENT]: { bg: "bg-blue-600", text: "text-white", label: "Sent" },
-  [InvoiceStatus.PAID]: { bg: "bg-green-600", text: "text-white", label: "Paid" },
-  [InvoiceStatus.OVERDUE]: { bg: "bg-red-600", text: "text-white", label: "Overdue" },
-  [InvoiceStatus.CANCELLED]: {
-    bg: "bg-zinc-100",
-    text: "text-zinc-700",
-    label: "Cancelled",
-  },
-};
 
 function formatCurrency(n: number) {
   return `$${n.toLocaleString()}`;
@@ -94,10 +90,6 @@ function formatDisplayDate(value: string) {
     month: "short",
     year: "numeric",
   }).format(date);
-}
-
-function getStatusBadgeClasses(status: InvoiceStatus) {
-  return statusBadgeStyles[status] ?? statusBadgeStyles.draft;
 }
 
 function InvoiceSummarySkeleton() {
@@ -152,9 +144,9 @@ export default function InvoiceListPage() {
   const [selectedClient, setSelectedClient] = useState<SelectedClient | null>(
     null,
   );
-  const [statusFilter, setStatusFilter] = useState<"All" | InvoiceStatus>(
-    "All",
-  );
+  const [statusFilter, setStatusFilter] = useState<
+    "All" | InvoiceStatus | ApprovalStatus | string
+  >("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -351,7 +343,9 @@ export default function InvoiceListPage() {
                 <Select
                   value={statusFilter}
                   onValueChange={(value) => {
-                    setStatusFilter(value as "All" | InvoiceStatus);
+                    setStatusFilter(
+                      value as "All" | InvoiceStatus | ApprovalStatus,
+                    );
                     setCurrentPage(1);
                   }}
                 >
@@ -490,51 +484,54 @@ export default function InvoiceListPage() {
                 </TableBody>
               ) : (
                 <TableBody>
-                  {invoices.map((inv) => {
-                    const status = getStatusBadgeClasses(inv.status);
-
-                    return (
-                      <TableRow key={inv.invoice._id}>
-                        <TableCell className="text-orange-500 font-medium px-6 py-4">
-                          {inv.invoiceNumber ||
-                            inv.invoice.invoiceNumber ||
-                            "—"}
-                        </TableCell>
-                        <TableCell className="px-6 py-4">
-                          {inv.projectName || "—"}
-                        </TableCell>
-                        <TableCell className="px-6 py-4">
-                          {formatDisplayDate(
-                            inv.dueDate || inv.invoice.dueDate || "",
-                          )}
-                        </TableCell>
-                        <TableCell className="px-6 py-4">
-                          {formatCurrency(
-                            inv.amount ?? inv.invoice.totalAmount ?? 0,
-                          )}
-                        </TableCell>
-                        <TableCell className="px-6 py-4">
-                          <span
-                            className={`inline-flex items-center gap-2 ${status.bg} ${status.text} px-2 py-0.5 rounded-md text-sm font-medium`}
-                          >
-                            <span className="w-2 h-2 bg-white rounded-full" />
-                            {status.label}
-                          </span>
-                        </TableCell>
-                        <TableCell className="px-6 py-4">
-                          <Button
-                            title="View"
-                            variant="ghost"
-                            onClick={() =>
-                              navigate(`/invoice/${inv.invoice._id}`)
-                            }
-                          >
-                            <Eye />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
+                  {invoices.map((inv) => (
+                    <TableRow key={inv.invoice._id}>
+                      <TableCell className="text-orange-500 font-medium px-6 py-4">
+                        {inv.invoiceNumber ||
+                          inv.invoice.invoiceNumber ||
+                          "—"}
+                      </TableCell>
+                      <TableCell className="px-6 py-4">
+                        {inv.projectName || "—"}
+                      </TableCell>
+                      <TableCell className="px-6 py-4">
+                        {formatDisplayDate(
+                          inv.dueDate || inv.invoice.dueDate || "",
+                        )}
+                      </TableCell>
+                      <TableCell className="px-6 py-4">
+                        {formatCurrency(
+                          inv.amount ?? inv.invoice.totalAmount ?? 0,
+                        )}
+                      </TableCell>
+                      <TableCell className="px-6 py-4">
+                        <WorkflowStatusBadge
+                          workflowStatus={
+                            inv.workflowStatus ||
+                            inv.invoice?.workflowStatus ||
+                            inv.status ||
+                            inv.invoice?.status
+                          }
+                          approvalStatus={
+                            inv.approval?.status ||
+                            inv.invoice?.approval?.status
+                          }
+                          invoiceStatus={inv.status || inv.invoice?.status}
+                        />
+                      </TableCell>
+                      <TableCell className="px-6 py-4">
+                        <Button
+                          title="View"
+                          variant="ghost"
+                          onClick={() =>
+                            navigate(`/invoice/${inv.invoice._id}`)
+                          }
+                        >
+                          <Eye />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               )}
             </Table>
