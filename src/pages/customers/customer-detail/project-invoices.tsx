@@ -26,6 +26,7 @@ import StatCard from "@/components/ui/stat-card";
 import { useInvoicesQuery, useMarkInvoicePaidMutation } from "@/modules/invoices/invoices.hooks";
 import { useLeadDetailQuery } from "@/modules/leads/leads.hooks";
 import { InvoiceStatus } from "@/modules/invoices/invoices.api";
+import { WorkflowStatusBadge } from "@/components/invoice/approval-modals";
 
 function formatCurrency(n: number) {
   return `$${n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
@@ -294,41 +295,20 @@ export default function ProjectInvoicesPage() {
                       {itemsCount}
                     </TableCell>
                     <TableCell>
-                      {status === "Pending" && (
-                        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium bg-[#FEF9C3] text-[#CA8A04] border border-[#FEF08A]">
-                          <div className="w-2 h-2 rounded-full bg-[#EAB308]"></div>
-                          Pending
-                          <CheckCircle2 className="h-3 w-3 ml-1 opacity-70" />
-                        </span>
-                      )}
-                      {status === "Paid" && (
-                        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium bg-[#DCFCE7] text-[#16A34A] border border-[#BBF7D0]">
-                          <div className="w-2 h-2 rounded-full bg-[#22C55E]"></div>
-                          Paid
-                          <CheckCircle2 className="h-3 w-3 ml-1 opacity-70" />
-                        </span>
-                      )}
-                      {status === "Overdue" && (
-                        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium bg-[#FEE2E2] text-[#DC2626] border border-[#FECACA]">
-                          <div className="w-2 h-2 rounded-full bg-[#EF4444]"></div>
-                          Overdue
-                          <svg
-                            width="12"
-                            height="12"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="ml-1 opacity-70"
-                          >
-                            <circle cx="12" cy="12" r="10" />
-                            <line x1="12" y1="8" x2="12" y2="12" />
-                            <line x1="12" y1="16" x2="12.01" y2="16" />
-                          </svg>
-                        </span>
-                      )}
+                      <WorkflowStatusBadge
+                        variant="light"
+                        workflowStatus={
+                          inv.workflowStatus ||
+                          inv.invoice?.workflowStatus ||
+                          inv.status ||
+                          inv.invoice?.status
+                        }
+                        approvalStatus={
+                          inv.approval?.status ||
+                          inv.invoice?.approval?.status
+                        }
+                        invoiceStatus={inv.status || inv.invoice?.status}
+                      />
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
