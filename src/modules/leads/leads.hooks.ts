@@ -9,6 +9,8 @@ import {
   escalateLeadProvider,
   getLeadDetailProvider,
   getScoredLeadsProvider,
+  getLeadScoringProvider,
+  type GetLeadScoringFilters,
   getLeadsProvider,
   importLeadsProvider,
   createLeadProvider,
@@ -232,9 +234,21 @@ export function useUpdateLeadLifecycleMutation() {
   });
 }
 
+export function useLeadScoringQuery(
+  page = 1,
+  limit = 20,
+  filters?: GetLeadScoringFilters
+) {
+  return useQuery({
+    queryKey: ["leads", "scoring", page, limit, filters],
+    queryFn: () => getLeadScoringProvider(page, limit, filters),
+    staleTime: 60 * 1000,
+  });
+}
+
 type UpdateLeadTemperatureVariables = {
   leadId: string;
-  temperature: "hot" | "warm" | "cold";
+  temperature: "hot" | "warm" | "cold" | string;
 };
 
 export function useUpdateLeadTemperatureMutation() {
@@ -242,13 +256,18 @@ export function useUpdateLeadTemperatureMutation() {
 
   return useMutation({
     mutationFn: ({ leadId, temperature }: UpdateLeadTemperatureVariables) =>
-      updateLeadTemperatureProvider(leadId, { temperature }),
+      updateLeadTemperatureProvider(leadId, {
+        temperature: temperature.toLowerCase() as "hot" | "warm" | "cold",
+      }),
     onSuccess: (response, variables) => {
       if (!response.success) {
         return;
       }
 
       void queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
+      void queryClient.invalidateQueries({ queryKey: ["leads", "scoring"] });
+      void queryClient.invalidateQueries({ queryKey: ["leads", "list"] });
+      void queryClient.invalidateQueries({ queryKey: ["followups", "activity"] });
       void queryClient.invalidateQueries({
         queryKey: ["sales", "leads", "detail", variables.leadId],
       });
