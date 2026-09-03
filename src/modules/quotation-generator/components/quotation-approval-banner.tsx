@@ -7,11 +7,10 @@ import {
   AlertTriangle,
   History,
   FileText,
-  ChevronRight,
-  ShieldCheck,
+  FileCheck,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -31,9 +30,15 @@ interface QuotationApprovalBannerProps {
   workflowStatus?: WorkflowStatus | string;
   approval?: QuotationApprovalInfo | null;
   versionNumber?: number;
+  /** @deprecated Action buttons have been removed from this banner */
   onSubmitForApproval?: () => void;
+  /** @deprecated Action buttons have been removed from this banner */
   onSendToCustomer?: () => void;
+  /** @deprecated Action buttons have been removed from this banner */
   isSubmitting?: boolean;
+  isEdited?: boolean;
+  /** @deprecated Action buttons have been removed from this banner */
+  onEdit?: () => void;
   className?: string;
 }
 
@@ -42,8 +47,8 @@ export function QuotationApprovalBanner({
   approval,
   versionNumber = 1,
   onSubmitForApproval,
-  onSendToCustomer,
   isSubmitting = false,
+  isEdited = false,
   className = "",
 }: QuotationApprovalBannerProps) {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -56,6 +61,8 @@ export function QuotationApprovalBanner({
       ? "approved"
       : workflowStatus === "rejected"
       ? "rejected"
+      : workflowStatus === "sent"
+      ? "sent"
       : "not_submitted");
 
   const rejectionReason = approval?.rejectionReason;
@@ -66,252 +73,166 @@ export function QuotationApprovalBanner({
     approval?.approvedVersionNumber !== null &&
     approval.approvedVersionNumber !== versionNumber;
 
-  const renderBadge = () => {
+  const canSubmit =
+    Boolean(onSubmitForApproval) &&
+    (status === "not_submitted" ||
+      status === "draft" ||
+      status === "rejected" ||
+      (status === "approved" && isStaleApproved));
+
+  const submitButtonText =
+    status === "rejected" || isStaleApproved
+      ? "Re-submit for Approval"
+      : "Submit for Approval";
+
+  const getConfig = () => {
     switch (status) {
       case "pending_approval":
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-bold border border-amber-200">
-            <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
-            Pending Admin Approval
-          </span>
-        );
+        return {
+          containerClass: "bg-amber-50/80 border-amber-200 text-amber-950",
+          iconContainerClass: "bg-amber-100 text-amber-700",
+          icon: <Clock className="w-4 h-4 animate-pulse" />,
+          title: "Waiting for Admin Approval",
+          badgeText: "Pending Approval",
+          badgeClass: "bg-amber-100 text-amber-800 border-amber-300",
+          description: "This quotation is currently awaiting management review and approval.",
+          historyBtnClass: "text-amber-900 hover:bg-amber-100/80 border-amber-300",
+        };
       case "approved":
         if (isStaleApproved) {
-          return (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100 text-orange-800 text-xs font-bold border border-orange-200">
-              <AlertTriangle className="w-3.5 h-3.5 text-orange-600" />
-              Re-submission Required (v{versionNumber} edited)
-            </span>
-          );
+          return {
+            containerClass: "bg-orange-50/80 border-orange-200 text-orange-950",
+            iconContainerClass: "bg-orange-100 text-orange-700",
+            icon: <AlertTriangle className="w-4 h-4" />,
+            title: `Quotation Modified (v${versionNumber})`,
+            badgeText: "Re-approval Required",
+            badgeClass: "bg-orange-100 text-orange-800 border-orange-300",
+            description: `Modified since last approval (v${approval?.approvedVersionNumber}). Needs re-approval before sending.`,
+            historyBtnClass: "text-orange-900 hover:bg-orange-100/80 border-orange-300",
+          };
         }
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-200">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            Admin Approved (v{approval?.approvedVersionNumber || versionNumber})
-          </span>
-        );
+        return {
+          containerClass: "bg-emerald-50/80 border-emerald-200 text-emerald-950",
+          iconContainerClass: "bg-emerald-100 text-emerald-700",
+          icon: <CheckCircle2 className="w-4 h-4" />,
+          title: `Admin Approved (v${approval?.approvedVersionNumber || versionNumber})`,
+          badgeText: "Approved",
+          badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-300",
+          description: "Quotation has been approved by admin and is ready to be sent to the customer.",
+          historyBtnClass: "text-emerald-900 hover:bg-emerald-100/80 border-emerald-300",
+        };
       case "rejected":
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-100 text-rose-800 text-xs font-bold border border-rose-200">
-            <XCircle className="w-3.5 h-3.5 text-rose-600" />
-            Rejected by Admin
-          </span>
-        );
+        if (isEdited) {
+          return {
+            containerClass: "bg-amber-50/80 border-amber-200 text-amber-950",
+            iconContainerClass: "bg-amber-100 text-amber-700",
+            icon: <AlertTriangle className="w-4 h-4" />,
+            title: `Quotation Adjusted (Revision v${versionNumber + 1})`,
+            badgeText: "Ready to Re-submit",
+            badgeClass: "bg-amber-100 text-amber-800 border-amber-300",
+            description: "Modifications made to address admin feedback.",
+            historyBtnClass: "text-amber-900 hover:bg-amber-100/80 border-amber-300",
+          };
+        }
+        return {
+          containerClass: "bg-rose-50/80 border-rose-200 text-rose-950",
+          iconContainerClass: "bg-rose-100 text-rose-700",
+          icon: <XCircle className="w-4 h-4" />,
+          title: "Approval Rejected by Admin",
+          badgeText: "Rejected",
+          badgeClass: "bg-rose-100 text-rose-800 border-rose-300",
+          description: rejectionReason
+            ? `Admin Note: "${rejectionReason}"`
+            : "Review feedback and make required adjustments before re-submitting.",
+          historyBtnClass: "text-rose-900 hover:bg-rose-100/80 border-rose-300",
+        };
       case "sent":
-      case workflowStatus === "sent" ? "sent" : "":
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-bold border border-blue-200">
-            <Send className="w-3.5 h-3.5 text-blue-600" />
-            Sent to Customer
-          </span>
-        );
+        return {
+          containerClass: "bg-blue-50/80 border-blue-200 text-blue-950",
+          iconContainerClass: "bg-blue-100 text-blue-700",
+          icon: <Send className="w-4 h-4" />,
+          title: "Sent to Customer",
+          badgeText: "Sent",
+          badgeClass: "bg-blue-100 text-blue-800 border-blue-300",
+          description: "This quotation has been officially sent to the customer.",
+          historyBtnClass: "text-blue-900 hover:bg-blue-100/80 border-blue-300",
+        };
       default:
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold border border-slate-200">
-            <FileText className="w-3.5 h-3.5 text-slate-500" />
-            Draft (Not Submitted)
-          </span>
-        );
+        return {
+          containerClass: "bg-slate-50 border-slate-200 text-slate-800",
+          iconContainerClass: "bg-slate-100 text-slate-600",
+          icon: <FileText className="w-4 h-4" />,
+          title: `Quotation Draft (v${versionNumber})`,
+          badgeText: "Draft",
+          badgeClass: "bg-slate-100 text-slate-700 border-slate-300",
+          description: "This quotation is currently in draft mode.",
+          historyBtnClass: "text-slate-700 hover:bg-slate-100 border-slate-200",
+        };
     }
   };
 
+  const config = getConfig();
+
   return (
-    <div className={`space-y-3 no-print ${className}`}>
-      {/* Pending Approval Banner */}
-      {status === "pending_approval" && (
-        <Card className="p-4 bg-amber-50/90 border-amber-200 text-amber-900 shadow-xs rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-amber-100 rounded-lg text-amber-700 shrink-0">
-              <Clock className="w-5 h-5 animate-pulse" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h4 className="text-sm font-bold text-amber-950">
-                  Waiting for Admin Approval
-                </h4>
-                {renderBadge()}
-              </div>
-              <p className="text-xs text-amber-800 mt-1">
-                This quotation has been submitted to management for review. Send to customer will be unlocked once approved.
-              </p>
-            </div>
+    <div className={`no-print ${className}`}>
+      <div
+        className={`px-4 py-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs ${config.containerClass}`}
+      >
+        <div className="flex items-start sm:items-center gap-3 min-w-0">
+          <div className={`p-1.5 rounded-lg shrink-0 ${config.iconContainerClass}`}>
+            {config.icon}
           </div>
-          {history.length > 0 && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowHistoryModal(true)}
-              className="bg-white border-amber-300 text-amber-900 hover:bg-amber-100 shrink-0 text-xs font-semibold"
-            >
-              <History className="w-3.5 h-3.5 mr-1" />
-              View Timeline
-            </Button>
-          )}
-        </Card>
-      )}
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h4 className="text-xs font-bold leading-none">
+                {config.title}
+              </h4>
+              <span
+                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${config.badgeClass}`}
+              >
+                {config.badgeText}
+              </span>
+            </div>
+            <p className="text-xs opacity-80 mt-1 leading-snug">
+              {config.description}
+            </p>
+          </div>
+        </div>
 
-      {/* Approved Banner */}
-      {status === "approved" && !isStaleApproved && (
-        <Card className="p-4 bg-emerald-50/90 border-emerald-200 text-emerald-950 shadow-xs rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-emerald-100 rounded-lg text-emerald-700 shrink-0">
-              <ShieldCheck className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h4 className="text-sm font-bold text-emerald-950">
-                  Quotation Approved by Admin
-                </h4>
-                {renderBadge()}
-              </div>
-              <p className="text-xs text-emerald-800 mt-1">
-                This quotation has been reviewed and approved (v{versionNumber}). You can now send it directly to the customer.
-              </p>
-            </div>
-          </div>
+        {(canSubmit || history.length > 0) && (
           <div className="flex items-center gap-2 shrink-0">
-            {history.length > 0 && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setShowHistoryModal(true)}
-              >
-                <History className="w-3.5 h-3.5 mr-1" />
-                History
-              </Button>
-            )}
-            {onSendToCustomer && (
-              <Button
-                type="button"
-                size="sm"
-                onClick={onSendToCustomer}
-              >
-                <Send className="w-3.5 h-3.5 mr-1.5" />
-                Send to Customer
-              </Button>
-            )}
-          </div>
-        </Card>
-      )}
-
-      {/* Stale Approved Banner */}
-      {status === "approved" && isStaleApproved && (
-        <Card className="p-4 bg-orange-50/90 border-orange-200 text-orange-950 shadow-xs rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-orange-100 rounded-lg text-orange-700 shrink-0">
-              <AlertTriangle className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h4 className="text-sm font-bold text-orange-950">
-                  Quotation Edited Since Last Approval
-                </h4>
-                {renderBadge()}
-              </div>
-              <p className="text-xs text-orange-800 mt-1">
-                The quote was modified to version v{versionNumber} after approval (v{approval?.approvedVersionNumber}). Please re-submit to Admin for approval.
-              </p>
-            </div>
-          </div>
-          {onSubmitForApproval && (
-            <Button
-              type="button"
-              size="sm"
-              onClick={onSubmitForApproval}
-              disabled={isSubmitting}
-            >
-              <Send className="w-3.5 h-3.5 mr-1.5" />
-              Re-submit for Approval
-            </Button>
-          )}
-        </Card>
-      )}
-
-      {/* Rejected Banner */}
-      {status === "rejected" && (
-        <Card className="p-4 bg-rose-50/90 border-rose-200 text-rose-950 shadow-xs rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-rose-100 rounded-lg text-rose-700 shrink-0">
-              <XCircle className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h4 className="text-sm font-bold text-rose-950">
-                  Quotation Approval Rejected
-                </h4>
-                {renderBadge()}
-              </div>
-              {rejectionReason && (
-                <div className="mt-2 p-2.5 bg-white/80 border border-rose-200 rounded-lg text-xs font-semibold text-rose-900">
-                  <span className="font-bold text-rose-950">Rejection Reason: </span>
-                  {rejectionReason}
-                </div>
-              )}
-              <p className="text-xs text-rose-800 mt-1">
-                Please make the required adjustments to pricing or scope and re-submit for review.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {history.length > 0 && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setShowHistoryModal(true)}
-              >
-                <History className="w-3.5 h-3.5 mr-1" />
-                History
-              </Button>
-            )}
-            {onSubmitForApproval && (
+            {canSubmit && (
               <Button
                 type="button"
                 size="sm"
                 onClick={onSubmitForApproval}
                 disabled={isSubmitting}
+                className="h-7.5 px-3 text-xs font-semibold shrink-0 cursor-pointer bg-blue-600 hover:bg-blue-700 text-white shadow-xs flex items-center gap-1.5"
               >
-                Submit for Approval
+                {isSubmitting ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <FileCheck className="w-3.5 h-3.5" />
+                )}
+                {submitButtonText}
+              </Button>
+            )}
+
+            {history.length > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowHistoryModal(true)}
+                className={`h-7.5 px-2.5 text-xs font-semibold shrink-0 cursor-pointer bg-white/80 backdrop-blur-xs border ${config.historyBtnClass}`}
+              >
+                <History className="w-3.5 h-3.5 mr-1" />
+                Timeline
               </Button>
             )}
           </div>
-        </Card>
-      )}
-
-      {/* Draft Banner */}
-      {(status === "not_submitted" || status === "draft") && (
-        <Card className="p-4 bg-slate-50/90 border-slate-200 text-slate-900 shadow-xs rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-slate-200/80 rounded-lg text-slate-700 shrink-0">
-              <FileText className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h4 className="text-sm font-bold text-slate-900">
-                  Quotation Draft (v{versionNumber})
-                </h4>
-                {renderBadge()}
-              </div>
-              <p className="text-xs text-slate-600 mt-1">
-                Before sending this quotation to the customer, submit it to Admin for review and approval.
-              </p>
-            </div>
-          </div>
-          {onSubmitForApproval && (
-            <Button
-              type="button"
-              size="sm"
-              onClick={onSubmitForApproval}
-              disabled={isSubmitting}
-            >
-              Submit for Approval
-              <ChevronRight className="w-3.5 h-3.5 ml-1" />
-            </Button>
-          )}
-        </Card>
-      )}
+        )}
+      </div>
 
       {/* Approval Timeline / History Dialog */}
       <Dialog open={showHistoryModal} onOpenChange={setShowHistoryModal}>
