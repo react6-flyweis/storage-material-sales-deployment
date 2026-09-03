@@ -638,6 +638,7 @@ export default function StorageQuotePage() {
     try {
       const payload: SaveEstimatePayload = {
         _id: estimateId || undefined,
+        leadId: selectedLeadId || activeLeadId || undefined,
         jobType: "Storage",
         scope: scope.toLowerCase() === "supply" ? "Supply" : scope.toLowerCase() === "install" ? "Install" : "Both",
         leadCompanyName:
@@ -915,6 +916,7 @@ export default function StorageQuotePage() {
           storageData,
           storagePricing,
           estimateId,
+          leadId: selectedLeadId || activeLeadId || undefined,
           sourceFileName,
           customerLeadName,
           customerAddress,

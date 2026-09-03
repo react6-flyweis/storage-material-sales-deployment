@@ -63,6 +63,7 @@ interface QuoteBreakdownPricingSectionProps {
   quotationForm?: Record<string, string>;
   extractedDrawing?: ExtractDrawingResponseData;
   pdfFileName?: string;
+  estimateId?: string | null;
   onShipperExtracted?: (data: ExtractShipperResponseData) => void;
 }
 
@@ -71,6 +72,7 @@ export function QuoteBreakdownPricingSection({
   quotationForm,
   extractedDrawing,
   pdfFileName,
+  estimateId: propEstimateId,
   onShipperExtracted,
 }: QuoteBreakdownPricingSectionProps) {
   const [activeTab, setActiveTab] = useState("breakdown");
@@ -122,6 +124,7 @@ export function QuoteBreakdownPricingSection({
     marginTargetMargin,
     marginFixedSellOverride,
     pembExtractedShipper,
+    pembLeadId,
     pembEstimateId,
     setPembEstimateId,
   } = useQuotationStore();
@@ -129,14 +132,15 @@ export function QuoteBreakdownPricingSection({
   const effectiveInitial = initialShipper || pembExtractedShipper || undefined;
 
   const [estimateId, setEstimateId] = useState<string | null>(
-    pembEstimateId || null
+    propEstimateId || pembEstimateId || null
   );
 
   useEffect(() => {
-    if (pembEstimateId) {
-      setEstimateId(pembEstimateId);
+    const eid = propEstimateId || pembEstimateId;
+    if (eid) {
+      setEstimateId(eid);
     }
-  }, [pembEstimateId]);
+  }, [propEstimateId, pembEstimateId]);
 
   // Page-specific local state
   const [sqFt, setSqFt] = useState(
@@ -167,6 +171,8 @@ export function QuoteBreakdownPricingSection({
   const navigate = useNavigate();
 
   const handleNavigateToPreview = useCallback(() => {
+    const activeEstimateId =
+      estimateId || propEstimateId || pembEstimateId || undefined;
     navigate("/quotation/quote-preview/view", {
       state: {
         quotationForm,
@@ -176,14 +182,29 @@ export function QuoteBreakdownPricingSection({
         buildingSize,
         additionalNotes,
         pdfFileName,
+        estimateId: activeEstimateId,
       },
     });
-  }, [navigate, quotationForm, extractedDrawing, shipperData, sqFt, buildingSize, additionalNotes, pdfFileName]);
+  }, [
+    navigate,
+    quotationForm,
+    extractedDrawing,
+    shipperData,
+    sqFt,
+    buildingSize,
+    additionalNotes,
+    pdfFileName,
+    estimateId,
+    propEstimateId,
+    pembEstimateId,
+  ]);
 
   const handleSaveDraft = useCallback(async () => {
-    if (!shipperData?.parsedCategories) return;
+    if (!shipperData) return;
     setIsSavingDraft(true);
     try {
+      const activeEstimateId =
+        estimateId || propEstimateId || pembEstimateId || undefined;
       const parsedSqFt = parseFloat(sqFt) || shipperData.squareFootage || 0;
       const effectiveCostPerSf = installCost > 0 ? installCost : (jobType === "Storage" ? 2.5 : 5.5);
       const effectiveSellPerSf = installSell > 0 ? installSell : (jobType === "Storage" ? 3.25 : 8.5);
@@ -195,7 +216,8 @@ export function QuoteBreakdownPricingSection({
 
       const res = await saveEstimateProvider(
         {
-          _id: estimateId || undefined,
+          _id: activeEstimateId,
+          leadId: quotationForm?.leadId || pembLeadId || undefined,
           jobType,
           scope: normalizeScope(scope),
           roofType: normalizeRoof(roofType),
@@ -271,11 +293,11 @@ export function QuoteBreakdownPricingSection({
             },
           status: "draft",
         },
-        estimateId || undefined
+        activeEstimateId
       );
 
       const data = res.data || res;
-      const savedId = data?.estimate?._id || data?._id;
+      const savedId = data?.estimate?._id || data?._id || activeEstimateId;
       if (savedId) {
         setEstimateId(savedId);
         setPembEstimateId(savedId);
@@ -287,6 +309,8 @@ export function QuoteBreakdownPricingSection({
     }
   }, [
     estimateId,
+    propEstimateId,
+    pembEstimateId,
     shipperData,
     jobType,
     scope,
@@ -296,6 +320,7 @@ export function QuoteBreakdownPricingSection({
     installCost,
     installSell,
     quotationForm,
+    pembLeadId,
     extractedDrawing,
     buildingSize,
     sqFt,
@@ -336,7 +361,7 @@ export function QuoteBreakdownPricingSection({
   // Compute estimate function
   const executeCompute = useCallback(
     async (overrides?: Partial<ComputeEstimateRequest>) => {
-      if (!shipperData?.parsedCategories) return;
+      if (!shipperData) return;
 
       setIsComputing(true);
       try {
@@ -349,7 +374,7 @@ export function QuoteBreakdownPricingSection({
         const marginSellVal = parseFloat(storeState.marginFixedSellOverride) || undefined;
 
         const payload: ComputeEstimateRequest = {
-          parsedCategories: shipperData.parsedCategories,
+          parsedCategories: shipperData.parsedCategories || {},
           jobType,
           scope: normalizeScope(scope),
           squareFootage: parsedSqFt,
@@ -440,8 +465,7 @@ export function QuoteBreakdownPricingSection({
       }
     },
     [
-      shipperData?.parsedCategories,
-      shipperData?.squareFootage,
+      shipperData,
       jobType,
       scope,
       sqFt,
@@ -474,7 +498,7 @@ export function QuoteBreakdownPricingSection({
 
   // Automatically trigger debounced re-compute when settings change
   useEffect(() => {
-    if (!shipperData?.parsedCategories) return;
+    if (!shipperData) return;
 
     if (computeAbortRef.current) {
       window.clearTimeout(computeAbortRef.current);
@@ -489,7 +513,7 @@ export function QuoteBreakdownPricingSection({
         window.clearTimeout(computeAbortRef.current);
       }
     };
-  }, [executeCompute, shipperData?.parsedCategories]);
+  }, [executeCompute, shipperData]);
 
   const handleSelectSf = useCallback(
     (selectedSf: number) => {
@@ -658,7 +682,7 @@ export function QuoteBreakdownPricingSection({
                 quotationForm={quotationForm}
                 extractedDrawing={extractedDrawing}
                 pdfFileName={pdfFileName}
-                estimateId={estimateId}
+                estimateId={estimateId || propEstimateId || pembEstimateId}
                 onQuotePreview={handleNavigateToPreview}
                 onSaveDraft={handleSaveDraft}
                 isSavingDraft={isSavingDraft}

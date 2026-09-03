@@ -135,6 +135,9 @@ const QuotePreviewListPage = lazy(
 const QuoteHistoryPage = lazy(
   () => import("@/modules/quotation-generator/pages/quote-history-page"),
 );
+const EstimateDetailPage = lazy(
+  () => import("@/modules/quotation-generator/pages/estimate-details-page"),
+);
 const PricingRulesPage = lazy(
   () => import("@/modules/quotation-generator/pages/pricing-rules-page"),
 );
@@ -395,6 +398,7 @@ export const salesRoutes: RouteObject[] = [
               { path: "quote-preview/view", element: <QuotePreviewPage /> },
               { path: "quote-preview/detail", element: <QuotePreviewPage /> },
               { path: "history", element: <QuoteHistoryPage /> },
+              { path: "history/:id", element: <EstimateDetailPage /> },
               { path: "quote-history", element: <QuoteHistoryPage /> },
               { path: "pricing-rules", element: <PricingRulesPage /> },
             ],

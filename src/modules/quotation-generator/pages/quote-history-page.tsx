@@ -1,6 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { ArrowLeft, Search, Trash2, ExternalLink, Loader2, RefreshCw, Eye } from "lucide-react";
+import {
+  ArrowLeft,
+  Search,
+  Trash2,
+  ExternalLink,
+  Loader2,
+  RefreshCw,
+  Eye,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   InputGroup,
@@ -11,15 +19,10 @@ import { Card } from "@/components/ui/card";
 import {
   getEstimatesListProvider,
   getHistorySummaryProvider,
-  getEstimateByIdProvider,
   deleteEstimateProvider,
   type SaveEstimatePayload,
-  type ExtractShipperResponseData,
-  type ShipperTabSummary,
-  type ShipperPricing,
-  type FullQuoteData,
 } from "../estimates.api";
-import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
+import { useLoadEstimateToEditor } from "../hooks/use-load-estimate-to-editor";
 import {
   formatCurrency2,
   formatPercent2,
@@ -31,7 +34,6 @@ export function QuoteHistoryPage() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingItem, setIsLoadingItem] = useState<string | null>(null);
   const [estimatesList, setEstimatesList] = useState<SaveEstimatePayload[]>([]);
   const [summaryData, setSummaryData] = useState<{
     totalQuotes?: number;
@@ -57,13 +59,20 @@ export function QuoteHistoryPage() {
       const rawList = listRes.data || listRes;
       const items: SaveEstimatePayload[] = Array.isArray(rawList)
         ? rawList
-        : (rawList as Record<string, unknown>)?.estimates as SaveEstimatePayload[] ||
-        (rawList as Record<string, unknown>)?.items as SaveEstimatePayload[] || [];
+        : ((rawList as Record<string, unknown>)
+            ?.estimates as SaveEstimatePayload[]) ||
+          ((rawList as Record<string, unknown>)
+            ?.items as SaveEstimatePayload[]) ||
+          [];
       setEstimatesList(items);
 
       if (summaryRes) {
-        const rawSummary = (summaryRes.data || summaryRes) as Record<string, unknown>;
-        const allTime = (rawSummary?.allTime as Record<string, unknown>) || rawSummary;
+        const rawSummary = (summaryRes.data || summaryRes) as Record<
+          string,
+          unknown
+        >;
+        const allTime =
+          (rawSummary?.allTime as Record<string, unknown>) || rawSummary;
         setSummaryData({
           ...rawSummary,
           ...allTime,
@@ -96,377 +105,20 @@ export function QuoteHistoryPage() {
     }
   };
 
+  const { loadAndEdit, loadingId: hookLoadingId } =
+    useLoadEstimateToEditor();
+
   const handleLoadAndEdit = async (item: SaveEstimatePayload) => {
     try {
-      let estimate = item;
-      if (item._id) {
-        setIsLoadingItem(item._id);
-        try {
-          const res = await getEstimateByIdProvider(item._id);
-          const fetchedData = res.data || res;
-          if ((fetchedData as Record<string, unknown>)?.estimate) {
-            estimate = (fetchedData as Record<string, unknown>).estimate as SaveEstimatePayload;
-          } else if (fetchedData && typeof fetchedData === "object" && !Array.isArray(fetchedData)) {
-            estimate = fetchedData as SaveEstimatePayload;
-          }
-        } catch (fetchErr) {
-          console.warn("Failed to fetch full estimate detail by ID, using item from list:", fetchErr);
-          estimate = item;
-        }
-      }
-
-      const isStorage =
-        estimate.jobType?.toUpperCase() === "STORAGE" ||
-        Boolean(estimate.storageData);
-
-      const store = useQuotationStore.getState();
-
-      // Synchronize addons & overrides if present
-      if (estimate.concreteAddon) {
-        if (estimate.concreteAddon.include !== undefined) store.setConcreteInclude(Boolean(estimate.concreteAddon.include));
-        if (estimate.concreteAddon.costSF !== undefined) store.setConcreteCostSf(Number(estimate.concreteAddon.costSF));
-        if (estimate.concreteAddon.marginPct !== undefined) store.setConcreteMarginPct(Number(estimate.concreteAddon.marginPct));
-        if (estimate.concreteAddon.slabThickness || estimate.concreteAddon.thickness) {
-          const thick = String(estimate.concreteAddon.slabThickness || estimate.concreteAddon.thickness);
-          if (thick === "4" || thick === '4"' || thick === '4”') {
-            store.setConcreteSlabThickness('4"');
-          } else {
-            store.setConcreteSlabThickness('6"');
-          }
-        }
-        if (estimate.concreteAddon.psi || estimate.concreteAddon.psiRating) {
-          store.setConcretePsiRating(String(estimate.concreteAddon.psi || estimate.concreteAddon.psiRating));
-        }
-        if (estimate.concreteAddon.sowNotes) {
-          store.setConcreteNotes(String(estimate.concreteAddon.sowNotes));
-        }
-        if (estimate.concreteAddon.sowItems && Array.isArray(estimate.concreteAddon.sowItems) && estimate.concreteAddon.sowItems.length > 0) {
-          store.setConcreteInclusions(estimate.concreteAddon.sowItems);
-        }
-      }
-
-      if (estimate.insulationAddon) {
-        if (estimate.insulationAddon.include !== undefined) store.setInsulationInclude(Boolean(estimate.insulationAddon.include));
-        if (estimate.insulationAddon.system || estimate.insulationAddon.systemLabel) {
-          const sys = (estimate.insulationAddon.system || estimate.insulationAddon.systemLabel || "").toLowerCase();
-          if (sys.includes("spray") || sys.includes("foam")) {
-            store.setInsulationSystem("Spray Foam");
-          } else if (sys.includes("double") || sys.includes("layer")) {
-            store.setInsulationSystem("Double-layer system");
-          } else {
-            store.setInsulationSystem("Vinyl-backed (single layer)");
-          }
-        }
-        if (estimate.insulationAddon.rRoof || estimate.insulationAddon.rValueRoof) {
-          store.setInsulationRValueRoof(String(estimate.insulationAddon.rRoof || estimate.insulationAddon.rValueRoof));
-        }
-        if (estimate.insulationAddon.rWall || estimate.insulationAddon.rValueWalls) {
-          store.setInsulationRValueWalls(String(estimate.insulationAddon.rWall || estimate.insulationAddon.rValueWalls));
-        }
-        if (estimate.insulationAddon.costSF !== undefined || estimate.insulationAddon.cogsSF !== undefined) {
-          store.setInsulationCogsSf(Number(estimate.insulationAddon.costSF ?? estimate.insulationAddon.cogsSF));
-        }
-        if (estimate.insulationAddon.marginPct !== undefined) {
-          store.setInsulationMarginPct(Number(estimate.insulationAddon.marginPct));
-        }
-      }
-
-      if (estimate.salesTax) {
-        if (estimate.salesTax.zip) store.setTaxZip(estimate.salesTax.zip);
-        if (estimate.salesTax.rate !== undefined) store.setTaxRate(Number(estimate.salesTax.rate));
-        if (estimate.salesTax.include !== undefined) store.setIncludeTax(Boolean(estimate.salesTax.include));
-      }
-
-      if (estimate.cogsOverride) {
-        store.setCogsOverrideApplied(Boolean(estimate.cogsOverride.applied));
-        if (estimate.cogsOverride.costDollar !== undefined && estimate.cogsOverride.costDollar !== null) {
-          store.setCogsCostInput(String(estimate.cogsOverride.costDollar));
-        }
-        if (estimate.cogsOverride.costPctAdj !== undefined && estimate.cogsOverride.costPctAdj !== null) {
-          store.setCogsCostAdjustPercent(Number(estimate.cogsOverride.costPctAdj));
-        }
-        if (estimate.cogsOverride.marginPct !== undefined && estimate.cogsOverride.marginPct !== null) {
-          store.setCogsMaterialMargin(Number(estimate.cogsOverride.marginPct));
-        }
-        if (estimate.cogsOverride.sellDollar !== undefined && estimate.cogsOverride.sellDollar !== null) {
-          store.setCogsFixedSellPrice(String(estimate.cogsOverride.sellDollar));
-        }
-      } else {
-        store.resetCogsSettings();
-      }
-
-      if (estimate.marginOverride) {
-        store.setMarginOverrideApplied(Boolean(estimate.marginOverride.applied));
-        if (estimate.marginOverride.laborSF !== undefined && estimate.marginOverride.laborSF !== null) {
-          store.setMarginLaborOverride(String(estimate.marginOverride.laborSF));
-        }
-        if (estimate.marginOverride.pct !== undefined && estimate.marginOverride.pct !== null) {
-          store.setMarginTargetMargin(String(estimate.marginOverride.pct));
-        }
-        if (estimate.marginOverride.sellFixed !== undefined && estimate.marginOverride.sellFixed !== null) {
-          store.setMarginFixedSellOverride(String(estimate.marginOverride.sellFixed));
-        }
-      } else {
-        store.resetMarginSettings();
-      }
-
-      if (isStorage) {
-        store.setJobType("Storage");
-        if (estimate.scope) {
-          const normScope = estimate.scope.toLowerCase();
-          store.setScope(normScope === "supply" ? "Supply" : normScope === "install" ? "Install" : "Both");
-        }
-        store.setStorageData(estimate.storageData || null);
-        store.setStoragePricing(estimate.storagePricingResult || null);
-        store.setStorageEstimateId(estimate._id || null);
-        store.setStorageFileName(estimate.sourceFileName || "Storage_COG.xlsx");
-        store.setStorageCustomerLeadName(estimate.leadCompanyName || "");
-        store.setStorageCustomerAddress(estimate.cityStateZip || estimate.streetAddress || "");
-        store.setStorageCustomerEmail(estimate.customerEmail || "");
-        store.setStorageJobNumber(estimate.jobNumber || "");
-
-        navigate("/quotation/storage-cog", {
-          state: {
-            storageData: estimate.storageData,
-            storagePricing: estimate.storagePricingResult,
-            estimateId: estimate._id,
-            sourceFileName: estimate.sourceFileName || "Storage_COG.xlsx",
-            customerLeadName: estimate.leadCompanyName || "",
-            customerAddress: estimate.cityStateZip || estimate.streetAddress || "",
-            customerEmail: estimate.customerEmail || "",
-            jobNumber: estimate.jobNumber || "",
-          },
-        });
-        return;
-      }
-
-      const pricingRes = estimate.pricingResult as Record<string, unknown> | undefined;
-      const effectiveSqFt = Number(estimate.squareFootage || estimate.sf || pricingRes?.totalSqFt || pricingRes?.sf || 0);
-
-      store.setJobType("PEMB");
-      if (estimate.scope) {
-        const normScope = estimate.scope.toLowerCase();
-        store.setScope(normScope === "install" ? "Install" : normScope === "both" ? "Both" : "Supply");
-      }
-      if (estimate.roofType) {
-        store.setRoofType(String(estimate.roofType));
-      }
-      if (estimate.blendPct !== undefined) {
-        const bp = Number(estimate.blendPct);
-        store.setBlendPercentage(bp <= 1 && bp > 0 ? bp * 100 : bp);
-      }
-      if (estimate.installLevel || (estimate as Record<string, unknown>).installDifficulty) {
-        store.setInstallDifficulty(String(estimate.installLevel || (estimate as Record<string, unknown>).installDifficulty));
-      }
-
-      // Derive effective installCost ($/SF) from unit rate or total instCost / SF
-      let effectiveInstallCost = Number(estimate.installCostPerSf);
-      if (!effectiveInstallCost || isNaN(effectiveInstallCost)) {
-        const totalInstCost = Number((pricingRes?.instCost as number) ?? estimate.installCost ?? 0);
-        if (totalInstCost > 0 && effectiveSqFt > 0) {
-          effectiveInstallCost = Number((totalInstCost / effectiveSqFt).toFixed(2));
-        } else {
-          effectiveInstallCost = 5.5;
-        }
-      }
-
-      // Derive effective sellPerSf ($/SF) from unit rate or total instSell / SF
-      let effectiveInstallSell = Number(estimate.sellPerSf);
-      if (!effectiveInstallSell || isNaN(effectiveInstallSell)) {
-        const totalInstSell = Number((pricingRes?.instSell as number) ?? 0);
-        if (totalInstSell > 0 && effectiveSqFt > 0) {
-          effectiveInstallSell = Number((totalInstSell / effectiveSqFt).toFixed(2));
-        } else {
-          effectiveInstallSell = 8.5;
-        }
-      }
-
-      store.setInstallCost(effectiveInstallCost);
-      store.setInstallSell(effectiveInstallSell);
-      store.setPembEstimateId(estimate._id || null);
-      store.setSquareFootage(effectiveSqFt);
-      store.setBuildingSize(estimate.buildingSize || "");
-
-      const formattedQuoteDate = estimate.quoteDate
-        ? new Date(estimate.quoteDate).toLocaleDateString("en-US", {
-            month: "long",
-            day: "numeric",
-            year: "numeric",
-          })
-        : "";
-
-      const leadInfo = {
-        leadName: estimate.leadCompanyName || estimate.jobNumber || estimate.cityStateZip || "Saved Estimate",
-        email: estimate.customerEmail || "",
-        street: estimate.streetAddress || "",
-        cityStateZip: estimate.cityStateZip || "",
-        buildingSize: estimate.buildingSize || "",
-        squareFootage: String(effectiveSqFt || ""),
-        jobNumber: estimate.jobNumber || "",
-        quoteDate: formattedQuoteDate,
-      };
-
-      store.setPembLeadData(leadInfo);
-
-      const pricingObj = ((estimate.pricingResult || {}) as Record<string, unknown>);
-      if (!pricingObj.rows && estimate.breakdownRows) {
-        pricingObj.rows = estimate.breakdownRows;
-      }
-
-      const shipperData: ExtractShipperResponseData = {
-        fileName: estimate.sourceFileName || "Shipper.xlsx",
-        sheetCount: estimate.tabSummary?.length || 1,
-        totalWeightLbs: Number(estimate.totalWeightLbs || pricingRes?.totWt || 0),
-        squareFootage: effectiveSqFt,
-        tabSummary: (estimate.tabSummary || []) as ShipperTabSummary[],
-        parsedCategories: estimate.parsedCategories,
-        pricing: pricingObj as ShipperPricing,
-        fullQuote: (estimate.fullQuoteResult as FullQuoteData) || (pricingObj as FullQuoteData),
-      };
-
-      store.setPembExtractedShipper(shipperData);
-
-      if (estimate.extractedDrawingFields) {
-        store.setPembExtractedDrawing({
-          fileName: estimate.sourceFileName || "Drawing.pdf",
-          textItemCount: 0,
-          filledCount: 0,
-          extracted: estimate.extractedDrawingFields,
-          rawTextPreview: "",
-        });
-      }
-
-      if (estimate.sourceFileName) {
-        store.setPembPdfFileName(estimate.sourceFileName);
-      }
-
-      navigate("/quotation/pemb", {
-        state: {
-          extractedShipper: shipperData,
-          extractedDrawing: estimate.extractedDrawingFields ? {
-            fileName: estimate.sourceFileName || "Drawing.pdf",
-            textItemCount: 0,
-            filledCount: 0,
-            extracted: estimate.extractedDrawingFields,
-            rawTextPreview: "",
-          } : undefined,
-          quotationForm: leadInfo,
-          estimateId: estimate._id,
-          sqFt: String(effectiveSqFt || ""),
-          buildingSize: estimate.buildingSize || "",
-          pdfFileName: estimate.sourceFileName,
-        },
-      });
+      await loadAndEdit(item);
     } catch (err) {
       console.error("Failed to load estimate detail:", err);
-    } finally {
-      setIsLoadingItem(null);
     }
   };
 
-  const handlePreviewQuote = async (item: SaveEstimatePayload) => {
-    try {
-      let estimate = item;
-      if (item._id) {
-        setIsLoadingItem(item._id);
-        try {
-          const res = await getEstimateByIdProvider(item._id);
-          const fetchedData = res.data || res;
-          if ((fetchedData as Record<string, unknown>)?.estimate) {
-            estimate = (fetchedData as Record<string, unknown>).estimate as SaveEstimatePayload;
-          } else if (fetchedData && typeof fetchedData === "object" && !Array.isArray(fetchedData)) {
-            estimate = fetchedData as SaveEstimatePayload;
-          }
-        } catch (fetchErr) {
-          console.warn("Failed to fetch full estimate detail for preview, using item from list:", fetchErr);
-          estimate = item;
-        }
-      }
-
-      const isStorage =
-        estimate.jobType?.toUpperCase() === "STORAGE" ||
-        Boolean(estimate.storageData);
-
-      if (isStorage) {
-        navigate("/quotation/storage-preview", {
-          state: {
-            storageData: estimate.storageData,
-            storagePricing: estimate.storagePricingResult,
-            estimateId: estimate._id,
-            sourceFileName: estimate.sourceFileName || "Storage_COG.xlsx",
-            customerLeadName: estimate.leadCompanyName || "",
-            customerAddress: estimate.cityStateZip || estimate.streetAddress || "",
-            customerEmail: estimate.customerEmail || "",
-            jobNumber: estimate.jobNumber || "",
-            scope: estimate.scope || "Both",
-            concreteInclude: estimate.concreteAddon?.include ?? false,
-            insulationInclude: estimate.insulationAddon?.include ?? false,
-            includeTax: estimate.salesTax?.include ?? true,
-            taxRate: estimate.salesTax?.rate ?? 0,
-          },
-        });
-        return;
-      }
-
-      const pricingRes = estimate.pricingResult as Record<string, unknown> | undefined;
-      const effectiveSqFt = Number(estimate.squareFootage || estimate.sf || pricingRes?.totalSqFt || pricingRes?.sf || 0);
-
-      const pricingObj = ((estimate.pricingResult || {}) as Record<string, unknown>);
-      if (!pricingObj.rows && estimate.breakdownRows) {
-        pricingObj.rows = estimate.breakdownRows;
-      }
-
-      const formattedQuoteDate = estimate.quoteDate
-        ? new Date(estimate.quoteDate).toLocaleDateString("en-US", {
-            month: "long",
-            day: "numeric",
-            year: "numeric",
-          })
-        : "";
-
-      navigate("/quotation/quote-preview/view", {
-        state: {
-          extractedShipper: {
-            fileName: estimate.sourceFileName || "Shipper.xlsx",
-            sheetCount: estimate.tabSummary?.length || 1,
-            totalWeightLbs: Number(estimate.totalWeightLbs || (pricingRes?.totWt as number) || 0),
-            squareFootage: effectiveSqFt,
-            parsedCategories: estimate.parsedCategories,
-            tabSummary: estimate.tabSummary,
-            pricing: pricingObj,
-            fullQuote:
-              estimate.fullQuoteResult ||
-              (pricingObj as Record<string, unknown> | undefined),
-          },
-          extractedDrawing: estimate.extractedDrawingFields
-            ? {
-                fileName: estimate.sourceFileName || "Drawing.pdf",
-                textItemCount: 0,
-                filledCount: 0,
-                extracted: estimate.extractedDrawingFields,
-                rawTextPreview: "",
-              }
-            : undefined,
-          quotationForm: {
-            leadName: estimate.leadCompanyName || "",
-            email: estimate.customerEmail || "",
-            street: estimate.streetAddress || "",
-            cityStateZip: estimate.cityStateZip || "",
-            buildingSize: estimate.buildingSize || "",
-            jobNumber: estimate.jobNumber || "",
-            quoteDate: formattedQuoteDate,
-          },
-          sqFt: String(effectiveSqFt || ""),
-          buildingSize: estimate.buildingSize || "",
-          pdfFileName: estimate.sourceFileName,
-          estimateId: estimate._id,
-          isFromList: true,
-        },
-      });
-    } catch (err) {
-      console.error("Failed to load estimate for preview:", err);
-    } finally {
-      setIsLoadingItem(null);
+  const handlePreviewQuote = (item: SaveEstimatePayload) => {
+    if (item._id) {
+      navigate(`/quotation/history/${item._id}`);
     }
   };
 
@@ -484,12 +136,26 @@ export function QuoteHistoryPage() {
   const totalQuotesCount = summaryData?.totalQuotes ?? 0;
   const totalPipelineVal = summaryData?.totalValue ?? 0;
   const totalProfitVal = summaryData?.totalProfit ?? 0;
-  const avgMarginVal = summaryData?.avgMargin ?? summaryData?.avgMarginPct ?? summaryData?.margin ?? "23.1";
+  const avgMarginVal =
+    summaryData?.avgMargin ??
+    summaryData?.avgMarginPct ??
+    summaryData?.margin ??
+    "23.1";
   const totalSfVal = summaryData?.totalSqFt ?? summaryData?.totalSf ?? 0;
-  const avgQuoteVal = summaryData?.avgQuote ?? (totalQuotesCount > 0 && totalPipelineVal > 0 ? totalPipelineVal / totalQuotesCount : 0);
+  const avgQuoteVal =
+    summaryData?.avgQuote ??
+    (totalQuotesCount > 0 && totalPipelineVal > 0
+      ? totalPipelineVal / totalQuotesCount
+      : 0);
 
-  const formattedPipelineVal = totalPipelineVal > 1000 ? `$${(totalPipelineVal / 1000).toFixed(0)}k` : `$${totalPipelineVal.toLocaleString()}`;
-  const formattedProfitVal = totalProfitVal > 1000 ? `$${(totalProfitVal / 1000).toFixed(0)}k` : `$${totalProfitVal.toLocaleString()}`;
+  const formattedPipelineVal =
+    totalPipelineVal > 1000
+      ? `$${(totalPipelineVal / 1000).toFixed(0)}k`
+      : `$${totalPipelineVal.toLocaleString()}`;
+  const formattedProfitVal =
+    totalProfitVal > 1000
+      ? `$${(totalProfitVal / 1000).toFixed(0)}k`
+      : `$${totalProfitVal.toLocaleString()}`;
 
   return (
     <div className="space-y-6 p-6">
@@ -534,7 +200,9 @@ export function QuoteHistoryPage() {
             disabled={isLoading}
             className="border border-slate-400 cursor-pointer"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`}
+            />
             Refresh
           </Button>
           <Button
@@ -556,13 +224,23 @@ export function QuoteHistoryPage() {
             <div className="text-[11px] font-black tracking-wider text-slate-700 uppercase">
               THIS MONTH
             </div>
-            <div className="text-[11px] font-semibold text-slate-500 mt-0.5">August 2026</div>
+            <div className="text-[11px] font-semibold text-slate-500 mt-0.5">
+              August 2026
+            </div>
           </div>
           <div className="space-y-0.5">
-            <div className="text-3xl font-black text-[#1d5bd8] tracking-tight">{formattedPipelineVal}</div>
-            <div className="text-xs font-bold text-[#1d5bd8]">{avgMarginVal}% avg margin</div>
-            <div className="text-[11px] font-medium text-slate-500">{formattedProfitVal} profit</div>
-            <div className="text-[11px] font-medium text-slate-500">{totalQuotesCount} quotes</div>
+            <div className="text-3xl font-black text-[#1d5bd8] tracking-tight">
+              {formattedPipelineVal}
+            </div>
+            <div className="text-xs font-bold text-[#1d5bd8]">
+              {avgMarginVal}% avg margin
+            </div>
+            <div className="text-[11px] font-medium text-slate-500">
+              {formattedProfitVal} profit
+            </div>
+            <div className="text-[11px] font-medium text-slate-500">
+              {totalQuotesCount} quotes
+            </div>
           </div>
         </Card>
 
@@ -572,13 +250,23 @@ export function QuoteHistoryPage() {
             <div className="text-[11px] font-black tracking-wider text-slate-700 uppercase">
               Q3 2026
             </div>
-            <div className="text-[11px] font-semibold text-slate-500 mt-0.5">This Quarter</div>
+            <div className="text-[11px] font-semibold text-slate-500 mt-0.5">
+              This Quarter
+            </div>
           </div>
           <div className="space-y-0.5">
-            <div className="text-3xl font-black text-[#1d5bd8] tracking-tight">{formattedPipelineVal}</div>
-            <div className="text-xs font-bold text-[#1d5bd8]">{avgMarginVal}% avg margin</div>
-            <div className="text-[11px] font-medium text-slate-500">{formattedProfitVal} profit</div>
-            <div className="text-[11px] font-medium text-slate-500">{totalQuotesCount} quotes</div>
+            <div className="text-3xl font-black text-[#1d5bd8] tracking-tight">
+              {formattedPipelineVal}
+            </div>
+            <div className="text-xs font-bold text-[#1d5bd8]">
+              {avgMarginVal}% avg margin
+            </div>
+            <div className="text-[11px] font-medium text-slate-500">
+              {formattedProfitVal} profit
+            </div>
+            <div className="text-[11px] font-medium text-slate-500">
+              {totalQuotesCount} quotes
+            </div>
           </div>
         </Card>
 
@@ -588,13 +276,23 @@ export function QuoteHistoryPage() {
             <div className="text-[11px] font-black tracking-wider text-slate-700 uppercase">
               YTD 2026
             </div>
-            <div className="text-[11px] font-semibold text-slate-500 mt-0.5">Year to Date</div>
+            <div className="text-[11px] font-semibold text-slate-500 mt-0.5">
+              Year to Date
+            </div>
           </div>
           <div className="space-y-0.5">
-            <div className="text-3xl font-black text-[#1d5bd8] tracking-tight">{formattedPipelineVal}</div>
-            <div className="text-xs font-bold text-[#1d5bd8]">{avgMarginVal}% avg margin</div>
-            <div className="text-[11px] font-medium text-slate-500">{formattedProfitVal} profit</div>
-            <div className="text-[11px] font-medium text-slate-500">{totalQuotesCount} quotes</div>
+            <div className="text-3xl font-black text-[#1d5bd8] tracking-tight">
+              {formattedPipelineVal}
+            </div>
+            <div className="text-xs font-bold text-[#1d5bd8]">
+              {avgMarginVal}% avg margin
+            </div>
+            <div className="text-[11px] font-medium text-slate-500">
+              {formattedProfitVal} profit
+            </div>
+            <div className="text-[11px] font-medium text-slate-500">
+              {totalQuotesCount} quotes
+            </div>
           </div>
         </Card>
 
@@ -619,29 +317,47 @@ export function QuoteHistoryPage() {
           <div className="space-y-2.5">
             <div className="grid grid-cols-2 gap-x-2 gap-y-2">
               <div>
-                <div className="text-[10px] font-semibold text-slate-400">Total Quotes</div>
-                <div className="text-sm font-extrabold text-slate-900 leading-none mt-0.5">{totalQuotesCount}</div>
-              </div>
-              <div>
-                <div className="text-[10px] font-semibold text-slate-400">Avg Quote</div>
+                <div className="text-[10px] font-semibold text-slate-400">
+                  Total Quotes
+                </div>
                 <div className="text-sm font-extrabold text-slate-900 leading-none mt-0.5">
-                  {avgQuoteVal > 0 ? `$${Math.round(avgQuoteVal).toLocaleString()}` : "$0"}
+                  {totalQuotesCount}
                 </div>
               </div>
               <div>
-                <div className="text-[10px] font-semibold text-slate-400">Avg Margin</div>
-                <div className="text-xs font-extrabold text-[#1d5bd8] leading-none mt-0.5">{avgMarginVal}%</div>
+                <div className="text-[10px] font-semibold text-slate-400">
+                  Avg Quote
+                </div>
+                <div className="text-sm font-extrabold text-slate-900 leading-none mt-0.5">
+                  {avgQuoteVal > 0
+                    ? `$${Math.round(avgQuoteVal).toLocaleString()}`
+                    : "$0"}
+                </div>
               </div>
               <div>
-                <div className="text-[10px] font-semibold text-slate-400">Total SF</div>
+                <div className="text-[10px] font-semibold text-slate-400">
+                  Avg Margin
+                </div>
+                <div className="text-xs font-extrabold text-[#1d5bd8] leading-none mt-0.5">
+                  {avgMarginVal}%
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] font-semibold text-slate-400">
+                  Total SF
+                </div>
                 <div className="text-xs font-extrabold text-slate-900 leading-none mt-0.5">
-                  {totalSfVal > 0 ? `${totalSfVal.toLocaleString()} SF` : "0 SF"}
+                  {totalSfVal > 0
+                    ? `${totalSfVal.toLocaleString()} SF`
+                    : "0 SF"}
                 </div>
               </div>
             </div>
 
             <div>
-              <div className="text-[10px] font-semibold text-slate-400">Total Profit Quoted</div>
+              <div className="text-[10px] font-semibold text-slate-400">
+                Total Profit Quoted
+              </div>
               <div className="text-lg font-black text-[#10b981] leading-none mt-0.5">
                 ${totalProfitVal.toLocaleString()}
               </div>
@@ -666,33 +382,87 @@ export function QuoteHistoryPage() {
 
         {filteredQuotes.length === 0 ? (
           <Card className="p-8 text-center bg-white border border-slate-200 rounded-2xl text-slate-500">
-            {isLoading ? "Fetching saved quotes from database..." : "No saved quotes found in history."}
+            {isLoading
+              ? "Fetching saved quotes from database..."
+              : "No saved quotes found in history."}
           </Card>
         ) : (
           <div className="space-y-4">
             {filteredQuotes.map((quote) => {
-              const isStorage = quote.jobType?.toUpperCase() === "STORAGE" || Boolean(quote.storageData);
-              const pricingRes = (quote.pricingResult || quote.storagePricingResult) as Record<string, unknown> | undefined;
-              const fullQuote = quote.fullQuoteResult as Record<string, unknown> | undefined;
+              const isStorage =
+                quote.jobType?.toUpperCase() === "STORAGE" ||
+                Boolean(quote.storageData);
+              const pricingRes = (quote.pricingResult ||
+                quote.storagePricingResult) as
+                | Record<string, unknown>
+                | undefined;
+              const fullQuote = quote.fullQuoteResult as
+                | Record<string, unknown>
+                | undefined;
 
-              const totSell = Number(quote.grandTotal ?? quote.totalSell ?? fullQuote?.grandTotal ?? pricingRes?.totSell ?? pricingRes?.grandTotal) || 0;
-              const prof = Number(quote.profit ?? fullQuote?.totalProfit ?? pricingRes?.profit) || 0;
-              const marginPct = Number(quote.marginPercent ?? fullQuote?.grandMargin ?? pricingRes?.profPct ?? pricingRes?.marginPercent) || 0;
-              const effectiveSqFt = Number(quote.squareFootage || quote.sf || pricingRes?.totalSqFt || pricingRes?.sf || 0);
-              const sfPrice = Number(quote.pricePerSf ?? fullQuote?.pricePerSf ?? pricingRes?.sfPrice ?? pricingRes?.pricePerSf) || (totSell && effectiveSqFt ? (totSell / effectiveSqFt).toFixed(2) : 0);
+              const totSell =
+                Number(
+                  quote.grandTotal ??
+                    quote.totalSell ??
+                    fullQuote?.grandTotal ??
+                    pricingRes?.totSell ??
+                    pricingRes?.grandTotal,
+                ) || 0;
+              const prof =
+                Number(
+                  quote.profit ?? fullQuote?.totalProfit ?? pricingRes?.profit,
+                ) || 0;
+              const marginPct =
+                Number(
+                  quote.marginPercent ??
+                    fullQuote?.grandMargin ??
+                    pricingRes?.profPct ??
+                    pricingRes?.marginPercent,
+                ) || 0;
+              const effectiveSqFt = Number(
+                quote.squareFootage ||
+                  quote.sf ||
+                  pricingRes?.totalSqFt ||
+                  pricingRes?.sf ||
+                  0,
+              );
+              const sfPrice =
+                Number(
+                  quote.pricePerSf ??
+                    fullQuote?.pricePerSf ??
+                    pricingRes?.sfPrice ??
+                    pricingRes?.pricePerSf,
+                ) ||
+                (totSell && effectiveSqFt
+                  ? (totSell / effectiveSqFt).toFixed(2)
+                  : 0);
 
-              const storageBuildings = (quote.storageData as { buildings?: unknown[] } | undefined)?.buildings;
+              const storageBuildings = (
+                quote.storageData as { buildings?: unknown[] } | undefined
+              )?.buildings;
               const displayBuilding = isStorage
                 ? `${storageBuildings?.length || 1} Storage Building${(storageBuildings?.length || 1) > 1 ? "s" : ""}`
                 : quote.buildingSize || "Building";
 
-              const formattedDate = quote.quoteDate || quote.createdAt
-                ? new Date(quote.quoteDate || quote.createdAt || "").toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })
-                : "";
+              const formattedDate =
+                quote.quoteDate || quote.createdAt
+                  ? new Date(
+                      quote.quoteDate || quote.createdAt || "",
+                    ).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })
+                  : "";
+
+              const quoteNumber =
+                quote.conversion?.quoteNumber || quote.quoteNumber;
+              const effectiveWorkflowStatus =
+                quote.conversion?.workflowStatus ||
+                quote.workflowStatus ||
+                quote.approval?.status ||
+                quote.status ||
+                "draft";
 
               return (
                 <div
@@ -705,8 +475,53 @@ export function QuoteHistoryPage() {
                       <h3 className="text-sm font-bold text-slate-900 leading-snug">
                         {quote.leadCompanyName || "Customer Quote"}
                       </h3>
-                      <div className="text-xs text-slate-500 font-normal mt-1 flex flex-wrap items-center gap-1">
-                        <span>{quote.status?.toUpperCase() || "DRAFT"}</span>
+                      <div className="text-xs text-slate-500 font-normal mt-1 flex flex-wrap items-center gap-1.5">
+                        {(() => {
+                          switch (effectiveWorkflowStatus) {
+                            case "pending_approval":
+                              return (
+                                <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px]">
+                                  Pending Approval
+                                </span>
+                              );
+                            case "approved":
+                              return (
+                                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">
+                                  Approved
+                                </span>
+                              );
+                            case "rejected":
+                              return (
+                                <span
+                                  className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold text-[10px]"
+                                  title={
+                                    quote.approval?.rejectionReason ||
+                                    "Approval Rejected"
+                                  }
+                                >
+                                  Rejected
+                                </span>
+                              );
+                            case "sent":
+                              return (
+                                <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold text-[10px]">
+                                  Sent
+                                </span>
+                              );
+                            default:
+                              return (
+                                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold text-[10px]">
+                                  Draft
+                                </span>
+                              );
+                          }
+                        })()}
+                        {quoteNumber && (
+                          <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-bold text-[10px] border border-blue-200">
+                            Quote #{quoteNumber}
+                          </span>
+                        )}
+
                         <span>·</span>
                         <span>{quote.scope?.toUpperCase() || "SUPPLY"}</span>
                         <span>·</span>
@@ -714,11 +529,17 @@ export function QuoteHistoryPage() {
                         <span>·</span>
                         <span>{displayBuilding}</span>
                         <span>·</span>
-                        <span>{quote.cityStateZip || quote.streetAddress || "Location"}</span>
+                        <span>
+                          {quote.cityStateZip ||
+                            quote.streetAddress ||
+                            "Location"}
+                        </span>
                       </div>
                     </div>
                     <div className="text-xs font-semibold text-[#2563eb] pt-1">
-                      Job #{quote.jobNumber || "Draft"} · {quote.sourceFileName || (isStorage ? "Storage_COG.xlsx" : "Drawing.pdf")}
+                      Job #{quote.jobNumber || "Draft"} ·{" "}
+                      {quote.sourceFileName ||
+                        (isStorage ? "Storage_COG.xlsx" : "Drawing.pdf")}
                       {formattedDate ? ` · ${formattedDate}` : ""}
                     </div>
                   </div>
@@ -745,9 +566,16 @@ export function QuoteHistoryPage() {
                     {/* Bottom Right Badge & Action Buttons */}
                     <div className="flex flex-wrap items-center gap-2.5">
                       <div className="flex items-center gap-1.5 mr-1">
-                        <span className={`px-1.5 py-0.5 rounded-xs text-[10px] font-bold tracking-wide uppercase ${isStorage ? "bg-amber-100 text-amber-900" : "bg-[#dbeafe] text-[#2563eb]"
-                          }`}>
-                          {isStorage ? "STORAGE COG" : quote.jobType?.toUpperCase() || "PEMB"}
+                        <span
+                          className={`px-1.5 py-0.5 rounded-xs text-[10px] font-bold tracking-wide uppercase ${
+                            isStorage
+                              ? "bg-amber-100 text-amber-900"
+                              : "bg-[#dbeafe] text-[#2563eb]"
+                          }`}
+                        >
+                          {isStorage
+                            ? "STORAGE COG"
+                            : quote.jobType?.toUpperCase() || "PEMB"}
                         </span>
                       </div>
 
@@ -764,10 +592,10 @@ export function QuoteHistoryPage() {
                       <Button
                         type="button"
                         onClick={() => handleLoadAndEdit(quote)}
-                        disabled={isLoadingItem === quote._id}
+                        disabled={hookLoadingId === quote._id}
                         className="bg-[#1e3e66] hover:bg-[#152e4d] text-white h-8 px-3 text-xs font-medium rounded-md cursor-pointer flex items-center gap-1.5 shadow-xs"
                       >
-                        {isLoadingItem === quote._id ? (
+                        {hookLoadingId === quote._id ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         ) : (
                           <ExternalLink className="h-3.5 w-3.5" />
@@ -778,10 +606,10 @@ export function QuoteHistoryPage() {
                       <Button
                         type="button"
                         onClick={() => handlePreviewQuote(quote)}
-                        disabled={isLoadingItem === quote._id}
+                        disabled={hookLoadingId === quote._id}
                         className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white h-8 px-3.5 text-xs font-semibold rounded-md cursor-pointer flex items-center gap-1.5 shadow-xs"
                       >
-                        {isLoadingItem === quote._id ? (
+                        {hookLoadingId === quote._id ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         ) : (
                           <Eye className="h-3.5 w-3.5" />

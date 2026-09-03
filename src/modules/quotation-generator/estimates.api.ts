@@ -435,12 +435,26 @@ export async function taxLookupProvider(
 }
 
 // ----------------------------------------------------------------------------
+// ESTIMATE CONVERSION METADATA CONTRACT (2026-09-03)
+// ----------------------------------------------------------------------------
+export interface EstimateConversion {
+  isConvertedToQuotation: boolean;
+  quotationId: string | null;
+  quoteNumber: string | null;
+  quotationStatus: "draft" | "sent" | "accepted" | "rejected" | null;
+  approvalStatus: "not_submitted" | "pending_approval" | "approved" | "rejected" | null;
+  workflowStatus: "draft" | "pending_approval" | "approved" | "rejected" | "sent" | null;
+  convertedAt: string | null;
+}
+
+// ----------------------------------------------------------------------------
 // SAVE ESTIMATE DRAFT / UPDATE
 // ----------------------------------------------------------------------------
 export interface SaveEstimatePayload extends Record<string, unknown> {
   _id?: string;
   createdBy?: string;
   leadId?: string | null;
+  conversion?: EstimateConversion;
   jobType?: string;
   scope?: string;
   roofType?: string;
@@ -491,6 +505,24 @@ export interface SaveEstimatePayload extends Record<string, unknown> {
   statementOfWork?: string[];
   exclusions?: string[];
   status?: string;
+  versionNumber?: number;
+  workflowStatus?: "draft" | "pending_approval" | "approved" | "rejected" | "sent" | string;
+  quoteNumber?: string;
+  approval?: {
+    status: "not_submitted" | "pending_approval" | "approved" | "rejected" | string;
+    submittedBy?: unknown;
+    submittedAt?: string | null;
+    reviewedBy?: unknown;
+    reviewedAt?: string | null;
+    rejectionReason?: string | null;
+    approvedVersionNumber?: number | null;
+    history?: Array<{
+      status: string;
+      note?: string;
+      by?: unknown;
+      at?: string | null;
+    }>;
+  };
   createdAt?: string;
   updatedAt?: string;
   grandTotal?: number;
@@ -522,6 +554,38 @@ export async function saveEstimateProvider(
   });
   return response.data;
 }
+
+export async function submitEstimateApprovalProvider(
+  estimateId: string,
+  note?: string
+) {
+  const response = await apiClient.post<{
+    success: boolean;
+    message?: string;
+    data?: SaveEstimatePayload;
+  }>(`/api/quotations/${encodeURIComponent(estimateId)}/submit-approval`, {
+    ...(note ? { note } : {}),
+    estimateId,
+  });
+  return response.data;
+}
+
+export async function sendEstimateProvider(
+  estimateId: string,
+  payload?: { email?: string; notes?: string }
+) {
+  const response = await apiClient.post<{
+    success: boolean;
+    message?: string;
+    data?: {
+      emailProvider?: "sendgrid" | "smtp_fallback" | string;
+      estimate?: SaveEstimatePayload;
+      [key: string]: unknown;
+    };
+  }>(`/api/quotations/${encodeURIComponent(estimateId)}/send`, payload || {});
+  return response.data;
+}
+
 
 // ----------------------------------------------------------------------------
 // ESTIMATES HISTORY & LIBRARY

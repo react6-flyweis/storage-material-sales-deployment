@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router";
 import { ArrowLeft, Printer, FolderUp, Loader2, FileSearch } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,10 +34,6 @@ export function QuotePreviewPage() {
     estimateId?: string;
   };
 
-  const [estimateId, setEstimateId] = useState<string | null>(
-    navState.estimateId || null
-  );
-
   const {
     jobType,
     scope,
@@ -71,7 +67,22 @@ export function QuotePreviewPage() {
     marginLaborOverride,
     marginTargetMargin,
     marginFixedSellOverride,
+    pembEstimateId,
+    setPembEstimateId,
+    pembExtractedShipper,
   } = useQuotationStore();
+
+  const [estimateId, setEstimateId] = useState<string | null>(
+    navState.estimateId || pembEstimateId || null
+  );
+
+  useEffect(() => {
+    const eid = navState.estimateId || pembEstimateId;
+    if (eid) {
+      setEstimateId(eid);
+      setPembEstimateId(eid);
+    }
+  }, [navState.estimateId, pembEstimateId, setPembEstimateId]);
 
   const pricingData = useQuotationPricing({
     extractedShipper: navState.extractedShipper,
@@ -105,9 +116,12 @@ export function QuotePreviewPage() {
   });
 
   // Server document preview payload
+  const activeEstimateId =
+    estimateId || pembEstimateId || navState.estimateId || undefined;
+
   const previewPayload: PreviewDocumentRequest = useMemo(
     () => ({
-      estimateId: estimateId || undefined,
+      estimateId: activeEstimateId,
       jobType: "PEMB",
       leadCompanyName: customerLeadName,
       customerEmail,
@@ -147,7 +161,7 @@ export function QuotePreviewPage() {
         : ["quote", "sow", "contract"],
     }),
     [
-      estimateId,
+      activeEstimateId,
       customerLeadName,
       customerEmail,
       customerAddress,
@@ -194,8 +208,10 @@ export function QuotePreviewPage() {
   const handleDownloadPdf = async () => {
     setIsDownloadingPdf(true);
     try {
+      const activeEstId =
+        estimateId || pembEstimateId || navState.estimateId || undefined;
       const payload: PreviewDocumentRequest = {
-        estimateId: estimateId || undefined,
+        estimateId: activeEstId,
         jobType: "PEMB",
         leadCompanyName: customerLeadName,
         customerEmail,
@@ -236,7 +252,7 @@ export function QuotePreviewPage() {
           ? ["quote", "sow", "contract", "drawings"]
           : ["quote", "sow", "contract"],
       };
-      const res = await downloadPdfProvider(payload, estimateId || undefined);
+      const res = await downloadPdfProvider(payload, activeEstId);
       const pdfData = res.data || res;
       if (pdfData?.fileBase64) {
         const a = document.createElement("a");
@@ -259,6 +275,8 @@ export function QuotePreviewPage() {
   const handleSaveToHistory = async () => {
     setIsSavingEstimate(true);
     try {
+      const activeEstId =
+        estimateId || pembEstimateId || navState.estimateId || undefined;
       const cogsCostVal = parseFloat(cogsCostInput) || undefined;
       const cogsSellVal = parseFloat(cogsFixedSellPrice) || undefined;
       const marginLaborVal = parseFloat(marginLaborOverride) || undefined;
@@ -267,7 +285,7 @@ export function QuotePreviewPage() {
 
       const res = await saveEstimateProvider(
         {
-          _id: estimateId || undefined,
+          _id: activeEstId,
           jobType,
           scope:
             (scope || "Both").toLowerCase() === "supply"
@@ -295,14 +313,27 @@ export function QuotePreviewPage() {
           sourceFileName:
             navState.pdfFileName ||
             navState.extractedShipper?.fileName ||
+            pembExtractedShipper?.fileName ||
             "",
-          parsedCategories: navState.extractedShipper?.parsedCategories,
-          tabSummary: navState.extractedShipper?.tabSummary,
-          breakdownRows: navState.extractedShipper?.pricing?.rows,
-          pricingResult: navState.extractedShipper?.pricing,
+          parsedCategories:
+            navState.extractedShipper?.parsedCategories ||
+            pembExtractedShipper?.parsedCategories,
+          tabSummary:
+            navState.extractedShipper?.tabSummary ||
+            pembExtractedShipper?.tabSummary,
+          breakdownRows:
+            navState.extractedShipper?.pricing?.rows ||
+            pembExtractedShipper?.pricing?.rows,
+          pricingResult:
+            navState.extractedShipper?.pricing ||
+            pembExtractedShipper?.pricing,
           fullQuoteResult:
             navState.extractedShipper?.fullQuote ||
+            pembExtractedShipper?.fullQuote ||
             (navState.extractedShipper?.pricing as
+              | Record<string, unknown>
+              | undefined) ||
+            (pembExtractedShipper?.pricing as
               | Record<string, unknown>
               | undefined),
           extractedDrawingFields: navState.extractedDrawing?.extracted,
@@ -356,18 +387,21 @@ export function QuotePreviewPage() {
               },
           status: "draft",
         },
-        estimateId || undefined
+        activeEstId
       );
 
       const data = res.data || res;
-      const savedId = data?.estimate?._id || data?._id;
+      const savedId = data?.estimate?._id || data?._id || activeEstId;
       if (savedId) {
         setEstimateId(savedId);
+        setPembEstimateId(savedId);
+        navigate(`/quotation/history/${savedId}`);
+        return;
       }
-      navigate("/quotation/quote-preview");
+      navigate("/quotation/history");
     } catch (err) {
       console.error("Failed to save estimate to history:", err);
-      navigate("/quotation/quote-preview");
+      navigate("/quotation/history");
     } finally {
       setIsSavingEstimate(false);
     }

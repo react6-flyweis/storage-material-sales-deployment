@@ -33,6 +33,7 @@ export function StoragePreviewPage() {
     storageData: storeStorageData,
     storagePricing: storeStoragePricing,
     storageEstimateId: storeStorageEstimateId,
+    setStorageEstimateId,
     storageCustomerLeadName: storeCustomerLeadName,
     storageCustomerAddress: storeCustomerAddress,
     storageCustomerEmail: storeCustomerEmail,
@@ -77,8 +78,16 @@ export function StoragePreviewPage() {
   const storagePricing =
     (storeStoragePricing as StoragePricing | null) || navState.storagePricing;
   const [estimateId, setEstimateId] = useState<string | null>(
-    storeStorageEstimateId || navState.estimateId || null
+    navState.estimateId || storeStorageEstimateId || null
   );
+
+  useEffect(() => {
+    const eid = navState.estimateId || storeStorageEstimateId;
+    if (eid) {
+      setEstimateId(eid);
+      setStorageEstimateId(eid);
+    }
+  }, [navState.estimateId, storeStorageEstimateId, setStorageEstimateId]);
 
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [isSavingEstimate, setIsSavingEstimate] = useState(false);
@@ -200,7 +209,9 @@ export function StoragePreviewPage() {
         format: "pdf",
       };
 
-      const res = await downloadPdfProvider(payload, estimateId || undefined);
+      const activeEstId =
+        estimateId || storeStorageEstimateId || navState.estimateId || undefined;
+      const res = await downloadPdfProvider(payload, activeEstId);
       const pdfData = res.data || res;
 
       const fileName =
@@ -259,10 +270,12 @@ export function StoragePreviewPage() {
   const handleSaveToHistory = async () => {
     setIsSavingEstimate(true);
     try {
+      const activeEstId =
+        estimateId || storeStorageEstimateId || navState.estimateId || undefined;
       const activeDrawings = storageDrawings.filter((d) => d.includeInPackage !== false);
       const res = await saveEstimateProvider(
         {
-          _id: estimateId || undefined,
+          _id: activeEstId,
           jobType: "Storage",
           scope: (scope || "Both").toLowerCase() === "supply" ? "Supply" : (scope || "Both").toLowerCase() === "install" ? "Install" : "Both",
           leadCompanyName: customerLeadName,
@@ -280,13 +293,16 @@ export function StoragePreviewPage() {
           })),
           status: "draft",
         },
-        estimateId || undefined
+        activeEstId
       );
 
       const data = res.data || res;
-      const savedId = data?.estimate?._id || data?._id;
+      const savedId = data?.estimate?._id || data?._id || activeEstId;
       if (savedId) {
         setEstimateId(savedId);
+        setStorageEstimateId(savedId);
+        navigate(`/quotation/history/${savedId}`);
+        return;
       }
       navigate("/quotation/history");
     } catch (err) {
@@ -305,7 +321,7 @@ export function StoragePreviewPage() {
   const previewPayload: PreviewDocumentRequest = useMemo(
     () => ({
       jobType: "Storage",
-      estimateId: estimateId || undefined,
+      estimateId: estimateId || storeStorageEstimateId || navState.estimateId || undefined,
       scope:
         (scope || "Both").toLowerCase() === "supply"
           ? "Supply"
@@ -381,6 +397,8 @@ export function StoragePreviewPage() {
     }),
     [
       estimateId,
+      navState.estimateId,
+      storeStorageEstimateId,
       scope,
       customerLeadName,
       customerEmail,

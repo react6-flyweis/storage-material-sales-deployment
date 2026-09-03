@@ -36,7 +36,7 @@ export default function PembQuotePage() {
     pembExtractedDrawing,
     pembExtractedShipper,
     pembPdfFileName,
-    // pembEstimateId,
+    pembEstimateId,
     setPembLeadData,
     setPembExtractedDrawing,
     setPembExtractedShipper,
@@ -104,7 +104,7 @@ export default function PembQuotePage() {
         quotationForm.cityStateZip)) ||
     navState.extractedShipper ||
     navState.estimateId ||
-    pembExtractedShipper
+    pembExtractedShipper,
   );
 
   useEffect(() => {
@@ -123,10 +123,10 @@ export default function PembQuotePage() {
 
   const [pdfFileName, setPdfFileName] = useState<string>(
     navState.pdfFileName ||
-    navState.extractedDrawing?.fileName ||
-    pembPdfFileName ||
-    pembExtractedDrawing?.fileName ||
-    ""
+      navState.extractedDrawing?.fileName ||
+      pembPdfFileName ||
+      pembExtractedDrawing?.fileName ||
+      "",
   );
 
   // Sync navState to store & local state if provided
@@ -174,7 +174,7 @@ export default function PembQuotePage() {
         quotationForm,
         extractedShipperSqFt: extractedShipper?.squareFootage,
       }),
-    [extracted, coverLabelMap, quotationForm, extractedShipper?.squareFootage]
+    [extracted, coverLabelMap, quotationForm, extractedShipper?.squareFootage],
   );
 
   const applyDimensions = useCallback(
@@ -186,7 +186,7 @@ export default function PembQuotePage() {
     }) => {
       if (dims.width || dims.length || dims.eaveHeight) {
         setBuildingSize(
-          `${dims.width || ""}${dims.length ? `×${dims.length}` : ""}${dims.eaveHeight ? `×${dims.eaveHeight}` : ""}`
+          `${dims.width || ""}${dims.length ? `×${dims.length}` : ""}${dims.eaveHeight ? `×${dims.eaveHeight}` : ""}`,
         );
       }
       if (dims.sqFootage) {
@@ -196,7 +196,7 @@ export default function PembQuotePage() {
         }
       }
     },
-    [setBuildingSize, setSquareFootage]
+    [setBuildingSize, setSquareFootage],
   );
 
   const handleApplyDimensionsOnly = useCallback(
@@ -210,14 +210,14 @@ export default function PembQuotePage() {
     }) => {
       applyDimensions(dims);
     },
-    [applyDimensions]
+    [applyDimensions],
   );
 
   const handleFormSubmit = useCallback(
     (data: ExtractedQuoteFormData) => {
       applyDimensions(data);
     },
-    [applyDimensions]
+    [applyDimensions],
   );
 
   const handleDrawingExtracted = useCallback(
@@ -238,7 +238,7 @@ export default function PembQuotePage() {
         applyDimensions(dims);
       }
     },
-    [applyDimensions, setPembExtractedDrawing, setPembPdfFileName]
+    [applyDimensions, setPembExtractedDrawing, setPembPdfFileName],
   );
 
   const handleShipperExtracted = useCallback(
@@ -249,7 +249,7 @@ export default function PembQuotePage() {
         setSquareFootage(data.squareFootage);
       }
     },
-    [setSquareFootage, setPembExtractedShipper]
+    [setSquareFootage, setPembExtractedShipper],
   );
 
   if (!hasLeadData) {
@@ -257,7 +257,10 @@ export default function PembQuotePage() {
   }
 
   const customerLeadName =
-    quotationForm?.leadName || extracted?.customer || coverLabelMap?.customer || "";
+    quotationForm?.leadName ||
+    extracted?.customer ||
+    coverLabelMap?.customer ||
+    "";
   const customerEmail = quotationForm?.email || "";
   const customerStreet = quotationForm?.street || "";
   const customerCityStateZip = quotationForm?.cityStateZip || "";
@@ -276,7 +279,7 @@ export default function PembQuotePage() {
         <div className="flex items-center gap-4">
           <Button
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={() => navigate("/quotation/pemb/create")}
             variant="outline"
             className="border-primary text-primary"
           >
@@ -286,7 +289,8 @@ export default function PembQuotePage() {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">PEMB Quote</h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Review the customer's material request, configure pricing, and generate a quotation for approval.
+              Review the customer's material request, configure pricing, and
+              generate a quotation for approval.
             </p>
           </div>
         </div>
@@ -308,7 +312,8 @@ export default function PembQuotePage() {
                     Customer & Project Information
                   </h2>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Fill in customer details — auto-populates Quote, SOW & Contract
+                    Fill in customer details — auto-populates Quote, SOW &
+                    Contract
                   </p>
                 </div>
               </div>
@@ -444,6 +449,7 @@ export default function PembQuotePage() {
             quotationForm={quotationForm}
             extractedDrawing={extractedDrawing}
             pdfFileName={pdfFileName}
+            estimateId={navState.estimateId || pembEstimateId}
             onShipperExtracted={handleShipperExtracted}
           />
         </div>
