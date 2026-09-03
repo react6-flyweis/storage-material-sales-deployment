@@ -116,7 +116,19 @@ export async function importLeadsProvider(payload: ImportLeadsPayload) {
   return response.data;
 }
 
-export async function getScoredLeadsProvider(page: number, limit: number, startDate?: string, endDate?: string) {
+export type GetLeadScoringFilters = {
+  startDate?: string;
+  endDate?: string;
+  status?: string;
+  client?: string;
+};
+
+export async function getScoredLeadsProvider(
+  page: number,
+  limit: number,
+  startDate?: string,
+  endDate?: string
+) {
   const params: { page: number; limit: number; startDate?: string; endDate?: string } = { page, limit };
   if (startDate) {
     params.startDate = startDate;
@@ -131,6 +143,33 @@ export async function getScoredLeadsProvider(page: number, limit: number, startD
   );
 
   return response.data;
+}
+
+export async function getLeadScoringProvider(
+  page = 1,
+  limit = 20,
+  filters?: GetLeadScoringFilters
+) {
+  const params: Record<string, string | number> = { page, limit };
+
+  if (filters?.startDate) params.startDate = filters.startDate;
+  if (filters?.endDate) params.endDate = filters.endDate;
+  if (filters?.status && filters.status !== "all") params.status = filters.status;
+  if (filters?.client) params.search = filters.client;
+
+  try {
+    const response = await apiClient.get<ScoredLeadsResponse>(
+      "/api/sales/leads/by-score",
+      { params }
+    );
+    return response.data;
+  } catch {
+    const response = await apiClient.get<ScoredLeadsResponse>(
+      "/api/admin/leads/by-score",
+      { params }
+    );
+    return response.data;
+  }
 }
 
 export type CreateLeadPayload = {

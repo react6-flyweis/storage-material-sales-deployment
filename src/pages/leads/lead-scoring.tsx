@@ -1,7 +1,6 @@
-import { useState, useMemo } from "react";
-import { Input } from "@/components/ui/input";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -9,7 +8,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import LeadLifecycleStatusSelect from "@/components/leads/lead-lifecycle-status-select";
 import {
   Table,
   TableBody,
@@ -19,298 +17,396 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import SuccessDialog from "@/components/success-dialog";
+import DateRangeFilter from "@/components/ui/date-range-filter";
+import type { DateRange } from "react-day-picker";
 import {
-  useScoredLeadsQuery,
+  useLeadScoringQuery,
   useUpdateLeadTemperatureMutation,
 } from "@/modules/leads/leads.hooks";
-import { getLeadProgress, getLeadProjectName } from "@/modules/leads/leads.utils";
 import {
-  getLeadLifecycleBadgeClassName,
-  getLeadLifecycleStatusLabel,
-} from "@/modules/leads/lifecycle-statuses";
+  useFollowUpActivitySummaryQuery,
+  useTemperatureTransitionSummaryQuery,
+} from "@/modules/followups/followups.hooks";
+import type { FollowUpKind } from "@/modules/followups/followups.api";
+import { Loader2, History, RotateCcw } from "lucide-react";
+import Pagination from "@/components/Pagination";
+import { format } from "date-fns";
+import { toast } from "sonner";
+import LeadFollowUpDetailDialog from "@/components/leads/lead-followup-detail-dialog";
 
-interface LeadScore {
+interface LeadRow {
   id: string;
-  name: string;
+  customerName: string;
   leadId: string;
-  jobId: string;
+  projectName?: string;
   location: string;
   progress: number;
   lifecycleStatus: string;
   quoteValue: number;
-  temperature: "hot" | "warm" | "cold";
+  score: number;
+  temperature: string;
+  scoreState?: string;
   lastActivity: string;
-  lastActivityDate?: string; // ISO date string for filtering
+  activityType?: string;
 }
 
-interface LeadFilters {
-  status: string;
-  client: string;
-  dateFrom: string;
-  dateTo: string;
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debouncedValue;
 }
-
-function filterLeadScores(
-  leads: LeadScore[],
-  overrides: Record<string, LeadScore["temperature"]>,
-  filters: LeadFilters,
-) {
-  const normalizedClient = filters.client.trim().toLowerCase();
-
-  return leads
-    .map((lead) => ({
-      ...lead,
-      temperature: overrides[lead.id] ?? lead.temperature,
-    }))
-    .filter((lead) => {
-      if (
-        filters.status !== "all" &&
-        lead.lifecycleStatus !== filters.status
-      ) {
-        return false;
-      }
-
-      if (
-        normalizedClient &&
-        !(
-          lead.name.toLowerCase().includes(normalizedClient) ||
-          lead.leadId.toLowerCase().includes(normalizedClient) ||
-          lead.location.toLowerCase().includes(normalizedClient)
-        )
-      ) {
-        return false;
-      }
-
-      if (filters.dateFrom && lead.lastActivityDate) {
-        const from = new Date(filters.dateFrom);
-        const activityDate = new Date(lead.lastActivityDate);
-
-        if (activityDate < from) {
-          return false;
-        }
-      }
-
-      if (filters.dateTo && lead.lastActivityDate) {
-        const to = new Date(filters.dateTo);
-        const activityDate = new Date(lead.lastActivityDate);
-
-        if (activityDate > to) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-}
-
-function LeadScoringSkeleton() {
-  return (
-    <div className="px-6 py-8 space-y-3 animate-pulse">
-      {Array.from({ length: 5 }).map((_, index) => (
-        <div
-          key={index}
-          className="grid grid-cols-6 gap-4 rounded-lg border border-slate-100 p-4"
-        >
-          <div className="h-4 rounded bg-slate-200 col-span-1" />
-          <div className="h-4 rounded bg-slate-200 col-span-1" />
-          <div className="h-4 rounded bg-slate-200 col-span-1" />
-          <div className="h-4 rounded bg-slate-200 col-span-1" />
-          <div className="h-8 rounded-full bg-slate-200 col-span-1 w-20" />
-          <div className="h-4 rounded bg-slate-200 col-span-1" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function LeadScoringEmptyState() {
-  return (
-    <div className="px-6 py-10 text-center space-y-3">
-      <p className="text-lg font-medium">No scored leads found</p>
-      <p className="text-sm text-slate-600">
-        Try adjusting filters or refresh.
-      </p>
-    </div>
-  );
-}
-
-// initial sample removed — data comes from API
 
 export default function LeadScoring() {
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [status, setStatus] = useState("all");
   const [client, setClient] = useState("");
-  const [showSuccess, setShowSuccess] = useState(false);
+  const [activity, setActivity] = useState("all");
+  const [scoreState, setScoreState] = useState("all");
 
-  const isFilterApplied = dateFrom !== "" || dateTo !== "" || status !== "all" || client !== "";
+  // History detail dialog state
+  const [selectedDetailLead, setSelectedDetailLead] = useState<{
+    id: string;
+    name?: string;
+  } | null>(null);
 
-  const handleClearFilters = () => {
-    setDateFrom("");
-    setDateTo("");
-    setStatus("all");
-    setClient("");
-  };
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
 
-  const [overrides, setOverrides] = useState<
-    Record<string, LeadScore["temperature"]>
-  >({});
+  const isDateRangeSelected = Boolean(dateFrom || dateTo);
 
-  const updateLeadTemperatureMutation = useUpdateLeadTemperatureMutation();
+  // Map Activity dropdown to API kind: "manual" vs "automatic" vs "all"
+  const followUpKind: FollowUpKind | "all" =
+    activity === "auto_activity"
+      ? "automatic"
+      : activity === "user_activity"
+        ? "manual"
+        : "all";
 
-  const updateLeadTemperature = (
-    id: string,
-    newTemperature: LeadScore["temperature"],
-  ) => {
-    setOverrides((s) => ({ ...s, [id]: newTemperature }));
+  const debouncedClient = useDebounce(client, 300);
+  const isSearching = client !== debouncedClient;
 
-    updateLeadTemperatureMutation.mutate(
-      { leadId: id, temperature: newTemperature },
+  // 1. Follow-Up Activity Query (New Contract)
+  const {
+    data: activityResponse,
+    isLoading: isActivityLoading,
+    isFetching: isActivityFetching,
+    isError: isActivityError,
+  } = useFollowUpActivitySummaryQuery({
+    kind: followUpKind,
+    startDate: dateFrom,
+    endDate: dateTo,
+    status: status !== "all" ? status : undefined,
+    temperature: status !== "all" ? status : undefined,
+    search: debouncedClient,
+    page,
+    limit,
+  });
+
+  // 2. Legacy Scoring Query (Safe fallback if activity endpoint is in progress)
+  const {
+    data: legacyScoringData,
+    isLoading: isLegacyLoading,
+    isFetching: isLegacyFetching,
+  } = useLeadScoringQuery(page, limit, {
+    startDate: dateFrom,
+    endDate: dateTo,
+    status,
+    client: debouncedClient,
+  });
+
+  // 3. Summary API to fetch transition counts for the Score State dropdown
+  const { data: transitionSummaryResponse } =
+    useTemperatureTransitionSummaryQuery(dateFrom, dateTo, isDateRangeSelected);
+  const transitionSummary = transitionSummaryResponse?.data;
+  const transitions = transitionSummary?.transitions;
+
+  const updateTemperatureMutation = useUpdateLeadTemperatureMutation();
+
+  const updateLeadScore = (id: string, newScore: string) => {
+    updateTemperatureMutation.mutate(
+      { leadId: id, temperature: newScore.toLowerCase() },
       {
-        onSuccess: () => {
-          setShowSuccess(true);
-        },
-        onError: () => {
-          setOverrides((current) => {
-            const next = { ...current };
-            delete next[id];
-            return next;
-          });
-        },
+        onSuccess: () => toast.success("Lead status updated successfully!"),
+        onError: (err: any) =>
+          toast.error(
+            err?.response?.data?.message || "Failed to update lead status",
+          ),
       },
     );
   };
 
-  // fetch scored leads from API
-  const {
-    data: scoredResp,
-    isLoading,
-    isError,
-    refetch,
-  } = useScoredLeadsQuery(1, 20, dateFrom, dateTo);
-
-  const apiLeads: LeadScore[] = (scoredResp?.data?.leads || []).map((l) => {
-    const scoreNum = l.score ?? 0;
-    const temperatureValue: LeadScore["temperature"] = l.temperature ?? "cold";
-
-    const lifecycle = l.lifecycleStatus || "initial_contact";
-    const progress = getLeadProgress(lifecycle);
-
-    return {
-      id: l.leadId,
-      name: getLeadProjectName(l, { firstName: l.customerName }),
-      leadId: l.leadId,
-      jobId: l.jobId,
-      location: l.customerName || "",
-      progress,
-      lifecycleStatus: lifecycle,
-      quoteValue: l.quoteValue || 0,
-      temperature: temperatureValue,
-      lastActivity: `${scoreNum} pts`,
-      lastActivityDate: undefined,
-    };
-  });
-
-  const filteredLeads = useMemo(
-    () =>
-      filterLeadScores(apiLeads, overrides, {
-        status,
-        client,
-        dateFrom,
-        dateTo,
-      }),
-    [apiLeads, overrides, status, client, dateFrom, dateTo],
-  );
-
-  const getTemperatureBadgeClass = (temperature: string) => {
-    switch (temperature) {
+  const getScoreBadgeClass = (score: string) => {
+    switch (score?.toLowerCase()) {
       case "hot":
-        return "bg-red-500 hover:bg-red-600 text-white";
+        return "bg-[#ef4444] hover:bg-[#dc2626] text-white border-0 font-medium";
       case "warm":
-        return "bg-yellow-500 hover:bg-yellow-600 text-white";
+        return "bg-[#f59e0b] hover:bg-[#d97706] text-white border-0 font-medium";
       case "cold":
-        return "bg-green-500 hover:bg-green-600 text-white";
+        return "bg-[#10b981] hover:bg-[#059669] text-white border-0 font-medium";
       default:
-        return "bg-gray-500 text-white";
+        return "bg-gray-500 text-white border-0 font-medium";
     }
   };
 
-  const formatTemperatureLabel = (temperature: LeadScore["temperature"]) => {
-    return temperature.charAt(0).toUpperCase() + temperature.slice(1);
+  const getStatusBadgeClass = (statusStr: string) => {
+    const s = statusStr?.toLowerCase() || "";
+    if (s.includes("proposal")) {
+      return "bg-[#f3e8ff] text-[#9333ea] hover:bg-[#ede9fe] border-0 rounded-full px-3 py-1 text-xs font-normal";
+    }
+    if (s.includes("quotation")) {
+      return "bg-[#ffedd5] text-[#ea580c] hover:bg-[#fed7aa] border-0 rounded-full px-3 py-1 text-xs font-normal";
+    }
+    if (s.includes("initial")) {
+      return "bg-[#e0f2fe] text-[#0284c7] hover:bg-[#bae6fd] border-0 rounded-full px-3 py-1 text-xs font-normal";
+    }
+    return "bg-gray-100 text-gray-700 rounded-full px-3 py-1 text-xs font-normal";
   };
 
   const renderProgressDots = (progress: number) => {
-    const normalizedProgress = Math.max(0, Math.min(4, progress));
-
     return (
-      <div className="flex gap-1">
-        {[...Array(4)].map((_, i) => (
-          <div
-            key={i}
-            className={`w-2 h-2 rounded-full ${i < normalizedProgress ? "bg-green-500" : "bg-gray-300"
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-1">
+          {[...Array(4)].map((_, i) => (
+            <div
+              key={i}
+              className={`w-2 h-2 rounded-full ${
+                i < progress ? "bg-[#10b981]" : "bg-gray-300"
               }`}
-          />
-        ))}
+            />
+          ))}
+        </div>
+        <span className="text-[11px] font-medium text-blue-600">
+          Step {progress}/7
+        </span>
       </div>
     );
   };
 
+  const formatLastActivity = (dateStr?: string | null) => {
+    if (!dateStr) return "-";
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      return format(d, "MM/dd/yyyy hh:mm a");
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const hasActivityData =
+    !isActivityError &&
+    activityResponse?.success &&
+    Array.isArray(activityResponse?.data?.leads);
+
+  const isDataLoading =
+    isSearching ||
+    (hasActivityData
+      ? isActivityLoading || isActivityFetching
+      : isLegacyLoading || isLegacyFetching || isActivityLoading || isActivityFetching);
+
+  // Map leads: prefer Follow-Up Activity API with safe fallbacks
+  const baseLeads = useMemo<LeadRow[]>(() => {
+    if (hasActivityData) {
+      return (activityResponse?.data?.leads || []).map((item, idx) => {
+        const lead = item.lead;
+        const temp = (
+          lead.leadScoring?.temperature ||
+          lead.temperature ||
+          "cold"
+        ).toLowerCase();
+
+        return {
+          id: lead._id || String(idx),
+          customerName: lead.customerName || lead.projectName || "N/A",
+          leadId:
+            lead.jobId || (lead._id ? `${lead._id.slice(0, 8)}...` : "N/A"),
+          projectName: lead.projectName,
+          location: lead.location || "N/A",
+          progress: temp === "hot" ? 4 : temp === "warm" ? 3 : 2,
+          lifecycleStatus: lead.lifecycleStatus || "initial_contact",
+          quoteValue: lead.quoteValue ?? 0,
+          score: lead.leadScoring?.score ?? lead.score ?? 50,
+          temperature: temp,
+          scoreState: "-",
+          lastActivity: formatLastActivity(item.lastFollowUpAt),
+          activityType: followUpKind,
+        };
+      });
+    }
+
+    // Fallback to legacy scoring data if activity API is not yet active
+    const apiLeads = legacyScoringData?.data?.leads || [];
+    return apiLeads.map((l: any, idx: number) => {
+      const temp = (l.temperature || "warm").toLowerCase();
+      return {
+        id: l.leadId || l._id || String(idx),
+        customerName: l.customerName || "N/A",
+        leadId: l.projectId || l.leadId || "N/A",
+        projectName: l.projectName,
+        location: l.location || "N/A",
+        progress: l.progress ?? (temp === "hot" ? 4 : temp === "warm" ? 3 : 2),
+        lifecycleStatus: l.lifecycleStatus || l.status || "Pending",
+        quoteValue: l.quoteValue ?? 0,
+        score: l.score ?? 50,
+        temperature: temp,
+        scoreState:
+          l.scoreState || l.transition || l.temperatureTransition || "-",
+        lastActivity: formatLastActivity(l.updatedAt || l.lastActivity),
+        activityType: l.activityType,
+      };
+    });
+  }, [hasActivityData, activityResponse, legacyScoringData, followUpKind]);
+
+  // Client-side filtering matching the filters row
+  const filteredLeads = useMemo(() => {
+    return baseLeads.filter((item) => {
+      // Filter by Status (temperature)
+      if (
+        status !== "all" &&
+        item.temperature.toLowerCase() !== status.toLowerCase()
+      ) {
+        return false;
+      }
+      // Filter by Client Search
+      if (client.trim()) {
+        const q = client.toLowerCase();
+        const match =
+          item.customerName.toLowerCase().includes(q) ||
+          item.leadId.toLowerCase().includes(q) ||
+          (item.projectName && item.projectName.toLowerCase().includes(q)) ||
+          item.location.toLowerCase().includes(q);
+        if (!match) return false;
+      }
+      // Filter by Activity
+      if (activity && activity !== "all") {
+        if (activity === "user_activity" && item.activityType !== "manual") {
+          return false;
+        }
+        if (activity === "auto_activity" && item.activityType !== "automatic") {
+          return false;
+        }
+      }
+      // Filter by Score State (when date range selected)
+      if (isDateRangeSelected && scoreState !== "all") {
+        if (item.scoreState !== scoreState) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [baseLeads, status, client, activity, scoreState, isDateRangeSelected]);
+
+  const totalLeadsCount = hasActivityData
+    ? (activityResponse?.data?.pagination?.totalLeads ?? filteredLeads.length)
+    : (legacyScoringData?.data?.total ?? filteredLeads.length);
+
+  const hasActiveFilters = Boolean(
+    dateFrom ||
+    dateTo ||
+    status !== "all" ||
+    client.trim() ||
+    activity !== "all" ||
+    scoreState !== "all"
+  );
+
+  const handleClearFilters = () => {
+    setDateRange(undefined);
+    setDateFrom("");
+    setDateTo("");
+    setStatus("all");
+    setClient("");
+    setActivity("all");
+    setScoreState("all");
+    setPage(1);
+  };
+
   return (
     <div className="">
-      {/* Header */}
-      <div className="bg-teal-400  px-6 py-4 text-white">
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl font-semibold">Lead Scoring</h1>
-          {isLoading ? (
-            <Loader2 className="h-5 w-5 animate-spin text-white" />
-          ) : null}
-        </div>
+      {/* Top Banner Header */}
+      <div className="bg-teal-400 px-6 py-4 text-white flex items-center justify-between">
+        <h1 className="text-xl font-semibold">Lead Scoring</h1>
       </div>
 
       <div className="p-6 space-y-6">
-        <h2 className="text-lg font-semibold mb-4">Lead Scoring</h2>
-        {/* Filters */}
-        <div className="bg-white p-6 rounded-lg space-y-4 ">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="space-y-2">
+        {/* Title */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl font-bold text-gray-900">
+              Lead Scoring & Auto Follow-up
+            </h1>
+            {isDateRangeSelected && (
+              <span className="text-gray-600 font-semibold text-sm sm:text-base flex items-center gap-2">
+                Total Leads - {totalLeadsCount}
+                {isDataLoading && (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-600" />
+                )}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Filters Card */}
+        <div className="bg-white p-6 rounded-lg space-y-4 shadow">
+          {hasActiveFilters && (
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Filters
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearFilters}
+                className="h-7 px-2.5 text-xs text-gray-500 hover:text-red-600 flex items-center gap-1.5 cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Clear Filters</span>
+              </Button>
+            </div>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Date Range */}
+            <div className="flex flex-col gap-2">
               <label className="text-sm font-medium text-gray-700">
-                Date From
+                Date Range
               </label>
-              <Input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                placeholder="dd-mm-yyyy"
-                className="bg-white"
+              <DateRangeFilter
+                value={dateRange}
+                mode="dialog"
+                past={true}
+                future={false}
+                onChange={(d) => {
+                  setDateRange(d);
+                  setDateFrom(d?.from ? d.from.toISOString().slice(0, 10) : "");
+                  setDateTo(d?.to ? d.to.toISOString().slice(0, 10) : "");
+                }}
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">
-                Date To
-              </label>
-              <Input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                placeholder="dd-mm-yyyy"
-                className="bg-white"
-              />
-            </div>
-
-            <div className="space-y-2">
+            {/* Status */}
+            <div className="flex flex-col gap-2">
               <label className="text-sm font-medium text-gray-700">
                 Status
               </label>
-              <LeadLifecycleStatusSelect
-                value={status}
-                onValueChange={setStatus}
-                triggerClassName="bg-white w-full"
-              />
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger className="bg-white min-w-40">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="hot">Hot</SelectItem>
+                  <SelectItem value="warm">Warm</SelectItem>
+                  <SelectItem value="cold">Cold</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            <div className="space-y-2">
+            {/* Client Search */}
+            <div className="flex flex-col gap-2">
               <label className="text-sm font-medium text-gray-700">
                 Client
               </label>
@@ -322,139 +418,265 @@ export default function LeadScoring() {
                 className="bg-white"
               />
             </div>
-          </div>
-          {isFilterApplied && (
-            <div className="flex justify-end pt-2">
-              <Button
-                variant="ghost"
-                onClick={handleClearFilters}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50 border border-red-200"
-              >
-                Clear Filters
-              </Button>
+
+            {/* Activity Select */}
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-gray-700">
+                Activity
+              </label>
+              <Select value={activity} onValueChange={setActivity}>
+                <SelectTrigger className="bg-white min-w-40">
+                  <SelectValue placeholder="All Activity" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Activity</SelectItem>
+                  <SelectItem value="user_activity">User Activity</SelectItem>
+                  <SelectItem value="auto_activity">Auto Activity</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Table */}
+        {/* Conditional Score State Filter (Placed below the filters card) */}
+        {isDateRangeSelected && (
+          <div className="flex flex-col gap-1.5 w-full sm:w-60 animate-in fade-in-50 duration-200">
+            <label className="text-xs font-semibold text-gray-700">
+              Score State
+            </label>
+            <Select value={scoreState} onValueChange={setScoreState}>
+              <SelectTrigger className="bg-white min-w-48 shadow-sm border border-gray-200">
+                <SelectValue placeholder="All" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">
+                  All
+                  {transitionSummary?.totals?.totalTransitions !== undefined
+                    ? ` (${transitionSummary.totals.totalTransitions})`
+                    : ""}
+                </SelectItem>
+                <SelectItem value="Cold → Warm">
+                  Cold → Warm
+                  {transitions?.cold_to_warm !== undefined
+                    ? ` (${transitions.cold_to_warm})`
+                    : ""}
+                </SelectItem>
+                <SelectItem value="Cold → Hot">
+                  Cold → Hot
+                  {transitions?.cold_to_hot !== undefined
+                    ? ` (${transitions.cold_to_hot})`
+                    : ""}
+                </SelectItem>
+                <SelectItem value="Warm → Cold">
+                  Warm → Cold
+                  {transitions?.warm_to_cold !== undefined
+                    ? ` (${transitions.warm_to_cold})`
+                    : ""}
+                </SelectItem>
+                <SelectItem value="Warm → Hot">
+                  Warm → Hot
+                  {transitions?.warm_to_hot !== undefined
+                    ? ` (${transitions.warm_to_hot})`
+                    : ""}
+                </SelectItem>
+                <SelectItem value="Hot → Cold">
+                  Hot → Cold
+                  {transitions?.hot_to_cold !== undefined
+                    ? ` (${transitions.hot_to_cold})`
+                    : ""}
+                </SelectItem>
+                <SelectItem value="Hot → Warm">
+                  Hot → Warm
+                  {transitions?.hot_to_warm !== undefined
+                    ? ` (${transitions.hot_to_warm})`
+                    : ""}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {/* Table Card */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
-          {isError ? (
-            <div className="px-6 py-10 text-center space-y-3">
-              <p className="text-sm text-slate-600">
-                Unable to load scored leads.
-              </p>
-              <Button variant="outline" onClick={() => refetch()}>
-                Try again
-              </Button>
-            </div>
-          ) : isLoading ? (
-            <LeadScoringSkeleton />
-          ) : filteredLeads.length === 0 ? (
-            <LeadScoringEmptyState />
-          ) : (
-            <Table>
-              <TableHeader className="bg-gray-50">
+          <Table>
+            <TableHeader className="bg-gray-50">
+              <TableRow>
+                <TableHead className="font-semibold text-gray-600 uppercase text-xs">
+                  LEAD INFO
+                </TableHead>
+                <TableHead className="font-semibold text-gray-600 uppercase text-xs">
+                  PROGRESS
+                </TableHead>
+                <TableHead className="font-semibold text-gray-600 uppercase text-xs">
+                  STATUS
+                </TableHead>
+                <TableHead className="font-semibold text-gray-600 uppercase text-xs">
+                  QUOTE VALUE
+                </TableHead>
+                <TableHead className="font-semibold text-gray-600 uppercase text-xs">
+                  SCORE
+                </TableHead>
+                {/* Score State Column (Shown only when date range is selected) */}
+                {isDateRangeSelected && (
+                  <TableHead className="font-semibold text-gray-600 uppercase text-xs">
+                    SCORE STATE
+                  </TableHead>
+                )}
+                <TableHead className="font-semibold text-gray-600 uppercase text-xs">
+                  LAST ACTIVITY
+                </TableHead>
+                <TableHead className="font-semibold text-gray-600 uppercase text-xs text-right">
+                  ACTIONS
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isDataLoading ? (
                 <TableRow>
-                  <TableHead className="font-semibold text-gray-600 uppercase text-xs">
-                    Lead Info
-                  </TableHead>
-                  <TableHead className="font-semibold text-gray-600 uppercase text-xs">
-                    Progress
-                  </TableHead>
-                  <TableHead className="font-semibold text-gray-600 uppercase text-xs">
-                    Status
-                  </TableHead>
-                  <TableHead className="font-semibold text-gray-600 uppercase text-xs">
-                    Quote Value
-                  </TableHead>
-                  <TableHead className="font-semibold text-gray-600 uppercase text-xs">
-                    Score
-                  </TableHead>
-                  <TableHead className="font-semibold text-gray-600 uppercase text-xs">
-                    Last Activity
-                  </TableHead>
+                  <TableCell
+                    colSpan={isDateRangeSelected ? 8 : 7}
+                    className="h-32 text-center"
+                  >
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <Loader2 className="h-6 w-6 animate-spin text-teal-600" />
+                      <span className="text-xs font-medium text-gray-500">
+                        Updating leads...
+                      </span>
+                    </div>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredLeads.map((lead) => (
-                  <TableRow key={lead.leadId} className="hover:bg-gray-50">
-                    <TableCell>
-                      <div>
-                        <div className="font-medium text-gray-900">
-                          {lead.name}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {lead.jobId}
-                        </div>
-                        <div className="text-sm text-gray-400">
-                          {lead.location}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
-                        {renderProgressDots(lead.progress)}
-                        <span className="text-sm text-gray-600">
-                          Step {lead.progress}/7
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        className={getLeadLifecycleBadgeClassName(
-                          lead.lifecycleStatus,
-                        )}
-                      >
-                        {getLeadLifecycleStatusLabel(lead.lifecycleStatus)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      ${lead.quoteValue.toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={lead.temperature}
-                        onValueChange={(val) =>
-                          updateLeadTemperature(
-                            lead.id,
-                            val as LeadScore["temperature"],
-                          )
-                        }
-                        disabled={updateLeadTemperatureMutation.isPending}
-                      >
-                        <SelectTrigger
-                          className={`${getTemperatureBadgeClass(
-                            lead.temperature,
-                          )} rounded-full px-4`}
-                        >
-                          <SelectValue
-                            placeholder={formatTemperatureLabel(
-                              lead.temperature,
+              ) : filteredLeads.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={isDateRangeSelected ? 8 : 7}
+                    className="h-28 text-center text-gray-500 text-sm"
+                  >
+                    No leads found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredLeads.map((lead) => {
+                  const displayScore =
+                    lead.temperature.charAt(0).toUpperCase() +
+                    lead.temperature.slice(1).toLowerCase();
+
+                  return (
+                    <TableRow key={lead.id} className="hover:bg-gray-50">
+                      <TableCell className="py-4">
+                        <div>
+                          <div className="font-medium text-[13px] text-gray-900">
+                            {lead.customerName}
+                          </div>
+                          {lead.projectName &&
+                            lead.projectName !== lead.customerName && (
+                              <div className="text-[12px] text-gray-500 mt-0.5">
+                                {lead.projectName}
+                              </div>
                             )}
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="hot">Hot</SelectItem>
-                          <SelectItem value="warm">Warm</SelectItem>
-                          <SelectItem value="cold">Cold</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="text-gray-600">
-                      {lead.lastActivity}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+                          <div className="text-[12px] text-gray-500 mt-0.5">
+                            {lead.leadId}
+                          </div>
+                          <div className="text-[12px] text-gray-400 mt-0.5">
+                            {lead.location || "N/A"}
+                          </div>
+                        </div>
+                      </TableCell>
+
+                      <TableCell className="py-4">
+                        {renderProgressDots(lead.progress)}
+                      </TableCell>
+
+                      <TableCell className="py-4">
+                        <Badge
+                          className={getStatusBadgeClass(lead.lifecycleStatus)}
+                        >
+                          {lead.lifecycleStatus.replace(/_/g, " ")}
+                        </Badge>
+                      </TableCell>
+
+                      <TableCell className="py-4 font-bold text-[13px] text-gray-900">
+                        ${lead.quoteValue?.toLocaleString() || "0"}
+                      </TableCell>
+
+                      <TableCell className="py-4">
+                        <Select
+                          value={displayScore}
+                          onValueChange={(val) => updateLeadScore(lead.id, val)}
+                        >
+                          <SelectTrigger
+                            className={`${getScoreBadgeClass(
+                              displayScore,
+                            )} rounded-full px-4 h-7 text-xs w-24 justify-between`}
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Hot">Hot</SelectItem>
+                            <SelectItem value="Warm">Warm</SelectItem>
+                            <SelectItem value="Cold">Cold</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+
+                      {/* Score State Value: Empty ("-") if data is not available */}
+                      {isDateRangeSelected && (
+                        <TableCell className="py-4 text-xs font-medium text-gray-700">
+                          {lead.scoreState || "-"}
+                        </TableCell>
+                      )}
+
+                      <TableCell className="py-4 text-xs text-gray-600">
+                        {lead.lastActivity}
+                      </TableCell>
+
+                      {/* History Action Button */}
+                      <TableCell className="py-4 text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setSelectedDetailLead({
+                              id: lead.id,
+                              name: lead.projectName || lead.customerName,
+                            })
+                          }
+                          className="h-7 px-2.5 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 border border-gray-200 shadow-sm cursor-pointer inline-flex items-center gap-1.5 rounded-md"
+                        >
+                          <History className="w-3.5 h-3.5 text-gray-500" />
+                          <span>History</span>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+
+          {totalLeadsCount > limit ? (
+            <div className="p-4 border-t border-gray-100">
+              <Pagination
+                totalItems={totalLeadsCount}
+                currentPage={page}
+                rowsPerPage={limit}
+                onPageChange={setPage}
+                onRowsPerPageChange={(newLimit) => {
+                  setLimit(newLimit);
+                  setPage(1);
+                }}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
 
-      <SuccessDialog
-        open={showSuccess}
-        onClose={() => setShowSuccess(false)}
-        title="Lead scores updated"
+      {/* Lead Follow-Up History Detail Dialog */}
+      <LeadFollowUpDetailDialog
+        open={Boolean(selectedDetailLead)}
+        onOpenChange={(open) => !open && setSelectedDetailLead(null)}
+        leadId={selectedDetailLead?.id || null}
+        leadName={selectedDetailLead?.name}
+        kind={followUpKind === "all" ? "manual" : followUpKind}
       />
     </div>
   );
