@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import SuccessDialog from "@/components/success-dialog";
 import type { LeadDetailPayments } from "@/modules/leads/leads.api";
 import {
@@ -10,6 +9,7 @@ import {
   formatLeadDateTime,
 } from "@/modules/leads/leads.utils";
 import { useSendInvoiceMutation, useInvoicesQuery, useInvoiceStatsQuery } from "@/modules/invoices/invoices.hooks";
+import { WorkflowStatusBadge } from "@/components/invoice/approval-modals";
 
 type Props = {
   leadId?: string;
@@ -61,10 +61,18 @@ export default function PaymentsCard({ leadId, leadDbId, paymentsData }: Props) 
         createdAt: item.invoice?.createdAt ?? "",
         totalAmount: item.amount ?? item.invoice?.totalAmount ?? 0,
         status: item.status ?? item.invoice?.status ?? "",
+        workflowStatus: item.workflowStatus ?? item.invoice?.workflowStatus ?? item.status ?? item.invoice?.status ?? "",
+        approvalStatus: item.approval?.status ?? item.invoice?.approval?.status ?? "",
+        isApproved: (item.approval?.status ?? item.invoice?.approval?.status) === "approved",
         sentAt: (item.invoice as { sentAt?: string | null })?.sentAt ?? null,
         paidAt: (item.invoice as { paidAt?: string | null })?.paidAt ?? null,
       }))
-    : (paymentsData?.invoices ?? []);
+    : (paymentsData?.invoices ?? []).map((inv) => ({
+        ...inv,
+        workflowStatus: inv.status,
+        approvalStatus: "",
+        isApproved: false,
+      }));
 
   const total = formatLeadCurrency(stats?.totalAmount ?? 0);
   const paid = formatLeadCurrency(stats?.totalPaid ?? 0);
@@ -141,17 +149,13 @@ export default function PaymentsCard({ leadId, leadDbId, paymentsData }: Props) 
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-4">
-                            <Badge
-                              variant="secondary"
-                              className={`capitalize ${
-                                status === "draft"
-                                  ? "bg-yellow-50 text-yellow-700"
-                                  : "bg-green-50 text-green-700"
-                              }`}
-                            >
-                              {status}
-                            </Badge>
-                            <span className="text-xs">
+                            <WorkflowStatusBadge
+                              variant="light"
+                              workflowStatus={invoice.workflowStatus}
+                              approvalStatus={invoice.approvalStatus}
+                              invoiceStatus={invoice.status}
+                            />
+                            <span className="text-xs text-gray-500">
                               {
                                 status === "sent" && formatLeadDateTime(invoice.sentAt)
                               }
@@ -163,9 +167,10 @@ export default function PaymentsCard({ leadId, leadDbId, paymentsData }: Props) 
                               <div className="flex flex-col items-start">
                                 <Button
                                   variant="link"
-                                  className="text-sm h-auto p-0"
+                                  className="text-sm h-auto p-0 disabled:opacity-50 disabled:no-underline"
                                   onClick={() => handleSendEmail(invoice._id)}
-                                  disabled={sendInvoiceMutation.isPending}
+                                  disabled={!invoice.isApproved || sendInvoiceMutation.isPending}
+                                  title={!invoice.isApproved ? "Requires admin approval before notifying" : undefined}
                                 >
                                   {sendInvoiceMutation.isPending &&
                                     sendInvoiceMutation.variables === invoice._id

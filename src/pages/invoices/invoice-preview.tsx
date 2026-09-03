@@ -1,35 +1,26 @@
 import { useNavigate, useParams } from "react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Mail, Wallet } from "lucide-react";
+import { ArrowLeft, Mail, Send, Edit } from "lucide-react";
 import SuccessDialog from "@/components/success-dialog";
 import {
   useInvoiceDetailQuery,
   useSendInvoiceMutation,
 } from "@/modules/invoices/invoices.hooks";
-import { InvoiceStatus } from "@/modules/invoices/invoices.api";
 import InvoiceTemplate from "@/components/invoice/invoice-template";
-
-const statusBadgeStyles: Record<
-  InvoiceStatus,
-  { bg: string; text: string; label: string }
-> = {
-  [InvoiceStatus.DRAFT]: { bg: "bg-slate-600", text: "text-white", label: "Draft" },
-  [InvoiceStatus.SENT]: { bg: "bg-blue-600", text: "text-white", label: "Sent" },
-  [InvoiceStatus.PAID]: { bg: "bg-green-600", text: "text-white", label: "Paid" },
-  [InvoiceStatus.OVERDUE]: { bg: "bg-red-600", text: "text-white", label: "Overdue" },
-  [InvoiceStatus.CANCELLED]: {
-    bg: "bg-zinc-100",
-    text: "text-zinc-700",
-    label: "Cancelled",
-  },
-};
+import {
+  WorkflowStatusBadge,
+  SubmitApprovalDialog,
+  ApprovalHistoryTimeline,
+} from "@/components/invoice/approval-modals";
 
 export default function InvoicePreview() {
   const navigate = useNavigate();
   const params = useParams();
   const [showSuccess, setShowSuccess] = useState(false);
   const [sendFailed, setSendFailed] = useState(false);
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+
   const invoiceId = params.id;
   const {
     data: invoiceDetailResponse,
@@ -93,68 +84,130 @@ export default function InvoicePreview() {
     );
   }
 
-  const currentStatus = invoice.status as InvoiceStatus | undefined;
-  const badgeStyle = currentStatus ? statusBadgeStyles[currentStatus] : undefined;
+  const approvalStatus = invoice.approval?.status || "not_submitted";
+  const workflowStatus = invoice.workflowStatus || invoice.status;
+  const isApproved = approvalStatus === "approved";
+  const isRejected = approvalStatus === "rejected";
+  const isNotSubmitted =
+    approvalStatus === "not_submitted" || workflowStatus === "draft";
+  const isSent = invoice.status === "sent";
+  const isPaid = invoice.status === "paid";
+
+  // Check revision mismatch (if edited after approval)
+  const isRevisionMismatch = Boolean(
+    isApproved &&
+    invoice.approval?.approvedRevision !== undefined &&
+    invoice.approval?.approvedRevision !== null &&
+    invoice.revision !== undefined &&
+    invoice.revision !== null &&
+    invoice.approval.approvedRevision !== invoice.revision,
+  );
+
+  const canSendInvoice =
+    isApproved && !isRevisionMismatch && !isSent && !isPaid;
+  const canEditInvoice = !isSent && !isPaid;
+  const canSubmitForApproval =
+    (isNotSubmitted || isRejected || isRevisionMismatch) && !isSent && !isPaid;
 
   return (
     <>
-      <div className="md:px-5 px-2 md:pt-5 pb-10 space-y-6">
-        {/* Top Actions */}
-        <div className="flex justify-between items-center mb-3 mt-1 max-w-7xl gap-4 mr-auto">
-          <div className="flex gap-4 items-center">
+      <div className="md:px-5 px-2 md:pt-5 pb-10 space-y-6 max-w-7xl mr-auto">
+        {/* Top Header & Actions Bar */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-3 mt-1">
+          <div className="flex flex-wrap gap-3 items-center">
             <Button
               variant="outline"
-              className="bg-white hover:bg-gray-50 text-gray-700 border-gray-200 min-w-25"
+              className="bg-white hover:bg-gray-50 text-gray-700 border-gray-200 gap-1.5"
               onClick={() => navigate(-1)}
             >
+              <ArrowLeft className="w-4 h-4" />
               Back
             </Button>
-            {badgeStyle && (
-              <span
-                className={`inline-flex items-center gap-2 ${badgeStyle.bg} ${badgeStyle.text} px-2 py-0.5 rounded-md text-sm font-medium`}
-              >
-                <span className="w-2 h-2 bg-white rounded-full" />
-                {badgeStyle.label}
-              </span>
-            )}
+            <WorkflowStatusBadge
+              workflowStatus={workflowStatus}
+              approvalStatus={approvalStatus}
+              invoiceStatus={invoice.status}
+            />
           </div>
-          <div className="flex flex-col items-end gap-2">
-            <div className="flex gap-4">
-              {invoice?.status === "draft" && (
+
+          <div className="flex flex-col items-end gap-1.5 w-full sm:w-auto">
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* Edit Button */}
+              {canEditInvoice && (
                 <Button
                   variant="outline"
-                  className="bg-white hover:bg-gray-50 text-gray-700 border-gray-200 min-w-25"
+                  className="bg-white hover:bg-gray-50 text-gray-700 border-gray-200 gap-1.5"
                   onClick={() => navigate("edit")}
                 >
+                  <Edit className="w-4 h-4" />
                   Edit
                 </Button>
               )}
-              {invoice?.status !== "sent" && invoice?.status !== "paid" && (
+
+              {/* Submit / Resubmit for Approval Button */}
+              {canSubmitForApproval && (
                 <Button
-                  className="bg-[#2563EB] hover:bg-blue-700 text-white min-w-25 gap-2"
-                  onClick={handleSendEmail}
-                  disabled={sendInvoiceMutation.isPending}
+                  className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
+                  onClick={() => setShowSubmitModal(true)}
                 >
-                  <Mail className="w-4 h-4" />
-                  {sendInvoiceMutation.isPending ? "Sending..." : "Email"}
+                  <Send className="w-4 h-4" />
+                  {isRejected ? "Resubmit for Approval" : "Submit for Approval"}
                 </Button>
               )}
-              <Button
+
+              {/* Email / Send Button */}
+              {!isSent && !isPaid && (
+                <Button
+                  className="bg-[#2563EB] hover:bg-blue-700 text-white gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={handleSendEmail}
+                  disabled={!canSendInvoice || sendInvoiceMutation.isPending}
+                  title={
+                    !isApproved
+                      ? "Admin approval is required before sending invoice to customer"
+                      : isRevisionMismatch
+                        ? "Invoice edited after approval. Please resubmit."
+                        : undefined
+                  }
+                >
+                  <Mail className="w-4 h-4" />
+                  {sendInvoiceMutation.isPending
+                    ? "Sending..."
+                    : "Email Invoice"}
+                </Button>
+              )}
+
+              {/* Payments button commented out as requested */}
+              {/* <Button
                 variant="outline"
-                className="bg-white hover:bg-gray-50 text-gray-700 border-gray-200 min-w-25"
+                className="bg-white hover:bg-gray-50 text-gray-700 border-gray-200"
               >
-                <Wallet />
+                <Wallet className="w-4 h-4 mr-1.5" />
                 Payments
-              </Button>
+              </Button> */}
             </div>
+
             {sendFailed && (
-              <p className="text-[10px] text-destructive">Send failed</p>
+              <p className="text-xs text-destructive">
+                Send failed. Please try again.
+              </p>
             )}
           </div>
         </div>
 
+        {/* Main Invoice Document Template */}
         <InvoiceTemplate invoice={invoice} paymentSchedule={paymentSchedule} />
+
+        {/* Approval History & Audit Trail */}
+        <ApprovalHistoryTimeline history={invoice.approval?.history} />
       </div>
+
+      {/* Submit for Approval Dialog */}
+      <SubmitApprovalDialog
+        invoiceId={invoice._id}
+        open={showSubmitModal}
+        onOpenChange={setShowSubmitModal}
+      />
+
       <SuccessDialog
         open={showSuccess}
         onClose={() => setShowSuccess(false)}
@@ -164,4 +217,3 @@ export default function InvoicePreview() {
     </>
   );
 }
-

@@ -10,6 +10,7 @@ import {
   getInvoicesProvider,
   sendInvoiceProvider,
   markInvoicePaidProvider,
+  submitInvoiceForApprovalProvider,
   type CreateInvoiceDraftPayload,
   type InvoiceListParams,
 } from "./invoices.api";
@@ -108,6 +109,27 @@ export function useEditInvoiceMutation() {
 
       void queryClient.invalidateQueries({ queryKey: ["invoices"] });
       void queryClient.invalidateQueries({ queryKey: ["invoices", "detail"] });
+    },
+  });
+}
+
+export function useSubmitInvoiceForApprovalMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      invoiceId,
+      payload,
+    }: {
+      invoiceId: string;
+      payload?: { note?: string };
+    }) => submitInvoiceForApprovalProvider(invoiceId, payload),
+    onSuccess: (response) => {
+      if (!response.success) return;
+
+      void queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      void queryClient.invalidateQueries({ queryKey: ["invoices", "detail"] });
+      void queryClient.invalidateQueries({ queryKey: ["sales", "leads", "detail"] });
     },
   });
 }

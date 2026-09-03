@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
-import { Calendar, Plus } from "lucide-react";
+import { Calendar, Plus, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router";
 import InvoiceLineItem from "./invoice-line-item";
 import AddMarkupDialog from "@/components/invoice/add-markup-dialog";
@@ -823,14 +823,25 @@ export default function InvoiceForm({
           setSuccessOpen(false);
           if (createdInvoiceId) navigate(`/invoice/${createdInvoiceId}`);
         }}
-        title={isEdit ? "Invoice updated" : "Invoice created"}
+        title={
+          isEdit
+            ? "Invoice updated (Requires Approval)"
+            : "Invoice created (Submitted for Approval)"
+        }
         okLabel="View invoice"
       />
       {/* Header */}
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-          {isEdit ? `Invoice#${invoiceNumber}` : "New Invoice"}
-        </h1>
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+            {isEdit ? `Invoice#${invoiceNumber}` : "New Invoice"}
+          </h1>
+          {isEdit && invoice?.revision !== undefined && invoice?.revision !== null && (
+            <p className="text-xs text-gray-500 mt-1">
+              Current Revision: <span className="font-semibold">v{invoice.revision}</span> (Saving will create v{invoice.revision + 1})
+            </p>
+          )}
+        </div>
         <div className="flex items-center gap-3 ml-auto">
           {isEdit && (
             <Button
@@ -853,6 +864,17 @@ export default function InvoiceForm({
           </Button>
         </div>
       </header>
+
+      {/* Revision Notice for Edited Invoices */}
+      {isEdit && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3.5 text-xs text-blue-800 max-w-7xl mx-auto flex items-center gap-2.5">
+          <AlertTriangle className="w-4 h-4 text-blue-600 shrink-0" />
+          <span>
+            <strong>Revision Note: </strong>
+            Saving edits will increment this invoice to revision <strong>v{(invoice?.revision ?? 1) + 1}</strong> and reset approval status to draft, requiring re-submission for admin approval.
+          </span>
+        </div>
+      )}
 
       {errors.root?.message && (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 max-w-7xl mx-auto">
