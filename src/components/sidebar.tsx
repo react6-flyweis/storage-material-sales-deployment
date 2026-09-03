@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuthStore } from "@/modules/auth/auth.store";
+import { useChatUnreadCountQuery } from "@/modules/team-chat/team-chat.hooks";
 
 // icons
 import dashboardIcon from "@/assets/icons/sidebar/dashboard.svg";
@@ -24,6 +25,16 @@ import meetingsIcon from "@/assets/icons/sidebar/meetings.svg";
 // import freightIcon from "@/assets/icons/sidebar/freights.svg";
 // import salesIcon from "@/assets/icons/sidebar/sales.svg";
 // import communicationIcon from "@/assets/icons/sidebar/communication.svg";
+
+
+// Quotation tool icons
+import pembIcon from "@/assets/icons/sidebar/pemb.svg";
+import storageCogIcon from "@/assets/icons/sidebar/storage-cog-sheet.svg";
+import quotePreviewIcon from "@/assets/icons/sidebar/quote-preview.svg";
+import customQuoteIcon from "@/assets/icons/sidebar/custom-quote.svg";
+import quotationHistoryIcon from "@/assets/icons/sidebar/quotation-history.svg";
+import pricingRulesIcon from "@/assets/icons/sidebar/pricing-rules.svg";
+
 
 // Leads
 import escalatedLeadsIcon from "@/assets/icons/sidebar/escalated-leads.svg";
@@ -63,11 +74,13 @@ type NavGroup =
   | "notifications"
   | "awarded-freight"
   | "sales"
+  | "quoting"
   | "communication";
 
 interface NavigationItem {
-  path: string;
-  label: string;
+  sectionHeader?: string;
+  path?: string;
+  label?: string;
   collapsible?: boolean;
   icon?: string;
   subItems?: {
@@ -84,6 +97,7 @@ interface NavigationGroup {
   color: string;
   link: string;
   items: NavigationItem[];
+  hiddenFromSidebar?: boolean;
 }
 
 const navigationGroups: NavigationGroup[] = [
@@ -95,6 +109,7 @@ const navigationGroups: NavigationGroup[] = [
     link: "/dashboard",
     items: [],
   },
+
 
 
   {
@@ -115,20 +130,6 @@ const navigationGroups: NavigationGroup[] = [
             label: "Overview",
             icon: overviewIcon,
           },
-          // Activity log
-          // {
-          //   path: "/leads/follow-up/communication-timeline",
-          //   label: "Lead Communication Timeline",
-          // },
-          // {
-          //   path: "/leads/follow-up/smart-reminders",
-          //   label: "Smart Follow up Reminders",
-          // },
-          // {
-          //   path: "/leads/follow-up/activity-log",
-          //   label: "Activity Log",
-          //   icon: activityLogIcon,
-          // },
           {
             path: "/leads/follow-up/script-generator",
             label: "AI Follow-Up Script Generator",
@@ -139,25 +140,13 @@ const navigationGroups: NavigationGroup[] = [
             label: "Lead Scoring",
             icon: leadScoringIcon,
           },
-          // {
-          //   path: "/leads/payment-follow-up",
-          //   label: "Payment Follow-Up",
-          //   icon: leadScoringIcon,
-          // },
-          // {
-          //   path: "/leads/follow-up/kpis",
-          //   label: "Follow-Up KPIs",
-          //   icon: followupKpiIcon,
-          // },
-          // insights
-          // {
-          //   path: "/leads/follow-up/insights",
-          //   label: "Insights",
-          //   icon: insightIcon,
-          // },
         ],
       },
-      // { path: "/leads/ai-marketing", label: "AI Support" },
+      {
+        path: "/leads/quotation-list",
+        label: "All Quotations",
+        icon: quotationHistoryIcon,
+      },
       {
         path: "/leads/escalated",
         label: "Escalated Leads",
@@ -168,12 +157,25 @@ const navigationGroups: NavigationGroup[] = [
         label: "All Purchase Orders",
         icon: purchaseOrdersIcon,
       },
-      // new quotation list
-      // {
-      //   path: "/leads/quotation-list",
-      //   label: "New Quotation List",
-      //   icon: invoiceListIcon,
-      // },
+    ],
+  },
+
+  {
+    id: "quoting" as NavGroup,
+    icon: leadsIcon,
+    label: "Quoting",
+    color: "bg-[#2563EB]",
+    link: "/quotation",
+    hiddenFromSidebar: false,
+    items: [
+      { sectionHeader: "QUOTING" },
+      { path: "/quotation/pemb", label: "PEMB Quote", icon: pembIcon },
+      { path: "/quotation/storage-cog", label: "Storage COG Sheet", icon: storageCogIcon },
+      { path: "/quotation/quote-preview", label: "Quote Preview", icon: quotePreviewIcon },
+      { path: "/quotation/custom", label: "Custom Quote", icon: customQuoteIcon },
+      { path: "/quotation/history", label: "Quote History", icon: quotationHistoryIcon },
+      { sectionHeader: "SETTINGS" },
+      { path: "/quotation/pricing-rules", label: "Pricing Rules", icon: pricingRulesIcon },
     ],
   },
 
@@ -287,6 +289,9 @@ export function Sidebar({
   const location = useLocation();
   const navigate = useNavigate();
   const currentUser = useAuthStore((state) => state.user);
+  const { data: unreadData } = useChatUnreadCountQuery();
+  const unreadCount = unreadData?.count ?? unreadData?.total ?? 0;
+
   const [hoveredGroup, setHoveredGroup] = useState<{
     label: string;
     top: number;
@@ -297,7 +302,7 @@ export function Sidebar({
       return new Set(
         navigationGroups.flatMap((group) =>
           group.items
-            .filter((item) => item.collapsible && item.subItems)
+            .filter((item): item is NavigationItem & { path: string } => Boolean(item.collapsible && item.subItems && item.path))
             .map((item) => item.path),
         ),
       );
@@ -316,6 +321,7 @@ export function Sidebar({
         return true;
       }
       return group.items.some((item) => {
+        if (!item.path) return false;
         if (item.path === "/") {
           return currentPath === "/";
         }
@@ -339,7 +345,9 @@ export function Sidebar({
         if (isAnySubItemActive) {
           setCollapsedSections((prev) => {
             const newSet = new Set(prev);
-            newSet.delete(item.path);
+            if (item.path) {
+              newSet.delete(item.path);
+            }
             return newSet;
           });
         }
@@ -376,6 +384,7 @@ export function Sidebar({
       if (
         item.collapsible &&
         item.subItems &&
+        item.path &&
         !collapsedSections.has(item.path)
       ) {
         height += item.subItems.length * 36; // Sub-items are slightly smaller
@@ -393,7 +402,7 @@ export function Sidebar({
       ? calculatedPadding
       : 10;
 
-  const userDisplayName = currentUser?.name ?? "Sales User";
+  // const userDisplayName = currentUser?.name ?? "Sales User";
   const userDisplayEmail = currentUser?.email ?? "sales@steelpro.com";
 
   const handleGroupChange = (group: (typeof navigationGroups)[0]) => {
@@ -433,45 +442,54 @@ export function Sidebar({
         >
           <div style={{ direction: "ltr" }}>
             <nav className="flex flex-col gap-5">
-              {navigationGroups.map((group) => {
-                const iconSrc = group.icon as string;
-                const isActive = activeGroup.id === group.id;
+              {navigationGroups
+                .filter((group) => !group.hiddenFromSidebar || activeGroup.id === group.id)
+                .map((group) => {
+                  const iconSrc = group.icon as string;
+                  const isActive = activeGroup.id === group.id;
+                  const isCommunication = group.id === "messages";
+                  const showBadge = isCommunication && unreadCount > 0;
 
-                return (
-                  <button
-                    key={group.id}
-                    onClick={() => handleGroupChange(group)}
-                    onMouseEnter={(event) => {
-                      const rect = event.currentTarget.getBoundingClientRect();
-                      setHoveredGroup({
-                        label: group.label,
-                        top: rect.top + rect.height / 2,
-                        left: rect.left - 4,
-                      });
-                    }}
-                    onMouseLeave={() => setHoveredGroup(null)}
-                    className={`relative flex items-center justify-center transition-all group focus:outline-none`}
-                  >
-                    {isActive && (
-                      <img
-                        src={activeBgImage}
-                        alt="Active background"
-                        className="absolute -right-3 max-w-14 **: object-contain"
-                      />
-                    )}
-                    <div
-                      className={`z-50 relative size-10 flex items-center justify-center rounded-full ${group.color
-                        } ${isActive ? "" : ""} group-hover:scale-105`}
+                  return (
+                    <button
+                      key={group.id}
+                      onClick={() => handleGroupChange(group)}
+                      onMouseEnter={(event) => {
+                        const rect = event.currentTarget.getBoundingClientRect();
+                        setHoveredGroup({
+                          label: group.label,
+                          top: rect.top + rect.height / 2,
+                          left: rect.left - 4,
+                        });
+                      }}
+                      onMouseLeave={() => setHoveredGroup(null)}
+                      className={`relative flex items-center justify-center transition-all group focus:outline-none`}
                     >
-                      <img
-                        src={iconSrc}
-                        alt={group.label}
-                        className="max-w-5 max-h-5 object-contain"
-                      />
-                    </div>
-                  </button>
-                );
-              })}
+                      {isActive && (
+                        <img
+                          src={activeBgImage}
+                          alt="Active background"
+                          className="absolute -right-3 max-w-14 **: object-contain"
+                        />
+                      )}
+                      <div
+                        className={`z-50 relative size-10 flex items-center justify-center rounded-full ${group.color
+                          } ${isActive ? "" : ""} group-hover:scale-105`}
+                      >
+                        <img
+                          src={iconSrc}
+                          alt={group.label}
+                          className="max-w-5 max-h-5 object-contain"
+                        />
+                        {showBadge && (
+                          <span className="absolute -top-1 -right-1 z-60 bg-red-500 text-white text-[10px] font-bold rounded-full h-4.5 min-w-4.5 px-1 flex items-center justify-center shadow-xs">
+                            {unreadCount > 99 ? "99+" : unreadCount}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
             </nav>
           </div>
 
@@ -506,10 +524,10 @@ export function Sidebar({
               <XIcon className="h-5 w-5" />
             </button>
             <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 mb-1">
                 <div>
-                  <h2 className="text-lg font-bold text-gray-800">
-                    {userDisplayName}
+                  <h2 className="text-lg  font-bold text-gray-800">
+                    Sales Panel
                   </h2>
                   <p className="text-xs text-gray-500">{userDisplayEmail}</p>
                 </div>
@@ -547,23 +565,41 @@ export function Sidebar({
             style={{ paddingTop: `${menuPaddingTop}px` }}
           >
             <div className="space-y-2">
-              <NavLink
-                to={activeGroup.link}
-                onClick={handleNavClick}
-                className={() =>
-                  cn(
-                    "block px-4 py-2 rounded-md transition-colors text-sm w-[95%] mb-5 text-white",
-                    activeGroup.color,
-                  )
-                }
-              >
-                <div className="flex items-center gap-2">
-                  <span>{activeGroup.label}</span>
-                </div>
-              </NavLink>
+              {!activeGroup.hiddenFromSidebar && (
+                <NavLink
+                  to={activeGroup.link}
+                  onClick={handleNavClick}
+                  className={() =>
+                    cn(
+                      "block px-4 py-2 rounded-md transition-colors text-sm w-[95%] mb-5 text-white",
+                      activeGroup.color,
+                    )
+                  }
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span>{activeGroup.label}</span>
+                    {activeGroup.id === "messages" && unreadCount > 0 && (
+                      <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-xs">
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </span>
+                    )}
+                  </div>
+                </NavLink>
+              )}
 
-              {activeGroup?.items.map((item) => {
-                if (item.collapsible && item.subItems) {
+              {activeGroup?.items.map((item, index) => {
+                if (item.sectionHeader) {
+                  return (
+                    <div
+                      key={`section-${index}`}
+                      className="pt-3 pb-1 text-xs font-semibold tracking-wider text-gray-400 uppercase"
+                    >
+                      {item.sectionHeader}
+                    </div>
+                  );
+                }
+
+                if (item.collapsible && item.subItems && item.path) {
                   const isExpanded = !collapsedSections.has(item.path);
                   const fullPath = location.pathname + location.search;
                   const isAnySubItemActive = item.subItems.some(
@@ -573,7 +609,7 @@ export function Sidebar({
                   return (
                     <div key={item.path}>
                       <button
-                        onClick={() => toggleSection(item.path)}
+                        onClick={() => toggleSection(item.path!)}
                         className={cn(
                           "w-full flex items-center justify-between text-sm px-4 py-2 rounded transition-colors bg-white",
                           {
@@ -583,7 +619,7 @@ export function Sidebar({
                       >
                         <span className="flex items-center gap-2">
                           <span className="text-gray-500">
-                            <SidebarItemIcon src={item.icon} alt={item.label} />
+                            <SidebarItemIcon src={item.icon} alt={item.label || ""} />
                           </span>
                           {item.label}
                         </span>
@@ -611,12 +647,6 @@ export function Sidebar({
                                       [`text-white ${activeGroup.color}`]:
                                         isActiveExact,
                                       "bg-white shadow": !isActiveExact,
-                                      // islast
-                                      // "mb-6":
-                                      //   subItem ===
-                                      //   item.subItems?.[
-                                      //     item.subItems.length - 1
-                                      //   ],
                                     },
                                   )
                                 }
@@ -659,6 +689,8 @@ export function Sidebar({
                   );
                 }
 
+                if (!item.path) return null;
+
                 return (
                   <NavLink
                     key={item.path}
@@ -680,7 +712,7 @@ export function Sidebar({
                       <div className="flex items-center gap-2">
                         <SidebarItemIcon
                           src={item.icon}
-                          alt={item.label}
+                          alt={item.label || ""}
                           className={cn({
                             "brightness-0 invert": isActive,
                           })}
