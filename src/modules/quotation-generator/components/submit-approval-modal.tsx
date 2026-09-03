@@ -13,17 +13,19 @@ import {
 } from "@/components/ui/dialog";
 import SuccessDialog from "@/components/success-dialog";
 import { useSubmitQuotationForApprovalMutation } from "@/modules/quotations/quotations.hooks";
+import type { SubmitApprovalResponse } from "@/modules/quotations/quotations.api";
 
 interface SubmitApprovalModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   quotationId?: string;
+  estimateId?: string;
   quotationTitle?: string;
   quotationNumber?: string;
   versionNumber?: number;
   totalAmount?: string;
   onSubmit?: (note: string) => Promise<void>;
-  onSuccess?: () => void;
+  onSuccess?: (response?: SubmitApprovalResponse) => void;
   isLoading?: boolean;
 }
 
@@ -31,6 +33,7 @@ export function SubmitApprovalModal({
   open,
   onOpenChange,
   quotationId,
+  estimateId,
   quotationTitle = "Quotation Package",
   quotationNumber,
   versionNumber = 1,
@@ -57,15 +60,27 @@ export function SubmitApprovalModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+
+    const targetId = quotationId || estimateId;
+    if (!onSubmit && !targetId) {
+      setErrorMessage("No quotation or estimate ID found. Please save the estimate first.");
+      return;
+    }
+
     try {
+      let result: SubmitApprovalResponse | undefined;
       if (onSubmit) {
         await onSubmit(note);
-      } else if (quotationId) {
-        await submitMutation.mutateAsync({ quotationId, note });
+      } else if (targetId) {
+        result = await submitMutation.mutateAsync({
+          quotationId: targetId,
+          estimateId: estimateId || undefined,
+          note: note.trim() || undefined,
+        });
       }
       handleOpenChange(false);
       setShowSuccessDialog(true);
-      onSuccess?.();
+      onSuccess?.(result);
     } catch (error: unknown) {
       console.error("Failed to submit quotation for approval:", error);
       const msg =
@@ -148,7 +163,7 @@ export function SubmitApprovalModal({
               </DialogClose>
               <Button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || (!onSubmit && !quotationId && !estimateId)}
               >
                 {isSubmitting ? "Submitting..." : "Submit for Approval"}
               </Button>
