@@ -1,4 +1,5 @@
 import { apiClient } from "@/modules/auth/auth.api";
+import type { SaveEstimatePayload } from "@/modules/quotation-generator/estimates.api";
 
 export type ApprovalStatus =
   | "not_submitted"
@@ -54,20 +55,61 @@ export type QuotationItem = {
   quoteNumber?: string | null;
   versionNumber?: number;
   workflowStatus?: WorkflowStatus;
+  approvalStatus?: ApprovalStatus | string | null;
   approval?: QuotationApprovalInfo;
   status?: string | null;
+  proposalDate?: string | null;
+  companyName?: string | null;
+  location?: string | null;
+  buildingType?: string | null;
+  sqft?: string | number | null;
+  totalArea?: number | null;
+  basePrice?: number | null;
+  maxPrice?: number | null;
+  materialCost?: number | null;
+  freightCost?: number | null;
+  totalCOGS?: number | null;
+  markupPercent?: number | null;
+  markupValue?: number | null;
   finalPrice?: number | null;
-  leadId?: {
-    _id: string;
-    projectName?: string | null;
-  } | null;
-  customerId?: {
-    _id: string;
-    firstName?: string | null;
-    email?: string | null;
+  psf?: number | null;
+  currency?: string | null;
+  leadId?:
+    | string
+    | {
+        _id: string;
+        projectName?: string | null;
+      }
+    | null;
+  customerId?:
+    | string
+    | {
+        _id: string;
+        firstName?: string | null;
+        email?: string | null;
+      }
+    | null;
+  createdBy?: {
+    _id?: string;
+    name?: string;
+    email?: string;
+    role?: string;
   } | null;
   createdAt?: string | null;
+  updatedAt?: string | null;
   sentAt?: string | null;
+  sourceEstimateId?: string | null;
+  sourceEstimate?: SaveEstimatePayload | null;
+  estimate?: SaveEstimatePayload | null;
+  documents?: Array<Record<string, unknown>> | null;
+  documentMeta?: {
+    source?: string;
+    sourceEstimateId?: string;
+    hasPricingData?: boolean;
+    previewEndpoint?: string;
+    pdfEndpoint?: string;
+    defaultSections?: string[];
+  } | null;
 };
 
 export type QuotationsListResponse = {
@@ -154,6 +196,7 @@ export type CreateQuotationResponse = {
 
 export type SubmitApprovalPayload = {
   note?: string;
+  estimateId?: string;
 };
 
 export type SubmitApprovalResponse = {
@@ -186,10 +229,39 @@ export async function getQuotationsProvider(page = 1, limit = 20) {
   return response.data;
 }
 
-export async function getQuotationByIdProvider(quotationId: string) {
-  const response = await apiClient.get<{ success: boolean; data: QuotationItem }>(
-    `/api/quotations/${encodeURIComponent(quotationId)}`
-  );
+export async function getQuotationByIdProvider(
+  quotationId: string,
+  params?: { includeEstimate?: boolean; includeDocuments?: boolean }
+) {
+  const response = await apiClient.get<{
+    success: boolean;
+    message?: string;
+    data: QuotationItem | { quotation: QuotationItem };
+  }>(`/api/quotations/${encodeURIComponent(quotationId)}`, {
+    params: {
+      includeEstimate: params?.includeEstimate ?? true,
+      includeDocuments: params?.includeDocuments ?? true,
+      ...params,
+    },
+  });
+
+  const rawData = response.data?.data;
+  const quotation =
+    (rawData as { quotation?: QuotationItem })?.quotation ||
+    (rawData as QuotationItem);
+
+  return {
+    ...response.data,
+    data: quotation,
+  };
+}
+
+export async function convertEstimateToQuotationProvider(estimateId: string) {
+  const response = await apiClient.post<{
+    success: boolean;
+    message?: string;
+    data: QuotationItem;
+  }>(`/api/quotations/from-estimate/${encodeURIComponent(estimateId)}`);
   return response.data;
 }
 
@@ -215,11 +287,27 @@ export async function updateQuotationProvider(
 
 export async function submitQuotationForApprovalProvider(
   quotationId: string,
-  note?: string
+  payloadOrNote?: SubmitApprovalPayload | string,
+  estimateId?: string
 ) {
+  const payload: SubmitApprovalPayload =
+    typeof payloadOrNote === "string"
+      ? {
+          ...(payloadOrNote ? { note: payloadOrNote } : {}),
+          ...(estimateId ? { estimateId } : {}),
+        }
+      : {
+          ...(payloadOrNote?.note ? { note: payloadOrNote.note } : {}),
+          ...(payloadOrNote?.estimateId || estimateId
+            ? { estimateId: payloadOrNote?.estimateId || estimateId }
+            : {}),
+        };
+
+  const targetId = quotationId || payload.estimateId || "";
+
   const response = await apiClient.post<SubmitApprovalResponse>(
-    `/api/quotations/${encodeURIComponent(quotationId)}/submit-approval`,
-    { note }
+    `/api/quotations/${encodeURIComponent(targetId)}/submit-approval`,
+    payload
   );
 
   return response.data;
