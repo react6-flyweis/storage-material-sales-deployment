@@ -127,8 +127,16 @@ export default function QuotationListPage() {
       return {
         id: quotation._id,
         quoteNumber: quotation.quoteNumber || "N/A",
-        customer: quotation.customerId?.firstName?.trim() || "Unknown customer",
-        project: quotation.leadId?.projectName?.trim() || "N/A",
+        customer:
+          (typeof quotation.customerId === "object"
+            ? quotation.customerId?.firstName?.trim()
+            : null) ||
+          quotation.companyName ||
+          "Unknown customer",
+        project:
+          (typeof quotation.leadId === "object"
+            ? quotation.leadId?.projectName?.trim()
+            : null) || "N/A",
         status,
         value: formatMoney(quotation.finalPrice),
         dateSent: formatDate(quotation.sentAt ?? quotation.createdAt),
@@ -198,7 +206,9 @@ export default function QuotationListPage() {
         title={
           <div className="flex items-center gap-2">
             <span>Quotation</span>
-            {isLoading && <Loader2 className="h-5 w-5 animate-spin text-gray-600" />}
+            {isLoading && (
+              <Loader2 className="h-5 w-5 animate-spin text-gray-600" />
+            )}
           </div>
         }
         subtitle="Manage your assigned leads and track their progress."
@@ -209,7 +219,7 @@ export default function QuotationListPage() {
                 Create New Inquiry
               </Button>
             </Link>
-            <Link to="/quotation/create">
+            <Link to="/quotation/pemb/create">
               <Button className="bg-[#1e40af] hover:bg-[#1e3a8a] text-white font-medium rounded-lg px-4 py-2 flex items-center gap-2">
                 <PlusCircle className="w-4 h-4" />
                 Create New Quotation
