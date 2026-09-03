@@ -5,6 +5,7 @@ import {
 } from "@tanstack/react-query";
 import {
   createQuotationProvider,
+  convertEstimateToQuotationProvider,
   getQuotationByIdProvider,
   getQuotationsProvider,
   sendQuotationProvider,
@@ -20,11 +21,32 @@ export function useQuotationsQuery(page = 1, limit = 20) {
   });
 }
 
-export function useQuotationQuery(quotationId?: string) {
+export function useQuotationQuery(
+  quotationId?: string,
+  params?: { includeEstimate?: boolean; includeDocuments?: boolean }
+) {
   return useQuery({
-    queryKey: ["sales", "quotation", quotationId],
-    queryFn: () => getQuotationByIdProvider(quotationId!),
+    queryKey: ["sales", "quotation", quotationId, params],
+    queryFn: () => getQuotationByIdProvider(quotationId!, params),
     enabled: Boolean(quotationId),
+  });
+}
+
+export function useConvertEstimateToQuotationMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (estimateId: string) =>
+      convertEstimateToQuotationProvider(estimateId),
+    onSuccess: (_, estimateId) => {
+      void queryClient.invalidateQueries({ queryKey: ["sales", "estimates"] });
+      void queryClient.invalidateQueries({ queryKey: ["sales", "quotations"] });
+      if (estimateId) {
+        void queryClient.invalidateQueries({
+          queryKey: ["sales", "estimate", estimateId],
+        });
+      }
+    },
   });
 }
 
@@ -51,15 +73,27 @@ export function useSubmitQuotationForApprovalMutation() {
     mutationFn: ({
       quotationId,
       note,
+      estimateId,
     }: {
-      quotationId: string;
+      quotationId?: string;
       note?: string;
-    }) => submitQuotationForApprovalProvider(quotationId, note),
+      estimateId?: string;
+    }) => {
+      const targetId = quotationId || estimateId || "";
+      return submitQuotationForApprovalProvider(targetId, { note, estimateId });
+    },
     onSuccess: (_, variables) => {
       void queryClient.invalidateQueries({ queryKey: ["sales", "quotations"] });
-      void queryClient.invalidateQueries({
-        queryKey: ["sales", "quotation", variables.quotationId],
-      });
+      if (variables.quotationId) {
+        void queryClient.invalidateQueries({
+          queryKey: ["sales", "quotation", variables.quotationId],
+        });
+      }
+      if (variables.estimateId) {
+        void queryClient.invalidateQueries({
+          queryKey: ["sales", "quotation", variables.estimateId],
+        });
+      }
       void queryClient.invalidateQueries({ queryKey: ["sales", "estimates"] });
     },
   });
