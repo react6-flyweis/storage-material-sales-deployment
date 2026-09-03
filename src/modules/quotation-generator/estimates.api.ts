@@ -435,12 +435,26 @@ export async function taxLookupProvider(
 }
 
 // ----------------------------------------------------------------------------
+// ESTIMATE CONVERSION METADATA CONTRACT (2026-09-03)
+// ----------------------------------------------------------------------------
+export interface EstimateConversion {
+  isConvertedToQuotation: boolean;
+  quotationId: string | null;
+  quoteNumber: string | null;
+  quotationStatus: "draft" | "sent" | "accepted" | "rejected" | null;
+  approvalStatus: "not_submitted" | "pending_approval" | "approved" | "rejected" | null;
+  workflowStatus: "draft" | "pending_approval" | "approved" | "rejected" | "sent" | null;
+  convertedAt: string | null;
+}
+
+// ----------------------------------------------------------------------------
 // SAVE ESTIMATE DRAFT / UPDATE
 // ----------------------------------------------------------------------------
 export interface SaveEstimatePayload extends Record<string, unknown> {
   _id?: string;
   createdBy?: string;
   leadId?: string | null;
+  conversion?: EstimateConversion;
   jobType?: string;
   scope?: string;
   roofType?: string;
@@ -549,7 +563,10 @@ export async function submitEstimateApprovalProvider(
     success: boolean;
     message?: string;
     data?: SaveEstimatePayload;
-  }>(`/api/quotations/${encodeURIComponent(estimateId)}/submit-approval`, { note });
+  }>(`/api/quotations/${encodeURIComponent(estimateId)}/submit-approval`, {
+    ...(note ? { note } : {}),
+    estimateId,
+  });
   return response.data;
 }
 
