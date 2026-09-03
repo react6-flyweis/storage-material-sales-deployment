@@ -1,11 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router";
-import {
-  ArrowLeft,
-  Search,
-  Eye,
-  Loader2,
-} from "lucide-react";
+import { ArrowLeft, Search, Eye, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -18,6 +13,7 @@ import {
   getEstimateByIdProvider,
   type SaveEstimatePayload,
 } from "../estimates.api";
+import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 
 type FilterCategory = "all" | "pemb" | "storage" | "custom";
 
@@ -29,21 +25,20 @@ export function QuotePreviewListPage() {
   const [isLoadingItem, setIsLoadingItem] = useState<string | null>(null);
   const [estimatesList, setEstimatesList] = useState<SaveEstimatePayload[]>([]);
 
-
   const fetchEstimates = async () => {
     setIsLoading(true);
     try {
-      const listRes = await getEstimatesListProvider(40)
+      const listRes = await getEstimatesListProvider(40);
 
       const rawList = listRes.data || listRes;
       const items: SaveEstimatePayload[] = Array.isArray(rawList)
         ? rawList
-        : ((rawList as Record<string, unknown>)?.estimates as SaveEstimatePayload[]) ||
-        ((rawList as Record<string, unknown>)?.items as SaveEstimatePayload[]) ||
-        [];
+        : ((rawList as Record<string, unknown>)
+            ?.estimates as SaveEstimatePayload[]) ||
+          ((rawList as Record<string, unknown>)
+            ?.items as SaveEstimatePayload[]) ||
+          [];
       setEstimatesList(items);
-
-
     } catch (err) {
       console.error("Failed to load estimates for preview hub:", err);
     } finally {
@@ -55,7 +50,6 @@ export function QuotePreviewListPage() {
     fetchEstimates();
   }, []);
 
-
   const handlePreviewQuote = async (item: SaveEstimatePayload) => {
     try {
       let estimate = item;
@@ -65,14 +59,27 @@ export function QuotePreviewListPage() {
           const res = await getEstimateByIdProvider(item._id);
           const fetchedData = res.data || res;
           if ((fetchedData as Record<string, unknown>)?.estimate) {
-            estimate = (fetchedData as Record<string, unknown>).estimate as SaveEstimatePayload;
-          } else if (fetchedData && typeof fetchedData === "object" && !Array.isArray(fetchedData)) {
+            estimate = (fetchedData as Record<string, unknown>)
+              .estimate as SaveEstimatePayload;
+          } else if (
+            fetchedData &&
+            typeof fetchedData === "object" &&
+            !Array.isArray(fetchedData)
+          ) {
             estimate = fetchedData as SaveEstimatePayload;
           }
         } catch (fetchErr) {
-          console.warn("Failed to fetch full estimate detail for preview, using item from list:", fetchErr);
+          console.warn(
+            "Failed to fetch full estimate detail for preview, using item from list:",
+            fetchErr,
+          );
           estimate = item;
         }
+      }
+
+      const targetEstimateId = estimate._id || item._id;
+      if (targetEstimateId) {
+        estimate._id = targetEstimateId;
       }
 
       const isStorage =
@@ -81,14 +88,18 @@ export function QuotePreviewListPage() {
 
       // If Storage estimate, navigate to storage preview page
       if (isStorage) {
+        if (targetEstimateId) {
+          useQuotationStore.getState().setStorageEstimateId(targetEstimateId);
+        }
         navigate("/quotation/storage-preview", {
           state: {
             storageData: estimate.storageData,
             storagePricing: estimate.storagePricingResult,
-            estimateId: estimate._id,
+            estimateId: targetEstimateId,
             sourceFileName: estimate.sourceFileName || "Storage_COG.xlsx",
             customerLeadName: estimate.leadCompanyName || "",
-            customerAddress: estimate.cityStateZip || estimate.streetAddress || "",
+            customerAddress:
+              estimate.cityStateZip || estimate.streetAddress || "",
             customerEmail: estimate.customerEmail || "",
             jobNumber: estimate.jobNumber || "",
             scope: estimate.scope || "Both",
@@ -101,13 +112,26 @@ export function QuotePreviewListPage() {
         return;
       }
 
+      if (targetEstimateId) {
+        useQuotationStore.getState().setPembEstimateId(targetEstimateId);
+      }
+
       // Standard / PEMB quote preview
-      const pricingRes = estimate.pricingResult as Record<string, unknown> | undefined;
+      const pricingRes = estimate.pricingResult as
+        | Record<string, unknown>
+        | undefined;
       const effectiveSqFt = Number(
-        estimate.squareFootage || estimate.sf || pricingRes?.totalSqFt || pricingRes?.sf || 0
+        estimate.squareFootage ||
+          estimate.sf ||
+          pricingRes?.totalSqFt ||
+          pricingRes?.sf ||
+          0,
       );
 
-      const pricingObj = ((estimate.pricingResult || {}) as Record<string, unknown>);
+      const pricingObj = (estimate.pricingResult || {}) as Record<
+        string,
+        unknown
+      >;
       if (!pricingObj.rows && estimate.breakdownRows) {
         pricingObj.rows = estimate.breakdownRows;
       }
@@ -125,7 +149,9 @@ export function QuotePreviewListPage() {
           extractedShipper: {
             fileName: estimate.sourceFileName || "Shipper.xlsx",
             sheetCount: estimate.tabSummary?.length || 1,
-            totalWeightLbs: Number(estimate.totalWeightLbs || (pricingRes?.totWt as number) || 0),
+            totalWeightLbs: Number(
+              estimate.totalWeightLbs || (pricingRes?.totWt as number) || 0,
+            ),
             squareFootage: effectiveSqFt,
             parsedCategories: estimate.parsedCategories,
             tabSummary: estimate.tabSummary,
@@ -191,10 +217,10 @@ export function QuotePreviewListPage() {
   }, [estimatesList, activeFilter, searchTerm]);
 
   const pembCount = estimatesList.filter(
-    (q) => q.jobType?.toUpperCase() !== "STORAGE" && !q.storageData
+    (q) => q.jobType?.toUpperCase() !== "STORAGE" && !q.storageData,
   ).length;
   const storageCount = estimatesList.filter(
-    (q) => q.jobType?.toUpperCase() === "STORAGE" || Boolean(q.storageData)
+    (q) => q.jobType?.toUpperCase() === "STORAGE" || Boolean(q.storageData),
   ).length;
 
   return (
@@ -241,30 +267,33 @@ export function QuotePreviewListPage() {
           <button
             type="button"
             onClick={() => setActiveFilter("all")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${activeFilter === "all"
-              ? "bg-[#1e3e66] text-white shadow-xs"
-              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+              activeFilter === "all"
+                ? "bg-[#1e3e66] text-white shadow-xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
           >
             All Packages ({estimatesList.length})
           </button>
           <button
             type="button"
             onClick={() => setActiveFilter("pemb")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${activeFilter === "pemb"
-              ? "bg-[#2563eb] text-white shadow-xs"
-              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+              activeFilter === "pemb"
+                ? "bg-[#2563eb] text-white shadow-xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
           >
             PEMB Buildings ({pembCount})
           </button>
           <button
             type="button"
             onClick={() => setActiveFilter("storage")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${activeFilter === "storage"
-              ? "bg-amber-600 text-white shadow-xs"
-              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+              activeFilter === "storage"
+                ? "bg-amber-600 text-white shadow-xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
           >
             Storage COG ({storageCount})
           </button>
@@ -292,7 +321,8 @@ export function QuotePreviewListPage() {
               No quotation packages match your current filter.
             </p>
             <p className="text-xs text-slate-400 mt-1">
-              Create a new PEMB or Storage quote to view its generated preview package.
+              Create a new PEMB or Storage quote to view its generated preview
+              package.
             </p>
           </Card>
         ) : (
@@ -305,24 +335,43 @@ export function QuotePreviewListPage() {
                 quote.storagePricingResult) as
                 | Record<string, unknown>
                 | undefined;
-              const fullQuote = quote.fullQuoteResult as Record<string, unknown> | undefined;
+              const fullQuote = quote.fullQuoteResult as
+                | Record<string, unknown>
+                | undefined;
 
               const totSell =
                 Number(
                   quote.grandTotal ??
-                  quote.totalSell ??
-                  fullQuote?.grandTotal ??
-                  pricingRes?.totSell ??
-                  pricingRes?.grandTotal
+                    quote.totalSell ??
+                    fullQuote?.grandTotal ??
+                    pricingRes?.totSell ??
+                    pricingRes?.grandTotal,
                 ) || 0;
-              const prof = Number(quote.profit ?? fullQuote?.totalProfit ?? pricingRes?.profit) || 0;
+              const prof =
+                Number(
+                  quote.profit ?? fullQuote?.totalProfit ?? pricingRes?.profit,
+                ) || 0;
               const marginPct =
-                Number(quote.marginPercent ?? fullQuote?.grandMargin ?? pricingRes?.profPct ?? pricingRes?.marginPercent) || 0;
+                Number(
+                  quote.marginPercent ??
+                    fullQuote?.grandMargin ??
+                    pricingRes?.profPct ??
+                    pricingRes?.marginPercent,
+                ) || 0;
               const effectiveSqFt = Number(
-                quote.squareFootage || quote.sf || pricingRes?.totalSqFt || pricingRes?.sf || 0
+                quote.squareFootage ||
+                  quote.sf ||
+                  pricingRes?.totalSqFt ||
+                  pricingRes?.sf ||
+                  0,
               );
               const sfPrice =
-                Number(quote.pricePerSf ?? fullQuote?.pricePerSf ?? pricingRes?.sfPrice ?? pricingRes?.pricePerSf) ||
+                Number(
+                  quote.pricePerSf ??
+                    fullQuote?.pricePerSf ??
+                    pricingRes?.sfPrice ??
+                    pricingRes?.pricePerSf,
+                ) ||
                 (totSell && effectiveSqFt
                   ? (totSell / effectiveSqFt).toFixed(2)
                   : 0);
@@ -331,17 +380,30 @@ export function QuotePreviewListPage() {
                 quote.storageData as { buildings?: unknown[] } | undefined
               )?.buildings;
               const displayBuilding = isStorage
-                ? `${storageBuildings?.length || 1} Storage Building${(storageBuildings?.length || 1) > 1 ? "s" : ""
-                }`
+                ? `${storageBuildings?.length || 1} Storage Building${
+                    (storageBuildings?.length || 1) > 1 ? "s" : ""
+                  }`
                 : quote.buildingSize || "Building";
 
-              const formattedDate = quote.quoteDate || quote.createdAt
-                ? new Date(quote.quoteDate || quote.createdAt || "").toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })
-                : "";
+              const formattedDate =
+                quote.quoteDate || quote.createdAt
+                  ? new Date(
+                      quote.quoteDate || quote.createdAt || "",
+                    ).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })
+                  : "";
+
+              const quoteNumber =
+                quote.conversion?.quoteNumber || quote.quoteNumber;
+              const effectiveWorkflowStatus =
+                quote.conversion?.workflowStatus ||
+                quote.workflowStatus ||
+                quote.approval?.status ||
+                quote.status ||
+                "draft";
 
               return (
                 <div
@@ -356,12 +418,7 @@ export function QuotePreviewListPage() {
                       </h3>
                       <div className="text-xs text-slate-500 font-normal mt-1 flex flex-wrap items-center gap-1.5">
                         {(() => {
-                          const wfStatus =
-                            quote.workflowStatus ||
-                            quote.approval?.status ||
-                            quote.status ||
-                            "draft";
-                          switch (wfStatus) {
+                          switch (effectiveWorkflowStatus) {
                             case "pending_approval":
                               return (
                                 <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px]">
@@ -376,7 +433,13 @@ export function QuotePreviewListPage() {
                               );
                             case "rejected":
                               return (
-                                <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold text-[10px]" title={quote.approval?.rejectionReason || "Approval Rejected"}>
+                                <span
+                                  className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold text-[10px]"
+                                  title={
+                                    quote.approval?.rejectionReason ||
+                                    "Approval Rejected"
+                                  }
+                                >
                                   Rejected
                                 </span>
                               );
@@ -394,6 +457,13 @@ export function QuotePreviewListPage() {
                               );
                           }
                         })()}
+
+                        {quoteNumber && (
+                          <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-bold text-[10px] border border-blue-200">
+                            Quote #{quoteNumber}
+                          </span>
+                        )}
+
                         <span>·</span>
                         <span>{quote.scope?.toUpperCase() || "SUPPLY"}</span>
                         <span>·</span>
@@ -401,11 +471,17 @@ export function QuotePreviewListPage() {
                         <span>·</span>
                         <span>{displayBuilding}</span>
                         <span>·</span>
-                        <span>{quote.cityStateZip || quote.streetAddress || "Location"}</span>
+                        <span>
+                          {quote.cityStateZip ||
+                            quote.streetAddress ||
+                            "Location"}
+                        </span>
                       </div>
                     </div>
                     <div className="text-xs font-semibold text-[#2563eb] pt-1">
-                      Job #{quote.jobNumber || "Draft"} · {quote.sourceFileName || (isStorage ? "Storage_COG.xlsx" : "Drawing.pdf")}
+                      Job #{quote.jobNumber || "Draft"} ·{" "}
+                      {quote.sourceFileName ||
+                        (isStorage ? "Storage_COG.xlsx" : "Drawing.pdf")}
                       {formattedDate ? ` · ${formattedDate}` : ""}
                     </div>
                   </div>
@@ -425,7 +501,10 @@ export function QuotePreviewListPage() {
                         <span>${prof.toLocaleString()}</span>
                       </div>
                       <div className="text-xs font-semibold text-[#16a34a]">
-                        {typeof marginPct === "number" ? marginPct.toFixed(1) : marginPct}%
+                        {typeof marginPct === "number"
+                          ? marginPct.toFixed(1)
+                          : marginPct}
+                        %
                       </div>
                     </div>
 
@@ -433,17 +512,20 @@ export function QuotePreviewListPage() {
                     <div className="flex flex-wrap items-center gap-2.5">
                       <div className="flex items-center gap-1.5 mr-1">
                         <span
-                          className={`px-1.5 py-0.5 rounded-xs text-[10px] font-bold tracking-wide uppercase ${isStorage ? "bg-amber-100 text-amber-900" : "bg-[#dbeafe] text-[#2563eb]"
-                            }`}
+                          className={`px-1.5 py-0.5 rounded-xs text-[10px] font-bold tracking-wide uppercase ${
+                            isStorage
+                              ? "bg-amber-100 text-amber-900"
+                              : "bg-[#dbeafe] text-[#2563eb]"
+                          }`}
                         >
-                          {isStorage ? "STORAGE COG" : quote.jobType?.toUpperCase() || "PEMB"}
+                          {isStorage
+                            ? "STORAGE COG"
+                            : quote.jobType?.toUpperCase() || "PEMB"}
                         </span>
                         <span className="text-xs text-slate-500 font-normal hidden sm:inline">
                           {isStorage ? "Mini storage" : "Vendor blend"}
                         </span>
                       </div>
-
-
 
                       <Button
                         type="button"
