@@ -1,10 +1,12 @@
-import type { RouteObject } from "react-router";
+import { Navigate, type RouteObject } from "react-router";
 import { lazy } from "react";
 import { NotFound } from "@/pages/not-found";
 import { RouterErrorFallback } from "@/pages/error-page";
 import { AdminLayout } from "@/components/admin-layout";
+// import { QuotationLayout } from "@/modules/quotation-generator";
 import { ProtectedRoute, PublicOnlyRoute } from "@/modules/auth/auth.guards";
 
+// const QuotationSystemPage = lazy(() => import("@/modules/quotation-generator/pages/quotation-system"));
 const SignIn = lazy(() => import("@/pages/sign-in"));
 const ForgotPassword = lazy(() => import("@/pages/forgot-password"));
 const ResetPassword = lazy(() => import("@/pages/reset-password"));
@@ -109,6 +111,33 @@ const PurchaseOrderDetails = lazy(
 const QuotationList = lazy(() => import("@/pages/leads/quotation-list"));
 const QuotationDetails = lazy(() => import("@/pages/leads/quotation-details"));
 const NewInquiry = lazy(() => import("@/pages/leads/new-inquiry"));
+const CreateQuotationPage = lazy(
+  () => import("@/modules/quotation-generator/pages/create-quotation-page"),
+);
+const CustomQuote = lazy(
+  () => import("@/modules/quotation-generator/pages/custom-quote"),
+);
+const PembQuotePage = lazy(
+  () => import("@/modules/quotation-generator/pages/pemb-quote-page"),
+);
+const StorageQuotePage = lazy(
+  () => import("@/modules/quotation-generator/pages/storage-quote-page"),
+);
+const StoragePreviewPage = lazy(
+  () => import("@/modules/quotation-generator/pages/storage-preview-page"),
+);
+const QuotePreviewPage = lazy(
+  () => import("@/modules/quotation-generator/pages/quote-preview-page"),
+);
+const QuotePreviewListPage = lazy(
+  () => import("@/modules/quotation-generator/pages/quote-preview-list-page"),
+);
+const QuoteHistoryPage = lazy(
+  () => import("@/modules/quotation-generator/pages/quote-history-page"),
+);
+const PricingRulesPage = lazy(
+  () => import("@/modules/quotation-generator/pages/pricing-rules-page"),
+);
 
 // Invoice section
 const InvoiceForm = lazy(() => import("@/pages/invoices/invoice-form"));
@@ -348,6 +377,27 @@ export const salesRoutes: RouteObject[] = [
           {
             path: "sales",
             element: <SalesPage />,
+          },
+
+          // quotation generator layout
+          {
+            path: "quotation",
+            // element: <QuotationLayout />,
+            children: [
+              { index: true, element: <Navigate to="/quotation/pemb" replace={true} /> },
+              { path: "pemb/create", element: <CreateQuotationPage /> },
+              { path: "pemb", element: <PembQuotePage /> },
+
+              { path: "custom", element: <CustomQuote /> },
+              { path: "storage-cog", element: <StorageQuotePage /> },
+              { path: "storage-preview", element: <StoragePreviewPage /> },
+              { path: "quote-preview", element: <QuotePreviewListPage /> },
+              { path: "quote-preview/view", element: <QuotePreviewPage /> },
+              { path: "quote-preview/detail", element: <QuotePreviewPage /> },
+              { path: "history", element: <QuoteHistoryPage /> },
+              { path: "quote-history", element: <QuoteHistoryPage /> },
+              { path: "pricing-rules", element: <PricingRulesPage /> },
+            ],
           },
 
           { path: "*", element: <NotFound /> },

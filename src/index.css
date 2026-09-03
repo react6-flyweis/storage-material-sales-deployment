@@ -119,12 +119,22 @@
 }
 
 @layer base {
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    overflow: hidden;
+  }
+
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply font-sans bg-background text-foreground;
   }
+
   html {
     @apply font-sans;
   }
@@ -141,13 +151,16 @@
   scrollbar-width: thin;
   scrollbar-color: rgba(148, 163, 184, 0.8) transparent;
 }
+
 .thin-scrollbar::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
+
 .thin-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
+
 .thin-scrollbar::-webkit-scrollbar-thumb {
   background-color: rgba(148, 163, 184, 0.6);
   border-radius: 9999px;
@@ -167,9 +180,11 @@
     Arial;
   color: var(--color-foreground);
 }
+
 .markdown-body p {
   margin: 0 0 0.75rem 0;
 }
+
 .markdown-body h1,
 .markdown-body h2,
 .markdown-body h3,
@@ -179,26 +194,31 @@
   margin: 1rem 0 0.5rem;
   font-weight: 600;
 }
+
 .markdown-body blockquote {
   margin: 0.5rem 0;
   padding-left: 1rem;
   border-left: 4px solid rgba(0, 0, 0, 0.08);
   color: var(--color-muted-foreground);
 }
+
 .markdown-body table {
   width: 100%;
   border-collapse: collapse;
   margin: 0.75rem 0;
 }
+
 .markdown-body th,
 .markdown-body td {
   border: 1px solid rgba(0, 0, 0, 0.08);
   padding: 0.5rem 0.75rem;
 }
+
 .markdown-body ul,
 .markdown-body ol {
   margin: 0.5rem 0 0.75rem 1.25rem;
 }
+
 .markdown-body code.inline-code {
   background: rgba(27, 31, 35, 0.05);
   padding: 0.2rem 0.4rem;
@@ -208,6 +228,7 @@
     ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Courier New",
     monospace;
 }
+
 .markdown-body pre.code-block {
   background: rgba(27, 31, 35, 0.9);
   color: #fff;
@@ -220,8 +241,96 @@
   font-size: 0.85rem;
   line-height: 1.45;
 }
+
 .markdown-body pre.code-block code {
   background: transparent;
   color: inherit;
   padding: 0;
+}
+
+/* Print styles for Quote Generator & PDF output */
+@media print {
+  /* Hide non-printable UI elements */
+  header,
+  aside,
+  nav,
+  .no-print,
+  [data-no-print] {
+    display: none !important;
+  }
+
+  /* Reset layout constraints and side margins for document printing */
+  html,
+  body,
+  #root,
+  #root > div,
+  main,
+  div[class*="ml-"],
+  [class*="ml-"] {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: static !important;
+    float: none !important;
+    margin: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+  }
+
+  /* Force full width on max-width wrappers in print mode */
+  .max-w-5xl,
+  .max-w-4xl,
+  .max-w-3xl,
+  [class*="max-w-"] {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* Preserve full color contrast and background colors in PDF export */
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    box-sizing: border-box !important;
+  }
+
+  @page {
+    size: portrait;
+    margin: 8mm;
+  }
+
+  /* Individual printable card styling and page breaking */
+  .print-card {
+    width: calc(100% - 4px) !important;
+    max-width: calc(100% - 4px) !important;
+    box-sizing: border-box !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+    break-before: page;
+    page-break-before: always;
+    margin-top: 0 !important;
+    margin-bottom: 24px !important;
+    margin-left: 2px !important;
+    margin-right: 2px !important;
+    padding: 24px !important;
+    background-color: #ffffff !important;
+  }
+
+  .print-card:first-of-type {
+    break-before: auto;
+    page-break-before: auto;
+  }
+
+  .print-avoid-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }
