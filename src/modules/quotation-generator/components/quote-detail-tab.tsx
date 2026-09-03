@@ -334,7 +334,22 @@ export function QuoteDetailTab({
         </Button>
         <Button
           type="button"
-          onClick={() => (onQuotePreview ? onQuotePreview() : navigate("/quotation/quote-preview/view"))}
+          onClick={() =>
+            onQuotePreview
+              ? onQuotePreview()
+              : navigate("/quotation/quote-preview/view", {
+                  state: {
+                    quotationForm,
+                    extractedDrawing,
+                    extractedShipper,
+                    sqFt,
+                    buildingSize,
+                    additionalNotes,
+                    pdfFileName,
+                    estimateId,
+                  },
+                })
+          }
           className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-6 py-2.5 rounded-lg text-xs font-semibold cursor-pointer shadow-xs"
         >
           Quote Preview
