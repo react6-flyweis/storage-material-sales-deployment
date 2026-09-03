@@ -32,21 +32,21 @@ export function QuotationSidebar({
   const activeTab = location.pathname.includes("/quotation/pricing-rules")
     ? "pricing-rules"
     : location.pathname.includes("/quotation/history") ||
-      location.pathname.includes("/quotation/quote-history")
-    ? "quote-history"
-    : location.pathname.includes("/quotation/storage-preview")
-    ? "storage-preview"
-    : location.pathname.includes("/quotation/quote-preview")
-    ? "quote-preview"
-    : location.pathname.includes("/quotation/storage")
-    ? "storage-cog"
-    : location.pathname.includes("/quotation/create")
-    ? "custom-quote"
-    : location.pathname.includes("/quotation/extracted-drawing") ||
-      location.pathname.includes("/quotation/upload-drawing") ||
-      location.pathname.includes("/quotation/pemb")
-    ? "pemb-quote"
-    : "pemb-quote";
+        location.pathname.includes("/quotation/quote-history")
+      ? "quote-history"
+      : location.pathname.includes("/quotation/storage-preview")
+        ? "storage-preview"
+        : location.pathname.includes("/quotation/quote-preview")
+          ? "quote-preview"
+          : location.pathname.includes("/quotation/storage")
+            ? "storage-cog"
+            : location.pathname.includes("/quotation/pemb/create")
+              ? "custom-quote"
+              : location.pathname.includes("/quotation/extracted-drawing") ||
+                  location.pathname.includes("/quotation/upload-drawing") ||
+                  location.pathname.includes("/quotation/pemb")
+                ? "pemb-quote"
+                : "pemb-quote";
 
   // Store Hooks
   const {
@@ -66,7 +66,8 @@ export function QuotationSidebar({
 
   // Calculated values
   const profitMargin = Math.max(0, installSell - installCost);
-  const marginPercent = installSell > 0 ? ((profitMargin / installSell) * 100).toFixed(1) : "0.0";
+  const marginPercent =
+    installSell > 0 ? ((profitMargin / installSell) * 100).toFixed(1) : "0.0";
   const savedVsCentral = Math.round((blendPercentage / 100) * 950);
 
   const roofOptions = [
@@ -88,7 +89,7 @@ export function QuotationSidebar({
         className={cn(
           "fixed top-0 bottom-0 left-0 z-50 flex w-72 flex-col bg-[#0b223c] text-white transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 overflow-y-auto select-none border-r border-slate-800/80 shadow-2xl shrink-0",
           isOpen ? "translate-x-0" : "-translate-x-full",
-          className
+          className,
         )}
       >
         {/* Mobile close button */}
@@ -105,7 +106,9 @@ export function QuotationSidebar({
         {/* Header Section */}
         <div className="px-5 pt-6 pb-4 border-b border-slate-700/50">
           <div className="flex items-center gap-1.5 text-lg font-bold tracking-wide text-white">
-            <span className="font-extrabold text-white tracking-wider">STORAGE</span>
+            <span className="font-extrabold text-white tracking-wider">
+              STORAGE
+            </span>
             <span className="bg-[#1b72e8] text-white px-2 py-0.5 rounded text-sm font-black tracking-normal uppercase">
               MATERIALS
             </span>
@@ -132,7 +135,7 @@ export function QuotationSidebar({
                   "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-150 text-left cursor-pointer",
                   activeTab === "pemb-quote"
                     ? "bg-[#1d3d63] text-white border border-blue-400/30 shadow-xs"
-                    : "text-slate-300 hover:bg-slate-800/50 hover:text-white"
+                    : "text-slate-300 hover:bg-slate-800/50 hover:text-white",
                 )}
               >
                 <FileText className="h-4 w-4 shrink-0 text-blue-300" />
@@ -148,7 +151,7 @@ export function QuotationSidebar({
                   "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-150 text-left cursor-pointer",
                   activeTab === "storage-cog"
                     ? "bg-[#1d3d63] text-white border border-blue-400/30 shadow-xs"
-                    : "text-slate-300 hover:bg-slate-800/50 hover:text-white"
+                    : "text-slate-300 hover:bg-slate-800/50 hover:text-white",
                 )}
               >
                 <Copy className="h-4 w-4 shrink-0 text-amber-300" />
@@ -165,24 +168,27 @@ export function QuotationSidebar({
                 }}
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-150 text-left cursor-pointer",
-                  activeTab === "quote-preview" || activeTab === "storage-preview"
+                  activeTab === "quote-preview" ||
+                    activeTab === "storage-preview"
                     ? "bg-[#1d3d63] text-white border border-blue-400/30 shadow-xs"
-                    : "text-slate-300 hover:bg-slate-800/50 hover:text-white"
+                    : "text-slate-300 hover:bg-slate-800/50 hover:text-white",
                 )}
               >
                 <CheckSquare className="h-4 w-4 shrink-0 text-slate-300" />
-                <span>{jobType === "Storage" ? "Storage Preview" : "Quote Preview"}</span>
+                <span>
+                  {jobType === "Storage" ? "Storage Preview" : "Quote Preview"}
+                </span>
               </button>
 
               <button
                 onClick={() => {
-                  navigate("/quotation/create");
+                  navigate("/quotation/pemb/create");
                 }}
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-150 text-left cursor-pointer",
                   activeTab === "custom-quote"
                     ? "bg-[#1d3d63] text-white border border-blue-400/30 shadow-xs"
-                    : "text-slate-300 hover:bg-slate-800/50 hover:text-white"
+                    : "text-slate-300 hover:bg-slate-800/50 hover:text-white",
                 )}
               >
                 <FileEdit className="h-4 w-4 shrink-0 text-slate-300" />
@@ -197,7 +203,7 @@ export function QuotationSidebar({
                   "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-150 text-left cursor-pointer",
                   activeTab === "quote-history"
                     ? "bg-[#1d3d63] text-white border border-blue-400/30 shadow-xs"
-                    : "text-slate-300 hover:bg-slate-800/50 hover:text-white"
+                    : "text-slate-300 hover:bg-slate-800/50 hover:text-white",
                 )}
               >
                 <History className="h-4 w-4 shrink-0 text-slate-300" />
@@ -218,7 +224,7 @@ export function QuotationSidebar({
                   "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-150 text-left cursor-pointer",
                   activeTab === "pricing-rules"
                     ? "bg-[#1d3d63] text-white border border-blue-400/30 shadow-xs"
-                    : "text-slate-300 hover:bg-slate-800/50 hover:text-white"
+                    : "text-slate-300 hover:bg-slate-800/50 hover:text-white",
                 )}
               >
                 <Percent className="h-4 w-4 shrink-0 text-slate-300" />
@@ -246,7 +252,7 @@ export function QuotationSidebar({
                     "py-2 px-3 rounded-lg text-xs font-bold transition-all text-center border cursor-pointer",
                     jobType === "PEMB"
                       ? "bg-[#1b72e8] text-white border-blue-500 shadow-sm"
-                      : "bg-[#122b48] text-slate-300 border-slate-600/60 hover:bg-[#183558]"
+                      : "bg-[#122b48] text-slate-300 border-slate-600/60 hover:bg-[#183558]",
                   )}
                 >
                   PEMB
@@ -263,7 +269,7 @@ export function QuotationSidebar({
                     "py-2 px-3 rounded-lg text-xs font-bold transition-all text-center border cursor-pointer",
                     jobType === "Storage"
                       ? "bg-[#1b72e8] text-white border-blue-500 shadow-sm"
-                      : "bg-[#122b48] text-slate-300 border-slate-600/60 hover:bg-[#183558]"
+                      : "bg-[#122b48] text-slate-300 border-slate-600/60 hover:bg-[#183558]",
                   )}
                 >
                   Storage
@@ -288,7 +294,7 @@ export function QuotationSidebar({
                         ? item === "Both"
                           ? "bg-[#16803d] text-white border-green-500 shadow-sm"
                           : "bg-[#1b72e8] text-white border-blue-500 shadow-sm"
-                        : "bg-[#122b48] text-slate-300 border-slate-600/60 hover:bg-[#183558]"
+                        : "bg-[#122b48] text-slate-300 border-slate-600/60 hover:bg-[#183558]",
                     )}
                   >
                     {item}
@@ -307,8 +313,16 @@ export function QuotationSidebar({
                 onClick={() => setIsRoofSelectOpen(!isRoofSelectOpen)}
                 className="w-full bg-white text-slate-900 rounded-lg px-3 py-2 text-xs font-bold flex items-center justify-between shadow-sm hover:bg-slate-50 transition-colors cursor-pointer"
               >
-                <span>{roofOptions.find((opt) => opt.value === roofType)?.label || roofType}</span>
-                <ChevronDown className={cn("h-4 w-4 text-slate-700 transition-transform", isRoofSelectOpen && "rotate-180")} />
+                <span>
+                  {roofOptions.find((opt) => opt.value === roofType)?.label ||
+                    roofType}
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "h-4 w-4 text-slate-700 transition-transform",
+                    isRoofSelectOpen && "rotate-180",
+                  )}
+                />
               </button>
 
               {isRoofSelectOpen && (
@@ -323,7 +337,8 @@ export function QuotationSidebar({
                       }}
                       className={cn(
                         "w-full text-left px-3 py-2 text-xs font-medium hover:bg-blue-50 transition-colors cursor-pointer",
-                        roofType === opt.value && "bg-blue-100 text-blue-900 font-bold"
+                        roofType === opt.value &&
+                          "bg-blue-100 text-blue-900 font-bold",
                       )}
                     >
                       {opt.label}
@@ -337,7 +352,9 @@ export function QuotationSidebar({
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-[11px] font-bold tracking-wider text-slate-300 uppercase">
                 <span>INSTALL COST $/SF</span>
-                <span className="text-amber-400 text-xs font-extrabold">${installCost.toFixed(2)}</span>
+                <span className="text-amber-400 text-xs font-extrabold">
+                  ${installCost.toFixed(2)}
+                </span>
               </div>
               <input
                 type="range"
@@ -354,7 +371,9 @@ export function QuotationSidebar({
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-[11px] font-bold tracking-wider text-slate-300 uppercase">
                 <span>INSTALL SELL $/SF</span>
-                <span className="text-slate-200 text-xs font-extrabold">${installSell.toFixed(2)}</span>
+                <span className="text-slate-200 text-xs font-extrabold">
+                  ${installSell.toFixed(2)}
+                </span>
               </div>
               <input
                 type="range"
