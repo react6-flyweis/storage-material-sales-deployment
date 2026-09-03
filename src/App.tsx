@@ -4,8 +4,7 @@ import { salesRoutes } from "./routes/sales.routes";
 import { Loading } from "./components/loading";
 import * as Sentry from "@sentry/react";
 import ErrorBoundary from "@/pages/error-page";
-
-
+import { Toaster } from "sonner";
 
 const sentryCreateBrowserRouter = Sentry.wrapCreateBrowserRouterV7(createBrowserRouter);
 const router = sentryCreateBrowserRouter(salesRoutes);
@@ -15,6 +14,7 @@ export function App() {
     <ErrorBoundary>
       <Suspense fallback={<Loading />}>
         <RouterProvider router={router} />
+        <Toaster richColors position="top-right" />
       </Suspense>
     </ErrorBoundary>
   );
