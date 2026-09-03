@@ -38,8 +38,14 @@ export default function CreateQuotationPage() {
   const [searchParams] = useSearchParams();
   const {
     setPembLeadData,
+    setPembEstimateId,
     pembLeadId,
   } = useQuotationStore();
+
+  useEffect(() => {
+    // Reset any existing estimate ID when deliberately creating a brand new quotation
+    setPembEstimateId(null);
+  }, [setPembEstimateId]);
 
   const initialLeadId =
     searchParams.get("lead") ||
@@ -166,8 +172,11 @@ export default function CreateQuotationPage() {
 
   const onSubmit = (data: CreateQuotationFormValues) => {
     console.log("Quotation Form Data:", data);
+    setPembEstimateId(null);
     setPembLeadData(data);
-    navigate("/quotation/pemb", { state: { quotationForm: data } });
+    navigate("/quotation/pemb", {
+      state: { quotationForm: data, estimateId: undefined },
+    });
   };
 
   return (
