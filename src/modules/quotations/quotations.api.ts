@@ -101,6 +101,8 @@ export type QuotationItem = {
   sourceEstimateId?: string | null;
   sourceEstimate?: SaveEstimatePayload | null;
   estimate?: SaveEstimatePayload | null;
+  pdfLink?: string | null;
+  htmlPreviewLink?: string | null;
   documents?: Array<Record<string, unknown>> | null;
   documentMeta?: {
     source?: string;
