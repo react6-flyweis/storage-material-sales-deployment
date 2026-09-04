@@ -18,7 +18,16 @@ export function useLoginMutation() {
   const setLoginData = useAuthStore((state) => state.setLoginData);
 
   return useMutation({
-    mutationFn: (payload: LoginRequest) => loginProvider(payload),
+    mutationFn: async (payload: LoginRequest) => {
+      const response = await loginProvider(payload);
+
+      const userRole = response?.data?.role || response?.data?.user?.role;
+      if (userRole?.toLowerCase() !== "sales") {
+        throw new Error("Access denied. Only sales accounts are allowed to log in.");
+      }
+
+      return response;
+    },
     onSuccess: (response) => {
       if (response.success) {
         setLoginData(response.data);
