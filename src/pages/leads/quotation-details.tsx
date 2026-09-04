@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router";
 import {
   ArrowLeft,
@@ -7,30 +7,39 @@ import {
   Send,
   Loader2,
   ExternalLink,
-  CheckCircle2,
-  Clock,
-  XCircle,
   AlertCircle,
-  FileText,
+  FileEdit,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
-import Logo from "@/assets/the-steel-logo-dark.svg";
 import { useQuotationQuery } from "@/modules/quotations/quotations.hooks";
 import { SubmitApprovalModal } from "@/modules/quotation-generator/components/submit-approval-modal";
 import { SendQuotationModal } from "@/modules/quotation-generator/components/send-quotation-modal";
+import { QuotationApprovalBanner } from "@/modules/quotation-generator/components/quotation-approval-banner";
+import { ServerDocumentPreview } from "@/modules/quotation-generator/components/server-document-preview";
+import { useLoadEstimateToEditor } from "@/modules/quotation-generator/hooks/use-load-estimate-to-editor";
+import { apiClient } from "@/modules/auth/auth.api";
 import type {
   WorkflowStatus,
+  ApprovalStatus,
+  QuotationApprovalInfo,
   QuotationItem,
 } from "@/modules/quotations/quotations.api";
 
 export default function QuotationDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
+
+  // HTML Preview State
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+
+  const { loadAndEdit, isLoading: isEditingEstimate } =
+    useLoadEstimateToEditor();
 
   // Fetch quotation details with includeEstimate=true and includeDocuments=true
   const {
@@ -52,11 +61,44 @@ export default function QuotationDetailsPage() {
     quotation?.quoteNumber || estimate?.quoteNumber || "QUO-DRAFT";
   const workflowStatus: WorkflowStatus =
     quotation?.workflowStatus ||
+    (quotation?.status as WorkflowStatus) ||
     (quotation?.approval?.status as WorkflowStatus) ||
     (quotation?.approvalStatus as WorkflowStatus) ||
     "draft";
   const versionNumber =
     quotation?.versionNumber || estimate?.versionNumber || 1;
+
+  const approvalInfo: QuotationApprovalInfo = useMemo(() => {
+    if (quotation?.approval) {
+      return quotation.approval;
+    }
+    return {
+      status: (quotation?.approvalStatus || "not_submitted") as ApprovalStatus,
+      rejectionReason: (quotation as { rejectionReason?: string })
+        ?.rejectionReason,
+      approvedVersionNumber: (quotation as { approvedVersionNumber?: number })
+        ?.approvedVersionNumber,
+    };
+  }, [quotation]);
+
+  const isSent = workflowStatus === "sent";
+
+  const isApproved =
+    approvalInfo?.status === "approved" ||
+    workflowStatus === "approved" ||
+    isSent;
+  const isStaleApproved =
+    (approvalInfo?.status === "approved" || workflowStatus === "approved") &&
+    approvalInfo?.approvedVersionNumber !== undefined &&
+    approvalInfo?.approvedVersionNumber !== null &&
+    approvalInfo.approvedVersionNumber !== versionNumber;
+
+  const canSubmit =
+    workflowStatus === "draft" ||
+    approvalInfo?.status === "not_submitted" ||
+    approvalInfo?.status === "rejected" ||
+    workflowStatus === "rejected" ||
+    isStaleApproved;
 
   const customerName =
     quotation?.companyName ||
@@ -79,53 +121,6 @@ export default function QuotationDetailsPage() {
     estimate?.customerEmail ||
     "";
 
-  const customerAddress =
-    quotation?.location ||
-    estimate?.cityStateZip ||
-    estimate?.streetAddress ||
-    "United States";
-
-  const quoteDate =
-    quotation?.proposalDate || quotation?.createdAt
-      ? new Date(
-          quotation.proposalDate || quotation.createdAt || "",
-        ).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        })
-      : estimate?.quoteDate || new Date().toLocaleDateString();
-
-  const finalAmount =
-    Number(
-      quotation?.finalPrice ??
-        quotation?.basePrice ??
-        estimate?.totalSell ??
-        estimate?.grandTotal ??
-        0,
-    ) || 0;
-
-  const squareFootage = Number(
-    quotation?.totalArea ||
-      quotation?.sqft ||
-      estimate?.squareFootage ||
-      estimate?.sf ||
-      0,
-  );
-
-  const pricePerSf =
-    Number(quotation?.psf) ||
-    (squareFootage > 0 && finalAmount > 0
-      ? Number((finalAmount / squareFootage).toFixed(2))
-      : 0);
-
-  const materialCost = Number(quotation?.materialCost) || 0;
-  const freightCost = Number(quotation?.freightCost) || 0;
-  const totalCogs = Number(quotation?.totalCOGS) || 0;
-  const jobType = quotation?.buildingType || estimate?.jobType || "PEMB";
-  const buildingSize =
-    estimate?.buildingSize || `${jobType} Structure (${squareFootage} SF)`;
-  const scope = estimate?.scope || "Supply";
   const rawEstimateId =
     quotation?.sourceEstimateId ||
     estimate?._id ||
@@ -135,17 +130,90 @@ export default function QuotationDetailsPage() {
       ? (rawEstimateId as { _id?: string })._id
       : (rawEstimateId as string | undefined);
 
-  const approval = quotation?.approval;
-  const statusReason =
-    approval?.rejectionReason ||
-    approval?.history?.filter((h) => Boolean(h?.note)).slice(-1)[0]?.note ||
-    (workflowStatus === "rejected" ? "Needs update and resubmission" : null);
+  const isStorage =
+    estimate?.jobType?.toUpperCase() === "STORAGE" ||
+    Boolean(estimate?.storageData) ||
+    quotation?.buildingType?.toLowerCase().includes("storage");
+
+  // Effective quotation ID
+  const effectiveQuotationId = quotation?._id || id;
+
+  // Direct routes:
+  // 1) HTML Preview: GET /api/quotations/:quotationId/pdf?format=html
+  const htmlPreviewUrl = effectiveQuotationId
+    ? `/api/quotations/${encodeURIComponent(effectiveQuotationId)}/pdf?format=html`
+    : null;
+
+  // 2) PDF Download: GET /api/quotations/:quotationId/pdf?format=pdf (default is pdf)
+  const pdfDownloadUrl = effectiveQuotationId
+    ? `/api/quotations/${encodeURIComponent(effectiveQuotationId)}/pdf?format=pdf`
+    : null;
+
+  // Fetch HTML preview
+  const loadHtmlPreview = useCallback(async () => {
+    if (!htmlPreviewUrl) return;
+    setIsPreviewLoading(true);
+    setPreviewError(null);
+    try {
+      const response = await apiClient.get<string>(htmlPreviewUrl, {
+        headers: { Accept: "text/html" },
+        responseType: "text",
+      });
+
+      if (typeof response.data === "string") {
+        setPreviewHtml(response.data);
+      } else {
+        setPreviewHtml(String(response.data || ""));
+      }
+    } catch (err: unknown) {
+      console.error("Failed to load quotation HTML preview:", err);
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Failed to load quotation preview.";
+      setPreviewError(msg);
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  }, [htmlPreviewUrl]);
+
+  useEffect(() => {
+    if (htmlPreviewUrl) {
+      loadHtmlPreview();
+    }
+  }, [htmlPreviewUrl, loadHtmlPreview]);
+
+  const handleDownloadPdf = async () => {
+    if (!pdfDownloadUrl) return;
+    setIsDownloadingPdf(true);
+    try {
+      const res = await apiClient.get(pdfDownloadUrl, { responseType: "blob" });
+      const url = URL.createObjectURL(
+        new Blob([res.data], { type: "application/pdf" }),
+      );
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Quotation_${quoteNumber}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to download PDF:", err);
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
 
   const handlePrint = () => {
-    const originalTitle = document.title;
-    document.title = `Quotation_${quoteNumber}`;
     window.print();
-    document.title = originalTitle;
+  };
+
+  const handleEditEstimate = () => {
+    if (estimate) {
+      loadAndEdit(estimate);
+    } else if (sourceEstimateId) {
+      loadAndEdit(sourceEstimateId);
+    }
   };
 
   if (isLoading) {
@@ -187,406 +255,176 @@ export default function QuotationDetailsPage() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+    <div className="space-y-6 p-6 max-w-6xl mx-auto">
       {/* Top Action Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 no-print">
         <div className="flex items-center gap-3">
           <Button
-            size="sm"
-            variant="outline"
-            className="px-4 border-slate-300 text-slate-700 hover:bg-slate-50 cursor-pointer"
-            onClick={() => navigate(-1)}
+            type="button"
+            onClick={() => navigate("/leads/quotation-list")}
+            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2 text-sm font-semibold flex items-center gap-2 cursor-pointer shadow-xs"
           >
-            <ArrowLeft className="h-4 w-4 mr-1.5" />
+            <ArrowLeft className="h-4 w-4" />
             Back
           </Button>
           <div>
-            <h1 className="text-xl font-bold text-slate-900 leading-tight">
-              Quotation #{quoteNumber}
-            </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Version v{versionNumber} · Created on {quoteDate}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2.5">
-          {sourceEstimateId && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                navigate(`/quotation/history/${sourceEstimateId}`);
-              }}
-              className="border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-semibold cursor-pointer"
-            >
-              <ExternalLink className="h-3.5 w-3.5 mr-1" />
-              Source Estimate
-            </Button>
-          )}
-
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handlePrint}
-            className="border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-semibold cursor-pointer"
-          >
-            <Printer className="h-3.5 w-3.5 mr-1" />
-            Print
-          </Button>
-
-          {/* Workflow Action Buttons */}
-          {workflowStatus === "draft" && (
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => setShowSubmitModal(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs cursor-pointer"
-            >
-              <FileCheck className="h-3.5 w-3.5 mr-1" />
-              Submit for Approval
-            </Button>
-          )}
-
-          {workflowStatus === "approved" && (
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => setShowSendModal(true)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs cursor-pointer"
-            >
-              <Send className="h-3.5 w-3.5 mr-1" />
-              Send to Customer
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Inline Small Status & Reason Banner */}
-      <div
-        className={cn(
-          "flex items-center justify-between gap-3 px-3.5 py-2 rounded-lg border text-xs no-print",
-          workflowStatus === "rejected" &&
-            "bg-rose-50 border-rose-200 text-rose-900",
-          workflowStatus === "pending_approval" &&
-            "bg-amber-50 border-amber-200 text-amber-900",
-          workflowStatus === "approved" &&
-            "bg-emerald-50 border-emerald-200 text-emerald-900",
-          workflowStatus === "sent" &&
-            "bg-blue-50 border-blue-200 text-blue-900",
-          workflowStatus === "draft" &&
-            "bg-slate-50 border-slate-200 text-slate-700",
-        )}
-      >
-        <div className="flex flex-wrap items-center gap-2">
-          {workflowStatus === "rejected" && (
-            <XCircle className="h-4 w-4 text-rose-600 shrink-0" />
-          )}
-          {workflowStatus === "pending_approval" && (
-            <Clock className="h-4 w-4 text-amber-600 shrink-0" />
-          )}
-          {workflowStatus === "approved" && (
-            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-          )}
-          {workflowStatus === "sent" && (
-            <Send className="h-4 w-4 text-blue-600 shrink-0" />
-          )}
-          {workflowStatus === "draft" && (
-            <FileText className="h-4 w-4 text-slate-500 shrink-0" />
-          )}
-
-          <span className="font-bold uppercase tracking-wider text-[11px]">
-            {workflowStatus === "pending_approval"
-              ? "Pending Approval"
-              : workflowStatus === "approved"
-                ? "Approved"
-                : workflowStatus === "rejected"
-                  ? "Rejected"
-                  : workflowStatus === "sent"
-                    ? "Sent to Customer"
-                    : "Draft"}
-          </span>
-
-          {statusReason && (
-            <>
-              <span className="opacity-40 font-bold">•</span>
-              <span className="text-slate-700">
-                <span className="font-semibold text-slate-500">Reason:</span>{" "}
-                {statusReason}
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-bold text-slate-900 leading-tight">
+                {customerName}
+              </h1>
+              {quoteNumber && (
+                <span className="px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 font-bold text-xs border border-blue-200">
+                  Quote #{quoteNumber}
+                </span>
+              )}
+              <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200">
+                v{versionNumber}
               </span>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Main Quotation Document Card */}
-      <Card className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 md:p-12 relative">
-        {/* Header Branding & Company Details */}
-        <div className="flex flex-col md:flex-row justify-between items-start gap-8 mb-10 pb-8 border-b border-slate-200">
-          <div className="space-y-3">
-            <img src={Logo} alt="The Steel Logo" className="w-36 h-auto" />
-            <div className="text-xs text-slate-500 leading-relaxed font-normal">
-              <p className="font-bold text-slate-700">
-                The Steel Building Depot
-              </p>
-              <p>1851 Madison Ave Suite 300</p>
-              <p>Council Bluffs, IA 51503, United States</p>
-              <p>contact@thesteelcompany.com</p>
-            </div>
-          </div>
-
-          <div className="text-right space-y-1 pt-2">
-            <h2 className="text-2xl font-black text-slate-800 tracking-wider uppercase">
-              QUOTATION
-            </h2>
-            <div className="text-xs text-slate-600 space-y-1">
-              <div>
-                <span className="font-semibold text-slate-400 mr-2">
-                  QUOTE NUMBER:
+              {isStorage && (
+                <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 font-bold text-xs border border-amber-200">
+                  Mini Storage
                 </span>
-                <span className="font-bold text-slate-800">#{quoteNumber}</span>
-              </div>
-              <div>
-                <span className="font-semibold text-slate-400 mr-2">DATE:</span>
-                <span className="font-bold text-slate-800">{quoteDate}</span>
-              </div>
-              <div>
-                <span className="font-semibold text-slate-400 mr-2">
-                  VALID FOR:
-                </span>
-                <span className="font-bold text-slate-800">30 Days</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Customer & Job Information Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 p-5 bg-slate-50 rounded-xl border border-slate-200/80">
-          <div>
-            <div className="text-[11px] font-black text-slate-400 uppercase tracking-wider mb-2">
-              QUOTED TO
-            </div>
-            <div className="text-sm font-bold text-slate-900">
-              {customerName}
-            </div>
-            {customerEmail && (
-              <div className="text-xs text-slate-600 mt-0.5">
-                {customerEmail}
-              </div>
-            )}
-            <div className="text-xs text-slate-500 mt-1">{customerAddress}</div>
-          </div>
-
-          <div>
-            <div className="text-[11px] font-black text-slate-400 uppercase tracking-wider mb-2">
-              PROJECT SPECIFICATIONS
-            </div>
-            <div className="text-xs text-slate-700 space-y-1">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Job Type:</span>
-                <span className="font-semibold">{jobType}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Scope:</span>
-                <span className="font-semibold">{scope}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Building Size:</span>
-                <span className="font-semibold">{buildingSize}</span>
-              </div>
-              {squareFootage > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Area:</span>
-                  <span className="font-semibold">
-                    {squareFootage.toLocaleString()} SF
-                  </span>
-                </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* Line Items Table */}
-        <div className="mb-10">
-          <div className="border border-slate-200 rounded-lg overflow-hidden">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
-                <tr>
-                  <th className="py-3 px-4">Item & Description</th>
-                  <th className="py-3 px-4 text-center">Qty / Size</th>
-                  <th className="py-3 px-4 text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {/* Main Building Package */}
-                <tr>
-                  <td className="py-3.5 px-4 font-semibold text-slate-900">
-                    <div>{buildingSize} Steel Structure</div>
-                    <div className="text-[11px] font-normal text-slate-500 mt-0.5">
-                      Scope: {scope} · Engineered steel building package
-                    </div>
-                  </td>
-                  <td className="py-3.5 px-4 text-center text-slate-600">
-                    {squareFootage > 0
-                      ? `${squareFootage.toLocaleString()} SF`
-                      : "1 Unit"}
-                  </td>
-                  <td className="py-3.5 px-4 text-right font-bold text-slate-900">
-                    $
-                    {finalAmount.toLocaleString("en-US", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </td>
-                </tr>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Send to Customer Button (if approved & not stale) */}
+          {isApproved && !isStaleApproved && (
+            <Button
+              type="button"
+              onClick={() => setShowSendModal(true)}
+              disabled={isSent}
+              title={
+                isSent
+                  ? "Quotation has already been sent to customer"
+                  : undefined
+              }
+              className={`px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 shadow-xs ${
+                isSent
+                  ? "bg-slate-200 text-slate-500 cursor-not-allowed border border-slate-300"
+                  : "bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
+              }`}
+            >
+              <Send className="h-4 w-4" />
+              {isSent ? "Already Sent" : "Send to Customer"}
+            </Button>
+          )}
 
-                {/* Additional notes or items */}
-                {estimate?.concreteAddon?.include && (
-                  <tr>
-                    <td className="py-3 px-4 text-slate-700">
-                      <div>
-                        Concrete Slab Add-on (
-                        {estimate.concreteAddon.slabThickness || '4"'},{" "}
-                        {estimate.concreteAddon.psi || "3000"} PSI)
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-center text-slate-500">
-                      {squareFootage} SF
-                    </td>
-                    <td className="py-3 px-4 text-right text-slate-700 font-medium">
-                      Included in Package
-                    </td>
-                  </tr>
-                )}
+          {/* Submit / Re-submit for Approval Button */}
+          {canSubmit && (
+            <Button
+              type="button"
+              onClick={() => setShowSubmitModal(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
+            >
+              <FileCheck className="h-4 w-4" />
+              {workflowStatus === "rejected" || isStaleApproved
+                ? "Re-submit for Approval"
+                : "Submit for Approval"}
+            </Button>
+          )}
 
-                {estimate?.insulationAddon?.include && (
-                  <tr>
-                    <td className="py-3 px-4 text-slate-700">
-                      <div>
-                        Insulation System (
-                        {estimate.insulationAddon.system || "Standard"})
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-center text-slate-500">
-                      {squareFootage} SF
-                    </td>
-                    <td className="py-3 px-4 text-right text-slate-700 font-medium">
-                      Included in Package
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          {/* Edit Estimate Button (if backed by estimate) */}
+          {sourceEstimateId && (
+            <Button
+              type="button"
+              onClick={handleEditEstimate}
+              disabled={isEditingEstimate}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
+              title="Load estimate into generator editor to modify"
+            >
+              {isEditingEstimate ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileEdit className="h-4 w-4" />
+              )}
+              Edit Estimate
+            </Button>
+          )}
+
+          {/* Source Estimate Link Button */}
+          {sourceEstimateId && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                navigate(`/quotation/history/${sourceEstimateId}`);
+              }}
+              className="border-slate-300 text-slate-700 hover:bg-slate-50 px-3.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer bg-white"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Source Estimate
+            </Button>
+          )}
+
+          {/* Download PDF Button */}
+          <Button
+            type="button"
+            onClick={handleDownloadPdf}
+            disabled={isDownloadingPdf}
+            className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
+            title={"Download PDF file"}
+          >
+            {isDownloadingPdf ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {isDownloadingPdf ? "Downloading..." : "Download PDF"}
+          </Button>
+
+          {/* Print Button */}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handlePrint}
+            className="border-slate-300 text-slate-700 hover:bg-slate-50 px-3.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer bg-white"
+          >
+            <Printer className="h-4 w-4" />
+            Print
+          </Button>
         </div>
+      </div>
 
-        {/* Totals Section */}
-        <div className="flex flex-col md:flex-row justify-between items-start gap-8 mb-12">
-          <div className="w-full md:w-1/2 space-y-2 text-xs text-slate-500">
-            <p className="font-bold text-slate-700 uppercase tracking-wider">
-              Terms & Conditions
-            </p>
-            <p>
-              This quotation is valid for 30 calendar days from date of
-              issuance. Prices reflect standard site conditions and design loads
-              as specified.
-            </p>
-            <p>
-              By approving or signing, the client accepts the specifications and
-              pricing presented herein.
-            </p>
-          </div>
+      {/* Approval Status & Workflow Banner */}
+      <QuotationApprovalBanner
+        workflowStatus={workflowStatus}
+        approval={approvalInfo}
+        versionNumber={versionNumber}
+        onSubmitForApproval={() => setShowSubmitModal(true)}
+      />
 
-          <div className="w-full md:w-80 space-y-2 p-4 bg-slate-50 rounded-xl border border-slate-200">
-            {materialCost > 0 && (
-              <div className="flex justify-between text-xs text-slate-500">
-                <span>Material Cost</span>
-                <span>
-                  $
-                  {materialCost.toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
-              </div>
-            )}
-            {freightCost > 0 && (
-              <div className="flex justify-between text-xs text-slate-500">
-                <span>Freight Cost</span>
-                <span>
-                  $
-                  {freightCost.toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
-              </div>
-            )}
-            {totalCogs > 0 && (
-              <div className="flex justify-between text-xs text-slate-600 font-medium pt-1 border-t border-slate-200">
-                <span>Total COGS</span>
-                <span>
-                  $
-                  {totalCogs.toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
-              </div>
-            )}
-            <div className="flex justify-between text-xs text-slate-600 font-medium">
-              <span>Subtotal</span>
-              <span>
-                $
-                {finalAmount.toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </span>
-            </div>
-            {pricePerSf > 0 && (
-              <div className="flex justify-between text-xs text-slate-500">
-                <span>Unit Price</span>
-                <span className="font-semibold text-slate-700">
-                  ${pricePerSf.toFixed(2)}/SF
-                </span>
-              </div>
-            )}
-            <div className="border-t border-slate-200 pt-2 flex justify-between text-sm font-black text-slate-900">
-              <span>Final Sell Price</span>
-              <span className="text-[#2563eb]">
-                $
-                {finalAmount.toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Signature Line */}
-        <div className="flex justify-end pt-8 border-t border-slate-200">
-          <div className="w-64 text-center">
-            <div className="border-b border-slate-400 mb-2 h-12" />
-            <p className="text-xs text-slate-500 font-medium">
-              Authorized Signature & Date
-            </p>
-          </div>
-        </div>
-      </Card>
+      {/* Document HTML Preview Card */}
+      <div id="quotation-preview-section">
+        <ServerDocumentPreview
+          html={previewHtml}
+          isLoading={isPreviewLoading}
+          error={previewError}
+          onRetry={loadHtmlPreview}
+          title={`Quotation Document — ${customerName}`}
+          minHeight={850}
+        />
+      </div>
 
       {/* Modals for Approval & Send */}
       <SubmitApprovalModal
         open={showSubmitModal}
         onOpenChange={setShowSubmitModal}
         quotationId={quotation._id}
+        estimateId={sourceEstimateId}
         quotationTitle={`Quotation #${quoteNumber} - ${customerName}`}
         quotationNumber={quoteNumber}
         versionNumber={versionNumber}
-        totalAmount={`$${finalAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+        totalAmount={
+          quotation?.finalPrice
+            ? `$${Number(quotation.finalPrice).toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}`
+            : undefined
+        }
         onSuccess={() => {
           void refetch();
         }}
@@ -600,6 +438,7 @@ export default function QuotationDetailsPage() {
         customerName={customerName}
         approvalStatus={workflowStatus}
         versionNumber={versionNumber}
+        approvedVersionNumber={approvalInfo?.approvedVersionNumber}
         onSuccess={() => {
           void refetch();
         }}
