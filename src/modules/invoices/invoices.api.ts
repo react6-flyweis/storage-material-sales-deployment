@@ -176,6 +176,8 @@ export type InvoiceListParams = {
   startDate?: string;
   endDate?: string;
   status?: InvoiceStatus | ApprovalStatus | string;
+  pending?: boolean | string;
+  approvalStatus?: string;
   leadId?: string;
   search?: string;
   page?: number;
@@ -272,6 +274,8 @@ export async function getInvoicesProvider(params: InvoiceListParams = {}) {
       ...(params.startDate ? { startDate: params.startDate } : {}),
       ...(params.endDate ? { endDate: params.endDate } : {}),
       ...(params.status ? { status: params.status } : {}),
+      ...(params.pending !== undefined ? { pending: params.pending } : {}),
+      ...(params.approvalStatus ? { approvalStatus: params.approvalStatus } : {}),
       ...(params.leadId ? { leadId: params.leadId } : {}),
       ...(params.search ? { search: params.search } : {}),
     },
@@ -342,6 +346,8 @@ export type InvoiceExportParams = {
   startDate?: string;
   endDate?: string;
   status?: InvoiceStatus | ApprovalStatus | string;
+  pending?: boolean | string;
+  approvalStatus?: string;
   leadId?: string;
   search?: string;
   format: "pdf" | "excel";
