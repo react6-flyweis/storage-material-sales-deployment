@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import { useMemo, useState } from "react";
-import { Download, Eye, Upload, Loader2, PlusCircle } from "lucide-react";
+import { Eye, Loader2, PlusCircle } from "lucide-react";
 import TitleSubtitle from "@/components/TitleSubtitle";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,9 +33,10 @@ interface QuotationRow {
 }
 
 const statusColors: Record<string, { bg: string; text: string }> = {
-  "Project Converted": { bg: "bg-green-100", text: "text-green-700" },
-  Rejected: { bg: "bg-orange-100", text: "text-orange-700" },
-  "Quote sent": { bg: "bg-purple-100", text: "text-purple-700" },
+  Approved: { bg: "bg-green-100", text: "text-green-700" },
+  "Pending Approval": { bg: "bg-amber-100", text: "text-amber-800" },
+  Rejected: { bg: "bg-rose-100", text: "text-rose-700" },
+  Sent: { bg: "bg-blue-100", text: "text-blue-800" },
   Draft: { bg: "bg-slate-100", text: "text-slate-700" },
 };
 
@@ -63,19 +64,31 @@ function formatDate(value?: string | null) {
   }).format(date);
 }
 
-function normalizeStatus(status?: string | null) {
-  switch (status) {
+function normalizeStatus(
+  status?: string | null,
+  approvalStatus?: string | null,
+) {
+  const raw = (
+    status ||
+    (approvalStatus && approvalStatus !== "not_submitted"
+      ? approvalStatus
+      : "draft")
+  )
+    .trim()
+    .toLowerCase();
+
+  switch (raw) {
     case "sent":
-      return "Quote sent";
-    case "draft":
-      return "Draft";
+      return "Sent";
     case "approved":
-    case "converted":
-      return "Project Converted";
+      return "Approved";
+    case "pending_approval":
+      return "Pending Approval";
     case "rejected":
       return "Rejected";
+    case "draft":
     default:
-      return status ?? "Unknown";
+      return "Draft";
   }
 }
 
@@ -105,7 +118,6 @@ function EmptyState() {
 export default function QuotationListPage() {
   const [selectedFilters, setSelectedFilters] = useState({
     buildingType: "",
-    projectValue: "",
     status: "",
   });
 
@@ -121,7 +133,12 @@ export default function QuotationListPage() {
     const items = data?.data.quotations ?? [];
 
     return items.map((quotation) => {
-      const status = normalizeStatus(quotation.status);
+      const approvalStatus =
+        quotation.approval?.status || quotation.approvalStatus;
+      const status = normalizeStatus(
+        quotation.workflowStatus || quotation.status,
+        approvalStatus,
+      );
       const colors = getStatusClassName(status);
 
       return {
@@ -138,37 +155,19 @@ export default function QuotationListPage() {
             ? quotation.leadId?.projectName?.trim()
             : null) || "N/A",
         status,
+        buildingType: quotation.buildingType || "",
+        rawStatus: (
+          quotation.workflowStatus ||
+          quotation.status ||
+          ""
+        ).toLowerCase(),
+        rawApprovalStatus: (approvalStatus || "").toLowerCase(),
         value: formatMoney(quotation.finalPrice),
         dateSent: formatDate(quotation.sentAt ?? quotation.createdAt),
         statusClassName: `${colors.bg} ${colors.text}`,
       };
     });
   }, [data]);
-
-  const quotationStats = useMemo(() => {
-    const counts = {
-      total: data?.data.total ?? 0,
-      approved: 0,
-      pending: 0,
-      rejected: 0,
-    };
-
-    quotations.forEach((quotation) => {
-      if (quotation.status === "Project Converted") {
-        counts.approved += 1;
-      }
-
-      if (quotation.status === "Quote sent" || quotation.status === "Draft") {
-        counts.pending += 1;
-      }
-
-      if (quotation.status === "Rejected") {
-        counts.rejected += 1;
-      }
-    });
-
-    return counts;
-  }, [data?.data.total, quotations]);
 
   const handleFilterChange = (filterName: string, value: string) => {
     setSelectedFilters((prev) => ({
@@ -180,22 +179,22 @@ export default function QuotationListPage() {
   const statBoxes = [
     {
       label: "Total Quotation",
-      value: quotationStats.total,
+      value: data?.data.total || "-",
       bgColor: "bg-blue-600",
     },
     {
       label: "Approved Quotation",
-      value: quotationStats.approved,
+      value: "-",
       bgColor: "bg-green-500",
     },
     {
       label: "Pending Approval",
-      value: quotationStats.pending,
+      value: "-",
       bgColor: "bg-yellow-400",
     },
     {
       label: "Rejected Quotation",
-      value: quotationStats.rejected,
+      value: "-",
       bgColor: "bg-orange-400",
     },
   ];
@@ -241,25 +240,8 @@ export default function QuotationListPage() {
         ))}
       </div>
 
-      <div className="flex justify-between items-center">
-        <div className="flex gap-3 flex-wrap">
-          <Button
-            className="bg-white text-gray-800 border border-gray-300 hover:bg-gray-50 flex items-center gap-2"
-            size="sm"
-          >
-            <Upload className="w-4 h-4" />
-            Import CSV
-          </Button>
-          <Button
-            className="bg-white text-gray-800 border border-gray-300 hover:bg-gray-50 flex items-center gap-2"
-            size="sm"
-          >
-            <Download className="w-4 h-4" />
-            Export Data
-          </Button>
-        </div>
-
-        <div className="flex gap-4 ">
+      <div className="flex justify-end items-center">
+        <div className="flex gap-4">
           <Select
             value={selectedFilters.buildingType}
             onValueChange={(v) => handleFilterChange("buildingType", v)}
@@ -274,19 +256,6 @@ export default function QuotationListPage() {
             </SelectContent>
           </Select>
           <Select
-            value={selectedFilters.projectValue}
-            onValueChange={(v) => handleFilterChange("projectValue", v)}
-          >
-            <SelectTrigger className="w-44 bg-white">
-              <SelectValue placeholder="Project Value" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="0-10000">$0 - $10,000</SelectItem>
-              <SelectItem value="10000-50000">$10,000 - $50,000</SelectItem>
-              <SelectItem value="50000+">$50,000+</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select
             value={selectedFilters.status}
             onValueChange={(v) => handleFilterChange("status", v)}
           >
@@ -294,9 +263,11 @@ export default function QuotationListPage() {
               <SelectValue placeholder="All Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="converted">Project Converted</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="pending_approval">Pending Approval</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
               <SelectItem value="rejected">Rejected</SelectItem>
-              <SelectItem value="quote-sent">Quote sent</SelectItem>
+              <SelectItem value="sent">Sent</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -400,7 +371,7 @@ export default function QuotationListPage() {
 
       <div className="bg-white">
         <Pagination
-          totalItems={quotationStats.total}
+          totalItems={data?.data.total || 0}
           currentPage={currentPage}
           rowsPerPage={rowsPerPage}
           onPageChange={(p) => setCurrentPage(p)}
