@@ -6,7 +6,7 @@ import {
   Printer,
   ArrowRightCircle,
   FileEdit,
-  Send,
+  FileText,
   AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,16 +19,8 @@ import {
 } from "../estimates.api";
 import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
 import { ServerDocumentPreview } from "../components/server-document-preview";
-import { QuotationApprovalBanner } from "../components/quotation-approval-banner";
-import { SubmitApprovalModal } from "../components/submit-approval-modal";
-import { SendQuotationModal } from "../components/send-quotation-modal";
 import { useLoadEstimateToEditor } from "../hooks/use-load-estimate-to-editor";
 import { useConvertEstimateToQuotationMutation } from "@/modules/quotations/quotations.hooks";
-import type {
-  WorkflowStatus,
-  ApprovalStatus,
-  QuotationApprovalInfo,
-} from "@/modules/quotations/quotations.api";
 
 export function EstimateDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -40,8 +32,6 @@ export function EstimateDetailPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
-  const [showSubmitModal, setShowSubmitModal] = useState(false);
-  const [showSendModal, setShowSendModal] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
 
   const { loadAndEdit, isLoading: isEditing } = useLoadEstimateToEditor();
@@ -92,32 +82,6 @@ export function EstimateDetailPage() {
 
   const conversion = estimate?.conversion;
   const quoteNumber = conversion?.quoteNumber;
-
-  const workflowStatus = (conversion?.workflowStatus ||
-    estimate?.workflowStatus ||
-    estimate?.approvalStatus ||
-    "draft") as WorkflowStatus;
-
-  const approvalInfo: QuotationApprovalInfo = useMemo(() => {
-    if (estimate?.approval) {
-      return estimate.approval as unknown as QuotationApprovalInfo;
-    }
-    return {
-      status: (conversion?.approvalStatus ||
-        estimate?.approvalStatus ||
-        "not_submitted") as ApprovalStatus,
-      rejectionReason: estimate?.rejectionReason as string | undefined,
-    };
-  }, [estimate, conversion]);
-
-  const isApproved =
-    approvalInfo?.status === "approved" || workflowStatus === "approved";
-  const versionNumber = estimate?.versionNumber || 1;
-  const isStaleApproved =
-    isApproved &&
-    approvalInfo?.approvedVersionNumber !== undefined &&
-    approvalInfo?.approvedVersionNumber !== null &&
-    approvalInfo.approvedVersionNumber !== versionNumber;
 
   // Server document preview request payload
   const previewPayload: PreviewDocumentRequest | null = useMemo(() => {
@@ -184,8 +148,14 @@ export function EstimateDetailPage() {
     if (!id) return;
     setIsConverting(true);
     try {
-      await convertMutation.mutateAsync(id);
-      await fetchEstimateDetail();
+      const res = await convertMutation.mutateAsync(id);
+      const resData = (res as { data?: { quotation?: { _id?: string }; _id?: string } })?.data;
+      const quotationId = resData?.quotation?._id || resData?._id;
+      if (quotationId) {
+        navigate(`/leads/quotation-details/${quotationId}`);
+      } else {
+        await fetchEstimateDetail();
+      }
     } catch (err) {
       console.error("Failed to convert estimate to quotation:", err);
     } finally {
@@ -281,8 +251,27 @@ export function EstimateDetailPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          {/* View Quotation Button (if converted) */}
+          {(conversion?.isConvertedToQuotation || conversion?.quotationId) && (
+            <Button
+              type="button"
+              onClick={() => {
+                if (conversion?.quotationId) {
+                  navigate(`/leads/quotation-details/${conversion.quotationId}`);
+                } else {
+                  navigate("/leads/quotation-list");
+                }
+              }}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
+              title="View the official quotation"
+            >
+              <FileText className="h-4 w-4" />
+              View Quotation
+            </Button>
+          )}
+
           {/* Convert to Quote Button (if unconverted) */}
-          {!conversion?.isConvertedToQuotation && (
+          {!conversion?.isConvertedToQuotation && !conversion?.quotationId && (
             <Button
               type="button"
               onClick={handleConvertToQuotation}
@@ -296,18 +285,6 @@ export function EstimateDetailPage() {
                 <ArrowRightCircle className="h-4 w-4" />
               )}
               Convert to Quote
-            </Button>
-          )}
-
-          {/* Send to Customer Button (if approved & not stale) */}
-          {isApproved && !isStaleApproved && (
-            <Button
-              type="button"
-              onClick={() => setShowSendModal(true)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
-            >
-              <Send className="h-4 w-4" />
-              Send to Customer
             </Button>
           )}
 
@@ -341,30 +318,8 @@ export function EstimateDetailPage() {
             )}
             {isDownloadingPdf ? "Generating PDF..." : "Generate & Print PDF"}
           </Button>
-
-          {/* Refresh view */}
-          {/* <Button
-            type="button"
-            variant="outline"
-            onClick={fetchEstimateDetail}
-            disabled={isFetching}
-            className="border-slate-300 text-slate-700 hover:bg-slate-50 px-3.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer bg-white"
-          >
-            <RefreshCw
-              className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
-            />
-            Refresh
-          </Button> */}
         </div>
       </div>
-
-      {/* Approval Status & Workflow Banner */}
-      <QuotationApprovalBanner
-        workflowStatus={workflowStatus}
-        approval={approvalInfo}
-        versionNumber={versionNumber}
-        onSubmitForApproval={() => setShowSubmitModal(true)}
-      />
 
       {/* Server Document Preview */}
       <div ref={previewSectionRef} id="preview-section">
@@ -377,34 +332,6 @@ export function EstimateDetailPage() {
           minHeight={800}
         />
       </div>
-
-      {/* Approval & Send Modals */}
-      <SubmitApprovalModal
-        open={showSubmitModal}
-        onOpenChange={setShowSubmitModal}
-        quotationId={conversion?.quotationId || id}
-        estimateId={id}
-        quotationTitle={`Estimate Package - ${customerLeadName}`}
-        quotationNumber={quoteNumber || undefined}
-        versionNumber={versionNumber}
-        onSuccess={() => {
-          fetchEstimateDetail();
-        }}
-      />
-
-      <SendQuotationModal
-        open={showSendModal}
-        onOpenChange={setShowSendModal}
-        quotationId={conversion?.quotationId || id}
-        customerEmail={customerEmail}
-        customerName={customerLeadName}
-        approvalStatus={approvalInfo?.status || "approved"}
-        versionNumber={versionNumber}
-        approvedVersionNumber={approvalInfo?.approvedVersionNumber}
-        onSuccess={() => {
-          fetchEstimateDetail();
-        }}
-      />
     </div>
   );
 }
