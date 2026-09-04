@@ -287,6 +287,18 @@ export type FollowUpModeOfContact = "call" | "email" | "meeting" | "sms" | "chat
 export type LeadTemperature = "hot" | "warm" | "cold";
 export type TransitionSource = "manual_override" | "ai_scoring" | "system";
 
+export type LeadTransitionInfo = {
+  transitionState: string;
+  transitionFrom?: string;
+  transitionTo?: string;
+  transitionAt?: string;
+  transitionSource?: string;
+  scoreBefore?: number;
+  scoreAfter?: number;
+  scoreDelta?: number;
+  transitionReason?: string;
+};
+
 export type FollowUpActivityFilters = {
   kind?: FollowUpKind | "all";
   view?: FollowUpView;
@@ -299,6 +311,7 @@ export type FollowUpActivityFilters = {
   modeOfContact?: FollowUpModeOfContact | string;
   temperature?: LeadTemperature | string;
   search?: string;
+  transitionState?: string;
 };
 
 export type FollowUpActivityLeadItem = {
@@ -320,7 +333,9 @@ export type FollowUpActivityLeadItem = {
     };
     score?: number;
     temperature?: LeadTemperature | string;
+    transition?: LeadTransitionInfo;
   };
+  transition?: LeadTransitionInfo;
   followUpCount: number;
   pendingCount: number;
   completedCount: number;
@@ -390,6 +405,8 @@ export type FollowUpActivityDetailResponse = {
       jobId?: string;
       projectName?: string;
       customerName?: string;
+      location?: string;
+      quoteValue?: number;
       lifecycleStatus?: string;
       assignedSales?: {
         _id?: string;
@@ -399,7 +416,9 @@ export type FollowUpActivityDetailResponse = {
         temperature?: LeadTemperature | string;
         score?: number;
       };
+      transition?: LeadTransitionInfo;
     };
+    transition?: LeadTransitionInfo;
     totals: {
       followUpCount: number;
       pendingCount: number;
@@ -434,6 +453,9 @@ export async function getFollowUpActivitySummaryProvider(
   if (filters.modeOfContact) params.modeOfContact = filters.modeOfContact;
   if (filters.temperature && filters.temperature !== "all") params.temperature = filters.temperature;
   if (filters.search) params.search = filters.search;
+  if (filters.transitionState && filters.transitionState !== "all") {
+    params.transitionState = filters.transitionState;
+  }
 
   const response = await apiClient.get<FollowUpActivitySummaryResponse>(
     "/api/followups/activity",
@@ -443,19 +465,32 @@ export async function getFollowUpActivitySummaryProvider(
   return response.data;
 }
 
+export type FollowUpActivityDetailOptions = {
+  startDate?: string;
+  endDate?: string;
+  transitionState?: string;
+};
+
 export async function getFollowUpActivityDetailProvider(
   leadId: string,
   kind: FollowUpKind = "manual",
   page = 1,
-  limit = 20
+  limit = 20,
+  options?: FollowUpActivityDetailOptions
 ) {
-  const params = {
+  const params: Record<string, string | number> = {
     view: "detail",
     kind,
     leadId,
     page,
     limit,
   };
+
+  if (options?.startDate) params.startDate = options.startDate;
+  if (options?.endDate) params.endDate = options.endDate;
+  if (options?.transitionState && options.transitionState !== "all") {
+    params.transitionState = options.transitionState;
+  }
 
   const response = await apiClient.get<FollowUpActivityDetailResponse>(
     "/api/followups/activity",
