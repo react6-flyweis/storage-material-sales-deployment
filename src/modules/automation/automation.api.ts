@@ -11,6 +11,45 @@ export type SendChatDropOffResponse = {
   data?: unknown;
 };
 
+export type WarmPreset = "twice_week" | "weekly" | "d7_15_30" | "custom";
+export type ColdPreset = "d7_15_30" | "every_15" | "monthly" | "custom";
+export type ChatPreset = "default" | "twice_day" | "daily" | "custom";
+
+export interface FollowupAutomationConfigPayload {
+  channels: {
+    sms: boolean;
+    email: boolean;
+  };
+  timezone: string;
+  chatDropOff: {
+    enabled: boolean;
+    inactivityMinutes: number;
+    maxAttempts: number;
+    attemptIntervalsMinutes: number[];
+  };
+  coldLead: {
+    enabled: boolean;
+    maxAttempts: number;
+    intervalsDays: number[];
+  };
+  manualReminder: {
+    defaultReminderMinutes: number;
+    sendDueNowReminder: boolean;
+  };
+  leadFrequency?: {
+    warm?: {
+      preset?: WarmPreset;
+      maxAttempts?: number;
+      intervalsDays?: number[];
+    };
+    cold?: {
+      preset?: ColdPreset;
+      maxAttempts?: number;
+      intervalsDays?: number[];
+    };
+  };
+}
+
 export type FollowUpAutomationConfig = {
   key?: string;
   chatDropOff?: {
@@ -34,6 +73,18 @@ export type FollowUpAutomationConfig = {
   manualReminder?: {
     defaultReminderMinutes: number;
     sendDueNowReminder: boolean;
+  };
+  leadFrequency?: {
+    warm?: {
+      preset?: WarmPreset;
+      maxAttempts?: number;
+      intervalsDays?: number[];
+    };
+    cold?: {
+      preset?: ColdPreset;
+      maxAttempts?: number;
+      intervalsDays?: number[];
+    };
   };
   channels?: {
     sms: boolean;
