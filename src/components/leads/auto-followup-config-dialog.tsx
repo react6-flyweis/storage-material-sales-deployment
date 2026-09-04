@@ -24,7 +24,13 @@ import {
   useAutomationConfigQuery,
   useUpdateAutomationConfigMutation,
 } from "@/modules/automation/automation.hooks";
-import { useAuthStore } from "@/modules/auth/auth.store";
+import {
+  type WarmPreset,
+  type ColdPreset,
+  type ChatPreset,
+  type FollowupAutomationConfigPayload,
+  type FollowUpAutomationConfig,
+} from "@/modules/automation/automation.api";
 import {
   Loader2,
   Save,
@@ -54,12 +60,117 @@ const COMMON_TIMEZONES = [
   { value: "Asia/Dubai", label: "Asia/Dubai (GST)" },
 ];
 
+const CHAT_PRESETS: Record<
+  Exclude<ChatPreset, "custom">,
+  { label: string; desc: string; intervals: number[]; maxAttempts: number }
+> = {
+  default: {
+    label: "Default",
+    desc: "30m, 3h, 24h",
+    intervals: [30, 180, 1440],
+    maxAttempts: 3,
+  },
+  twice_day: {
+    label: "Twice a Day",
+    desc: "6h, 12h",
+    intervals: [360, 720],
+    maxAttempts: 2,
+  },
+  daily: {
+    label: "Daily",
+    desc: "24h, 48h, 72h",
+    intervals: [1440, 2880, 4320],
+    maxAttempts: 3,
+  },
+};
+
+const WARM_PRESETS: Record<
+  Exclude<WarmPreset, "custom">,
+  { label: string; desc: string; intervals: number[]; maxAttempts: number }
+> = {
+  twice_week: {
+    label: "Twice a Week",
+    desc: "+3, +7, +10, +14d",
+    intervals: [3, 7, 10, 14],
+    maxAttempts: 4,
+  },
+  weekly: {
+    label: "Weekly",
+    desc: "7, 14, 21, 28d",
+    intervals: [7, 14, 21, 28],
+    maxAttempts: 4,
+  },
+  d7_15_30: {
+    label: "Day 7, 15, 30",
+    desc: "7, 15, 30d",
+    intervals: [7, 15, 30],
+    maxAttempts: 3,
+  },
+};
+
+const COLD_PRESETS: Record<
+  Exclude<ColdPreset, "custom">,
+  { label: string; desc: string; intervals: number[]; maxAttempts: number }
+> = {
+  d7_15_30: {
+    label: "Day 7, 15, 30",
+    desc: "7, 15, 30d",
+    intervals: [7, 15, 30],
+    maxAttempts: 3,
+  },
+  every_15: {
+    label: "Every 15 Days",
+    desc: "15, 30, 45, 60d",
+    intervals: [15, 30, 45, 60],
+    maxAttempts: 4,
+  },
+  monthly: {
+    label: "Monthly",
+    desc: "30, 60, 90d",
+    intervals: [30, 60, 90],
+    maxAttempts: 3,
+  },
+};
+
 function formatMinutes(mins: number): string {
   if (mins < 60) return `${mins}m`;
   if (mins % 60 === 0) return `${mins / 60}h`;
   const hrs = Math.floor(mins / 60);
   const remainingMins = mins % 60;
   return `${hrs}h ${remainingMins}m`;
+}
+
+function parseNumberArray(str: string): number[] {
+  return str
+    .split(",")
+    .map((item) => Number(item.trim()))
+    .filter((n) => !isNaN(n) && n > 0);
+}
+
+function matchArray(a: number[], b: number[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((val, idx) => val === b[idx]);
+}
+
+function detectChatPreset(intervals: number[]): ChatPreset {
+  for (const [key, item] of Object.entries(CHAT_PRESETS)) {
+    if (matchArray(intervals, item.intervals)) return key as ChatPreset;
+  }
+  return "custom";
+}
+
+function detectWarmPreset(intervals: number[]): WarmPreset {
+  for (const [key, item] of Object.entries(WARM_PRESETS)) {
+    if (matchArray(intervals, item.intervals)) return key as WarmPreset;
+  }
+  return "custom";
+}
+
+function detectColdPreset(intervals: number[]): ColdPreset {
+  for (const [key, item] of Object.entries(COLD_PRESETS)) {
+    if (matchArray(intervals, item.intervals)) return key as ColdPreset;
+  }
+  return "custom";
 }
 
 export default function AutoFollowUpConfigDialog({
@@ -73,8 +184,6 @@ export default function AutoFollowUpConfigDialog({
     refetch,
   } = useAutomationConfigQuery();
   const updateMutation = useUpdateAutomationConfigMutation();
-  const role = useAuthStore((state) => state.role);
-  const isAdmin = !role || role.toLowerCase() === "admin";
 
   // Form states
   const [channels, setChannels] = useState({ sms: true, email: true });
@@ -84,15 +193,21 @@ export default function AutoFollowUpConfigDialog({
     enabled: true,
     inactivityMinutes: 30,
     maxAttempts: 3,
+    preset: "default" as ChatPreset,
     attemptIntervalsStr: "30, 180, 1440",
-    requireNotQuoteReady: false,
-    requireNotHandedToSales: false,
+  });
+
+  const [warmLead, setWarmLead] = useState({
+    preset: "twice_week" as WarmPreset,
+    maxAttempts: 4,
+    intervalsDaysStr: "3, 7, 10, 14",
   });
 
   const [coldLead, setColdLead] = useState({
     enabled: true,
+    preset: "d7_15_30" as ColdPreset,
     maxAttempts: 4,
-    intervalsDaysStr: "1, 3, 7, 14",
+    intervalsDaysStr: "7, 15, 30",
   });
 
   const [manualReminder, setManualReminder] = useState({
@@ -103,109 +218,151 @@ export default function AutoFollowUpConfigDialog({
   const [activeTab, setActiveTab] = useState("channels");
   const [showSuccess, setShowSuccess] = useState(false);
 
-  // Populate state from API data
+  // Synchronize state from API
+  const syncFromConfig = (cfg?: FollowUpAutomationConfig | null) => {
+    if (!cfg) return;
+
+    if (cfg.channels) {
+      setChannels({
+        sms: Boolean(cfg.channels.sms),
+        email: Boolean(cfg.channels.email),
+      });
+    }
+
+    if (cfg.timezone) {
+      setTimezone(cfg.timezone);
+    }
+
+    if (cfg.chatDropOff) {
+      const intervals = Array.isArray(cfg.chatDropOff.attemptIntervalsMinutes)
+        ? cfg.chatDropOff.attemptIntervalsMinutes
+        : [30, 180, 1440];
+      setChatDropOff({
+        enabled: Boolean(cfg.chatDropOff.enabled),
+        inactivityMinutes:
+          typeof cfg.chatDropOff.inactivityMinutes === "number"
+            ? cfg.chatDropOff.inactivityMinutes
+            : 30,
+        maxAttempts: Number(cfg.chatDropOff.maxAttempts) || 3,
+        preset: detectChatPreset(intervals),
+        attemptIntervalsStr: intervals.join(", "),
+      });
+    }
+
+    if (cfg.leadFrequency?.warm) {
+      const intervals = Array.isArray(cfg.leadFrequency.warm.intervalsDays)
+        ? cfg.leadFrequency.warm.intervalsDays
+        : [3, 7, 10, 14];
+      setWarmLead({
+        preset:
+          (cfg.leadFrequency.warm.preset as WarmPreset) ||
+          detectWarmPreset(intervals),
+        maxAttempts: Number(cfg.leadFrequency.warm.maxAttempts) || 4,
+        intervalsDaysStr: intervals.join(", "),
+      });
+    } else {
+      setWarmLead({
+        preset: "twice_week",
+        maxAttempts: 4,
+        intervalsDaysStr: "3, 7, 10, 14",
+      });
+    }
+
+    const coldIntervals = Array.isArray(cfg.coldLead?.intervalsDays)
+      ? cfg.coldLead.intervalsDays
+      : Array.isArray(cfg.leadFrequency?.cold?.intervalsDays)
+        ? cfg.leadFrequency.cold.intervalsDays
+        : [7, 15, 30];
+    const coldPreset =
+      (cfg.leadFrequency?.cold?.preset as ColdPreset) ||
+      detectColdPreset(coldIntervals);
+    setColdLead({
+      enabled:
+        cfg.coldLead?.enabled !== undefined
+          ? Boolean(cfg.coldLead.enabled)
+          : true,
+      preset: coldPreset,
+      maxAttempts:
+        Number(cfg.coldLead?.maxAttempts) ||
+        Number(cfg.leadFrequency?.cold?.maxAttempts) ||
+        4,
+      intervalsDaysStr: coldIntervals.join(", "),
+    });
+
+    if (cfg.manualReminder) {
+      setManualReminder({
+        defaultReminderMinutes:
+          typeof cfg.manualReminder.defaultReminderMinutes === "number"
+            ? cfg.manualReminder.defaultReminderMinutes
+            : 30,
+        sendDueNowReminder: Boolean(cfg.manualReminder.sendDueNowReminder),
+      });
+    }
+  };
+
   useEffect(() => {
     if (configResponse?.data?.config && open) {
-      const cfg = configResponse.data.config;
-      if (cfg.channels) {
-        setChannels({
-          sms: Boolean(cfg.channels.sms),
-          email: Boolean(cfg.channels.email),
-        });
-      }
-      if (cfg.timezone) {
-        setTimezone(cfg.timezone);
-      }
-      if (cfg.chatDropOff) {
-        setChatDropOff({
-          enabled: Boolean(cfg.chatDropOff.enabled),
-          inactivityMinutes: Number(cfg.chatDropOff.inactivityMinutes) || 30,
-          maxAttempts: Number(cfg.chatDropOff.maxAttempts) || 3,
-          attemptIntervalsStr: Array.isArray(
-            cfg.chatDropOff.attemptIntervalsMinutes,
-          )
-            ? cfg.chatDropOff.attemptIntervalsMinutes.join(", ")
-            : "30, 180, 1440",
-          requireNotQuoteReady: Boolean(cfg.chatDropOff.requireNotQuoteReady),
-          requireNotHandedToSales: Boolean(
-            cfg.chatDropOff.requireNotHandedToSales,
-          ),
-        });
-      }
-      if (cfg.coldLead) {
-        setColdLead({
-          enabled: Boolean(cfg.coldLead.enabled),
-          maxAttempts: Number(cfg.coldLead.maxAttempts) || 4,
-          intervalsDaysStr: Array.isArray(cfg.coldLead.intervalsDays)
-            ? cfg.coldLead.intervalsDays.join(", ")
-            : "1, 3, 7, 14",
-        });
-      }
-      if (cfg.manualReminder) {
-        setManualReminder({
-          defaultReminderMinutes:
-            Number(cfg.manualReminder.defaultReminderMinutes) || 30,
-          sendDueNowReminder: Boolean(cfg.manualReminder.sendDueNowReminder),
-        });
-      }
+      queueMicrotask(() => {
+        syncFromConfig(configResponse.data.config);
+      });
     }
   }, [configResponse, open]);
 
-  // Helper parser for comma separated numbers
-  const parseNumberArray = (str: string): number[] => {
-    return str
-      .split(",")
-      .map((item) => Number(item.trim()))
-      .filter((n) => !isNaN(n) && n > 0);
+  const parsedChatIntervals = parseNumberArray(chatDropOff.attemptIntervalsStr);
+  const parsedWarmIntervals = parseNumberArray(warmLead.intervalsDaysStr);
+  const parsedColdIntervals = parseNumberArray(coldLead.intervalsDaysStr);
+
+  const handleApplyChatPreset = (presetKey: ChatPreset) => {
+    if (presetKey === "custom") {
+      setChatDropOff((prev) => ({ ...prev, preset: "custom" }));
+      return;
+    }
+    const target = CHAT_PRESETS[presetKey];
+    if (target) {
+      setChatDropOff((prev) => ({
+        ...prev,
+        preset: presetKey,
+        attemptIntervalsStr: target.intervals.join(", "),
+        maxAttempts: target.maxAttempts,
+      }));
+    }
   };
 
-  const parsedChatIntervals = parseNumberArray(chatDropOff.attemptIntervalsStr);
-  const parsedColdIntervals = parseNumberArray(coldLead.intervalsDaysStr);
+  const handleApplyWarmPreset = (presetKey: WarmPreset) => {
+    if (presetKey === "custom") {
+      setWarmLead((prev) => ({ ...prev, preset: "custom" }));
+      return;
+    }
+    const target = WARM_PRESETS[presetKey];
+    if (target) {
+      setWarmLead({
+        preset: presetKey,
+        intervalsDaysStr: target.intervals.join(", "),
+        maxAttempts: target.maxAttempts,
+      });
+    }
+  };
+
+  const handleApplyColdPreset = (presetKey: ColdPreset) => {
+    if (presetKey === "custom") {
+      setColdLead((prev) => ({ ...prev, preset: "custom" }));
+      return;
+    }
+    const target = COLD_PRESETS[presetKey];
+    if (target) {
+      setColdLead((prev) => ({
+        ...prev,
+        preset: presetKey,
+        intervalsDaysStr: target.intervals.join(", "),
+        maxAttempts: target.maxAttempts,
+      }));
+    }
+  };
 
   const handleReset = () => {
     if (configResponse?.data?.config) {
-      const cfg = configResponse.data.config;
-      if (cfg.channels) {
-        setChannels({
-          sms: Boolean(cfg.channels.sms),
-          email: Boolean(cfg.channels.email),
-        });
-      }
-      if (cfg.timezone) {
-        setTimezone(cfg.timezone);
-      }
-      if (cfg.chatDropOff) {
-        setChatDropOff({
-          enabled: Boolean(cfg.chatDropOff.enabled),
-          inactivityMinutes: Number(cfg.chatDropOff.inactivityMinutes) || 30,
-          maxAttempts: Number(cfg.chatDropOff.maxAttempts) || 3,
-          attemptIntervalsStr: Array.isArray(
-            cfg.chatDropOff.attemptIntervalsMinutes,
-          )
-            ? cfg.chatDropOff.attemptIntervalsMinutes.join(", ")
-            : "30, 180, 1440",
-          requireNotQuoteReady: Boolean(cfg.chatDropOff.requireNotQuoteReady),
-          requireNotHandedToSales: Boolean(
-            cfg.chatDropOff.requireNotHandedToSales,
-          ),
-        });
-      }
-      if (cfg.coldLead) {
-        setColdLead({
-          enabled: Boolean(cfg.coldLead.enabled),
-          maxAttempts: Number(cfg.coldLead.maxAttempts) || 4,
-          intervalsDaysStr: Array.isArray(cfg.coldLead.intervalsDays)
-            ? cfg.coldLead.intervalsDays.join(", ")
-            : "1, 3, 7, 14",
-        });
-      }
-      if (cfg.manualReminder) {
-        setManualReminder({
-          defaultReminderMinutes:
-            Number(cfg.manualReminder.defaultReminderMinutes) || 30,
-          sendDueNowReminder: Boolean(cfg.manualReminder.sendDueNowReminder),
-        });
-      }
+      syncFromConfig(configResponse.data.config);
+      toast.info("Reset configuration to active server settings.");
     }
   };
 
@@ -218,15 +375,27 @@ export default function AutoFollowUpConfigDialog({
       setActiveTab("chatDropOff");
       return;
     }
+    if (parsedWarmIntervals.length === 0) {
+      toast.error(
+        "Please enter at least one valid interval for Warm Leads (in days).",
+      );
+      setActiveTab("leadFrequency");
+      return;
+    }
     if (coldLead.enabled && parsedColdIntervals.length === 0) {
       toast.error(
         "Please enter at least one valid interval for Cold Lead follow-ups (in days).",
       );
-      setActiveTab("coldLead");
+      setActiveTab("leadFrequency");
       return;
     }
 
-    const payload = {
+    // Sort intervals in ascending order as required by contract
+    const sortedChatIntervals = [...parsedChatIntervals].sort((a, b) => a - b);
+    const sortedWarmIntervals = [...parsedWarmIntervals].sort((a, b) => a - b);
+    const sortedColdIntervals = [...parsedColdIntervals].sort((a, b) => a - b);
+
+    const payload: FollowupAutomationConfigPayload = {
       channels: {
         sms: channels.sms,
         email: channels.email,
@@ -234,23 +403,48 @@ export default function AutoFollowUpConfigDialog({
       timezone: timezone.trim() || "UTC",
       chatDropOff: {
         enabled: chatDropOff.enabled,
-        inactivityMinutes: Number(chatDropOff.inactivityMinutes) || 30,
-        maxAttempts:
-          Number(chatDropOff.maxAttempts) || parsedChatIntervals.length || 3,
-        attemptIntervalsMinutes: parsedChatIntervals,
-        requireNotQuoteReady: chatDropOff.requireNotQuoteReady,
-        requireNotHandedToSales: chatDropOff.requireNotHandedToSales,
+        inactivityMinutes: Math.max(
+          0,
+          Number(chatDropOff.inactivityMinutes) || 0,
+        ),
+        maxAttempts: Math.max(
+          1,
+          Number(chatDropOff.maxAttempts) || sortedChatIntervals.length || 3,
+        ),
+        attemptIntervalsMinutes: sortedChatIntervals,
       },
       coldLead: {
         enabled: coldLead.enabled,
-        maxAttempts:
-          Number(coldLead.maxAttempts) || parsedColdIntervals.length || 4,
-        intervalsDays: parsedColdIntervals,
+        maxAttempts: Math.max(
+          1,
+          Number(coldLead.maxAttempts) || sortedColdIntervals.length || 4,
+        ),
+        intervalsDays: sortedColdIntervals,
       },
       manualReminder: {
-        defaultReminderMinutes:
-          Number(manualReminder.defaultReminderMinutes) || 30,
+        defaultReminderMinutes: Math.max(
+          0,
+          Number(manualReminder.defaultReminderMinutes) || 0,
+        ),
         sendDueNowReminder: manualReminder.sendDueNowReminder,
+      },
+      leadFrequency: {
+        warm: {
+          preset: warmLead.preset,
+          maxAttempts: Math.max(
+            1,
+            Number(warmLead.maxAttempts) || sortedWarmIntervals.length || 4,
+          ),
+          intervalsDays: sortedWarmIntervals,
+        },
+        cold: {
+          preset: coldLead.preset,
+          maxAttempts: Math.max(
+            1,
+            Number(coldLead.maxAttempts) || sortedColdIntervals.length || 4,
+          ),
+          intervalsDays: sortedColdIntervals,
+        },
       },
     };
 
@@ -271,298 +465,294 @@ export default function AutoFollowUpConfigDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl w-full p-0 gap-0 overflow-hidden flex flex-col max-h-[90vh]">
-        {/* Header */}
-        <DialogHeader className="border-b px-6 py-4.5">
-          <DialogTitle className="text-lg font-semibold text-gray-900">
-            Auto Follow-up Configuration
-          </DialogTitle>
-          <DialogDescription className="text-xs text-gray-500 mt-0.5">
-            Configure automated follow-up rules, intervals, and notification
-            channels.
-          </DialogDescription>
-        </DialogHeader>
+        <DialogContent className="sm:max-w-2xl w-full p-0 gap-0 overflow-hidden flex flex-col max-h-[90vh]">
+          {/* Header */}
+          <DialogHeader className="border-b px-6 py-4.5">
+            <DialogTitle className="text-lg font-semibold text-gray-900">
+              Auto Follow-up Configuration
+            </DialogTitle>
+            <DialogDescription className="text-xs text-gray-500 mt-0.5">
+              Configure automated follow-up rules, interval cadences, and
+              notification channels.
+            </DialogDescription>
+          </DialogHeader>
 
-        {/* Loading state */}
-        {isLoading ? (
-          <div className="py-20 flex flex-col items-center justify-center gap-3 text-gray-500">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-            <p className="text-sm font-medium">
-              Loading automation configuration...
-            </p>
-          </div>
-        ) : isError ? (
-          <div className="p-8 text-center space-y-3">
-            <div className="w-12 h-12 rounded-full bg-red-50 text-red-500 mx-auto flex items-center justify-center">
-              <AlertCircle className="w-6 h-6" />
+          {/* Loading state */}
+          {isLoading ? (
+            <div className="py-20 flex flex-col items-center justify-center gap-3 text-gray-500">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+              <p className="text-sm font-medium">
+                Loading automation configuration...
+              </p>
             </div>
-            <h3 className="text-sm font-semibold text-gray-900">
-              Failed to load configuration
-            </h3>
-            <p className="text-xs text-gray-500">
-              Unable to retrieve automation settings from the server.
-            </p>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => refetch()}
-              className="mt-2"
-            >
-              <RotateCcw className="w-3.5 h-3.5 mr-1.5" /> Try Again
-            </Button>
-          </div>
-        ) : (
-          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-            {!isAdmin && (
-              <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs px-3.5 py-2.5 rounded-lg flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <span>
-                  You are currently in read-only mode. Only administrators can
-                  save configuration updates.
-                </span>
+          ) : isError ? (
+            <div className="p-8 text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-red-50 text-red-500 mx-auto flex items-center justify-center">
+                <AlertCircle className="w-6 h-6" />
               </div>
-            )}
+              <h3 className="text-sm font-semibold text-gray-900">
+                Failed to load configuration
+              </h3>
+              <p className="text-xs text-gray-500">
+                Unable to retrieve automation settings from the server.
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => refetch()}
+                className="mt-2"
+              >
+                <RotateCcw className="w-3.5 h-3.5 mr-1.5" /> Try Again
+              </Button>
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
 
-            <Tabs
-              value={activeTab}
-              onValueChange={setActiveTab}
-              className="w-full"
-            >
-              <TabsList className="grid grid-cols-3 bg-gray-100 p-1 rounded-lg w-full sm:h-auto">
-                <TabsTrigger
+              <Tabs
+                value={activeTab}
+                onValueChange={setActiveTab}
+                className="w-full"
+              >
+                <TabsList className="grid grid-cols-3 bg-gray-100 p-1 rounded-lg w-full sm:h-auto">
+                  <TabsTrigger
+                    value="channels"
+                    className="text-xs py-2 data-active:bg-white data-active:text-gray-900 data-active:shadow-xs font-medium cursor-pointer"
+                  >
+                    General & Channels
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="chatDropOff"
+                    className="text-xs py-2 data-active:bg-white data-active:text-gray-900 data-active:shadow-xs font-medium cursor-pointer"
+                  >
+                    Chat Drop-Off
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="leadFrequency"
+                    className="text-xs py-2 data-active:bg-white data-active:text-gray-900 data-active:shadow-xs font-medium cursor-pointer"
+                  >
+                    Lead Cadence (Warm & Cold)
+                  </TabsTrigger>
+                </TabsList>
+
+                {/* 1. General & Channels Tab */}
+                <TabsContent
                   value="channels"
-                  className="text-xs py-2 data-active:bg-white data-active:text-gray-900 data-active:shadow-xs font-medium"
+                  className="space-y-4 pt-3 mt-0 focus-visible:ring-0"
                 >
-                  General & Channels
-                </TabsTrigger>
-                <TabsTrigger
-                  value="chatDropOff"
-                  className="text-xs py-2 data-active:bg-white data-active:text-gray-900 data-active:shadow-xs font-medium"
-                >
-                  Chat Drop-Off
-                </TabsTrigger>
-                <TabsTrigger
-                  value="coldLead"
-                  className="text-xs py-2 data-active:bg-white data-active:text-gray-900 data-active:shadow-xs font-medium"
-                >
-                  Cold Leads
-                </TabsTrigger>
-              </TabsList>
-
-              {/* 1. General & Channels Tab */}
-              <TabsContent
-                value="channels"
-                className="space-y-4 pt-3 mt-0 focus-visible:ring-0"
-              >
-                {/* Notification Channels */}
-                <div className="border border-gray-200 rounded-lg p-4 bg-white space-y-3">
-                  <div className="pb-2 border-b border-gray-100">
-                    <h4 className="text-sm font-semibold text-gray-900">
-                      Communication Channels
-                    </h4>
-                    <p className="text-xs text-gray-500">
-                      Enable or disable automated delivery methods
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                    <div className="flex items-center justify-between p-3 rounded-lg border border-gray-100 bg-gray-50/50">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
-                          <Smartphone className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-gray-900">
-                            SMS Notifications
-                          </p>
-                          <p className="text-[11px] text-gray-500">
-                            Send text messages
-                          </p>
-                        </div>
-                      </div>
-                      <Switch
-                        checked={channels.sms}
-                        onCheckedChange={(checked) =>
-                          setChannels((prev) => ({ ...prev, sms: checked }))
-                        }
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between p-3 rounded-lg border border-gray-100 bg-gray-50/50">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
-                          <Mail className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-gray-900">
-                            Email Notifications
-                          </p>
-                          <p className="text-[11px] text-gray-500">
-                            Send email updates
-                          </p>
-                        </div>
-                      </div>
-                      <Switch
-                        checked={channels.email}
-                        onCheckedChange={(checked) =>
-                          setChannels((prev) => ({ ...prev, email: checked }))
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Timezone Configuration */}
-                <div className="border border-gray-200 rounded-lg p-4 bg-white space-y-3">
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-900">
-                      Automation Timezone
-                    </h4>
-                    <p className="text-xs text-gray-500">
-                      Timezone used for scheduling intervals and sweep runs
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-                    <Select value={timezone} onValueChange={setTimezone}>
-                      <SelectTrigger className="bg-white text-xs">
-                        <SelectValue placeholder="Select timezone" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {COMMON_TIMEZONES.map((tz) => (
-                          <SelectItem
-                            key={tz.value}
-                            value={tz.value}
-                            className="text-xs"
-                          >
-                            {tz.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    <div className="flex items-center gap-2">
-                      <Label
-                        htmlFor="custom-tz"
-                        className="text-xs text-gray-500 whitespace-nowrap"
-                      >
-                        Or enter code:
-                      </Label>
-                      <Input
-                        id="custom-tz"
-                        type="text"
-                        value={timezone}
-                        onChange={(e) => setTimezone(e.target.value)}
-                        placeholder="e.g. UTC, America/Chicago"
-                        className="text-xs bg-white h-9"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Manual Reminder Defaults */}
-                <div className="border border-gray-200 rounded-lg p-4 bg-white space-y-3">
-                  <div className="pb-2 border-b border-gray-100">
-                    <h4 className="text-sm font-semibold text-gray-900">
-                      Manual Task Reminders
-                    </h4>
-                    <p className="text-xs text-gray-500">
-                      Default settings for manual follow-up reminders
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-gray-700">
-                        Advance Reminder (Minutes)
-                      </Label>
-                      <Input
-                        type="number"
-                        min={5}
-                        max={1440}
-                        step={5}
-                        value={manualReminder.defaultReminderMinutes}
-                        onChange={(e) =>
-                          setManualReminder((prev) => ({
-                            ...prev,
-                            defaultReminderMinutes: Number(e.target.value) || 0,
-                          }))
-                        }
-                        className="text-xs bg-white"
-                      />
-                      <p className="text-[11px] text-gray-500">
-                        Default alert sent{" "}
-                        {manualReminder.defaultReminderMinutes} minutes before
-                        due time
-                      </p>
-                    </div>
-
-                    <div className="flex items-center justify-between p-3 rounded-lg border border-gray-100 bg-gray-50/50">
-                      <div>
-                        <p className="text-xs font-medium text-gray-900">
-                          Send &quot;Due Now&quot; Alert
-                        </p>
-                        <p className="text-[11px] text-gray-500">
-                          Notify right at deadline
-                        </p>
-                      </div>
-                      <Switch
-                        checked={manualReminder.sendDueNowReminder}
-                        onCheckedChange={(checked) =>
-                          setManualReminder((prev) => ({
-                            ...prev,
-                            sendDueNowReminder: checked,
-                          }))
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
-
-              {/* 2. Chat Drop-Off Automation Tab */}
-              <TabsContent
-                value="chatDropOff"
-                className="space-y-4 pt-3 mt-0 focus-visible:ring-0"
-              >
-                <div className="border border-gray-200 rounded-lg p-4 bg-white space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-                    <div>
+                  {/* Notification Channels */}
+                  <div className="border border-gray-200 rounded-lg p-4 bg-white space-y-3">
+                    <div className="pb-2 border-b border-gray-100">
                       <h4 className="text-sm font-semibold text-gray-900">
-                        Chat Drop-Off Follow-Up
+                        Communication Channels
                       </h4>
                       <p className="text-xs text-gray-500">
-                        Automatically re-engage users who abandoned active chats
+                        Enable or disable automated delivery methods
                       </p>
                     </div>
-                    <Switch
-                      checked={chatDropOff.enabled}
-                      onCheckedChange={(checked) =>
-                        setChatDropOff((prev) => ({
-                          ...prev,
-                          enabled: checked,
-                        }))
-                      }
-                    />
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      <div className="flex items-center justify-between p-3 rounded-lg border border-gray-100 bg-gray-50/50">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+                            <Smartphone className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium text-gray-900">
+                              SMS Notifications
+                            </p>
+                            <p className="text-[11px] text-gray-500">
+                              Send text messages
+                            </p>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={channels.sms}
+                          onCheckedChange={(checked) =>
+                            setChannels((prev) => ({ ...prev, sms: checked }))
+                          }
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 rounded-lg border border-gray-100 bg-gray-50/50">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+                            <Mail className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium text-gray-900">
+                              Email Notifications
+                            </p>
+                            <p className="text-[11px] text-gray-500">
+                              Send email updates
+                            </p>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={channels.email}
+                          onCheckedChange={(checked) =>
+                            setChannels((prev) => ({ ...prev, email: checked }))
+                          }
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Timezone Configuration */}
+                  <div className="border border-gray-200 rounded-lg p-4 bg-white space-y-3">
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900">
+                        Automation Timezone
+                      </h4>
+                      <p className="text-xs text-gray-500">
+                        Timezone used for scheduling intervals and sweep runs
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                      <Select value={timezone} onValueChange={setTimezone}>
+                        <SelectTrigger className="bg-white text-xs">
+                          <SelectValue placeholder="Select timezone" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {COMMON_TIMEZONES.map((tz) => (
+                            <SelectItem
+                              key={tz.value}
+                              value={tz.value}
+                              className="text-xs"
+                            >
+                              {tz.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <div className="flex items-center gap-2">
+                        <Label
+                          htmlFor="custom-tz"
+                          className="text-xs text-gray-500 whitespace-nowrap"
+                        >
+                          Or enter code:
+                        </Label>
+                        <Input
+                          id="custom-tz"
+                          type="text"
+                          value={timezone}
+                          onChange={(e) => setTimezone(e.target.value)}
+                          placeholder="e.g. UTC, America/Chicago"
+                          className="text-xs bg-white h-9"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Manual Reminder Defaults */}
+                  <div className="border border-gray-200 rounded-lg p-4 bg-white space-y-3">
+                    <div className="pb-2 border-b border-gray-100">
+                      <h4 className="text-sm font-semibold text-gray-900">
+                        Manual Task Reminders
+                      </h4>
+                      <p className="text-xs text-gray-500">
+                        Default settings for manual follow-up reminders
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-gray-700">
+                          Advance Reminder (Minutes)
+                        </Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={1440}
+                          step={5}
+                          value={manualReminder.defaultReminderMinutes}
+                          onChange={(e) =>
+                            setManualReminder((prev) => ({
+                              ...prev,
+                              defaultReminderMinutes: Math.max(
+                                0,
+                                Number(e.target.value) || 0,
+                              ),
+                            }))
+                          }
+                          className="text-xs bg-white"
+                        />
+                        <p className="text-[11px] text-gray-500">
+                          Default alert sent{" "}
+                          {manualReminder.defaultReminderMinutes} minutes before
+                          due time
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 rounded-lg border border-gray-100 bg-gray-50/50">
+                        <div>
+                          <p className="text-xs font-medium text-gray-900">
+                            Send &quot;Due Now&quot; Alert
+                          </p>
+                          <p className="text-[11px] text-gray-500">
+                            Notify right at deadline
+                          </p>
+                        </div>
+                        <Switch
+                          checked={manualReminder.sendDueNowReminder}
+                          onCheckedChange={(checked) =>
+                            setManualReminder((prev) => ({
+                              ...prev,
+                              sendDueNowReminder: checked,
+                            }))
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                {/* 2. Chat Drop-Off Automation Tab */}
+                <TabsContent
+                  value="chatDropOff"
+                  className="space-y-4 pt-3 mt-0 focus-visible:ring-0"
+                >
+                  <div className="border border-gray-200 rounded-lg p-4 bg-white space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-900">
+                          Chat Drop-Off Follow-Up
+                        </h4>
+                        <p className="text-xs text-gray-500">
+                          Automatically re-engage users who abandoned active chats
+                        </p>
+                      </div>
+                      <Switch
+                        checked={chatDropOff.enabled}
+                        onCheckedChange={(checked) =>
+                          setChatDropOff((prev) => ({
+                            ...prev,
+                            enabled: checked,
+                          }))
+                        }
+                      />
+                    </div>
+
                     <div className="space-y-1.5">
                       <Label className="text-xs text-gray-700">
                         Inactivity Trigger (Minutes)
                       </Label>
                       <Input
                         type="number"
-                        min={5}
+                        min={0}
                         max={10080}
                         value={chatDropOff.inactivityMinutes}
                         onChange={(e) =>
                           setChatDropOff((prev) => ({
                             ...prev,
-                            inactivityMinutes: Number(e.target.value) || 0,
+                            inactivityMinutes: Math.max(
+                              0,
+                              Number(e.target.value) || 0,
+                            ),
                           }))
                         }
-                        className="text-xs bg-white"
+                        className="text-xs bg-white sm:max-w-xs"
                         placeholder="e.g. 30"
                       />
                       <p className="text-[11px] text-gray-500">
@@ -572,327 +762,475 @@ export default function AutoFollowUpConfigDialog({
                       </p>
                     </div>
 
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-gray-700">
-                        Max Follow-Up Attempts
-                      </Label>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={10}
-                        value={chatDropOff.maxAttempts}
-                        onChange={(e) =>
-                          setChatDropOff((prev) => ({
-                            ...prev,
-                            maxAttempts: Number(e.target.value) || 0,
-                          }))
-                        }
-                        className="text-xs bg-white"
-                        placeholder="e.g. 3"
-                      />
-                      <p className="text-[11px] text-gray-500">
-                        Maximum attempts before stopping automatic drop-off
-                        pings
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Intervals */}
-                  <div className="space-y-2 pt-2 border-t border-gray-100">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs text-gray-700 font-medium">
-                        Attempt Intervals (Minutes, comma-separated)
-                      </Label>
-                      <div className="flex gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setChatDropOff((prev) => ({
-                              ...prev,
-                              attemptIntervalsStr: "30, 180, 1440",
-                              maxAttempts: 3,
-                            }))
-                          }
-                          className="text-[11px] text-blue-600 hover:text-blue-700 bg-blue-50 px-2 py-0.5 rounded cursor-pointer border border-blue-200/60 font-medium"
-                        >
-                          Default (30m, 3h, 24h)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setChatDropOff((prev) => ({
-                              ...prev,
-                              attemptIntervalsStr: "20, 120, 720",
-                              maxAttempts: 3,
-                            }))
-                          }
-                          className="text-[11px] text-gray-600 hover:text-gray-800 bg-gray-100 px-2 py-0.5 rounded cursor-pointer"
-                        >
-                          Fast (20m, 2h, 12h)
-                        </button>
+                    {/* Presets & Intervals */}
+                    <div className="space-y-2 pt-2 border-t border-gray-100">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs text-gray-700 font-medium">
+                          Attempt Intervals
+                        </Label>
+                        <div className="flex gap-1.5">
+                          {(
+                            Object.keys(CHAT_PRESETS) as Array<
+                              Exclude<ChatPreset, "custom">
+                            >
+                          ).map((key) => {
+                            const item = CHAT_PRESETS[key];
+                            const isSelected = chatDropOff.preset === key;
+                            return (
+                              <button
+                                key={key}
+                                type="button"
+                                onClick={() => handleApplyChatPreset(key)}
+                                className={`text-[11px] px-2 py-0.5 rounded cursor-pointer ${
+                                  isSelected
+                                    ? "text-blue-600 bg-blue-50 border border-blue-200/60 font-medium"
+                                    : "text-gray-600 hover:text-gray-800 bg-gray-100"
+                                }`}
+                              >
+                                {item.label} ({item.desc})
+                              </button>
+                            );
+                          })}
+                          <button
+                            type="button"
+                            onClick={() => handleApplyChatPreset("custom")}
+                            className={`text-[11px] px-2 py-0.5 rounded cursor-pointer ${
+                              chatDropOff.preset === "custom"
+                                ? "text-blue-600 bg-blue-50 border border-blue-200/60 font-medium"
+                                : "text-gray-600 hover:text-gray-800 bg-gray-100"
+                            }`}
+                          >
+                            Custom
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                    <Input
-                      type="text"
-                      value={chatDropOff.attemptIntervalsStr}
-                      onChange={(e) =>
-                        setChatDropOff((prev) => ({
-                          ...prev,
-                          attemptIntervalsStr: e.target.value,
-                        }))
-                      }
-                      placeholder="e.g. 30, 180, 1440"
-                      className="text-xs bg-white font-mono"
-                    />
 
-                    {/* Visual chips */}
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {parsedChatIntervals.map((mins, idx) => (
-                        <Badge
-                          key={idx}
-                          variant="secondary"
-                          className="text-[11px] bg-blue-50 text-blue-700 border border-blue-200 font-normal px-2.5 py-0.5"
-                        >
-                          Attempt #{idx + 1}: {formatMinutes(mins)} ({mins}m)
-                        </Badge>
-                      ))}
-                      {parsedChatIntervals.length === 0 && (
-                        <span className="text-[11px] text-red-500">
-                          Please specify at least one interval in minutes.
-                        </span>
+                      {chatDropOff.preset === "custom" ? (
+                        <div className="space-y-3 pt-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-gray-700">
+                                Max Follow-Up Attempts
+                              </Label>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={6}
+                                value={chatDropOff.maxAttempts}
+                                onChange={(e) =>
+                                  setChatDropOff((prev) => ({
+                                    ...prev,
+                                    maxAttempts: Math.max(
+                                      1,
+                                      Number(e.target.value) || 1,
+                                    ),
+                                  }))
+                                }
+                                className="text-xs bg-white"
+                                placeholder="e.g. 3"
+                              />
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-gray-700">
+                                Intervals (Minutes, comma-separated)
+                              </Label>
+                              <Input
+                                type="text"
+                                value={chatDropOff.attemptIntervalsStr}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  const nums = parseNumberArray(val);
+                                  setChatDropOff((prev) => ({
+                                    ...prev,
+                                    attemptIntervalsStr: val,
+                                    preset: detectChatPreset(nums),
+                                  }));
+                                }}
+                                placeholder="e.g. 30, 180, 1440"
+                                className="text-xs bg-white font-mono"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {parsedChatIntervals.map((mins, idx) => (
+                              <Badge
+                                key={idx}
+                                variant="secondary"
+                                className="text-[11px] bg-blue-50 text-blue-700 border border-blue-200 font-normal px-2.5 py-0.5"
+                              >
+                                Attempt #{idx + 1}: {formatMinutes(mins)} ({mins}m)
+                              </Badge>
+                            ))}
+                            {parsedChatIntervals.length === 0 && (
+                              <span className="text-[11px] text-red-500">
+                                Please specify at least one interval in minutes.
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="pt-1 space-y-1.5">
+                          <div className="flex flex-wrap gap-1.5">
+                            {parsedChatIntervals.map((mins, idx) => (
+                              <Badge
+                                key={idx}
+                                variant="secondary"
+                                className="text-[11px] bg-blue-50 text-blue-700 border border-blue-200 font-normal px-2.5 py-0.5"
+                              >
+                                Attempt #{idx + 1}: {formatMinutes(mins)} ({mins}m)
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
+                </TabsContent>
 
-                  {/* Additional Drop-Off Conditions */}
-                  <div className="space-y-3 pt-3 border-t border-gray-100">
-                    <div>
-                      <h5 className="text-xs font-semibold text-gray-900">
-                        Drop-Off Trigger Conditions
-                      </h5>
-                      <p className="text-[11px] text-gray-500">
-                        Optional constraints before sending drop-off messages
-                      </p>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="flex items-center justify-between p-3 rounded-lg border border-gray-100 bg-gray-50/50">
-                        <div>
-                          <p className="text-xs font-medium text-gray-900">
-                            Require Quote Not Ready
-                          </p>
-                          <p className="text-[11px] text-gray-500">
-                            Only send if quote is pending
-                          </p>
-                        </div>
-                        <Switch
-                          checked={chatDropOff.requireNotQuoteReady}
-                          onCheckedChange={(checked) =>
-                            setChatDropOff((prev) => ({
-                              ...prev,
-                              requireNotQuoteReady: checked,
-                            }))
-                          }
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between p-3 rounded-lg border border-gray-100 bg-gray-50/50">
-                        <div>
-                          <p className="text-xs font-medium text-gray-900">
-                            Require Not Handed to Sales
-                          </p>
-                          <p className="text-[11px] text-gray-500">
-                            Only send if unassigned to sales
-                          </p>
-                        </div>
-                        <Switch
-                          checked={chatDropOff.requireNotHandedToSales}
-                          onCheckedChange={(checked) =>
-                            setChatDropOff((prev) => ({
-                              ...prev,
-                              requireNotHandedToSales: checked,
-                            }))
-                          }
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
-
-              {/* 3. Cold Leads Automation Tab */}
-              <TabsContent
-                value="coldLead"
-                className="space-y-4 pt-3 mt-0 focus-visible:ring-0"
-              >
-                <div className="border border-gray-200 rounded-lg p-4 bg-white space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-                    <div>
+                {/* 3. Lead Cadence (Warm & Cold) Tab */}
+                <TabsContent
+                  value="leadFrequency"
+                  className="space-y-4 pt-3 mt-0 focus-visible:ring-0"
+                >
+                  {/* Card 1: Warm Leads */}
+                  <div className="border border-gray-200 rounded-lg p-4 bg-white space-y-4">
+                    <div className="pb-3 border-b border-gray-100">
                       <h4 className="text-sm font-semibold text-gray-900">
-                        Cold Lead Re-engagement
+                        Warm Leads
                       </h4>
                       <p className="text-xs text-gray-500">
-                        Automated multi-day drip reminders for dormant or cold
-                        leads
+                        Follow-up schedule for warm leads
                       </p>
                     </div>
-                    <Switch
-                      checked={coldLead.enabled}
-                      onCheckedChange={(checked) =>
-                        setColdLead((prev) => ({ ...prev, enabled: checked }))
-                      }
-                    />
-                  </div>
 
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-gray-700">
-                      Max Follow-Up Attempts
-                    </Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={10}
-                      value={coldLead.maxAttempts}
-                      onChange={(e) =>
-                        setColdLead((prev) => ({
-                          ...prev,
-                          maxAttempts: Number(e.target.value) || 0,
-                        }))
-                      }
-                      className="text-xs bg-white sm:max-w-xs"
-                      placeholder="e.g. 4"
-                    />
-                    <p className="text-[11px] text-gray-500">
-                      Total number of cold outreach attempts before closing
-                      cadence
-                    </p>
-                  </div>
-
-                  {/* Intervals */}
-                  <div className="space-y-2 pt-2 border-t border-gray-100">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs text-gray-700 font-medium">
-                        Interval Schedule (Days, comma-separated)
-                      </Label>
-                      <div className="flex gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setColdLead((prev) => ({
-                              ...prev,
-                              intervalsDaysStr: "1, 3, 7, 14",
-                              maxAttempts: 4,
-                            }))
-                          }
-                          className="text-[11px] text-blue-600 hover:text-blue-700 bg-blue-50 px-2 py-0.5 rounded cursor-pointer border border-blue-200/60 font-medium"
-                        >
-                          Standard (1, 3, 7, 14d)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setColdLead((prev) => ({
-                              ...prev,
-                              intervalsDaysStr: "1, 2, 5",
-                              maxAttempts: 3,
-                            }))
-                          }
-                          className="text-[11px] text-gray-600 hover:text-gray-800 bg-gray-100 px-2 py-0.5 rounded cursor-pointer"
-                        >
-                          Short (1, 2, 5d)
-                        </button>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs text-gray-700 font-medium">
+                          Interval Schedule
+                        </Label>
+                        <div className="flex gap-1.5">
+                          {(
+                            Object.keys(WARM_PRESETS) as Array<
+                              Exclude<WarmPreset, "custom">
+                            >
+                          ).map((key) => {
+                            const item = WARM_PRESETS[key];
+                            const isSelected = warmLead.preset === key;
+                            return (
+                              <button
+                                key={key}
+                                type="button"
+                                onClick={() => handleApplyWarmPreset(key)}
+                                className={`text-[11px] px-2 py-0.5 rounded cursor-pointer ${
+                                  isSelected
+                                    ? "text-blue-600 bg-blue-50 border border-blue-200/60 font-medium"
+                                    : "text-gray-600 hover:text-gray-800 bg-gray-100"
+                                }`}
+                              >
+                                {item.label}
+                              </button>
+                            );
+                          })}
+                          <button
+                            type="button"
+                            onClick={() => handleApplyWarmPreset("custom")}
+                            className={`text-[11px] px-2 py-0.5 rounded cursor-pointer ${
+                              warmLead.preset === "custom"
+                                ? "text-blue-600 bg-blue-50 border border-blue-200/60 font-medium"
+                                : "text-gray-600 hover:text-gray-800 bg-gray-100"
+                            }`}
+                          >
+                            Custom
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                    <Input
-                      type="text"
-                      value={coldLead.intervalsDaysStr}
-                      onChange={(e) =>
-                        setColdLead((prev) => ({
-                          ...prev,
-                          intervalsDaysStr: e.target.value,
-                        }))
-                      }
-                      placeholder="e.g. 1, 3, 7, 14"
-                      className="text-xs bg-white font-mono"
-                    />
 
-                    {/* Visual chips */}
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {parsedColdIntervals.map((days, idx) => (
-                        <Badge
-                          key={idx}
-                          variant="secondary"
-                          className="text-[11px] bg-blue-50 text-blue-700 border border-blue-200 font-normal px-2.5 py-0.5"
-                        >
-                          Attempt #{idx + 1}: Day {days}
-                        </Badge>
-                      ))}
-                      {parsedColdIntervals.length === 0 && (
-                        <span className="text-[11px] text-red-500">
-                          Please specify at least one interval in days.
-                        </span>
+                      {warmLead.preset === "custom" ? (
+                        <div className="space-y-3 pt-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-gray-700">
+                                Max Follow-Up Attempts
+                              </Label>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={6}
+                                value={warmLead.maxAttempts}
+                                onChange={(e) =>
+                                  setWarmLead((prev) => ({
+                                    ...prev,
+                                    maxAttempts: Math.max(
+                                      1,
+                                      Number(e.target.value) || 1,
+                                    ),
+                                  }))
+                                }
+                                className="text-xs bg-white"
+                                placeholder="e.g. 4"
+                              />
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-gray-700">
+                                Interval Schedule (Days, comma-separated)
+                              </Label>
+                              <Input
+                                type="text"
+                                value={warmLead.intervalsDaysStr}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  const nums = parseNumberArray(val);
+                                  setWarmLead((prev) => ({
+                                    ...prev,
+                                    intervalsDaysStr: val,
+                                    preset: detectWarmPreset(nums),
+                                  }));
+                                }}
+                                placeholder="e.g. 3, 7, 10, 14"
+                                className="text-xs bg-white font-mono"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {parsedWarmIntervals.map((days, idx) => (
+                              <Badge
+                                key={idx}
+                                variant="secondary"
+                                className="text-[11px] bg-blue-50 text-blue-700 border border-blue-200 font-normal px-2.5 py-0.5"
+                              >
+                                Attempt #{idx + 1}: Day {days}
+                              </Badge>
+                            ))}
+                            {parsedWarmIntervals.length === 0 && (
+                              <span className="text-[11px] text-red-500">
+                                Please specify at least one interval in days.
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="pt-1 space-y-1.5">
+                          <div className="flex flex-wrap gap-1.5">
+                            {parsedWarmIntervals.map((days, idx) => (
+                              <Badge
+                                key={idx}
+                                variant="secondary"
+                                className="text-[11px] bg-blue-50 text-blue-700 border border-blue-200 font-normal px-2.5 py-0.5"
+                              >
+                                Attempt #{idx + 1}: Day {days}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </div>
-        )}
 
-        {/* Footer */}
-        <DialogFooter className="border-t px-6 py-4 flex items-center justify-between bg-gray-50/50 shrink-0">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={handleReset}
-            disabled={isLoading || updateMutation.isPending}
-            className="text-gray-600 hover:text-gray-900 text-xs"
-          >
-            <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
-            Reset to Current
-          </Button>
+                  {/* Card 2: Cold Leads */}
+                  <div className="border border-gray-200 rounded-lg p-4 bg-white space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-900">
+                          Cold Leads
+                        </h4>
+                        <p className="text-xs text-gray-500">
+                          Automated drip reminders for cold leads
+                        </p>
+                      </div>
+                      <Switch
+                        checked={coldLead.enabled}
+                        onCheckedChange={(checked) =>
+                          setColdLead((prev) => ({ ...prev, enabled: checked }))
+                        }
+                      />
+                    </div>
 
-          <div className="flex items-center gap-2">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs text-gray-700 font-medium">
+                          Interval Schedule
+                        </Label>
+                        <div className="flex gap-1.5">
+                          {(
+                            Object.keys(COLD_PRESETS) as Array<
+                              Exclude<ColdPreset, "custom">
+                            >
+                          ).map((key) => {
+                            const item = COLD_PRESETS[key];
+                            const isSelected = coldLead.preset === key;
+                            return (
+                              <button
+                                key={key}
+                                type="button"
+                                onClick={() => handleApplyColdPreset(key)}
+                                className={`text-[11px] px-2 py-0.5 rounded cursor-pointer ${
+                                  isSelected
+                                    ? "text-blue-600 bg-blue-50 border border-blue-200/60 font-medium"
+                                    : "text-gray-600 hover:text-gray-800 bg-gray-100"
+                                }`}
+                              >
+                                {item.label}
+                              </button>
+                            );
+                          })}
+                          <button
+                            type="button"
+                            onClick={() => handleApplyColdPreset("custom")}
+                            className={`text-[11px] px-2 py-0.5 rounded cursor-pointer ${
+                              coldLead.preset === "custom"
+                                ? "text-blue-600 bg-blue-50 border border-blue-200/60 font-medium"
+                                : "text-gray-600 hover:text-gray-800 bg-gray-100"
+                            }`}
+                          >
+                            Custom
+                          </button>
+                        </div>
+                      </div>
+
+                      {coldLead.preset === "custom" ? (
+                        <div className="space-y-3 pt-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-gray-700">
+                                Max Follow-Up Attempts
+                              </Label>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={6}
+                                value={coldLead.maxAttempts}
+                                onChange={(e) =>
+                                  setColdLead((prev) => ({
+                                    ...prev,
+                                    maxAttempts: Math.max(
+                                      1,
+                                      Number(e.target.value) || 1,
+                                    ),
+                                  }))
+                                }
+                                className="text-xs bg-white"
+                                placeholder="e.g. 4"
+                              />
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-gray-700">
+                                Interval Schedule (Days, comma-separated)
+                              </Label>
+                              <Input
+                                type="text"
+                                value={coldLead.intervalsDaysStr}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  const nums = parseNumberArray(val);
+                                  setColdLead((prev) => ({
+                                    ...prev,
+                                    intervalsDaysStr: val,
+                                    preset: detectColdPreset(nums),
+                                  }));
+                                }}
+                                placeholder="e.g. 7, 15, 30"
+                                className="text-xs bg-white font-mono"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {parsedColdIntervals.map((days, idx) => (
+                              <Badge
+                                key={idx}
+                                variant="secondary"
+                                className="text-[11px] bg-blue-50 text-blue-700 border border-blue-200 font-normal px-2.5 py-0.5"
+                              >
+                                Attempt #{idx + 1}: Day {days}
+                              </Badge>
+                            ))}
+                            {parsedColdIntervals.length === 0 && (
+                              <span className="text-[11px] text-red-500">
+                                Please specify at least one interval in days.
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="pt-1 space-y-1.5">
+                          <div className="flex flex-wrap gap-1.5">
+                            {parsedColdIntervals.map((days, idx) => (
+                              <Badge
+                                key={idx}
+                                variant="secondary"
+                                className="text-[11px] bg-blue-50 text-blue-700 border border-blue-200 font-normal px-2.5 py-0.5"
+                              >
+                                Attempt #{idx + 1}: Day {days}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </div>
+          )}
+
+          {/* Footer */}
+          <DialogFooter className="border-t px-6 py-4 flex items-center justify-between bg-gray-50/50 shrink-0">
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               size="sm"
-              onClick={() => onOpenChange(false)}
-              disabled={updateMutation.isPending}
-              className="text-xs"
+              onClick={handleReset}
+              disabled={isLoading || updateMutation.isPending}
+              className="text-gray-600 hover:text-gray-900 text-xs cursor-pointer"
             >
-              Cancel
+              <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+              Reset to Current
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleSave}
-              disabled={isLoading || updateMutation.isPending || !isAdmin}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-4"
-            >
-              {updateMutation.isPending ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="w-3.5 h-3.5 mr-1.5" />
-                  Save Configuration
-                </>
-              )}
-            </Button>
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-    <SuccessDialog
-      open={showSuccess}
-      onClose={() => setShowSuccess(false)}
-      title="Configuration Saved Successfully!"
-    />
-  </>
+
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onOpenChange(false)}
+                disabled={updateMutation.isPending}
+                className="text-xs cursor-pointer"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleSave}
+                disabled={isLoading || updateMutation.isPending}
+                className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-4 cursor-pointer"
+              >
+                {updateMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-3.5 h-3.5 mr-1.5" />
+                    Save Configuration
+                  </>
+                )}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <SuccessDialog
+        open={showSuccess}
+        onClose={() => setShowSuccess(false)}
+        title="Configuration Saved Successfully!"
+      />
+    </>
   );
 }

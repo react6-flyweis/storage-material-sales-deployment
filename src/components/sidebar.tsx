@@ -20,12 +20,10 @@ import invoices from "@/assets/icons/sidebar/invoices.svg";
 
 import meetingsIcon from "@/assets/icons/sidebar/meetings.svg";
 
-
 // import deliveryIcon from "@/assets/icons/sidebar/delivery.svg";
 // import freightIcon from "@/assets/icons/sidebar/freights.svg";
 // import salesIcon from "@/assets/icons/sidebar/sales.svg";
 // import communicationIcon from "@/assets/icons/sidebar/communication.svg";
-
 
 // Quotation tool icons
 import pembIcon from "@/assets/icons/sidebar/pemb.svg";
@@ -34,7 +32,6 @@ import quotePreviewIcon from "@/assets/icons/sidebar/quote-preview.svg";
 import customQuoteIcon from "@/assets/icons/sidebar/custom-quote.svg";
 import quotationHistoryIcon from "@/assets/icons/sidebar/quotation-history.svg";
 import pricingRulesIcon from "@/assets/icons/sidebar/pricing-rules.svg";
-
 
 // Leads
 import escalatedLeadsIcon from "@/assets/icons/sidebar/escalated-leads.svg";
@@ -110,8 +107,6 @@ const navigationGroups: NavigationGroup[] = [
     items: [],
   },
 
-
-
   {
     id: "links" as NavGroup,
     icon: leadsIcon,
@@ -137,7 +132,7 @@ const navigationGroups: NavigationGroup[] = [
           },
           {
             path: "/leads/follow-up/scoring",
-            label: "Lead Scoring",
+            label: "Lead Scoring & Auto followup",
             icon: leadScoringIcon,
           },
         ],
@@ -170,12 +165,32 @@ const navigationGroups: NavigationGroup[] = [
     items: [
       { sectionHeader: "QUOTING" },
       { path: "/quotation/pemb", label: "PEMB Quote", icon: pembIcon },
-      { path: "/quotation/storage-cog", label: "Storage COG Sheet", icon: storageCogIcon },
-      { path: "/quotation/quote-preview", label: "Quote Preview", icon: quotePreviewIcon },
-      { path: "/quotation/custom", label: "Custom Quote", icon: customQuoteIcon },
-      { path: "/quotation/history", label: "Quote History", icon: quotationHistoryIcon },
+      {
+        path: "/quotation/storage-cog",
+        label: "Storage COG Sheet",
+        icon: storageCogIcon,
+      },
+      {
+        path: "/quotation/quote-preview",
+        label: "Quote Preview",
+        icon: quotePreviewIcon,
+      },
+      {
+        path: "/quotation/custom",
+        label: "Custom Quote",
+        icon: customQuoteIcon,
+      },
+      {
+        path: "/quotation/history",
+        label: "Quote History",
+        icon: quotationHistoryIcon,
+      },
       { sectionHeader: "SETTINGS" },
-      { path: "/quotation/pricing-rules", label: "Pricing Rules", icon: pricingRulesIcon },
+      {
+        path: "/quotation/pricing-rules",
+        label: "Pricing Rules",
+        icon: pricingRulesIcon,
+      },
     ],
   },
 
@@ -185,9 +200,7 @@ const navigationGroups: NavigationGroup[] = [
     label: "Customer",
     color: "bg-[#EAB308]",
     link: "/customers",
-    items: [
-      { path: "/meetings", label: "Meetings", icon: meetingsIcon },
-    ],
+    items: [{ path: "/meetings", label: "Meetings", icon: meetingsIcon }],
   },
 
   {
@@ -302,7 +315,9 @@ export function Sidebar({
       return new Set(
         navigationGroups.flatMap((group) =>
           group.items
-            .filter((item): item is NavigationItem & { path: string } => Boolean(item.collapsible && item.subItems && item.path))
+            .filter((item): item is NavigationItem & { path: string } =>
+              Boolean(item.collapsible && item.subItems && item.path),
+            )
             .map((item) => item.path),
         ),
       );
@@ -398,7 +413,7 @@ export function Sidebar({
   // Determine final padding: use calculated padding if content fits, otherwise use 5
   const menuPaddingTop =
     activeGroupItemsHeight + calculatedPadding + topSectionHeight + 20 <
-      window.innerHeight
+    window.innerHeight
       ? calculatedPadding
       : 10;
 
@@ -432,8 +447,9 @@ export function Sidebar({
       )}
 
       <div
-        className={`flex fixed inset-y-0 left-0 lg:left-0 lg:top-0 z-50 transition-transform duration-300 lg:translate-x-0 h-screen ${isOpen ? "translate-x-0" : "-translate-x-full"
-          }`}
+        className={`flex fixed inset-y-0 left-0 lg:left-0 lg:top-0 z-50 transition-transform duration-300 lg:translate-x-0 h-screen ${
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
       >
         {/* Icon Sidebar */}
         <aside
@@ -443,7 +459,10 @@ export function Sidebar({
           <div style={{ direction: "ltr" }}>
             <nav className="flex flex-col gap-5">
               {navigationGroups
-                .filter((group) => !group.hiddenFromSidebar || activeGroup.id === group.id)
+                .filter(
+                  (group) =>
+                    !group.hiddenFromSidebar || activeGroup.id === group.id,
+                )
                 .map((group) => {
                   const iconSrc = group.icon as string;
                   const isActive = activeGroup.id === group.id;
@@ -455,7 +474,8 @@ export function Sidebar({
                       key={group.id}
                       onClick={() => handleGroupChange(group)}
                       onMouseEnter={(event) => {
-                        const rect = event.currentTarget.getBoundingClientRect();
+                        const rect =
+                          event.currentTarget.getBoundingClientRect();
                         setHoveredGroup({
                           label: group.label,
                           top: rect.top + rect.height / 2,
@@ -473,8 +493,9 @@ export function Sidebar({
                         />
                       )}
                       <div
-                        className={`z-50 relative size-10 flex items-center justify-center rounded-full ${group.color
-                          } ${isActive ? "" : ""} group-hover:scale-105`}
+                        className={`z-50 relative size-10 flex items-center justify-center rounded-full ${
+                          group.color
+                        } ${isActive ? "" : ""} group-hover:scale-105`}
                       >
                         <img
                           src={iconSrc}
@@ -619,7 +640,10 @@ export function Sidebar({
                       >
                         <span className="flex items-center gap-2">
                           <span className="text-gray-500">
-                            <SidebarItemIcon src={item.icon} alt={item.label || ""} />
+                            <SidebarItemIcon
+                              src={item.icon}
+                              alt={item.label || ""}
+                            />
                           </span>
                           {item.label}
                         </span>

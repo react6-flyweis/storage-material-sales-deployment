@@ -19,20 +19,22 @@ import {
 import { Badge } from "@/components/ui/badge";
 import DateRangeFilter from "@/components/ui/date-range-filter";
 import type { DateRange } from "react-day-picker";
-import {
-  useLeadScoringQuery,
-  useUpdateLeadTemperatureMutation,
-} from "@/modules/leads/leads.hooks";
+import { useUpdateLeadTemperatureMutation } from "@/modules/leads/leads.hooks";
 import {
   useFollowUpActivitySummaryQuery,
   useTemperatureTransitionSummaryQuery,
 } from "@/modules/followups/followups.hooks";
-import type { FollowUpKind } from "@/modules/followups/followups.api";
-import { Loader2, History, RotateCcw } from "lucide-react";
+import type {
+  FollowUpKind,
+  LeadTransitionInfo,
+} from "@/modules/followups/followups.api";
+import { Loader2, ArrowRight, History, RotateCcw } from "lucide-react";
 import Pagination from "@/components/Pagination";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import AutoFollowUpConfigDialog from "@/components/leads/auto-followup-config-dialog";
 import LeadFollowUpDetailDialog from "@/components/leads/lead-followup-detail-dialog";
+import { getApiErrorMessage } from "@/lib/api-error";
 
 interface LeadRow {
   id: string;
@@ -46,6 +48,7 @@ interface LeadRow {
   score: number;
   temperature: string;
   scoreState?: string;
+  transition?: LeadTransitionInfo;
   lastActivity: string;
   activityType?: string;
 }
@@ -67,6 +70,7 @@ export default function LeadScoring() {
   const [client, setClient] = useState("");
   const [activity, setActivity] = useState("all");
   const [scoreState, setScoreState] = useState("all");
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
 
   // History detail dialog state
   const [selectedDetailLead, setSelectedDetailLead] = useState<{
@@ -90,12 +94,11 @@ export default function LeadScoring() {
   const debouncedClient = useDebounce(client, 300);
   const isSearching = client !== debouncedClient;
 
-  // 1. Follow-Up Activity Query (New Contract)
+  // Follow-Up Activity Query with transition state & date range filters
   const {
     data: activityResponse,
     isLoading: isActivityLoading,
     isFetching: isActivityFetching,
-    isError: isActivityError,
   } = useFollowUpActivitySummaryQuery({
     kind: followUpKind,
     startDate: dateFrom,
@@ -103,23 +106,13 @@ export default function LeadScoring() {
     status: status !== "all" ? status : undefined,
     temperature: status !== "all" ? status : undefined,
     search: debouncedClient,
+    transitionState:
+      isDateRangeSelected && scoreState !== "all" ? scoreState : undefined,
     page,
     limit,
   });
 
-  // 2. Legacy Scoring Query (Safe fallback if activity endpoint is in progress)
-  const {
-    data: legacyScoringData,
-    isLoading: isLegacyLoading,
-    isFetching: isLegacyFetching,
-  } = useLeadScoringQuery(page, limit, {
-    startDate: dateFrom,
-    endDate: dateTo,
-    status,
-    client: debouncedClient,
-  });
-
-  // 3. Summary API to fetch transition counts for the Score State dropdown
+  // Summary API to fetch transition counts for the Transition State dropdown
   const { data: transitionSummaryResponse } =
     useTemperatureTransitionSummaryQuery(dateFrom, dateTo, isDateRangeSelected);
   const transitionSummary = transitionSummaryResponse?.data;
@@ -132,10 +125,10 @@ export default function LeadScoring() {
       { leadId: id, temperature: newScore.toLowerCase() },
       {
         onSuccess: () => toast.success("Lead status updated successfully!"),
-        onError: (err: any) =>
-          toast.error(
-            err?.response?.data?.message || "Failed to update lead status",
-          ),
+        onError: (err) => {
+          const errorMessage = getApiErrorMessage(err);
+          toast.error(errorMessage || "Failed to update lead status");
+        },
       },
     );
   };
@@ -198,69 +191,37 @@ export default function LeadScoring() {
     }
   };
 
-  const hasActivityData =
-    !isActivityError &&
-    activityResponse?.success &&
-    Array.isArray(activityResponse?.data?.leads);
+  const isDataLoading = isSearching || isActivityLoading || isActivityFetching;
 
-  const isDataLoading =
-    isSearching ||
-    (hasActivityData
-      ? isActivityLoading || isActivityFetching
-      : isLegacyLoading || isLegacyFetching || isActivityLoading || isActivityFetching);
-
-  // Map leads: prefer Follow-Up Activity API with safe fallbacks
+  // Map leads from Follow-Up Activity API
   const baseLeads = useMemo<LeadRow[]>(() => {
-    if (hasActivityData) {
-      return (activityResponse?.data?.leads || []).map((item, idx) => {
-        const lead = item.lead;
-        const temp = (
-          lead.leadScoring?.temperature ||
-          lead.temperature ||
-          "cold"
-        ).toLowerCase();
+    return (activityResponse?.data?.leads || []).map((item, idx) => {
+      const lead = item.lead;
+      const temp = (
+        lead.leadScoring?.temperature ||
+        lead.temperature ||
+        "cold"
+      ).toLowerCase();
+      const transition = item.transition || lead.transition;
 
-        return {
-          id: lead._id || String(idx),
-          customerName: lead.customerName || lead.projectName || "N/A",
-          leadId:
-            lead.jobId || (lead._id ? `${lead._id.slice(0, 8)}...` : "N/A"),
-          projectName: lead.projectName,
-          location: lead.location || "N/A",
-          progress: temp === "hot" ? 4 : temp === "warm" ? 3 : 2,
-          lifecycleStatus: lead.lifecycleStatus || "initial_contact",
-          quoteValue: lead.quoteValue ?? 0,
-          score: lead.leadScoring?.score ?? lead.score ?? 50,
-          temperature: temp,
-          scoreState: "-",
-          lastActivity: formatLastActivity(item.lastFollowUpAt),
-          activityType: followUpKind,
-        };
-      });
-    }
-
-    // Fallback to legacy scoring data if activity API is not yet active
-    const apiLeads = legacyScoringData?.data?.leads || [];
-    return apiLeads.map((l: any, idx: number) => {
-      const temp = (l.temperature || "warm").toLowerCase();
       return {
-        id: l.leadId || l._id || String(idx),
-        customerName: l.customerName || "N/A",
-        leadId: l.projectId || l.leadId || "N/A",
-        projectName: l.projectName,
-        location: l.location || "N/A",
-        progress: l.progress ?? (temp === "hot" ? 4 : temp === "warm" ? 3 : 2),
-        lifecycleStatus: l.lifecycleStatus || l.status || "Pending",
-        quoteValue: l.quoteValue ?? 0,
-        score: l.score ?? 50,
+        id: lead._id || String(idx),
+        customerName: lead.customerName || lead.projectName || "N/A",
+        leadId: lead.jobId || (lead._id ? `${lead._id.slice(0, 8)}...` : "N/A"),
+        projectName: lead.projectName,
+        location: lead.location || "N/A",
+        progress: temp === "hot" ? 4 : temp === "warm" ? 3 : 2,
+        lifecycleStatus: lead.lifecycleStatus || "initial_contact",
+        quoteValue: lead.quoteValue ?? 0,
+        score: lead.leadScoring?.score ?? lead.score ?? 50,
         temperature: temp,
-        scoreState:
-          l.scoreState || l.transition || l.temperatureTransition || "-",
-        lastActivity: formatLastActivity(l.updatedAt || l.lastActivity),
-        activityType: l.activityType,
+        scoreState: transition?.transitionState || "-",
+        transition,
+        lastActivity: formatLastActivity(item.lastFollowUpAt),
+        activityType: followUpKind,
       };
     });
-  }, [hasActivityData, activityResponse, legacyScoringData, followUpKind]);
+  }, [activityResponse, followUpKind]);
 
   // Client-side filtering matching the filters row
   const filteredLeads = useMemo(() => {
@@ -291,9 +252,20 @@ export default function LeadScoring() {
           return false;
         }
       }
-      // Filter by Score State (when date range selected)
+      // Filter by Transition State (when date range selected)
       if (isDateRangeSelected && scoreState !== "all") {
-        if (item.scoreState !== scoreState) {
+        const tState = item.transition?.transitionState;
+        if (tState) {
+          if (tState !== scoreState) return false;
+        } else if (item.scoreState && item.scoreState !== "-") {
+          const normalized = item.scoreState
+            .toLowerCase()
+            .replace(/\s*→\s*/g, "_to_")
+            .replace(/\s+/g, "_");
+          if (normalized !== scoreState && item.scoreState !== scoreState) {
+            return false;
+          }
+        } else {
           return false;
         }
       }
@@ -301,9 +273,8 @@ export default function LeadScoring() {
     });
   }, [baseLeads, status, client, activity, scoreState, isDateRangeSelected]);
 
-  const totalLeadsCount = hasActivityData
-    ? (activityResponse?.data?.pagination?.totalLeads ?? filteredLeads.length)
-    : (legacyScoringData?.data?.total ?? filteredLeads.length);
+  const totalLeadsCount =
+    activityResponse?.data?.pagination?.totalLeads ?? filteredLeads.length;
 
   const hasActiveFilters = Boolean(
     dateFrom ||
@@ -311,7 +282,7 @@ export default function LeadScoring() {
     status !== "all" ||
     client.trim() ||
     activity !== "all" ||
-    scoreState !== "all"
+    scoreState !== "all",
   );
 
   const handleClearFilters = () => {
@@ -325,6 +296,80 @@ export default function LeadScoring() {
     setPage(1);
   };
 
+  const renderTransitionData = (lead: LeadRow) => {
+    const t = lead.transition;
+    if (!t) {
+      if (lead.scoreState && lead.scoreState !== "-") {
+        return (
+          <span className="text-xs font-medium text-gray-700">
+            {lead.scoreState}
+          </span>
+        );
+      }
+      return <span className="text-xs text-gray-400">—</span>;
+    }
+
+    const stateKey = t.transitionState || "";
+    const parts = stateKey.split("_to_");
+    const from = (t.transitionFrom || parts[0] || "").toLowerCase();
+    const to = (t.transitionTo || parts[1] || "").toLowerCase();
+
+    const getTempPill = (temp: string, isDest = false) => {
+      if (temp === "hot") {
+        return (
+          <span
+            className={`px-2 py-0.5 rounded text-[11px] font-medium capitalize ${
+              isDest
+                ? "bg-red-500 text-white font-semibold"
+                : "bg-red-100 text-red-700"
+            }`}
+          >
+            Hot
+          </span>
+        );
+      }
+      if (temp === "warm") {
+        return (
+          <span
+            className={`px-2 py-0.5 rounded text-[11px] font-medium capitalize ${
+              isDest
+                ? "bg-amber-500 text-white font-semibold"
+                : "bg-amber-100 text-amber-700"
+            }`}
+          >
+            Warm
+          </span>
+        );
+      }
+      if (temp === "cold") {
+        return (
+          <span
+            className={`px-2 py-0.5 rounded text-[11px] font-medium capitalize ${
+              isDest
+                ? "bg-emerald-500 text-white font-semibold"
+                : "bg-emerald-100 text-emerald-700"
+            }`}
+          >
+            Cold
+          </span>
+        );
+      }
+      return (
+        <span className="px-2 py-0.5 rounded text-[11px] bg-gray-100 text-gray-700 capitalize">
+          {temp || "—"}
+        </span>
+      );
+    };
+
+    return (
+      <div className="flex items-center gap-1.5">
+        {getTempPill(from, false)}
+        <ArrowRight className="w-3 h-3 text-gray-400 shrink-0" />
+        {getTempPill(to, true)}
+      </div>
+    );
+  };
+
   return (
     <div className="">
       {/* Top Banner Header */}
@@ -333,7 +378,7 @@ export default function LeadScoring() {
       </div>
 
       <div className="p-6 space-y-6">
-        {/* Title */}
+        {/* Title and Set Follow-Up Frequency Button */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <h1 className="text-xl font-bold text-gray-900">
@@ -348,6 +393,14 @@ export default function LeadScoring() {
               </span>
             )}
           </div>
+          <Button
+            onClick={() => setIsConfigOpen(true)}
+            variant="outline"
+            className="bg-white text-gray-800 hover:bg-gray-50 border border-gray-200 shadow-sm font-medium flex items-center gap-2 cursor-pointer text-xs rounded-lg px-4 py-2"
+          >
+            <span>Set Follow-Up Frequency</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Button>
         </div>
 
         {/* Filters Card */}
@@ -381,8 +434,18 @@ export default function LeadScoring() {
                 future={false}
                 onChange={(d) => {
                   setDateRange(d);
-                  setDateFrom(d?.from ? d.from.toISOString().slice(0, 10) : "");
-                  setDateTo(d?.to ? d.to.toISOString().slice(0, 10) : "");
+                  const from = d?.from ? format(d.from, "yyyy-MM-dd") : "";
+                  const to = d?.to
+                    ? format(d.to, "yyyy-MM-dd")
+                    : d?.from
+                      ? format(d.from, "yyyy-MM-dd")
+                      : "";
+                  setDateFrom(from);
+                  setDateTo(to);
+                  if (!from && !to) {
+                    setScoreState("all");
+                  }
+                  setPage(1);
                 }}
               />
             </div>
@@ -444,48 +507,49 @@ export default function LeadScoring() {
             <label className="text-xs font-semibold text-gray-700">
               Score State
             </label>
-            <Select value={scoreState} onValueChange={setScoreState}>
+            <Select
+              value={scoreState}
+              onValueChange={(val) => {
+                setScoreState(val);
+                setPage(1);
+              }}
+            >
               <SelectTrigger className="bg-white min-w-48 shadow-sm border border-gray-200">
                 <SelectValue placeholder="All" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">
-                  All
-                  {transitionSummary?.totals?.totalTransitions !== undefined
-                    ? ` (${transitionSummary.totals.totalTransitions})`
-                    : ""}
-                </SelectItem>
-                <SelectItem value="Cold → Warm">
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="cold_to_warm">
                   Cold → Warm
                   {transitions?.cold_to_warm !== undefined
                     ? ` (${transitions.cold_to_warm})`
                     : ""}
                 </SelectItem>
-                <SelectItem value="Cold → Hot">
+                <SelectItem value="cold_to_hot">
                   Cold → Hot
                   {transitions?.cold_to_hot !== undefined
                     ? ` (${transitions.cold_to_hot})`
                     : ""}
                 </SelectItem>
-                <SelectItem value="Warm → Cold">
+                <SelectItem value="warm_to_cold">
                   Warm → Cold
                   {transitions?.warm_to_cold !== undefined
                     ? ` (${transitions.warm_to_cold})`
                     : ""}
                 </SelectItem>
-                <SelectItem value="Warm → Hot">
+                <SelectItem value="warm_to_hot">
                   Warm → Hot
                   {transitions?.warm_to_hot !== undefined
                     ? ` (${transitions.warm_to_hot})`
                     : ""}
                 </SelectItem>
-                <SelectItem value="Hot → Cold">
+                <SelectItem value="hot_to_cold">
                   Hot → Cold
                   {transitions?.hot_to_cold !== undefined
                     ? ` (${transitions.hot_to_cold})`
                     : ""}
                 </SelectItem>
-                <SelectItem value="Hot → Warm">
+                <SelectItem value="hot_to_warm">
                   Hot → Warm
                   {transitions?.hot_to_warm !== undefined
                     ? ` (${transitions.hot_to_warm})`
@@ -618,10 +682,10 @@ export default function LeadScoring() {
                         </Select>
                       </TableCell>
 
-                      {/* Score State Value: Empty ("-") if data is not available */}
+                      {/* Transition Data: Only displayed when date range is selected */}
                       {isDateRangeSelected && (
-                        <TableCell className="py-4 text-xs font-medium text-gray-700">
-                          {lead.scoreState || "-"}
+                        <TableCell className="py-4">
+                          {renderTransitionData(lead)}
                         </TableCell>
                       )}
 
@@ -677,6 +741,12 @@ export default function LeadScoring() {
         leadId={selectedDetailLead?.id || null}
         leadName={selectedDetailLead?.name}
         kind={followUpKind === "all" ? "manual" : followUpKind}
+      />
+
+      {/* Auto Follow-up Configuration Modal */}
+      <AutoFollowUpConfigDialog
+        open={isConfigOpen}
+        onOpenChange={setIsConfigOpen}
       />
     </div>
   );

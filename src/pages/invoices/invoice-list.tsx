@@ -52,11 +52,11 @@ type SelectedClient = {
 };
 
 const statusOptions: Array<{
-  value: "All" | InvoiceStatus | ApprovalStatus;
+  value: "All" | InvoiceStatus | ApprovalStatus | "pending";
   label: string;
 }> = [
   { value: "All", label: "All" },
-  { value: ApprovalStatus.PENDING_APPROVAL, label: "Pending Approval" },
+  { value: "pending", label: "Pending Approval" },
   { value: ApprovalStatus.APPROVED, label: "Approved" },
   { value: ApprovalStatus.REJECTED, label: "Rejected" },
   { value: InvoiceStatus.DRAFT, label: "Draft" },
@@ -344,7 +344,7 @@ export default function InvoiceListPage() {
                   value={statusFilter}
                   onValueChange={(value) => {
                     setStatusFilter(
-                      value as "All" | InvoiceStatus | ApprovalStatus,
+                      value as "All" | InvoiceStatus | ApprovalStatus | "pending",
                     );
                     setCurrentPage(1);
                   }}

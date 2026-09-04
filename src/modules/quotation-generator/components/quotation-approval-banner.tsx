@@ -54,16 +54,17 @@ export function QuotationApprovalBanner({
   const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   const status: ApprovalStatus | string =
-    approval?.status ||
-    (workflowStatus === "pending_approval"
+    (workflowStatus === "sent"
+      ? "sent"
+      : workflowStatus === "pending_approval"
       ? "pending_approval"
-      : workflowStatus === "approved"
-      ? "approved"
       : workflowStatus === "rejected"
       ? "rejected"
-      : workflowStatus === "sent"
-      ? "sent"
-      : "not_submitted");
+      : workflowStatus === "approved"
+      ? "approved"
+      : approval?.status) ||
+    workflowStatus ||
+    "not_submitted";
 
   const rejectionReason = approval?.rejectionReason;
   const history = approval?.history || [];
