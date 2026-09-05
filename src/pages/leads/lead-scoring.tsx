@@ -119,15 +119,19 @@ export default function LeadScoring() {
   const transitions = transitionSummary?.transitions;
 
   const updateTemperatureMutation = useUpdateLeadTemperatureMutation();
+  const [updatingLeadId, setUpdatingLeadId] = useState<string | null>(null);
 
   const updateLeadScore = (id: string, newScore: string) => {
+    setUpdatingLeadId(id);
     updateTemperatureMutation.mutate(
       { leadId: id, temperature: newScore.toLowerCase() },
       {
-        onSuccess: () => toast.success("Lead status updated successfully!"),
         onError: (err) => {
           const errorMessage = getApiErrorMessage(err);
           toast.error(errorMessage || "Failed to update lead status");
+        },
+        onSettled: () => {
+          setUpdatingLeadId(null);
         },
       },
     );
@@ -662,23 +666,35 @@ export default function LeadScoring() {
                       </TableCell>
 
                       <TableCell className="py-4">
-                        <Select
-                          value={displayScore}
-                          onValueChange={(val) => updateLeadScore(lead.id, val)}
-                        >
-                          <SelectTrigger
+                        {updatingLeadId === lead.id ? (
+                          <div
                             className={`${getScoreBadgeClass(
                               displayScore,
-                            )} rounded-full px-4 h-7 text-xs w-24 justify-between`}
+                            )} rounded-full px-3 h-7 text-xs w-24 inline-flex items-center justify-center gap-1.5 opacity-90`}
                           >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Hot">Hot</SelectItem>
-                            <SelectItem value="Warm">Warm</SelectItem>
-                            <SelectItem value="Cold">Cold</SelectItem>
-                          </SelectContent>
-                        </Select>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Updating</span>
+                          </div>
+                        ) : (
+                          <Select
+                            value={displayScore}
+                            onValueChange={(val) => updateLeadScore(lead.id, val)}
+                            disabled={Boolean(updatingLeadId)}
+                          >
+                            <SelectTrigger
+                              className={`${getScoreBadgeClass(
+                                displayScore,
+                              )} rounded-full px-4 h-7 text-xs w-24 justify-between cursor-pointer`}
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Hot">Hot</SelectItem>
+                              <SelectItem value="Warm">Warm</SelectItem>
+                              <SelectItem value="Cold">Cold</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
                       </TableCell>
 
                       {/* Transition Data: Only displayed when date range is selected */}
