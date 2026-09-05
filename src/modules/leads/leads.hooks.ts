@@ -267,10 +267,19 @@ export function useUpdateLeadTemperatureMutation() {
       void queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
       void queryClient.invalidateQueries({ queryKey: ["leads", "scoring"] });
       void queryClient.invalidateQueries({ queryKey: ["leads", "list"] });
+      void queryClient.invalidateQueries({ queryKey: ["followups"] });
       void queryClient.invalidateQueries({ queryKey: ["followups", "activity"] });
-      void queryClient.invalidateQueries({
-        queryKey: ["sales", "leads", "detail", variables.leadId],
-      });
+      if (variables?.leadId) {
+        void queryClient.invalidateQueries({
+          queryKey: ["sales", "leads", "detail", variables.leadId],
+        });
+        void queryClient.invalidateQueries({
+          queryKey: ["leads", "detail", variables.leadId],
+        });
+        void queryClient.invalidateQueries({
+          queryKey: ["lead", "detail", variables.leadId],
+        });
+      }
     },
   });
 }
