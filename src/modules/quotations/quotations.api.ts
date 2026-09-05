@@ -208,8 +208,13 @@ export type SubmitApprovalResponse = {
 };
 
 export type SendQuotationPayload = {
-  email?: string;
+  message?: string;
+  note?: string;
+  emailMessage?: string;
+  coverNote?: string;
   notes?: string;
+  sections?: string[];
+  [key: string]: unknown;
 };
 
 export type SendQuotationResponse = {
