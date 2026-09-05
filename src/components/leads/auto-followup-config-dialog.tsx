@@ -208,6 +208,7 @@ export default function AutoFollowUpConfigDialog({
   });
 
   const [warmLead, setWarmLead] = useState({
+    enabled: true,
     preset: "twice_week" as WarmPreset,
     maxAttempts: 4,
     intervalsDaysStr: "3, 7, 10, 14",
@@ -259,45 +260,54 @@ export default function AutoFollowUpConfigDialog({
       });
     }
 
-    if (cfg.leadFrequency?.warm) {
-      const intervals = Array.isArray(cfg.leadFrequency.warm.intervalsDays)
-        ? cfg.leadFrequency.warm.intervalsDays
+    const warmConfig = cfg.leadFollowUp?.warm;
+    if (warmConfig) {
+      const intervals = Array.isArray(warmConfig.intervalsDays)
+        ? warmConfig.intervalsDays
         : [3, 7, 10, 14];
       setWarmLead({
+        enabled:
+          warmConfig.enabled !== undefined ? Boolean(warmConfig.enabled) : true,
         preset:
-          (cfg.leadFrequency.warm.preset as WarmPreset) ||
+          (warmConfig.preset as WarmPreset) ||
           detectWarmPreset(intervals),
-        maxAttempts: Number(cfg.leadFrequency.warm.maxAttempts) || 4,
+        maxAttempts: Number(warmConfig.maxAttempts) || 4,
         intervalsDaysStr: intervals.join(", "),
       });
     } else {
       setWarmLead({
+        enabled: true,
         preset: "twice_week",
         maxAttempts: 4,
         intervalsDaysStr: "3, 7, 10, 14",
       });
     }
 
-    const coldIntervals = Array.isArray(cfg.coldLead?.intervalsDays)
-      ? cfg.coldLead.intervalsDays
-      : Array.isArray(cfg.leadFrequency?.cold?.intervalsDays)
-        ? cfg.leadFrequency.cold.intervalsDays
+    const coldConfig = cfg.leadFollowUp?.cold;
+    if (coldConfig) {
+      const coldIntervals = Array.isArray(coldConfig.intervalsDays)
+        ? coldConfig.intervalsDays
         : [7, 15, 30];
-    const coldPreset =
-      (cfg.leadFrequency?.cold?.preset as ColdPreset) ||
-      detectColdPreset(coldIntervals);
-    setColdLead({
-      enabled:
-        cfg.coldLead?.enabled !== undefined
-          ? Boolean(cfg.coldLead.enabled)
-          : true,
-      preset: coldPreset,
-      maxAttempts:
-        Number(cfg.coldLead?.maxAttempts) ||
-        Number(cfg.leadFrequency?.cold?.maxAttempts) ||
-        4,
-      intervalsDaysStr: coldIntervals.join(", "),
-    });
+      const coldPreset =
+        (coldConfig.preset as ColdPreset) ||
+        detectColdPreset(coldIntervals);
+      setColdLead({
+        enabled:
+          coldConfig.enabled !== undefined
+            ? Boolean(coldConfig.enabled)
+            : true,
+        preset: coldPreset,
+        maxAttempts: Number(coldConfig.maxAttempts) || 4,
+        intervalsDaysStr: coldIntervals.join(", "),
+      });
+    } else {
+      setColdLead({
+        enabled: true,
+        preset: "d7_15_30",
+        maxAttempts: 4,
+        intervalsDaysStr: "7, 15, 30",
+      });
+    }
 
     if (cfg.manualReminder) {
       setManualReminder({
@@ -345,11 +355,12 @@ export default function AutoFollowUpConfigDialog({
     }
     const target = WARM_PRESETS[presetKey];
     if (target) {
-      setWarmLead({
+      setWarmLead((prev) => ({
+        ...prev,
         preset: presetKey,
         intervalsDaysStr: target.intervals.join(", "),
         maxAttempts: target.maxAttempts,
-      });
+      }));
     }
   };
 
@@ -392,13 +403,14 @@ export default function AutoFollowUpConfigDialog({
   const chatTabHasError = Boolean(chatIntervalsCountError || chatEmptyIntervalsError);
 
   const warmIntervalsCountError =
+    warmLead.enabled &&
     warmLead.preset === "custom" &&
     parsedWarmIntervals.length !== warmLead.maxAttempts
       ? `Number of intervals (${parsedWarmIntervals.length}) must equal Max Attempts (${warmLead.maxAttempts}). Max ${warmLead.maxAttempts - 1} ${warmLead.maxAttempts - 1 === 1 ? "comma" : "commas"} allowed.`
       : null;
 
   const warmEmptyIntervalsError =
-    parsedWarmIntervals.length === 0
+    warmLead.enabled && parsedWarmIntervals.length === 0
       ? "Please enter at least one valid interval in days."
       : null;
 
@@ -428,7 +440,7 @@ export default function AutoFollowUpConfigDialog({
       return;
     }
     if (leadTabHasError) {
-      setActiveTab("leadFrequency");
+      setActiveTab("leadFollowUp");
       return;
     }
 
@@ -455,14 +467,6 @@ export default function AutoFollowUpConfigDialog({
         ),
         attemptIntervalsMinutes: sortedChatIntervals,
       },
-      coldLead: {
-        enabled: coldLead.enabled,
-        maxAttempts: Math.max(
-          1,
-          Number(coldLead.maxAttempts) || sortedColdIntervals.length || 4,
-        ),
-        intervalsDays: sortedColdIntervals,
-      },
       manualReminder: {
         defaultReminderMinutes: Math.max(
           0,
@@ -470,8 +474,9 @@ export default function AutoFollowUpConfigDialog({
         ),
         sendDueNowReminder: manualReminder.sendDueNowReminder,
       },
-      leadFrequency: {
+      leadFollowUp: {
         warm: {
+          enabled: warmLead.enabled,
           preset: warmLead.preset,
           maxAttempts: Math.max(
             1,
@@ -480,6 +485,7 @@ export default function AutoFollowUpConfigDialog({
           intervalsDays: sortedWarmIntervals,
         },
         cold: {
+          enabled: coldLead.enabled,
           preset: coldLead.preset,
           maxAttempts: Math.max(
             1,
@@ -571,7 +577,7 @@ export default function AutoFollowUpConfigDialog({
                     )}
                   </TabsTrigger>
                   <TabsTrigger
-                    value="leadFrequency"
+                    value="leadFollowUp"
                     className="text-xs py-2 data-active:bg-white data-active:text-gray-900 data-active:shadow-xs font-medium cursor-pointer relative"
                   >
                     <span>Lead Cadence</span>
@@ -979,21 +985,38 @@ export default function AutoFollowUpConfigDialog({
 
                 {/* 3. Lead Cadence (Warm & Cold) Tab */}
                 <TabsContent
-                  value="leadFrequency"
+                  value="leadFollowUp"
                   className="space-y-4 pt-3 mt-0 focus-visible:ring-0"
                 >
                   {/* Card 1: Warm Leads */}
                   <div className="border border-gray-200 rounded-lg p-4 bg-white space-y-4">
-                    <div className="pb-3 border-b border-gray-100">
-                      <h4 className="text-sm font-semibold text-gray-900">
-                        Warm Leads
-                      </h4>
-                      <p className="text-xs text-gray-500">
-                        Follow-up schedule for warm leads
-                      </p>
+                    <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-900">
+                          Warm Leads
+                        </h4>
+                        <p className="text-xs text-gray-500">
+                          Follow-up schedule for warm leads
+                        </p>
+                      </div>
+                      <Switch
+                        checked={warmLead.enabled}
+                        onCheckedChange={(checked) =>
+                          setWarmLead((prev) => ({
+                            ...prev,
+                            enabled: checked,
+                          }))
+                        }
+                      />
                     </div>
 
-                    <div className="space-y-2">
+                    <div
+                      className={`space-y-2 transition-opacity ${
+                        !warmLead.enabled
+                          ? "opacity-40 pointer-events-none"
+                          : ""
+                      }`}
+                    >
                       <div className="flex items-center justify-between">
                         <Label className="text-xs text-gray-700 font-medium">
                           Interval Schedule
