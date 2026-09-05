@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
@@ -32,6 +33,7 @@ export function SendQuotationModal({
   open,
   onOpenChange,
   quotationId,
+  customerEmail = "",
   customerName = "Valued Customer",
   approvalStatus = "approved",
   versionNumber = 1,
@@ -120,6 +122,19 @@ export function SendQuotationModal({
             )}
 
             <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="customer-email">Recipient Email Address</Label>
+                <Input
+                  id="customer-email"
+                  type="email"
+                  readOnly
+                  tabIndex={-1}
+                  placeholder="customer@company.com"
+                  value={customerEmail}
+                  className="bg-muted text-muted-foreground cursor-default focus-visible:ring-0 focus-visible:border-input"
+                />
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="send-notes">
                   Message / Cover Note <span className="font-normal text-slate-500">(Optional)</span>
