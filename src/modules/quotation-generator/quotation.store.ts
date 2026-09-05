@@ -111,6 +111,7 @@ export interface QuotationState {
   setPembPdfFileName: (fileName: string) => void;
   setPembEstimateId: (id: string | null) => void;
   resetPembState: () => void;
+  resetPembFiles: () => void;
 
   // Storage Actions
   setStorageData: (data: Record<string, unknown> | null) => void;
@@ -335,6 +336,53 @@ export const useQuotationStore = create<QuotationState>((set) => ({
       pembPdfFileName: "",
       pembEstimateId: null,
     }),
+  resetPembFiles: () =>
+    set((state) => ({
+      pembExtractedDrawing: null,
+      pembExtractedShipper: null,
+      pembPdfFileName: "",
+      pembEstimateId: null,
+      buildingSize: state.pembBuildingSize || "",
+      squareFootage: state.pembSquareFootage
+        ? parseFloat(state.pembSquareFootage) || 0
+        : 0,
+      cogsOverrideApplied: false,
+      cogsCostInput: "",
+      cogsCostAdjustPercent: 0,
+      cogsMaterialMargin: 0,
+      cogsFixedSellPrice: "",
+      marginOverrideApplied: false,
+      marginLaborOverride: "",
+      marginTargetMargin: "",
+      marginFixedSellOverride: "",
+      concreteInclude: false,
+      concreteCostSf: 7.25,
+      concreteMarginPct: 25,
+      concreteSlabThickness: '6"',
+      concretePsiRating: "4000 PSI",
+      concreteNotes: "",
+      concreteInclusions: [
+        "Pier excavation & placement",
+        "Reinforced rebar system (tied)",
+        "10mm vapor barrier",
+        'Smooth finish (±1/10" tolerance)',
+        "All labor, equipment & materials",
+      ],
+      insulationInclude: false,
+      insulationSystem: "Vinyl-backed (single layer)",
+      insulationRValueRoof: "R-19",
+      insulationRValueWalls: "R-13",
+      insulationCogsSf: 1.5,
+      insulationMarginPct: 25,
+      insulationNotes: "",
+      insulationInclusions: [
+        "Roof insulation",
+        "Wall insulation",
+        "Vapor retarder / facing",
+        "All labor & installation",
+        "Seam tape & fasteners",
+      ],
+    })),
 
   // Storage Actions
   setStorageData: (storageData) => set({ storageData }),
