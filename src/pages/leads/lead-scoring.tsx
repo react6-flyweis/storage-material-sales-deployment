@@ -395,8 +395,7 @@ export default function LeadScoring() {
           </div>
           <Button
             onClick={() => setIsConfigOpen(true)}
-            variant="outline"
-            className="bg-white text-gray-800 hover:bg-gray-50 border border-gray-200 shadow-sm font-medium flex items-center gap-2 cursor-pointer text-xs rounded-lg px-4 py-2"
+            className="bg-teal-400 hover:bg-teal-600 text-white"
           >
             <span>Set Follow-Up Frequency</span>
             <ArrowRight className="w-3.5 h-3.5" />

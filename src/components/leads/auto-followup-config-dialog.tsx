@@ -147,6 +147,16 @@ function parseNumberArray(str: string): number[] {
     .filter((n) => !isNaN(n) && n > 0);
 }
 
+function limitIntervalsInput(val: string, maxAttempts: number): string {
+  let sanitized = val.replace(/[^0-9,\s]/g, "");
+  if (maxAttempts <= 0) return sanitized;
+  const parts = sanitized.split(",");
+  if (parts.length > maxAttempts) {
+    sanitized = parts.slice(0, maxAttempts).join(",");
+  }
+  return sanitized;
+}
+
 function matchArray(a: number[], b: number[]): boolean {
   if (a.length !== b.length) return false;
   return a.every((val, idx) => val === b[idx]);
@@ -366,26 +376,58 @@ export default function AutoFollowUpConfigDialog({
     }
   };
 
+  // Live validation calculations
+  const chatIntervalsCountError =
+    chatDropOff.enabled &&
+    chatDropOff.preset === "custom" &&
+    parsedChatIntervals.length !== chatDropOff.maxAttempts
+      ? `Number of intervals (${parsedChatIntervals.length}) must equal Max Attempts (${chatDropOff.maxAttempts}). Max ${chatDropOff.maxAttempts - 1} ${chatDropOff.maxAttempts - 1 === 1 ? "comma" : "commas"} allowed.`
+      : null;
+
+  const chatEmptyIntervalsError =
+    chatDropOff.enabled && parsedChatIntervals.length === 0
+      ? "Please enter at least one valid interval in minutes."
+      : null;
+
+  const chatTabHasError = Boolean(chatIntervalsCountError || chatEmptyIntervalsError);
+
+  const warmIntervalsCountError =
+    warmLead.preset === "custom" &&
+    parsedWarmIntervals.length !== warmLead.maxAttempts
+      ? `Number of intervals (${parsedWarmIntervals.length}) must equal Max Attempts (${warmLead.maxAttempts}). Max ${warmLead.maxAttempts - 1} ${warmLead.maxAttempts - 1 === 1 ? "comma" : "commas"} allowed.`
+      : null;
+
+  const warmEmptyIntervalsError =
+    parsedWarmIntervals.length === 0
+      ? "Please enter at least one valid interval in days."
+      : null;
+
+  const coldIntervalsCountError =
+    coldLead.enabled &&
+    coldLead.preset === "custom" &&
+    parsedColdIntervals.length !== coldLead.maxAttempts
+      ? `Number of intervals (${parsedColdIntervals.length}) must equal Max Attempts (${coldLead.maxAttempts}). Max ${coldLead.maxAttempts - 1} ${coldLead.maxAttempts - 1 === 1 ? "comma" : "commas"} allowed.`
+      : null;
+
+  const coldEmptyIntervalsError =
+    coldLead.enabled && parsedColdIntervals.length === 0
+      ? "Please enter at least one valid interval in days."
+      : null;
+
+  const leadTabHasError = Boolean(
+    warmIntervalsCountError ||
+      warmEmptyIntervalsError ||
+      coldIntervalsCountError ||
+      coldEmptyIntervalsError
+  );
+
   const handleSave = () => {
-    // Validate intervals
-    if (chatDropOff.enabled && parsedChatIntervals.length === 0) {
-      toast.error(
-        "Please enter at least one valid interval for Chat Drop-Off (in minutes).",
-      );
+    // Check validation errors directly on form
+    if (chatTabHasError) {
       setActiveTab("chatDropOff");
       return;
     }
-    if (parsedWarmIntervals.length === 0) {
-      toast.error(
-        "Please enter at least one valid interval for Warm Leads (in days).",
-      );
-      setActiveTab("leadFrequency");
-      return;
-    }
-    if (coldLead.enabled && parsedColdIntervals.length === 0) {
-      toast.error(
-        "Please enter at least one valid interval for Cold Lead follow-ups (in days).",
-      );
+    if (leadTabHasError) {
       setActiveTab("leadFrequency");
       return;
     }
@@ -507,7 +549,6 @@ export default function AutoFollowUpConfigDialog({
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-
               <Tabs
                 value={activeTab}
                 onValueChange={setActiveTab}
@@ -522,15 +563,21 @@ export default function AutoFollowUpConfigDialog({
                   </TabsTrigger>
                   <TabsTrigger
                     value="chatDropOff"
-                    className="text-xs py-2 data-active:bg-white data-active:text-gray-900 data-active:shadow-xs font-medium cursor-pointer"
+                    className="text-xs py-2 data-active:bg-white data-active:text-gray-900 data-active:shadow-xs font-medium cursor-pointer relative"
                   >
-                    Chat Drop-Off
+                    <span>Chat Drop-Off</span>
+                    {chatTabHasError && (
+                      <span className="ml-1.5 inline-flex items-center justify-center w-2 h-2 rounded-full bg-red-500" />
+                    )}
                   </TabsTrigger>
                   <TabsTrigger
                     value="leadFrequency"
-                    className="text-xs py-2 data-active:bg-white data-active:text-gray-900 data-active:shadow-xs font-medium cursor-pointer"
+                    className="text-xs py-2 data-active:bg-white data-active:text-gray-900 data-active:shadow-xs font-medium cursor-pointer relative"
                   >
-                    Lead Cadence (Warm & Cold)
+                    <span>Lead Cadence</span>
+                    {leadTabHasError && (
+                      <span className="ml-1.5 inline-flex items-center justify-center w-2 h-2 rounded-full bg-red-500" />
+                    )}
                   </TabsTrigger>
                 </TabsList>
 
@@ -590,7 +637,10 @@ export default function AutoFollowUpConfigDialog({
                         <Switch
                           checked={channels.email}
                           onCheckedChange={(checked) =>
-                            setChannels((prev) => ({ ...prev, email: checked }))
+                            setChannels((prev) => ({
+                              ...prev,
+                              email: checked,
+                            }))
                           }
                         />
                       </div>
@@ -610,7 +660,7 @@ export default function AutoFollowUpConfigDialog({
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
                       <Select value={timezone} onValueChange={setTimezone}>
-                        <SelectTrigger className="bg-white text-xs">
+                        <SelectTrigger className="w-full bg-white text-xs">
                           <SelectValue placeholder="Select timezone" />
                         </SelectTrigger>
                         <SelectContent>
@@ -666,17 +716,21 @@ export default function AutoFollowUpConfigDialog({
                           min={0}
                           max={1440}
                           step={5}
-                          value={manualReminder.defaultReminderMinutes}
-                          onChange={(e) =>
+                          value={
+                            manualReminder.defaultReminderMinutes === 0
+                              ? ""
+                              : manualReminder.defaultReminderMinutes
+                          }
+                          onChange={(e) => {
+                            const val = e.target.value;
                             setManualReminder((prev) => ({
                               ...prev,
-                              defaultReminderMinutes: Math.max(
-                                0,
-                                Number(e.target.value) || 0,
-                              ),
-                            }))
-                          }
+                              defaultReminderMinutes:
+                                val === "" ? 0 : Math.max(0, Number(val) || 0),
+                            }));
+                          }}
                           className="text-xs bg-white"
+                          placeholder="0"
                         />
                         <p className="text-[11px] text-gray-500">
                           Default alert sent{" "}
@@ -734,157 +788,191 @@ export default function AutoFollowUpConfigDialog({
                       />
                     </div>
 
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-gray-700">
-                        Inactivity Trigger (Minutes)
-                      </Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={10080}
-                        value={chatDropOff.inactivityMinutes}
-                        onChange={(e) =>
-                          setChatDropOff((prev) => ({
-                            ...prev,
-                            inactivityMinutes: Math.max(
-                              0,
-                              Number(e.target.value) || 0,
-                            ),
-                          }))
-                        }
-                        className="text-xs bg-white sm:max-w-xs"
-                        placeholder="e.g. 30"
-                      />
-                      <p className="text-[11px] text-gray-500">
-                        Trigger first follow-up after{" "}
-                        {chatDropOff.inactivityMinutes} mins (
-                        {formatMinutes(chatDropOff.inactivityMinutes)})
-                      </p>
-                    </div>
-
-                    {/* Presets & Intervals */}
-                    <div className="space-y-2 pt-2 border-t border-gray-100">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-xs text-gray-700 font-medium">
-                          Attempt Intervals
+                    <div
+                      className={`space-y-4 transition-opacity ${
+                        !chatDropOff.enabled
+                          ? "opacity-40 pointer-events-none"
+                          : ""
+                      }`}
+                    >
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-gray-700">
+                          Inactivity Trigger (Minutes)
                         </Label>
-                        <div className="flex gap-1.5">
-                          {(
-                            Object.keys(CHAT_PRESETS) as Array<
-                              Exclude<ChatPreset, "custom">
-                            >
-                          ).map((key) => {
-                            const item = CHAT_PRESETS[key];
-                            const isSelected = chatDropOff.preset === key;
-                            return (
-                              <button
-                                key={key}
-                                type="button"
-                                onClick={() => handleApplyChatPreset(key)}
-                                className={`text-[11px] px-2 py-0.5 rounded cursor-pointer ${
-                                  isSelected
-                                    ? "text-blue-600 bg-blue-50 border border-blue-200/60 font-medium"
-                                    : "text-gray-600 hover:text-gray-800 bg-gray-100"
-                                }`}
-                              >
-                                {item.label} ({item.desc})
-                              </button>
-                            );
-                          })}
-                          <button
-                            type="button"
-                            onClick={() => handleApplyChatPreset("custom")}
-                            className={`text-[11px] px-2 py-0.5 rounded cursor-pointer ${
-                              chatDropOff.preset === "custom"
-                                ? "text-blue-600 bg-blue-50 border border-blue-200/60 font-medium"
-                                : "text-gray-600 hover:text-gray-800 bg-gray-100"
-                            }`}
-                          >
-                            Custom
-                          </button>
-                        </div>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={10080}
+                          value={
+                            chatDropOff.inactivityMinutes === 0
+                              ? ""
+                              : chatDropOff.inactivityMinutes
+                          }
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setChatDropOff((prev) => ({
+                              ...prev,
+                              inactivityMinutes:
+                                val === "" ? 0 : Math.max(0, Number(val) || 0),
+                            }));
+                          }}
+                          className="text-xs bg-white sm:max-w-xs"
+                          placeholder="e.g. 30"
+                        />
+                        <p className="text-[11px] text-gray-500">
+                          Trigger first follow-up after{" "}
+                          {chatDropOff.inactivityMinutes} mins (
+                          {formatMinutes(chatDropOff.inactivityMinutes)})
+                        </p>
                       </div>
 
-                      {chatDropOff.preset === "custom" ? (
-                        <div className="space-y-3 pt-2">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="space-y-1.5">
-                              <Label className="text-xs text-gray-700">
-                                Max Follow-Up Attempts
-                              </Label>
-                              <Input
-                                type="number"
-                                min={1}
-                                max={6}
-                                value={chatDropOff.maxAttempts}
-                                onChange={(e) =>
-                                  setChatDropOff((prev) => ({
-                                    ...prev,
-                                    maxAttempts: Math.max(
-                                      1,
-                                      Number(e.target.value) || 1,
-                                    ),
-                                  }))
-                                }
-                                className="text-xs bg-white"
-                                placeholder="e.g. 3"
-                              />
-                            </div>
-
-                            <div className="space-y-1.5">
-                              <Label className="text-xs text-gray-700">
-                                Intervals (Minutes, comma-separated)
-                              </Label>
-                              <Input
-                                type="text"
-                                value={chatDropOff.attemptIntervalsStr}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  const nums = parseNumberArray(val);
-                                  setChatDropOff((prev) => ({
-                                    ...prev,
-                                    attemptIntervalsStr: val,
-                                    preset: detectChatPreset(nums),
-                                  }));
-                                }}
-                                placeholder="e.g. 30, 180, 1440"
-                                className="text-xs bg-white font-mono"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="flex flex-wrap gap-1.5 pt-1">
-                            {parsedChatIntervals.map((mins, idx) => (
-                              <Badge
-                                key={idx}
-                                variant="secondary"
-                                className="text-[11px] bg-blue-50 text-blue-700 border border-blue-200 font-normal px-2.5 py-0.5"
+                      {/* Presets & Intervals */}
+                      <div className="space-y-2 pt-2 border-t border-gray-100">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs text-gray-700 font-medium">
+                            Attempt Intervals
+                          </Label>
+                          <div className="flex gap-1.5">
+                            {(
+                              Object.keys(CHAT_PRESETS) as Array<
+                                Exclude<ChatPreset, "custom">
                               >
-                                Attempt #{idx + 1}: {formatMinutes(mins)} ({mins}m)
-                              </Badge>
-                            ))}
-                            {parsedChatIntervals.length === 0 && (
-                              <span className="text-[11px] text-red-500">
-                                Please specify at least one interval in minutes.
-                              </span>
+                            ).map((key) => {
+                              const item = CHAT_PRESETS[key];
+                              const isSelected = chatDropOff.preset === key;
+                              return (
+                                <button
+                                  key={key}
+                                  type="button"
+                                  onClick={() => handleApplyChatPreset(key)}
+                                  className={`text-[11px] px-2 py-0.5 rounded cursor-pointer ${
+                                    isSelected
+                                      ? "text-blue-600 bg-blue-50 border border-blue-200/60 font-medium"
+                                      : "text-gray-600 hover:text-gray-800 bg-gray-100"
+                                  }`}
+                                >
+                                  {item.label} ({item.desc})
+                                </button>
+                              );
+                            })}
+                            <button
+                              type="button"
+                              onClick={() => handleApplyChatPreset("custom")}
+                              className={`text-[11px] px-2 py-0.5 rounded cursor-pointer ${
+                                chatDropOff.preset === "custom"
+                                  ? "text-blue-600 bg-blue-50 border border-blue-200/60 font-medium"
+                                  : "text-gray-600 hover:text-gray-800 bg-gray-100"
+                              }`}
+                            >
+                              Custom
+                            </button>
+                          </div>
+                        </div>
+
+                        {chatDropOff.preset === "custom" ? (
+                          <div className="space-y-3 pt-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div className="space-y-1.5">
+                                <Label className="text-xs text-gray-700">
+                                  Max Follow-Up Attempts
+                                </Label>
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  max={6}
+                                  value={
+                                    chatDropOff.maxAttempts === 0
+                                      ? ""
+                                      : chatDropOff.maxAttempts
+                                  }
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    const newMax =
+                                      val === "" ? 1 : Math.max(1, Number(val) || 1);
+                                    setChatDropOff((prev) => ({
+                                      ...prev,
+                                      maxAttempts: newMax,
+                                      attemptIntervalsStr: limitIntervalsInput(
+                                        prev.attemptIntervalsStr,
+                                        newMax,
+                                      ),
+                                    }));
+                                  }}
+                                  className="text-xs bg-white"
+                                  placeholder="e.g. 3"
+                                />
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <Label className="text-xs text-gray-700">
+                                  Intervals (Minutes, comma-separated)
+                                </Label>
+                                <Input
+                                  type="text"
+                                  value={chatDropOff.attemptIntervalsStr}
+                                  onChange={(e) => {
+                                    const val = limitIntervalsInput(
+                                      e.target.value,
+                                      chatDropOff.maxAttempts,
+                                    );
+                                    const nums = parseNumberArray(val);
+                                    setChatDropOff((prev) => ({
+                                      ...prev,
+                                      attemptIntervalsStr: val,
+                                      preset: detectChatPreset(nums),
+                                    }));
+                                  }}
+                                  placeholder="e.g. 30, 180, 1440"
+                                  className={`text-xs bg-white font-mono ${
+                                    chatTabHasError
+                                      ? "border-red-500 focus-visible:ring-red-500"
+                                      : ""
+                                  }`}
+                                />
+                              </div>
+                            </div>
+
+                            {chatIntervalsCountError && (
+                              <p className="text-[11px] text-red-600 font-medium flex items-center gap-1">
+                                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                {chatIntervalsCountError}
+                              </p>
                             )}
+
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {parsedChatIntervals.map((mins, idx) => (
+                                <Badge
+                                  key={idx}
+                                  variant="secondary"
+                                  className="text-[11px] bg-blue-50 text-blue-700 border border-blue-200 font-normal px-2.5 py-0.5"
+                                >
+                                  Attempt #{idx + 1}: {formatMinutes(mins)} ({mins}m)
+                                </Badge>
+                              ))}
+                              {chatEmptyIntervalsError && (
+                                <span className="text-[11px] text-red-600 font-medium flex items-center gap-1">
+                                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                {chatEmptyIntervalsError}
+                              </span>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        <div className="pt-1 space-y-1.5">
-                          <div className="flex flex-wrap gap-1.5">
-                            {parsedChatIntervals.map((mins, idx) => (
-                              <Badge
-                                key={idx}
-                                variant="secondary"
-                                className="text-[11px] bg-blue-50 text-blue-700 border border-blue-200 font-normal px-2.5 py-0.5"
-                              >
-                                Attempt #{idx + 1}: {formatMinutes(mins)} ({mins}m)
-                              </Badge>
-                            ))}
+                        ) : (
+                          <div className="pt-1 space-y-1.5">
+                            <div className="flex flex-wrap gap-1.5">
+                              {parsedChatIntervals.map((mins, idx) => (
+                                <Badge
+                                  key={idx}
+                                  variant="secondary"
+                                  className="text-[11px] bg-blue-50 text-blue-700 border border-blue-200 font-normal px-2.5 py-0.5"
+                                >
+                                  Attempt #{idx + 1}: {formatMinutes(mins)} ({mins}m)
+                                </Badge>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
                 </TabsContent>
@@ -958,16 +1046,24 @@ export default function AutoFollowUpConfigDialog({
                                 type="number"
                                 min={1}
                                 max={6}
-                                value={warmLead.maxAttempts}
-                                onChange={(e) =>
+                                value={
+                                  warmLead.maxAttempts === 0
+                                    ? ""
+                                    : warmLead.maxAttempts
+                                }
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  const newMax =
+                                    val === "" ? 1 : Math.max(1, Number(val) || 1);
                                   setWarmLead((prev) => ({
                                     ...prev,
-                                    maxAttempts: Math.max(
-                                      1,
-                                      Number(e.target.value) || 1,
+                                    maxAttempts: newMax,
+                                    intervalsDaysStr: limitIntervalsInput(
+                                      prev.intervalsDaysStr,
+                                      newMax,
                                     ),
-                                  }))
-                                }
+                                  }));
+                                }}
                                 className="text-xs bg-white"
                                 placeholder="e.g. 4"
                               />
@@ -981,7 +1077,10 @@ export default function AutoFollowUpConfigDialog({
                                 type="text"
                                 value={warmLead.intervalsDaysStr}
                                 onChange={(e) => {
-                                  const val = e.target.value;
+                                  const val = limitIntervalsInput(
+                                    e.target.value,
+                                    warmLead.maxAttempts,
+                                  );
                                   const nums = parseNumberArray(val);
                                   setWarmLead((prev) => ({
                                     ...prev,
@@ -990,10 +1089,21 @@ export default function AutoFollowUpConfigDialog({
                                   }));
                                 }}
                                 placeholder="e.g. 3, 7, 10, 14"
-                                className="text-xs bg-white font-mono"
+                                className={`text-xs bg-white font-mono ${
+                                  warmIntervalsCountError || warmEmptyIntervalsError
+                                    ? "border-red-500 focus-visible:ring-red-500"
+                                    : ""
+                                }`}
                               />
                             </div>
                           </div>
+
+                          {warmIntervalsCountError && (
+                            <p className="text-[11px] text-red-600 font-medium flex items-center gap-1">
+                              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                              {warmIntervalsCountError}
+                            </p>
+                          )}
 
                           <div className="flex flex-wrap gap-1.5 pt-1">
                             {parsedWarmIntervals.map((days, idx) => (
@@ -1005,9 +1115,10 @@ export default function AutoFollowUpConfigDialog({
                                 Attempt #{idx + 1}: Day {days}
                               </Badge>
                             ))}
-                            {parsedWarmIntervals.length === 0 && (
-                              <span className="text-[11px] text-red-500">
-                                Please specify at least one interval in days.
+                            {warmEmptyIntervalsError && (
+                              <span className="text-[11px] text-red-600 font-medium flex items-center gap-1">
+                                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                {warmEmptyIntervalsError}
                               </span>
                             )}
                           </div>
@@ -1044,12 +1155,21 @@ export default function AutoFollowUpConfigDialog({
                       <Switch
                         checked={coldLead.enabled}
                         onCheckedChange={(checked) =>
-                          setColdLead((prev) => ({ ...prev, enabled: checked }))
+                          setColdLead((prev) => ({
+                            ...prev,
+                            enabled: checked,
+                          }))
                         }
                       />
                     </div>
 
-                    <div className="space-y-2">
+                    <div
+                      className={`space-y-2 transition-opacity ${
+                        !coldLead.enabled
+                          ? "opacity-40 pointer-events-none"
+                          : ""
+                      }`}
+                    >
                       <div className="flex items-center justify-between">
                         <Label className="text-xs text-gray-700 font-medium">
                           Interval Schedule
@@ -1102,16 +1222,24 @@ export default function AutoFollowUpConfigDialog({
                                 type="number"
                                 min={1}
                                 max={6}
-                                value={coldLead.maxAttempts}
-                                onChange={(e) =>
+                                value={
+                                  coldLead.maxAttempts === 0
+                                    ? ""
+                                    : coldLead.maxAttempts
+                                }
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  const newMax =
+                                    val === "" ? 1 : Math.max(1, Number(val) || 1);
                                   setColdLead((prev) => ({
                                     ...prev,
-                                    maxAttempts: Math.max(
-                                      1,
-                                      Number(e.target.value) || 1,
+                                    maxAttempts: newMax,
+                                    intervalsDaysStr: limitIntervalsInput(
+                                      prev.intervalsDaysStr,
+                                      newMax,
                                     ),
-                                  }))
-                                }
+                                  }));
+                                }}
                                 className="text-xs bg-white"
                                 placeholder="e.g. 4"
                               />
@@ -1125,7 +1253,10 @@ export default function AutoFollowUpConfigDialog({
                                 type="text"
                                 value={coldLead.intervalsDaysStr}
                                 onChange={(e) => {
-                                  const val = e.target.value;
+                                  const val = limitIntervalsInput(
+                                    e.target.value,
+                                    coldLead.maxAttempts,
+                                  );
                                   const nums = parseNumberArray(val);
                                   setColdLead((prev) => ({
                                     ...prev,
@@ -1134,10 +1265,21 @@ export default function AutoFollowUpConfigDialog({
                                   }));
                                 }}
                                 placeholder="e.g. 7, 15, 30"
-                                className="text-xs bg-white font-mono"
+                                className={`text-xs bg-white font-mono ${
+                                  coldIntervalsCountError || coldEmptyIntervalsError
+                                    ? "border-red-500 focus-visible:ring-red-500"
+                                    : ""
+                                }`}
                               />
                             </div>
                           </div>
+
+                          {coldIntervalsCountError && (
+                            <p className="text-[11px] text-red-600 font-medium flex items-center gap-1">
+                              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                              {coldIntervalsCountError}
+                            </p>
+                          )}
 
                           <div className="flex flex-wrap gap-1.5 pt-1">
                             {parsedColdIntervals.map((days, idx) => (
@@ -1149,9 +1291,10 @@ export default function AutoFollowUpConfigDialog({
                                 Attempt #{idx + 1}: Day {days}
                               </Badge>
                             ))}
-                            {parsedColdIntervals.length === 0 && (
-                              <span className="text-[11px] text-red-500">
-                                Please specify at least one interval in days.
+                            {coldEmptyIntervalsError && (
+                              <span className="text-[11px] text-red-600 font-medium flex items-center gap-1">
+                                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                {coldEmptyIntervalsError}
                               </span>
                             )}
                           </div>
@@ -1207,8 +1350,13 @@ export default function AutoFollowUpConfigDialog({
                 type="button"
                 size="sm"
                 onClick={handleSave}
-                disabled={isLoading || updateMutation.isPending}
-                className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-4 cursor-pointer"
+                disabled={
+                  isLoading ||
+                  updateMutation.isPending ||
+                  chatTabHasError ||
+                  leadTabHasError
+                }
+                className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-4 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {updateMutation.isPending ? (
                   <>

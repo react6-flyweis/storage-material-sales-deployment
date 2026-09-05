@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
@@ -25,7 +24,6 @@ interface SendQuotationModalProps {
   approvalStatus?: ApprovalStatus | string;
   versionNumber?: number;
   approvedVersionNumber?: number | null;
-  onSend?: (email: string, notes?: string) => Promise<{ emailProvider?: string; [key: string]: unknown } | void>;
   onSuccess?: () => void;
   isLoading?: boolean;
 }
@@ -34,16 +32,13 @@ export function SendQuotationModal({
   open,
   onOpenChange,
   quotationId,
-  customerEmail = "",
   customerName = "Valued Customer",
   approvalStatus = "approved",
   versionNumber = 1,
   approvedVersionNumber,
-  onSend,
   onSuccess,
   isLoading = false,
 }: SendQuotationModalProps) {
-  const [email, setEmail] = useState(customerEmail);
   const [notes, setNotes] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
@@ -66,21 +61,22 @@ export function SendQuotationModal({
     approvedVersionNumber !== null &&
     approvedVersionNumber !== versionNumber;
 
-  const canSend = isApproved && !isStale;
+  const canSend = isApproved && !isStale && Boolean(quotationId);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) return;
+    if (!quotationId) return;
     setErrorMessage(null);
     try {
-      if (onSend) {
-        await onSend(email, notes);
-      } else if (quotationId) {
-        await sendMutation.mutateAsync({
-          quotationId,
-          payload: { email, notes },
-        });
-      }
+      await sendMutation.mutateAsync({
+        quotationId,
+        payload: {
+          message: notes,
+          note: notes,
+          emailMessage: notes,
+          coverNote: notes,
+        },
+      });
       handleOpenChange(false);
       setShowSuccessDialog(true);
       onSuccess?.();
@@ -125,20 +121,8 @@ export function SendQuotationModal({
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="customer-email">Recipient Email Address</Label>
-                <Input
-                  id="customer-email"
-                  type="email"
-                  required
-                  placeholder="customer@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
                 <Label htmlFor="send-notes">
-                  Email Message / Cover Note <span className="font-normal text-slate-500">(Optional)</span>
+                  Message / Cover Note <span className="font-normal text-slate-500">(Optional)</span>
                 </Label>
                 <Textarea
                   id="send-notes"
@@ -162,7 +146,7 @@ export function SendQuotationModal({
               </DialogClose>
               <Button
                 type="submit"
-                disabled={!canSend || isSending || !email}
+                disabled={!canSend || isSending}
               >
                 {isSending ? "Sending..." : "Send Quotation"}
               </Button>
