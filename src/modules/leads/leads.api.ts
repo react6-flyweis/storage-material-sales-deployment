@@ -331,6 +331,7 @@ export type LeadDetailLead = {
   width?: number | null;
   length?: number | null;
   height?: number | null;
+  roofPitch?: string | null;
   roofStyle?: string;
   numDoors?: number;
   numWindows?: number;
