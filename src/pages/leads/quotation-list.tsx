@@ -64,18 +64,8 @@ function formatDate(value?: string | null) {
   }).format(date);
 }
 
-function normalizeStatus(
-  status?: string | null,
-  approvalStatus?: string | null,
-) {
-  const raw = (
-    status ||
-    (approvalStatus && approvalStatus !== "not_submitted"
-      ? approvalStatus
-      : "draft")
-  )
-    .trim()
-    .toLowerCase();
+function normalizeStatus(status?: string | null) {
+  const raw = (status || "draft").trim().toLowerCase();
 
   switch (raw) {
     case "sent":
@@ -87,8 +77,9 @@ function normalizeStatus(
     case "rejected":
       return "Rejected";
     case "draft":
-    default:
       return "Draft";
+    default:
+      return raw.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   }
 }
 
@@ -117,7 +108,6 @@ function EmptyState() {
 
 export default function QuotationListPage() {
   const [selectedFilters, setSelectedFilters] = useState({
-    buildingType: "",
     status: "",
   });
 
@@ -136,8 +126,7 @@ export default function QuotationListPage() {
       const approvalStatus =
         quotation.approval?.status || quotation.approvalStatus;
       const status = normalizeStatus(
-        quotation.workflowStatus || quotation.status,
-        approvalStatus,
+        quotation.status || quotation.workflowStatus,
       );
       const colors = getStatusClassName(status);
 
@@ -157,8 +146,8 @@ export default function QuotationListPage() {
         status,
         buildingType: quotation.buildingType || "",
         rawStatus: (
-          quotation.workflowStatus ||
           quotation.status ||
+          quotation.workflowStatus ||
           ""
         ).toLowerCase(),
         rawApprovalStatus: (approvalStatus || "").toLowerCase(),
@@ -240,21 +229,8 @@ export default function QuotationListPage() {
         ))}
       </div>
 
-      <div className="flex justify-end items-center">
+      <div className="flex  items-center">
         <div className="flex gap-4">
-          <Select
-            value={selectedFilters.buildingType}
-            onValueChange={(v) => handleFilterChange("buildingType", v)}
-          >
-            <SelectTrigger className="w-44 bg-white">
-              <SelectValue placeholder="Building Types" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="warehouse">Warehouse</SelectItem>
-              <SelectItem value="commercial">Commercial</SelectItem>
-              <SelectItem value="residential">Residential</SelectItem>
-            </SelectContent>
-          </Select>
           <Select
             value={selectedFilters.status}
             onValueChange={(v) => handleFilterChange("status", v)}
