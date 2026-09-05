@@ -91,21 +91,15 @@ export function ExtractedQuoteFormSection({
   }, [initialValues, reset]);
 
   useEffect(() => {
-    if (pdfFileName) {
-      setFileName(pdfFileName);
-    }
+    setFileName(pdfFileName || "");
   }, [pdfFileName]);
 
   useEffect(() => {
-    if (rawTextPreview !== undefined) {
-      setCurrentRawText(rawTextPreview);
-    }
+    setCurrentRawText(rawTextPreview || "");
   }, [rawTextPreview]);
 
   useEffect(() => {
-    if (note !== undefined) {
-      setCurrentNote(note);
-    }
+    setCurrentNote(note || "");
   }, [note]);
 
   const [isDragging, setIsDragging] = useState(false);

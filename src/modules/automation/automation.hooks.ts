@@ -41,6 +41,7 @@ export function useUpdateAutomationConfigMutation() {
       updateAutomationConfigProvider(payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["followup-automation", "config"] });
+      void queryClient.invalidateQueries({ queryKey: ["followups"] });
     },
   });
 }

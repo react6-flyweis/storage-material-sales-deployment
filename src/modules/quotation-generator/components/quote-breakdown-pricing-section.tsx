@@ -137,9 +137,7 @@ export function QuoteBreakdownPricingSection({
 
   useEffect(() => {
     const eid = propEstimateId || pembEstimateId;
-    if (eid) {
-      setEstimateId(eid);
-    }
+    setEstimateId(eid || null);
   }, [propEstimateId, pembEstimateId]);
 
   // Page-specific local state
@@ -163,6 +161,10 @@ export function QuoteBreakdownPricingSection({
       if (s.squareFootage) {
         setSqFt(String(s.squareFootage));
       }
+    } else {
+      setShipperData(undefined);
+      setFile(null);
+      setSqFt("");
     }
   }, [initialShipper, pembExtractedShipper]);
 

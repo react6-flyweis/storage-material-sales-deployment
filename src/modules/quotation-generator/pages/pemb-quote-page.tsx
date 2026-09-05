@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router";
-import { ArrowLeft, User, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, User, ChevronDown, ChevronUp, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -44,7 +44,10 @@ export default function PembQuotePage() {
     setPembEstimateId,
     setBuildingSize,
     setSquareFootage,
+    resetPembFiles,
   } = useQuotationStore();
+
+  const [resetKey, setResetKey] = useState(0);
 
   const navState = (location.state || {}) as {
     quotationForm?: Record<string, string>;
@@ -241,6 +244,27 @@ export default function PembQuotePage() {
     [applyDimensions, setPembExtractedDrawing, setPembPdfFileName],
   );
 
+  const handleReset = useCallback(() => {
+    // 1. Reset store drawing, excel/shipper, estimate, and calculation states
+    resetPembFiles();
+
+    // 2. Reset local state
+    setExtractedDrawing(undefined);
+    setExtractedShipper(undefined);
+    setPdfFileName("");
+
+    // 3. Force re-render of child components to wipe any uncommitted state
+    setResetKey((prev) => prev + 1);
+
+    // 4. Update router location state so drawing/shipper don't rehydrate from history
+    navigate(location.pathname, {
+      replace: true,
+      state: {
+        quotationForm,
+      },
+    });
+  }, [resetPembFiles, navigate, location.pathname, quotationForm]);
+
   const handleShipperExtracted = useCallback(
     (data: ExtractShipperResponseData) => {
       setExtractedShipper(data);
@@ -276,22 +300,37 @@ export default function PembQuotePage() {
 
       <div className="p-5 pt-0 space-y-6">
         {/* Top Header Banner */}
-        <div className="flex items-center gap-4">
-          <Button
-            type="button"
-            onClick={() => navigate("/quotation/pemb/create")}
-            variant="outline"
-            className="border-primary text-primary"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">PEMB Quote</h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Review the customer's material request, configure pricing, and
-              generate a quotation for approval.
-            </p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Button
+              type="button"
+              onClick={() => navigate("/quotation/pemb/create")}
+              variant="outline"
+              className="border-primary text-primary"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1.5" />
+              Back to Lead Selection
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">PEMB Quote</h1>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Review the customer's material request, configure pricing, and
+                generate a quotation for approval.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleReset}
+              className="text-slate-600 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors"
+              title="Reset drawing file, excel file, and quotation calculations"
+            >
+              <RotateCcw className="h-4 w-4 mr-1.5" />
+              Reset
+            </Button>
           </div>
         </div>
 
@@ -433,6 +472,7 @@ export default function PembQuotePage() {
 
           {/* Step 1: Prelim Drawing (PDF) & Extracted Quote Form */}
           <ExtractedQuoteFormSection
+            key={`drawing-section-${resetKey}`}
             initialValues={initialValues}
             pdfFileName={pdfFileName}
             rawTextPreview={extractedDrawing?.rawTextPreview}
@@ -445,6 +485,7 @@ export default function PembQuotePage() {
 
           {/* Step 2: Xshipper file (.xlsx) & Quote Breakdown Pricing Section */}
           <QuoteBreakdownPricingSection
+            key={`shipper-section-${resetKey}`}
             extractedShipper={extractedShipper}
             quotationForm={quotationForm}
             extractedDrawing={extractedDrawing}
