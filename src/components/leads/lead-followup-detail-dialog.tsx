@@ -19,9 +19,7 @@ import {
 import {
   Loader2,
   Calendar as CalendarIcon,
-  Phone,
   Mail,
-  Users,
   MessageSquare,
   Clock,
   CheckCircle2,
@@ -31,7 +29,7 @@ import dayjs from "dayjs";
 import { useFollowUpActivityDetailQuery } from "@/modules/followups/followups.hooks";
 import type {
   FollowUpKind,
-  FollowUpModeOfContact,
+  FollowUpHistoryItem,
 } from "@/modules/followups/followups.api";
 import Pagination from "@/components/Pagination";
 import StatCard from "@/components/ui/stat-card";
@@ -52,7 +50,7 @@ export default function LeadFollowUpDetailDialog({
   kind = "automatic",
 }: LeadFollowUpDetailDialogProps) {
   const [page, setPage] = useState(1);
-  const limit = 10;
+  const [limit, setLimit] = useState(10);
 
   const { data: response, isLoading } = useFollowUpActivityDetailQuery(
     leadId || "",
@@ -68,20 +66,81 @@ export default function LeadFollowUpDetailDialog({
   const history = detailData?.history || [];
   const totalHistory = detailData?.pagination?.totalHistory || history.length;
 
-  const getContactIcon = (mode?: FollowUpModeOfContact | string) => {
-    switch (mode) {
-      case "call":
-        return <Phone className="w-3.5 h-3.5 text-blue-600" />;
-      case "email":
-        return <Mail className="w-3.5 h-3.5 text-purple-600" />;
-      case "meeting":
-        return <Users className="w-3.5 h-3.5 text-emerald-600" />;
-      case "sms":
-      case "chat":
-        return <MessageSquare className="w-3.5 h-3.5 text-orange-600" />;
-      default:
-        return <Clock className="w-3.5 h-3.5 text-gray-500" />;
-    }
+  const renderDeliveryCell = (
+    item: FollowUpHistoryItem,
+    channel: "sms" | "email",
+  ) => {
+    const customerTarget = item.deliveryStatus?.customer?.[channel];
+    const repTarget = item.deliveryStatus?.salesEmployee?.[channel];
+
+    const getBadge = (status?: string, sentAt?: string | null, error?: string) => {
+      switch (status) {
+        case "sent":
+          return (
+            <Badge className="bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 px-2 py-0.5 text-xs font-medium inline-flex items-center gap-1">
+              <span>Sent</span>
+              {sentAt && (
+                <span className="text-[10px] text-green-600 font-normal">
+                  ({dayjs(sentAt).format("MMM DD, h:mm A")})
+                </span>
+              )}
+            </Badge>
+          );
+        case "failed":
+          return (
+            <Badge
+              title={error || "Delivery failed"}
+              className="bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 px-2 py-0.5 text-xs font-medium cursor-help"
+            >
+              Failed{error ? `: ${error}` : ""}
+            </Badge>
+          );
+        case "pending":
+          return (
+            <Badge className="bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 px-2 py-0.5 text-xs font-medium">
+              Pending
+            </Badge>
+          );
+        case "disabled":
+        default:
+          return <span className="text-gray-400 text-xs">—</span>;
+      }
+    };
+
+    return (
+      <div>
+        {getBadge(
+          customerTarget?.enabled ? customerTarget.status : "disabled",
+          customerTarget?.sentAt,
+          customerTarget?.error,
+        )}
+        {repTarget && repTarget.enabled && (
+          <div className="text-[10px] text-gray-500 mt-1 flex items-center gap-1">
+            <span className="font-medium">Rep:</span>
+            <span
+              className={
+                repTarget.status === "sent"
+                  ? "text-emerald-600 font-medium"
+                  : repTarget.status === "failed"
+                    ? "text-red-500 font-medium"
+                    : "text-amber-600"
+              }
+            >
+              {repTarget.status === "sent"
+                ? "Sent"
+                : repTarget.status === "failed"
+                  ? "Failed"
+                  : "Pending"}
+            </span>
+            {repTarget.sentAt && (
+              <span className="text-[10px] text-gray-400">
+                ({dayjs(repTarget.sentAt).format("h:mm A")})
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    );
   };
 
   const getStatusBadge = (status?: string) => {
@@ -228,8 +287,17 @@ export default function LeadFollowUpDetailDialog({
                     <TableHead className="font-semibold text-gray-700 uppercase text-[11px] h-10 px-4">
                       Follow-up Date
                     </TableHead>
-                    <TableHead className="font-semibold text-gray-700 uppercase text-[11px] h-10 px-4">
-                      Contact Type
+                    <TableHead className="font-semibold text-gray-700 uppercase text-[11px] h-10 px-4 min-w-30">
+                      <div className="flex items-center gap-1.5">
+                        <MessageSquare className="w-3.5 h-3.5 text-orange-600" />
+                        <span>SMS</span>
+                      </div>
+                    </TableHead>
+                    <TableHead className="font-semibold text-gray-700 uppercase text-[11px] h-10 px-4 min-w-35">
+                      <div className="flex items-center gap-1.5">
+                        <Mail className="w-3.5 h-3.5 text-purple-600" />
+                        <span>Email</span>
+                      </div>
                     </TableHead>
                     <TableHead className="font-semibold text-gray-700 uppercase text-[11px] h-10 px-4">
                       Source
@@ -248,7 +316,7 @@ export default function LeadFollowUpDetailDialog({
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="h-32 text-center text-xs text-gray-500">
+                      <TableCell colSpan={7} className="h-32 text-center text-xs text-gray-500">
                         <div className="flex items-center justify-center gap-2">
                           <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
                           <span>Loading activity records...</span>
@@ -257,7 +325,7 @@ export default function LeadFollowUpDetailDialog({
                     </TableRow>
                   ) : history.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="h-28 text-center text-xs text-gray-500">
+                      <TableCell colSpan={7} className="h-28 text-center text-xs text-gray-500">
                         No follow-up activity found for this lead.
                       </TableCell>
                     </TableRow>
@@ -278,12 +346,11 @@ export default function LeadFollowUpDetailDialog({
                         </TableCell>
 
                         <TableCell className="px-4 py-3">
-                          <div className="flex items-center gap-1.5 font-medium text-gray-800 capitalize">
-                            <span className="p-1 bg-gray-100 rounded">
-                              {getContactIcon(item.modeOfContact)}
-                            </span>
-                            <span>{item.modeOfContact || "Contact"}</span>
-                          </div>
+                          {renderDeliveryCell(item, "sms")}
+                        </TableCell>
+
+                        <TableCell className="px-4 py-3">
+                          {renderDeliveryCell(item, "email")}
                         </TableCell>
 
                         <TableCell className="px-4 py-3">
@@ -333,6 +400,10 @@ export default function LeadFollowUpDetailDialog({
                   totalItems={totalHistory}
                   rowsPerPage={limit}
                   onPageChange={setPage}
+                  onRowsPerPageChange={(newLimit) => {
+                    setLimit(newLimit);
+                    setPage(1);
+                  }}
                 />
               </div>
             )}
