@@ -16,33 +16,30 @@ export type ColdPreset = "d7_15_30" | "every_15" | "monthly" | "custom";
 export type ChatPreset = "default" | "twice_day" | "daily" | "custom";
 
 export interface FollowupAutomationConfigPayload {
-  channels: {
+  channels?: {
     sms: boolean;
     email: boolean;
   };
-  timezone: string;
+  timezone?: string;
   chatDropOff: {
     enabled: boolean;
-    inactivityMinutes: number;
+    inactivityMinutes?: number;
     maxAttempts: number;
     attemptIntervalsMinutes: number[];
-  };
-  coldLead: {
-    enabled: boolean;
-    maxAttempts: number;
-    intervalsDays: number[];
   };
   manualReminder: {
     defaultReminderMinutes: number;
     sendDueNowReminder: boolean;
   };
-  leadFrequency?: {
+  leadFollowUp?: {
     warm?: {
+      enabled?: boolean;
       preset?: WarmPreset;
       maxAttempts?: number;
       intervalsDays?: number[];
     };
     cold?: {
+      enabled?: boolean;
       preset?: ColdPreset;
       maxAttempts?: number;
       intervalsDays?: number[];
@@ -54,33 +51,27 @@ export type FollowUpAutomationConfig = {
   key?: string;
   chatDropOff?: {
     enabled: boolean;
-    inactivityMinutes: number;
+    inactivityMinutes?: number;
     maxAttempts: number;
     attemptIntervalsMinutes: number[];
     requireNotQuoteReady?: boolean;
     requireNotHandedToSales?: boolean;
   };
-  coldLead?: {
-    enabled: boolean;
-    intervalsDays: number[];
-    maxAttempts: number;
-  };
-  invoiceReminder?: {
-    enabled: boolean;
-    intervalsHours: number[];
-    maxAttempts: number;
-  };
+
+
   manualReminder?: {
     defaultReminderMinutes: number;
     sendDueNowReminder: boolean;
   };
-  leadFrequency?: {
+  leadFollowUp?: {
     warm?: {
+      enabled?: boolean;
       preset?: WarmPreset;
       maxAttempts?: number;
       intervalsDays?: number[];
     };
     cold?: {
+      enabled?: boolean;
       preset?: ColdPreset;
       maxAttempts?: number;
       intervalsDays?: number[];
