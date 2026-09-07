@@ -9,9 +9,11 @@ import {
   getQuotationByIdProvider,
   getQuotationsProvider,
   sendQuotationProvider,
+  markQuotationSentProvider,
   submitQuotationForApprovalProvider,
   type CreateQuotationPayload,
   type SendQuotationPayload,
+  type MarkQuotationSentPayload,
 } from "./quotations.api";
 
 export function useQuotationsQuery(page = 1, limit = 20) {
@@ -99,6 +101,8 @@ export function useSubmitQuotationForApprovalMutation() {
   });
 }
 
+export { type MarkQuotationSentPayload };
+
 export function useSendQuotationMutation() {
   const queryClient = useQueryClient();
 
@@ -116,7 +120,33 @@ export function useSendQuotationMutation() {
         queryKey: ["sales", "quotation", variables.quotationId],
       });
       void queryClient.invalidateQueries({ queryKey: ["sales", "estimates"] });
+      void queryClient.invalidateQueries({ queryKey: ["leads"] });
+      void queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
     },
   });
 }
+
+export function useMarkQuotationSentMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      quotationId,
+      payload,
+    }: {
+      quotationId: string;
+      payload?: MarkQuotationSentPayload;
+    }) => markQuotationSentProvider(quotationId, payload),
+    onSuccess: (_, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ["sales", "quotations"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["sales", "quotation", variables.quotationId],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["sales", "estimates"] });
+      void queryClient.invalidateQueries({ queryKey: ["leads"] });
+      void queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
+    },
+  });
+}
+
 
