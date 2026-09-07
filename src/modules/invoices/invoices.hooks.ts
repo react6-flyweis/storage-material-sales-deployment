@@ -9,10 +9,13 @@ import {
   getInvoiceStatsProvider,
   getInvoicesProvider,
   sendInvoiceProvider,
+  markInvoiceSentProvider,
   markInvoicePaidProvider,
   submitInvoiceForApprovalProvider,
   type CreateInvoiceDraftPayload,
   type InvoiceListParams,
+  type SendInvoicePayload,
+  type MarkInvoiceSentPayload,
 } from "./invoices.api";
 
 export function useInvoiceStatsQuery(params?: { leadId?: string }) {
@@ -140,17 +143,49 @@ export function useSubmitInvoiceForApprovalMutation() {
   });
 }
 
+export { type SendInvoicePayload, type MarkInvoiceSentPayload };
+
 export function useSendInvoiceMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (invoiceId: string) => sendInvoiceProvider(invoiceId),
+    mutationFn: (
+      variables: string | { invoiceId: string; payload?: SendInvoicePayload },
+    ) => {
+      if (typeof variables === "string") {
+        return sendInvoiceProvider(variables);
+      }
+      return sendInvoiceProvider(variables.invoiceId, variables.payload);
+    },
     onSuccess: (response) => {
       if (!response.success) return;
 
       void queryClient.invalidateQueries({ queryKey: ["invoices"] });
       void queryClient.invalidateQueries({ queryKey: ["invoices", "detail"] });
       void queryClient.invalidateQueries({ queryKey: ["sales", "leads", "detail"] });
+      void queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
+    },
+  });
+}
+
+export function useMarkInvoiceSentMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      invoiceId,
+      payload,
+    }: {
+      invoiceId: string;
+      payload?: MarkInvoiceSentPayload;
+    }) => markInvoiceSentProvider(invoiceId, payload),
+    onSuccess: (response) => {
+      if (!response.success) return;
+
+      void queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      void queryClient.invalidateQueries({ queryKey: ["invoices", "detail"] });
+      void queryClient.invalidateQueries({ queryKey: ["sales", "leads", "detail"] });
+      void queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
     },
   });
 }
