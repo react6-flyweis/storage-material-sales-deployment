@@ -517,6 +517,7 @@ export default function InvoiceListPage() {
                             inv.invoice?.approval?.status
                           }
                           invoiceStatus={inv.status || inv.invoice?.status}
+                          sendMethod={inv.invoice?.sendMethod || inv.sendMethod}
                         />
                       </TableCell>
                       <TableCell className="px-6 py-4">
