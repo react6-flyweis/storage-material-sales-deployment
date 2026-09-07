@@ -295,20 +295,10 @@ export default function QuotationDetailsPage() {
             <Button
               type="button"
               onClick={() => setShowSendModal(true)}
-              disabled={isSent}
-              title={
-                isSent
-                  ? "Quotation has already been sent to customer"
-                  : undefined
-              }
-              className={`px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 shadow-xs ${
-                isSent
-                  ? "bg-slate-200 text-slate-500 cursor-not-allowed border border-slate-300"
-                  : "bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
-              }`}
+              className="px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 shadow-xs bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
             >
               <Send className="h-4 w-4" />
-              {isSent ? "Already Sent" : "Send to Customer"}
+              {isSent ? "Resend to Customer" : "Send to Customer"}
             </Button>
           )}
 
@@ -393,6 +383,10 @@ export default function QuotationDetailsPage() {
         workflowStatus={workflowStatus}
         approval={approvalInfo}
         versionNumber={versionNumber}
+        sendMethod={quotation?.sendMethod}
+        sentTo={quotation?.sentTo}
+        sentCc={quotation?.sentCc}
+        sentMessage={quotation?.sentMessage}
         onSubmitForApproval={() => setShowSubmitModal(true)}
       />
 
@@ -437,6 +431,8 @@ export default function QuotationDetailsPage() {
         customerEmail={customerEmail}
         customerName={customerName}
         approvalStatus={workflowStatus}
+        workflowStatus={workflowStatus}
+        status={quotation?.status}
         versionNumber={versionNumber}
         approvedVersionNumber={approvalInfo?.approvedVersionNumber}
         onSuccess={() => {
