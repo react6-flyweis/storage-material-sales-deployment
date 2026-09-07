@@ -98,6 +98,10 @@ export type QuotationItem = {
   createdAt?: string | null;
   updatedAt?: string | null;
   sentAt?: string | null;
+  sendMethod?: "platform" | "manual" | null;
+  sentTo?: string | null;
+  sentCc?: string[] | null;
+  sentMessage?: string | null;
   sourceEstimateId?: string | null;
   sourceEstimate?: SaveEstimatePayload | null;
   estimate?: SaveEstimatePayload | null;
@@ -208,6 +212,11 @@ export type SubmitApprovalResponse = {
 };
 
 export type SendQuotationPayload = {
+  toEmail?: string;
+  to?: string;
+  cc?: string | string[];
+  ccEmail?: string | string[];
+  ccEmails?: string | string[];
   message?: string;
   note?: string;
   emailMessage?: string;
@@ -223,6 +232,30 @@ export type SendQuotationResponse = {
   data?: {
     emailProvider?: "sendgrid" | "smtp_fallback" | string;
     quotation?: QuotationItem;
+    sendMethod?: "platform" | "manual";
+    sentTo?: string;
+    sentCc?: string[];
+    messageIncluded?: boolean;
+    messageSourceKey?: string;
+    pdfAttached?: boolean;
+    pdfWarning?: string | null;
+    [key: string]: unknown;
+  };
+};
+
+export type MarkQuotationSentPayload = {
+  note?: string;
+  message?: string;
+  sentAt?: string;
+  [key: string]: unknown;
+};
+
+export type MarkQuotationSentResponse = {
+  success: boolean;
+  message: string;
+  data?: {
+    quotation?: QuotationItem;
+    sendMethod?: "manual";
     [key: string]: unknown;
   };
 };
@@ -331,4 +364,17 @@ export async function sendQuotationProvider(
 
   return response.data;
 }
+
+export async function markQuotationSentProvider(
+  quotationId: string,
+  payload?: MarkQuotationSentPayload
+) {
+  const response = await apiClient.post<MarkQuotationSentResponse>(
+    `/api/quotations/${encodeURIComponent(quotationId)}/mark-sent`,
+    payload || {}
+  );
+
+  return response.data;
+}
+
 
