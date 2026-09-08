@@ -206,7 +206,7 @@ export function getLeadProjectName(
   } | null,
   customer?: { firstName?: string | null; name?: string | null } | null
 ) {
-  console.log(lead)
+  // console.log(lead)
   if (lead?.projectName && lead.projectName !== "Untitled Lead" && lead.projectName !== "Untitled" && lead.projectName !== "N/A") {
     return lead.projectName;
   }
