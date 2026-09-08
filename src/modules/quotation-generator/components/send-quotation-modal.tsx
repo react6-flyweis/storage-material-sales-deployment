@@ -165,18 +165,21 @@ function SendQuotationDialogContent({
 
   return (
     <>
-      <DialogHeader>
-        <DialogTitle className="text-xl font-semibold flex items-center gap-2">
-          <Mail className="w-5 h-5 text-blue-600" />
-          {isSent ? "Resend or Mark Quotation" : "Send Quotation"}
-        </DialogTitle>
-        <DialogDescription>
-          Deliver quotation directly to customer via email, or mark it sent if already emailed outside the app.
-        </DialogDescription>
-      </DialogHeader>
+      <div className="p-6 pb-2 shrink-0">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+            <Mail className="w-5 h-5 text-blue-600" />
+            {isSent ? "Resend or Mark Quotation" : "Send Quotation"}
+          </DialogTitle>
+          <DialogDescription>
+            Deliver quotation directly to customer via email, or mark it sent if already emailed outside the app.
+          </DialogDescription>
+        </DialogHeader>
+      </div>
 
-      {/* Error Message */}
-      {errorMessage && (
+      <div className="p-6 pt-2 space-y-4 flex-1 min-h-0 overflow-y-auto">
+        {/* Error Message */}
+        {errorMessage && (
         <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive flex items-start gap-2">
           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
           <span>{errorMessage}</span>
@@ -321,38 +324,41 @@ function SendQuotationDialogContent({
           </form>
         </TabsContent>
       </Tabs>
+      </div>
 
-      <DialogFooter className="flex flex-row items-center justify-between pt-2 sm:justify-between border-t border-slate-100 mt-2">
-        <DialogClose asChild>
-          <Button type="button" variant="outline" disabled={isSending}>
-            Cancel
-          </Button>
-        </DialogClose>
+      <div className="p-6 pt-2 shrink-0">
+        <DialogFooter className="flex flex-row items-center justify-between sm:justify-between border-t border-slate-100 pt-2 m-0">
+          <DialogClose asChild>
+            <Button type="button" variant="outline" disabled={isSending}>
+              Cancel
+            </Button>
+          </DialogClose>
 
-        {activeTab === "platform" ? (
-          <Button
-            type="submit"
-            form="quotation-send-form"
-            disabled={!canSend || isSending}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            {isSending
-              ? "Sending..."
-              : isSent
-              ? "Resend Email"
-              : "Send Quotation"}
-          </Button>
-        ) : (
-          <Button
-            type="submit"
-            form="quotation-mark-sent-form"
-            disabled={!canMarkSent || isSending}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white"
-          >
-            {isSending ? "Marking as Sent..." : "Mark as Sent"}
-          </Button>
-        )}
-      </DialogFooter>
+          {activeTab === "platform" ? (
+            <Button
+              type="submit"
+              form="quotation-send-form"
+              disabled={!canSend || isSending}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {isSending
+                ? "Sending..."
+                : isSent
+                ? "Resend Email"
+                : "Send Quotation"}
+            </Button>
+          ) : (
+            <Button
+              type="submit"
+              form="quotation-mark-sent-form"
+              disabled={!canMarkSent || isSending}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {isSending ? "Marking as Sent..." : "Mark as Sent"}
+            </Button>
+          )}
+        </DialogFooter>
+      </div>
     </>
   );
 }
@@ -373,7 +379,7 @@ export function SendQuotationModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent className="sm:max-w-lg w-full max-h-[90vh] p-0 gap-0 overflow-hidden flex flex-col">
           {open && (
             <SendQuotationDialogContent
               {...props}
