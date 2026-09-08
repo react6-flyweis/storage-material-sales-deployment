@@ -30,6 +30,10 @@ interface QuotationApprovalBannerProps {
   workflowStatus?: WorkflowStatus | string;
   approval?: QuotationApprovalInfo | null;
   versionNumber?: number;
+  sendMethod?: "platform" | "manual" | string | null;
+  sentTo?: string | null;
+  sentCc?: string[] | null;
+  sentMessage?: string | null;
   /** @deprecated Action buttons have been removed from this banner */
   onSubmitForApproval?: () => void;
   /** @deprecated Action buttons have been removed from this banner */
@@ -46,6 +50,10 @@ export function QuotationApprovalBanner({
   workflowStatus = "draft",
   approval,
   versionNumber = 1,
+  sendMethod,
+  sentTo,
+  sentCc,
+  sentMessage,
   onSubmitForApproval,
   isSubmitting = false,
   isEdited = false,
@@ -148,14 +156,30 @@ export function QuotationApprovalBanner({
           historyBtnClass: "text-rose-900 hover:bg-rose-100/80 border-rose-300",
         };
       case "sent":
+        if (sendMethod === "manual") {
+          return {
+            containerClass: "bg-blue-50/80 border-blue-200 text-blue-950",
+            iconContainerClass: "bg-blue-100 text-blue-700",
+            icon: <Send className="w-4 h-4" />,
+            title: "Marked as Sent (External Email)",
+            badgeText: "Marked Sent",
+            badgeClass: "bg-blue-100 text-blue-800 border-blue-300",
+            description: sentMessage
+              ? `External Note: "${sentMessage}"`
+              : "This quotation was marked as sent externally (via Gmail, Outlook, etc.).",
+            historyBtnClass: "text-blue-900 hover:bg-blue-100/80 border-blue-300",
+          };
+        }
         return {
           containerClass: "bg-blue-50/80 border-blue-200 text-blue-950",
           iconContainerClass: "bg-blue-100 text-blue-700",
           icon: <Send className="w-4 h-4" />,
-          title: "Sent to Customer",
-          badgeText: "Sent",
+          title: "Sent to Customer via Email",
+          badgeText: "Sent via Email",
           badgeClass: "bg-blue-100 text-blue-800 border-blue-300",
-          description: "This quotation has been officially sent to the customer.",
+          description: sentTo
+            ? `Successfully emailed to ${sentTo}${sentCc && sentCc.length > 0 ? ` (CC: ${sentCc.join(", ")})` : ""}.`
+            : "This quotation has been officially sent to the customer.",
           historyBtnClass: "text-blue-900 hover:bg-blue-100/80 border-blue-300",
         };
       default:

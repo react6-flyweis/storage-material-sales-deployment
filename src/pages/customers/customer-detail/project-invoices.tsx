@@ -308,6 +308,7 @@ export default function ProjectInvoicesPage() {
                           inv.invoice?.approval?.status
                         }
                         invoiceStatus={inv.status || inv.invoice?.status}
+                        sendMethod={inv.invoice?.sendMethod || inv.sendMethod}
                       />
                     </TableCell>
                     <TableCell>

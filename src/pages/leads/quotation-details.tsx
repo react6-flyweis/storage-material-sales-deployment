@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuotationQuery } from "@/modules/quotations/quotations.hooks";
+import { useLeadDetailQuery } from "@/modules/leads/leads.hooks";
 import { SubmitApprovalModal } from "@/modules/quotation-generator/components/submit-approval-modal";
 import { SendQuotationModal } from "@/modules/quotation-generator/components/send-quotation-modal";
 import { QuotationApprovalBanner } from "@/modules/quotation-generator/components/quotation-approval-banner";
@@ -56,6 +57,15 @@ export default function QuotationDetailsPage() {
     (quotationResponse?.data as { quotation?: QuotationItem })?.quotation ||
     (quotationResponse?.data as QuotationItem);
   const estimate = quotation?.sourceEstimate || quotation?.estimate;
+
+  const leadIdStr =
+    typeof quotation?.leadId === "object"
+      ? quotation?.leadId?._id
+      : quotation?.leadId;
+  const { data: leadDetailData } = useLeadDetailQuery(
+    leadIdStr || "",
+    Boolean(leadIdStr)
+  );
 
   const quoteNumber =
     quotation?.quoteNumber || estimate?.quoteNumber || "QUO-DRAFT";
@@ -112,9 +122,13 @@ export default function QuotationDetailsPage() {
     "Valued Customer";
 
   const customerEmail =
+    quotation?.sentTo ||
+    quotation?.customerEmail ||
+    quotation?.defaultToEmail ||
     (typeof quotation?.customerId === "object"
       ? quotation?.customerId?.email
-      : null) ||
+      : undefined) ||
+    leadDetailData?.data?.customer?.email ||
     (typeof quotation?.createdBy === "object"
       ? quotation?.createdBy?.email
       : null) ||
@@ -295,20 +309,10 @@ export default function QuotationDetailsPage() {
             <Button
               type="button"
               onClick={() => setShowSendModal(true)}
-              disabled={isSent}
-              title={
-                isSent
-                  ? "Quotation has already been sent to customer"
-                  : undefined
-              }
-              className={`px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 shadow-xs ${
-                isSent
-                  ? "bg-slate-200 text-slate-500 cursor-not-allowed border border-slate-300"
-                  : "bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
-              }`}
+              className="px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 shadow-xs bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
             >
               <Send className="h-4 w-4" />
-              {isSent ? "Already Sent" : "Send to Customer"}
+              {isSent ? "Resend to Customer" : "Send to Customer"}
             </Button>
           )}
 
@@ -393,6 +397,10 @@ export default function QuotationDetailsPage() {
         workflowStatus={workflowStatus}
         approval={approvalInfo}
         versionNumber={versionNumber}
+        sendMethod={quotation?.sendMethod}
+        sentTo={quotation?.sentTo}
+        sentCc={quotation?.sentCc}
+        sentMessage={quotation?.sentMessage}
         onSubmitForApproval={() => setShowSubmitModal(true)}
       />
 
@@ -437,6 +445,8 @@ export default function QuotationDetailsPage() {
         customerEmail={customerEmail}
         customerName={customerName}
         approvalStatus={workflowStatus}
+        workflowStatus={workflowStatus}
+        status={quotation?.status}
         versionNumber={versionNumber}
         approvedVersionNumber={approvalInfo?.approvedVersionNumber}
         onSuccess={() => {

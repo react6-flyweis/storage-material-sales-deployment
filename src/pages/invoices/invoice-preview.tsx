@@ -2,10 +2,8 @@ import { useNavigate, useParams } from "react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Mail, Send, Edit } from "lucide-react";
-import SuccessDialog from "@/components/success-dialog";
 import {
   useInvoiceDetailQuery,
-  useSendInvoiceMutation,
 } from "@/modules/invoices/invoices.hooks";
 import InvoiceTemplate from "@/components/invoice/invoice-template";
 import {
@@ -13,13 +11,13 @@ import {
   SubmitApprovalDialog,
   ApprovalHistoryTimeline,
 } from "@/components/invoice/approval-modals";
+import { SendInvoiceModal } from "@/components/invoice/send-invoice-modal";
 
 export default function InvoicePreview() {
   const navigate = useNavigate();
   const params = useParams();
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [sendFailed, setSendFailed] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [showSendModal, setShowSendModal] = useState(false);
 
   const invoiceId = params.id;
   const {
@@ -27,29 +25,6 @@ export default function InvoicePreview() {
     isLoading,
     isError,
   } = useInvoiceDetailQuery(invoiceId);
-  const sendInvoiceMutation = useSendInvoiceMutation();
-
-  const handleSendEmail = async () => {
-    if (!invoiceId || sendInvoiceMutation.isPending) {
-      return;
-    }
-
-    setSendFailed(false);
-
-    try {
-      const response = await sendInvoiceMutation.mutateAsync(invoiceId);
-      if (!response.success) {
-        console.error("Failed to send invoice email:", response);
-        setSendFailed(true);
-        return;
-      }
-
-      setShowSuccess(true);
-    } catch (error) {
-      console.error("Failed to send invoice email:", error);
-      setSendFailed(true);
-    }
-  };
 
   const invoice = invoiceDetailResponse?.data.invoice;
   const paymentSchedule = invoiceDetailResponse?.data.paymentSchedule;
@@ -103,8 +78,17 @@ export default function InvoicePreview() {
     invoice.approval.approvedRevision !== invoice.revision,
   );
 
+  const customerEmail =
+    typeof invoice.customerId === "object"
+      ? invoice.customerId?.email || ""
+      : "";
+  const customerName =
+    typeof invoice.customerId === "object"
+      ? `${invoice.customerId?.firstName || ""} ${invoice.customerId?.lastName || ""}`.trim() || "Customer"
+      : "Customer";
+
   const canSendInvoice =
-    isApproved && !isRevisionMismatch && !isSent && !isPaid;
+    isApproved && !isRevisionMismatch && !isPaid;
   const canEditInvoice = !isSent && !isPaid;
   const canSubmitForApproval =
     (isNotSubmitted || isRejected || isRevisionMismatch) && !isSent && !isPaid;
@@ -127,6 +111,7 @@ export default function InvoicePreview() {
               workflowStatus={workflowStatus}
               approvalStatus={approvalStatus}
               invoiceStatus={invoice.status}
+              sendMethod={invoice.sendMethod}
             />
           </div>
 
@@ -156,11 +141,11 @@ export default function InvoicePreview() {
               )}
 
               {/* Email / Send Button */}
-              {!isSent && !isPaid && (
+              {!isPaid && (
                 <Button
                   className="bg-[#2563EB] hover:bg-blue-700 text-white gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  onClick={handleSendEmail}
-                  disabled={!canSendInvoice || sendInvoiceMutation.isPending}
+                  onClick={() => setShowSendModal(true)}
+                  disabled={!canSendInvoice}
                   title={
                     !isApproved
                       ? "Admin approval is required before sending invoice to customer"
@@ -170,27 +155,10 @@ export default function InvoicePreview() {
                   }
                 >
                   <Mail className="w-4 h-4" />
-                  {sendInvoiceMutation.isPending
-                    ? "Sending..."
-                    : "Email Invoice"}
+                  {isSent ? "Resend Invoice" : "Send Invoice"}
                 </Button>
               )}
-
-              {/* Payments button commented out as requested */}
-              {/* <Button
-                variant="outline"
-                className="bg-white hover:bg-gray-50 text-gray-700 border-gray-200"
-              >
-                <Wallet className="w-4 h-4 mr-1.5" />
-                Payments
-              </Button> */}
             </div>
-
-            {sendFailed && (
-              <p className="text-xs text-destructive">
-                Send failed. Please try again.
-              </p>
-            )}
           </div>
         </div>
 
@@ -208,11 +176,18 @@ export default function InvoicePreview() {
         onOpenChange={setShowSubmitModal}
       />
 
-      <SuccessDialog
-        open={showSuccess}
-        onClose={() => setShowSuccess(false)}
-        title="Email Sent"
-        okLabel="Done"
+      {/* Send Invoice Modal */}
+      <SendInvoiceModal
+        open={showSendModal}
+        onOpenChange={setShowSendModal}
+        invoiceId={invoice._id}
+        customerEmail={customerEmail}
+        customerName={customerName}
+        approvalStatus={approvalStatus}
+        workflowStatus={workflowStatus}
+        status={invoice.status}
+        revision={invoice.revision}
+        approvedRevision={invoice.approval?.approvedRevision}
       />
     </>
   );

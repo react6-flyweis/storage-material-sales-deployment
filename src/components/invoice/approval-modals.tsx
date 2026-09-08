@@ -33,6 +33,7 @@ function getStatusConfig(
   workflowStatus?: string | null,
   approvalStatus?: string | null,
   invoiceStatus?: string | null,
+  sendMethod?: string | null,
 ) {
   const effective = (
     workflowStatus ||
@@ -68,7 +69,12 @@ function getStatusConfig(
       };
     case "sent":
       return {
-        label: "Sent",
+        label:
+          sendMethod === "manual"
+            ? "Marked Sent"
+            : sendMethod === "platform"
+            ? "Sent via Email"
+            : "Sent",
         bg: "bg-blue-600",
         pillClass: "bg-blue-600 text-white",
         lightClass: "bg-blue-50 text-blue-700 border-blue-200",
@@ -122,16 +128,23 @@ export function WorkflowStatusBadge({
   workflowStatus,
   approvalStatus,
   invoiceStatus,
+  sendMethod,
   className = "",
   variant = "pill",
 }: {
   workflowStatus?: WorkflowStatus | string | null;
   approvalStatus?: ApprovalStatus | string | null;
   invoiceStatus?: string | null;
+  sendMethod?: "platform" | "manual" | string | null;
   className?: string;
   variant?: "pill" | "light";
 }) {
-  const config = getStatusConfig(workflowStatus, approvalStatus, invoiceStatus);
+  const config = getStatusConfig(
+    workflowStatus,
+    approvalStatus,
+    invoiceStatus,
+    sendMethod,
+  );
 
   if (variant === "light") {
     return (

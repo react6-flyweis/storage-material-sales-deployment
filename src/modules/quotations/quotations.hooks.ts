@@ -8,16 +8,35 @@ import {
   convertEstimateToQuotationProvider,
   getQuotationByIdProvider,
   getQuotationsProvider,
+  getQuotationStatsProvider,
   sendQuotationProvider,
+  markQuotationSentProvider,
   submitQuotationForApprovalProvider,
   type CreateQuotationPayload,
   type SendQuotationPayload,
+  type MarkQuotationSentPayload,
+  type GetQuotationsParams,
 } from "./quotations.api";
 
-export function useQuotationsQuery(page = 1, limit = 20) {
+export function useQuotationsQuery(
+  pageOrParams: number | GetQuotationsParams = 1,
+  limit = 20
+) {
+  const queryKey =
+    typeof pageOrParams === "object"
+      ? ["sales", "quotations", pageOrParams]
+      : ["sales", "quotations", pageOrParams, limit];
+
   return useQuery({
-    queryKey: ["sales", "quotations", page, limit],
-    queryFn: () => getQuotationsProvider(page, limit),
+    queryKey,
+    queryFn: () => getQuotationsProvider(pageOrParams, limit),
+  });
+}
+
+export function useQuotationStatsQuery() {
+  return useQuery({
+    queryKey: ["sales", "quotations", "stats"],
+    queryFn: getQuotationStatsProvider,
   });
 }
 
@@ -99,6 +118,8 @@ export function useSubmitQuotationForApprovalMutation() {
   });
 }
 
+export { type MarkQuotationSentPayload };
+
 export function useSendQuotationMutation() {
   const queryClient = useQueryClient();
 
@@ -116,7 +137,33 @@ export function useSendQuotationMutation() {
         queryKey: ["sales", "quotation", variables.quotationId],
       });
       void queryClient.invalidateQueries({ queryKey: ["sales", "estimates"] });
+      void queryClient.invalidateQueries({ queryKey: ["leads"] });
+      void queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
     },
   });
 }
+
+export function useMarkQuotationSentMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      quotationId,
+      payload,
+    }: {
+      quotationId: string;
+      payload?: MarkQuotationSentPayload;
+    }) => markQuotationSentProvider(quotationId, payload),
+    onSuccess: (_, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ["sales", "quotations"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["sales", "quotation", variables.quotationId],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["sales", "estimates"] });
+      void queryClient.invalidateQueries({ queryKey: ["leads"] });
+      void queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
+    },
+  });
+}
+
 

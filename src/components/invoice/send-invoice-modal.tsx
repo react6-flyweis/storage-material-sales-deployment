@@ -16,50 +16,53 @@ import {
 } from "@/components/ui/dialog";
 import SuccessDialog from "@/components/success-dialog";
 import { CcEmailInput } from "@/components/common/cc-email-input";
-import type { ApprovalStatus } from "@/modules/quotations/quotations.api";
+import type {
+  ApprovalStatus,
+  WorkflowStatus,
+} from "@/modules/invoices/invoices.api";
 import {
-  useSendQuotationMutation,
-  useMarkQuotationSentMutation,
-} from "@/modules/quotations/quotations.hooks";
+  useSendInvoiceMutation,
+  useMarkInvoiceSentMutation,
+} from "@/modules/invoices/invoices.hooks";
 
-interface SendQuotationModalProps {
+interface SendInvoiceModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  quotationId?: string;
+  invoiceId?: string;
   customerEmail?: string | null;
   customerName?: string | null;
   approvalStatus?: ApprovalStatus | string | null;
-  workflowStatus?: string | null;
+  workflowStatus?: WorkflowStatus | string | null;
   status?: string | null;
-  versionNumber?: number;
-  approvedVersionNumber?: number | null;
+  revision?: number | null;
+  approvedRevision?: number | null;
   onSuccess?: () => void;
   isLoading?: boolean;
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function SendQuotationDialogContent({
+function SendInvoiceDialogContent({
   onOpenChange,
-  quotationId,
+  invoiceId,
   customerEmail = "",
   customerName = "Valued Customer",
   approvalStatus = "approved",
   workflowStatus,
   status,
-  versionNumber = 1,
-  approvedVersionNumber,
+  revision,
+  approvedRevision,
   onSuccess,
   isLoading = false,
   onShowSuccess,
-}: Omit<SendQuotationModalProps, "open"> & {
+}: Omit<SendInvoiceModalProps, "open"> & {
   onShowSuccess: (msg: string) => void;
 }) {
   const [activeTab, setActiveTab] = useState<"platform" | "manual">("platform");
   const [toEmail, setToEmail] = useState(customerEmail || "");
   const [ccEmails, setCcEmails] = useState<string[]>([]);
   const [notes, setNotes] = useState(
-    `Dear ${customerName},\n\nPlease find attached our complete quotation package for your review. Please let us know if you have any questions or need modifications.`
+    `Dear ${customerName},\n\nPlease find attached the invoice for your review. Please let us know if you have any questions or require any assistance.\n\nThank you for your business!`
   );
   const [manualNote, setManualNote] = useState("");
   const [manualSentAt, setManualSentAt] = useState(() =>
@@ -67,27 +70,32 @@ function SendQuotationDialogContent({
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const sendMutation = useSendQuotationMutation();
-  const markSentMutation = useMarkQuotationSentMutation();
+  const sendMutation = useSendInvoiceMutation();
+  const markSentMutation = useMarkInvoiceSentMutation();
 
   const isSending = isLoading || sendMutation.isPending || markSentMutation.isPending;
 
   const effectiveStatus = (status || workflowStatus || "").toLowerCase();
   const isSent = effectiveStatus === "sent";
+  const isPaid = effectiveStatus === "paid";
+  const isCancelled = effectiveStatus === "cancelled";
 
   const isApproved = approvalStatus === "approved" || isSent;
-  const isStale =
+  const isRevisionMismatch = Boolean(
     isApproved &&
-    approvedVersionNumber !== undefined &&
-    approvedVersionNumber !== null &&
-    approvedVersionNumber !== versionNumber;
+    approvedRevision !== undefined &&
+    approvedRevision !== null &&
+    revision !== undefined &&
+    revision !== null &&
+    approvedRevision !== revision
+  );
 
-  const canSend = isApproved && !isStale && Boolean(quotationId);
-  const canMarkSent = isApproved && !isStale && !isSent && Boolean(quotationId);
+  const canSend = isApproved && !isRevisionMismatch && !isPaid && !isCancelled && Boolean(invoiceId);
+  const canMarkSent = isApproved && !isRevisionMismatch && !isSent && !isPaid && !isCancelled && Boolean(invoiceId);
 
   const handleSendPlatform = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!quotationId) return;
+    if (!invoiceId) return;
     setErrorMessage(null);
 
     const trimmedTo = toEmail.trim();
@@ -102,7 +110,7 @@ function SendQuotationDialogContent({
 
     try {
       await sendMutation.mutateAsync({
-        quotationId,
+        invoiceId,
         payload: {
           toEmail: trimmedTo,
           to: trimmedTo,
@@ -115,71 +123,68 @@ function SendQuotationDialogContent({
         },
       });
       onShowSuccess(
-        isSent ? "Quotation Resent Successfully!" : "Quotation Sent Successfully!"
+        isSent ? "Invoice Resent Successfully!" : "Invoice Sent Successfully!"
       );
       onOpenChange(false);
       onSuccess?.();
     } catch (error: unknown) {
-      console.error("Failed to send quotation:", error);
+      console.error("Failed to send invoice:", error);
       const msg =
         (error as { response?: { data?: { message?: string } }; message?: string })
           ?.response?.data?.message ||
         (error as { message?: string })?.message ||
-        "Failed to send quotation package. Please check email configuration.";
+        "Failed to send invoice email. Please check SMTP configuration.";
       setErrorMessage(msg);
     }
   };
 
   const handleMarkSent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!quotationId) return;
+    if (!invoiceId) return;
     setErrorMessage(null);
 
     if (isSent) {
-      setErrorMessage("Quotation has already been marked as sent.");
+      setErrorMessage("Invoice has already been marked as sent.");
       return;
     }
 
     try {
       await markSentMutation.mutateAsync({
-        quotationId,
+        invoiceId,
         payload: {
           note: manualNote.trim() || undefined,
           message: manualNote.trim() || undefined,
           sentAt: manualSentAt ? new Date(manualSentAt).toISOString() : undefined,
         },
       });
-      onShowSuccess("Quotation Marked as Sent!");
+      onShowSuccess("Invoice Marked as Sent!");
       onOpenChange(false);
       onSuccess?.();
     } catch (error: unknown) {
-      console.error("Failed to mark quotation as sent:", error);
+      console.error("Failed to mark invoice as sent:", error);
       const msg =
         (error as { response?: { data?: { message?: string } }; message?: string })
           ?.response?.data?.message ||
         (error as { message?: string })?.message ||
-        "Failed to mark quotation as sent.";
+        "Failed to mark invoice as sent.";
       setErrorMessage(msg);
     }
   };
 
   return (
     <>
-      <div className="p-6 pb-2 shrink-0">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-semibold flex items-center gap-2">
-            <Mail className="w-5 h-5 text-blue-600" />
-            {isSent ? "Resend or Mark Quotation" : "Send Quotation"}
-          </DialogTitle>
-          <DialogDescription>
-            Deliver quotation directly to customer via email, or mark it sent if already emailed outside the app.
-          </DialogDescription>
-        </DialogHeader>
-      </div>
+      <DialogHeader>
+        <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+          <Mail className="w-5 h-5 text-blue-600" />
+          {isSent ? "Resend or Mark Invoice" : "Send Invoice"}
+        </DialogTitle>
+        <DialogDescription>
+          Deliver invoice directly to customer via email, or mark it sent if already emailed outside the app.
+        </DialogDescription>
+      </DialogHeader>
 
-      <div className="p-6 pt-2 space-y-4 flex-1 min-h-0 overflow-y-auto">
-        {/* Error Message */}
-        {errorMessage && (
+      {/* Error Message */}
+      {errorMessage && (
         <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive flex items-start gap-2">
           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
           <span>{errorMessage}</span>
@@ -189,14 +194,14 @@ function SendQuotationDialogContent({
       {!isApproved && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
           <span className="font-semibold">Admin Approval Required: </span>
-          This quotation must be approved by Admin before sending.
+          This invoice must be approved by Admin before sending.
         </div>
       )}
 
-      {isStale && (
+      {isRevisionMismatch && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
           <span className="font-semibold">Revision Outdated: </span>
-          Quotation was edited after approval. Please re-submit for approval before sending.
+          Invoice was edited after approval. Please re-submit for approval before sending.
         </div>
       )}
 
@@ -217,7 +222,7 @@ function SendQuotationDialogContent({
             value="manual"
             disabled={isSent || !canSend}
             className="text-xs sm:text-sm disabled:opacity-50"
-            title={isSent ? "Quotation has already been marked as sent" : undefined}
+            title={isSent ? "Invoice has already been marked as sent" : undefined}
           >
             <CheckSquare className="w-3.5 h-3.5 mr-1.5" />
             Mark as Sent {isSent ? "(Done)" : ""}
@@ -226,13 +231,13 @@ function SendQuotationDialogContent({
 
         {/* TAB 1: Platform Send Form */}
         <TabsContent value="platform" className="space-y-4 pt-1">
-          <form id="quotation-send-form" onSubmit={handleSendPlatform} className="space-y-4">
+          <form id="invoice-send-form" onSubmit={handleSendPlatform} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="customer-to-email" className="text-xs font-semibold text-slate-700">
+              <Label htmlFor="invoice-to-email" className="text-xs font-semibold text-slate-700">
                 To Recipient <span className="text-destructive">*</span>
               </Label>
               <Input
-                id="customer-to-email"
+                id="invoice-to-email"
                 type="email"
                 placeholder="customer@example.com"
                 value={toEmail}
@@ -260,11 +265,11 @@ function SendQuotationDialogContent({
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="send-notes" className="text-xs font-semibold text-slate-700">
+              <Label htmlFor="invoice-send-notes" className="text-xs font-semibold text-slate-700">
                 Cover Note / Message <span className="font-normal text-slate-500">(Optional)</span>
               </Label>
               <Textarea
-                id="send-notes"
+                id="invoice-send-notes"
                 placeholder="Enter an optional cover message..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
@@ -272,7 +277,7 @@ function SendQuotationDialogContent({
                 className="min-h-24 text-sm"
               />
               <p className="text-[11px] text-slate-500">
-                The quotation PDF package is automatically generated and attached by the system.
+                The invoice PDF is automatically generated and attached by the system.
               </p>
             </div>
           </form>
@@ -280,37 +285,37 @@ function SendQuotationDialogContent({
 
         {/* TAB 2: Mark as Sent Form */}
         <TabsContent value="manual" className="space-y-4 pt-1">
-          <form id="quotation-mark-sent-form" onSubmit={handleMarkSent} className="space-y-4">
+          <form id="invoice-mark-sent-form" onSubmit={handleMarkSent} className="space-y-4">
             <div className="rounded-md bg-blue-50 border border-blue-200 p-3 text-xs text-blue-900 leading-relaxed">
               <span className="font-semibold">Sent externally via Gmail, Outlook, etc.?</span>
               <p className="mt-1 text-blue-800">
-                Marking this quotation as sent updates the document status to <strong>sent</strong> and advances the lead lifecycle to <strong>proposal_sent</strong> without requiring platform SMTP delivery.
+                Marking this invoice as sent updates the status to <strong>sent</strong> and records your audit note without requiring platform SMTP delivery.
               </p>
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="manual-notes" className="text-xs font-semibold text-slate-700">
+              <Label htmlFor="invoice-manual-notes" className="text-xs font-semibold text-slate-700">
                 Notes / Reference <span className="font-normal text-slate-500">(Optional)</span>
               </Label>
               <Textarea
-                id="manual-notes"
-                placeholder="e.g. Sent from Gmail by John on 7 Sep, customer confirmed receipt."
+                id="invoice-manual-notes"
+                placeholder="e.g. Sent from Gmail on 7 Sep, invoice copy attached."
                 value={manualNote}
                 onChange={(e) => setManualNote(e.target.value)}
                 disabled={isSending}
                 className="min-h-20 text-sm"
               />
               <p className="text-[11px] text-slate-500">
-                Stored on the document record and audit trail.
+                Stored on the document record and audit history.
               </p>
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="manual-sent-at" className="text-xs font-semibold text-slate-700">
+              <Label htmlFor="invoice-manual-sent-at" className="text-xs font-semibold text-slate-700">
                 Date & Time Sent <span className="font-normal text-slate-500">(Optional)</span>
               </Label>
               <Input
-                id="manual-sent-at"
+                id="invoice-manual-sent-at"
                 type="datetime-local"
                 value={manualSentAt}
                 onChange={(e) => setManualSentAt(e.target.value)}
@@ -324,52 +329,49 @@ function SendQuotationDialogContent({
           </form>
         </TabsContent>
       </Tabs>
-      </div>
 
-      <div className="p-6 pt-2 shrink-0">
-        <DialogFooter className="flex flex-row items-center justify-between sm:justify-between border-t border-slate-100 pt-2 m-0">
-          <DialogClose asChild>
-            <Button type="button" variant="outline" disabled={isSending}>
-              Cancel
-            </Button>
-          </DialogClose>
+      <DialogFooter className="flex flex-row items-center justify-between pt-2 sm:justify-between border-t border-slate-100 mt-2">
+        <DialogClose asChild>
+          <Button type="button" variant="outline" disabled={isSending}>
+            Cancel
+          </Button>
+        </DialogClose>
 
-          {activeTab === "platform" ? (
-            <Button
-              type="submit"
-              form="quotation-send-form"
-              disabled={!canSend || isSending}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              {isSending
-                ? "Sending..."
-                : isSent
-                ? "Resend Email"
-                : "Send Quotation"}
-            </Button>
-          ) : (
-            <Button
-              type="submit"
-              form="quotation-mark-sent-form"
-              disabled={!canMarkSent || isSending}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
-            >
-              {isSending ? "Marking as Sent..." : "Mark as Sent"}
-            </Button>
-          )}
-        </DialogFooter>
-      </div>
+        {activeTab === "platform" ? (
+          <Button
+            type="submit"
+            form="invoice-send-form"
+            disabled={!canSend || isSending}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            {isSending
+              ? "Sending..."
+              : isSent
+              ? "Resend Invoice"
+              : "Send Invoice"}
+          </Button>
+        ) : (
+          <Button
+            type="submit"
+            form="invoice-mark-sent-form"
+            disabled={!canMarkSent || isSending}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+          >
+            {isSending ? "Marking as Sent..." : "Mark as Sent"}
+          </Button>
+        )}
+      </DialogFooter>
     </>
   );
 }
 
-export function SendQuotationModal({
+export function SendInvoiceModal({
   open,
   onOpenChange,
   ...props
-}: SendQuotationModalProps) {
+}: SendInvoiceModalProps) {
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("Quotation Sent Successfully!");
+  const [successMessage, setSuccessMessage] = useState("Invoice Sent Successfully!");
 
   const handleShowSuccess = (msg: string) => {
     setSuccessMessage(msg);
@@ -379,9 +381,9 @@ export function SendQuotationModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-lg w-full max-h-[90vh] p-0 gap-0 overflow-hidden flex flex-col">
+        <DialogContent className="sm:max-w-xl">
           {open && (
-            <SendQuotationDialogContent
+            <SendInvoiceDialogContent
               {...props}
               onOpenChange={onOpenChange}
               onShowSuccess={handleShowSuccess}
