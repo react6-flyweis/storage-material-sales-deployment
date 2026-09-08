@@ -1,6 +1,36 @@
 import { apiClient } from "@/modules/auth/auth.api";
 import type { SaveEstimatePayload } from "@/modules/quotation-generator/estimates.api";
 
+export const BUILDING_TYPE = ["PEMB", "Storage"] as const;
+export type BuildingType = (typeof BUILDING_TYPE)[number];
+
+// Admin / Workflow statuses
+export const ADMIN_STATUS = [
+  "draft",
+  "pending",
+  "pending_approval",
+  "approved",
+  "rejected",
+  "sent",
+  "accepted",
+] as const;
+export type AdminStatus = (typeof ADMIN_STATUS)[number];
+
+export type QuotationCustomer = {
+  _id: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  company?: string;
+  phone?: string;
+};
+
+export type QuotationLead = {
+  _id: string;
+  jobId?: string;
+  projectName?: string;
+};
+
 export type ApprovalStatus =
   | "not_submitted"
   | "pending_approval"
@@ -50,16 +80,39 @@ export type QuotationApprovalInfo = {
   history?: QuotationApprovalHistoryItem[];
 };
 
+export type QuotationApproval = QuotationApprovalInfo;
+
 export type QuotationItem = {
   _id: string;
   quoteNumber?: string | null;
   versionNumber?: number;
   workflowStatus?: WorkflowStatus;
-  approvalStatus?: ApprovalStatus | string | null;
-  approval?: QuotationApprovalInfo;
-  status?: string | null;
+  approvalStatus?:
+    | "not_submitted"
+    | "pending_approval"
+    | "approved"
+    | "rejected"
+    | string
+    | null;
+  approval?: QuotationApproval;
+  status?:
+    | "draft"
+    | "pending"
+    | "pending_approval"
+    | "approved"
+    | "rejected"
+    | "sent"
+    | "accepted"
+    | string
+    | null;
   proposalDate?: string | null;
   companyName?: string | null;
+  customerName?: string | null;
+  customerEmail?: string | null;
+  defaultToEmail?: string | null;
+  projectName?: string | null;
+  jobId?: string | null;
+  projectId?: string | null;
   location?: string | null;
   buildingType?: string | null;
   sqft?: string | number | null;
@@ -74,21 +127,8 @@ export type QuotationItem = {
   finalPrice?: number | null;
   psf?: number | null;
   currency?: string | null;
-  leadId?:
-    | string
-    | {
-        _id: string;
-        projectName?: string | null;
-      }
-    | null;
-  customerId?:
-    | string
-    | {
-        _id: string;
-        firstName?: string | null;
-        email?: string | null;
-      }
-    | null;
+  leadId?: string | QuotationLead | null;
+  customerId?: string | QuotationCustomer | null;
   createdBy?: {
     _id?: string;
     name?: string;
@@ -116,6 +156,24 @@ export type QuotationItem = {
     pdfEndpoint?: string;
     defaultSections?: string[];
   } | null;
+};
+
+export type Quotation = QuotationItem;
+
+export type QuotationStats = {
+  total: number;
+  approved: number;
+  pendingApproval?: number;
+  pending_approval?: number;
+  rejected: number;
+  sent: number;
+  draft: number;
+};
+
+export type QuotationStatsResponse = {
+  success: boolean;
+  message?: string;
+  data: QuotationStats;
 };
 
 export type QuotationsListResponse = {
@@ -260,12 +318,36 @@ export type MarkQuotationSentResponse = {
   };
 };
 
-export async function getQuotationsProvider(page = 1, limit = 20) {
+export type GetQuotationsParams = {
+  page?: number;
+  limit?: number;
+  status?: string;
+  buildingType?: string;
+  search?: string;
+  [key: string]: unknown;
+};
+
+export async function getQuotationsProvider(
+  pageOrParams: number | GetQuotationsParams = 1,
+  limit = 20
+) {
+  const params: GetQuotationsParams =
+    typeof pageOrParams === "object"
+      ? pageOrParams
+      : { page: pageOrParams, limit };
+
   const response = await apiClient.get<QuotationsListResponse>(
     "/api/sales/quotations",
-    { params: { page, limit } },
+    { params },
   );
 
+  return response.data;
+}
+
+export async function getQuotationStatsProvider(): Promise<QuotationStatsResponse> {
+  const response = await apiClient.get<QuotationStatsResponse>(
+    "/api/sales/quotations/stats"
+  );
   return response.data;
 }
 
