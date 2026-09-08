@@ -8,18 +8,35 @@ import {
   convertEstimateToQuotationProvider,
   getQuotationByIdProvider,
   getQuotationsProvider,
+  getQuotationStatsProvider,
   sendQuotationProvider,
   markQuotationSentProvider,
   submitQuotationForApprovalProvider,
   type CreateQuotationPayload,
   type SendQuotationPayload,
   type MarkQuotationSentPayload,
+  type GetQuotationsParams,
 } from "./quotations.api";
 
-export function useQuotationsQuery(page = 1, limit = 20) {
+export function useQuotationsQuery(
+  pageOrParams: number | GetQuotationsParams = 1,
+  limit = 20
+) {
+  const queryKey =
+    typeof pageOrParams === "object"
+      ? ["sales", "quotations", pageOrParams]
+      : ["sales", "quotations", pageOrParams, limit];
+
   return useQuery({
-    queryKey: ["sales", "quotations", page, limit],
-    queryFn: () => getQuotationsProvider(page, limit),
+    queryKey,
+    queryFn: () => getQuotationsProvider(pageOrParams, limit),
+  });
+}
+
+export function useQuotationStatsQuery() {
+  return useQuery({
+    queryKey: ["sales", "quotations", "stats"],
+    queryFn: getQuotationStatsProvider,
   });
 }
 
