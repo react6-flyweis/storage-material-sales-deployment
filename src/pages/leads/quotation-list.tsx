@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Eye, Loader2, PlusCircle } from "lucide-react";
 import TitleSubtitle from "@/components/TitleSubtitle";
 import { Button } from "@/components/ui/button";
+import BuildingTypeSelector from "@/components/building-type-selector";
 import {
   Select,
   SelectTrigger,
@@ -19,24 +20,39 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import Pagination from "@/components/Pagination";
-import { useQuotationsQuery } from "@/modules/quotations/quotations.hooks";
+import {
+  BUILDING_TYPE,
+  ADMIN_STATUS,
+  type AdminStatus,
+  type Quotation,
+} from "@/modules/quotations/quotations.api";
+import {
+  useQuotationsQuery,
+  useQuotationStatsQuery,
+} from "@/modules/quotations/quotations.hooks";
 
-interface QuotationRow {
-  id: string;
-  quoteNumber: string;
-  customer: string;
-  project: string;
-  status: string;
-  value: string;
-  dateSent: string;
-  statusClassName: string;
-}
+const STATUS_LABELS: Record<AdminStatus, string> = {
+  draft: "Draft",
+  pending: "Pending",
+  pending_approval: "Pending Approval",
+  approved: "Approved",
+  rejected: "Rejected",
+  sent: "Sent",
+  accepted: "Accepted",
+};
+
+const BUILDING_TYPE_OPTIONS = BUILDING_TYPE.map((type) => ({
+  value: type,
+  label: type,
+}));
 
 const statusColors: Record<string, { bg: string; text: string }> = {
   Approved: { bg: "bg-green-100", text: "text-green-700" },
   "Pending Approval": { bg: "bg-amber-100", text: "text-amber-800" },
+  Pending: { bg: "bg-amber-100", text: "text-amber-800" },
   Rejected: { bg: "bg-rose-100", text: "text-rose-700" },
   Sent: { bg: "bg-blue-100", text: "text-blue-800" },
+  Accepted: { bg: "bg-emerald-100", text: "text-emerald-800" },
   Draft: { bg: "bg-slate-100", text: "text-slate-700" },
 };
 
@@ -74,8 +90,12 @@ function normalizeStatus(status?: string | null) {
       return "Approved";
     case "pending_approval":
       return "Pending Approval";
+    case "pending":
+      return "Pending";
     case "rejected":
       return "Rejected";
+    case "accepted":
+      return "Accepted";
     case "draft":
       return "Draft";
     default:
@@ -109,53 +129,36 @@ function EmptyState() {
 export default function QuotationListPage() {
   const [selectedFilters, setSelectedFilters] = useState({
     status: "",
+    buildingType: "",
   });
 
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(20);
 
-  const { data, isLoading, isError } = useQuotationsQuery(
-    currentPage,
-    rowsPerPage,
-  );
+  const queryParams = useMemo(() => {
+    const params: {
+      page: number;
+      limit: number;
+      status?: string;
+      buildingType?: string;
+    } = {
+      page: currentPage,
+      limit: rowsPerPage,
+    };
+    if (selectedFilters.status && selectedFilters.status !== "all") {
+      params.status = selectedFilters.status;
+    }
+    if (selectedFilters.buildingType && selectedFilters.buildingType !== "all") {
+      params.buildingType = selectedFilters.buildingType;
+    }
+    return params;
+  }, [currentPage, rowsPerPage, selectedFilters]);
 
-  const quotations: QuotationRow[] = useMemo(() => {
-    const items = data?.data.quotations ?? [];
+  const { data, isLoading, isError } = useQuotationsQuery(queryParams);
+  const { data: statsResponse } = useQuotationStatsQuery();
 
-    return items.map((quotation) => {
-      const approvalStatus =
-        quotation.approval?.status || quotation.approvalStatus;
-      const status = normalizeStatus(
-        quotation.status || quotation.workflowStatus,
-      );
-      const colors = getStatusClassName(status);
-
-      return {
-        id: quotation._id,
-        quoteNumber: quotation.quoteNumber || "N/A",
-        customer:
-          (typeof quotation.customerId === "object"
-            ? quotation.customerId?.firstName?.trim()
-            : null) ||
-          quotation.companyName ||
-          "Unknown customer",
-        project:
-          (typeof quotation.leadId === "object"
-            ? quotation.leadId?.projectName?.trim()
-            : null) || "N/A",
-        status,
-        buildingType: quotation.buildingType || "",
-        rawStatus: (
-          quotation.status ||
-          quotation.workflowStatus ||
-          ""
-        ).toLowerCase(),
-        rawApprovalStatus: (approvalStatus || "").toLowerCase(),
-        value: formatMoney(quotation.finalPrice),
-        dateSent: formatDate(quotation.sentAt ?? quotation.createdAt),
-        statusClassName: `${colors.bg} ${colors.text}`,
-      };
-    });
+  const quotations: Quotation[] = useMemo(() => {
+    return data?.data?.quotations ?? [];
   }, [data]);
 
   const handleFilterChange = (filterName: string, value: string) => {
@@ -163,27 +166,30 @@ export default function QuotationListPage() {
       ...prev,
       [filterName]: value,
     }));
+    setCurrentPage(1);
   };
+
+  const stats = statsResponse?.data;
 
   const statBoxes = [
     {
       label: "Total Quotation",
-      value: data?.data.total || "-",
+      value: stats?.total ?? data?.data?.total ?? "-",
       bgColor: "bg-blue-600",
     },
     {
       label: "Approved Quotation",
-      value: "-",
+      value: stats?.approved ?? "-",
       bgColor: "bg-green-500",
     },
     {
       label: "Pending Approval",
-      value: "-",
+      value: stats?.pendingApproval ?? stats?.pending_approval ?? "-",
       bgColor: "bg-yellow-400",
     },
     {
       label: "Rejected Quotation",
-      value: "-",
+      value: stats?.rejected ?? "-",
       bgColor: "bg-orange-400",
     },
   ];
@@ -229,24 +235,35 @@ export default function QuotationListPage() {
         ))}
       </div>
 
-      <div className="flex  items-center">
-        <div className="flex gap-4">
-          <Select
-            value={selectedFilters.status}
-            onValueChange={(v) => handleFilterChange("status", v)}
-          >
-            <SelectTrigger className="w-44 bg-white">
-              <SelectValue placeholder="All Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="draft">Draft</SelectItem>
-              <SelectItem value="pending_approval">Pending Approval</SelectItem>
-              <SelectItem value="approved">Approved</SelectItem>
-              <SelectItem value="rejected">Rejected</SelectItem>
-              <SelectItem value="sent">Sent</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="flex flex-wrap items-center gap-4">
+        {/* Building Type Selector */}
+        <BuildingTypeSelector
+          value={selectedFilters.buildingType}
+          onChange={(val) => handleFilterChange("buildingType", val)}
+          options={BUILDING_TYPE_OPTIONS}
+          includeAll
+          allLabel="All Building Types"
+          triggerClassName="w-full sm:w-44 bg-white text-xs h-9"
+          placeholder="Building Types"
+        />
+
+        {/* Status Filter */}
+        <Select
+          value={selectedFilters.status}
+          onValueChange={(v) => handleFilterChange("status", v)}
+        >
+          <SelectTrigger className="w-full sm:w-40 bg-white text-xs h-9">
+            <SelectValue placeholder="All Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            {ADMIN_STATUS.map((status) => (
+              <SelectItem key={status} value={status}>
+                {STATUS_LABELS[status] || status}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {isError ? (
@@ -263,23 +280,28 @@ export default function QuotationListPage() {
                 <TableHead className="">
                   <input type="checkbox" className="rounded" />
                 </TableHead>
-                <TableHead className=" text-gray-600 text-xs">
+                <TableHead className="text-gray-600 text-xs font-semibold">
                   QUOTE ID
                 </TableHead>
-                <TableHead className=" text-gray-600 text-xs">
-                  CUSTOMER
+                <TableHead className="text-gray-600 text-xs font-semibold">
+                  LEAD DETAILS
                 </TableHead>
-                <TableHead className=" text-gray-600 text-xs">
-                  PROJECT
+                <TableHead className="text-gray-600 text-xs font-semibold">
+                  BUILDING TYPE
                 </TableHead>
-                <TableHead className=" text-gray-600 text-xs">STATUS</TableHead>
-                <TableHead className=" text-gray-600 text-xs">
+                <TableHead className="text-gray-600 text-xs font-semibold">
+                  STATUS
+                </TableHead>
+                <TableHead className="text-gray-600 text-xs font-semibold">
                   QUOTATION VALUE
                 </TableHead>
-                <TableHead className=" text-gray-600 text-xs">
-                  DATE SENT
+                <TableHead className="text-gray-600 text-xs font-semibold">
+                  VERSION
                 </TableHead>
-                <TableHead className=" text-gray-600 text-xs">
+                <TableHead className="text-gray-600 text-xs font-semibold">
+                  DATE
+                </TableHead>
+                <TableHead className="text-gray-600 text-xs font-semibold">
                   ACTIONS
                 </TableHead>
               </tr>
@@ -287,7 +309,7 @@ export default function QuotationListPage() {
             {isLoading ? (
               <tbody>
                 <tr>
-                  <td colSpan={8}>
+                  <td colSpan={9}>
                     <QuotationTableSkeleton />
                   </td>
                 </tr>
@@ -295,50 +317,134 @@ export default function QuotationListPage() {
             ) : quotations.length === 0 ? (
               <tbody>
                 <tr>
-                  <td colSpan={8}>
+                  <td colSpan={9}>
                     <EmptyState />
                   </td>
                 </tr>
               </tbody>
             ) : (
               <TableBody className="divide-y divide-gray-200">
-                {quotations.map((quotation) => (
-                  <TableRow key={quotation.id} className="hover:bg-gray-50">
-                    <TableCell className="px-6 py-4">
-                      <input type="checkbox" className="rounded" />
-                    </TableCell>
-                    <TableCell className="px-6 py-4 text-sm text-gray-900">
-                      {quotation.quoteNumber}
-                    </TableCell>
-                    <TableCell className="px-6 py-4 text-sm text-gray-900">
-                      {quotation.customer}
-                    </TableCell>
-                    <TableCell className="px-6 py-4 text-sm text-gray-900">
-                      {quotation.project}
-                    </TableCell>
-                    <TableCell className="px-6 py-4 text-sm">
-                      <span
-                        className={`px-2 py-0.5 whitespace-nowrap rounded-full text-xs ${quotation.statusClassName}`}
-                      >
-                        {quotation.status}
-                      </span>
-                    </TableCell>
-                    <TableCell className="px-6 py-4 text-sm text-gray-900">
-                      {quotation.value}
-                    </TableCell>
-                    <TableCell className="px-6 py-4 text-sm text-gray-900">
-                      {quotation.dateSent}
-                    </TableCell>
-                    <TableCell className="px-6 py-4 text-sm">
-                      <Link
-                        to={`/leads/quotation-details/${quotation.id}`}
-                        className="text-purple-500 inline-block"
-                      >
-                        <Eye className="size-4 " />
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {quotations.map((quotation) => {
+                  const status = normalizeStatus(
+                    quotation.status || quotation.workflowStatus
+                  );
+                  const colors = getStatusClassName(status);
+
+                  // Lead & Customer information extraction
+                  const customerObj =
+                    typeof quotation.customerId === "object" &&
+                    quotation.customerId !== null
+                      ? quotation.customerId
+                      : null;
+                  const leadObj =
+                    typeof quotation.leadId === "object" &&
+                    quotation.leadId !== null
+                      ? quotation.leadId
+                      : null;
+                  const projectName =
+                    quotation.projectName ||
+                    leadObj?.projectName ||
+                    quotation.companyName ||
+                    customerObj?.company ||
+                    "";
+                  const jobId =
+                    quotation.jobId ||
+                    quotation.projectId ||
+                    leadObj?.jobId ||
+                    "";
+                  const customerName =
+                    quotation.customerName ||
+                    [customerObj?.firstName, customerObj?.lastName]
+                      .filter(Boolean)
+                      .join(" ")
+                      .trim() ||
+                    "";
+                  const customerEmail =
+                    quotation.customerEmail ||
+                    quotation.defaultToEmail ||
+                    customerObj?.email ||
+                    quotation.sentTo ||
+                    "";
+
+                  return (
+                    <TableRow key={quotation._id} className="hover:bg-gray-50">
+                      <TableCell className="px-6 py-4">
+                        <input type="checkbox" className="rounded" />
+                      </TableCell>
+                      <TableCell className="px-6 py-4 text-sm text-gray-900 font-medium">
+                        <Link
+                          to={`/leads/quotation-details/${quotation._id}`}
+                          className="hover:underline text-blue-600"
+                        >
+                          {quotation.quoteNumber || "N/A"}
+                        </Link>
+                      </TableCell>
+
+                      {/* LEAD DETAILS CELL */}
+                      <TableCell className="px-6 py-4 text-sm text-gray-900">
+                        <div className="flex flex-col">
+                          <span className="font-medium text-gray-900">
+                            {projectName || customerName || "—"}
+                          </span>
+                          {jobId && (
+                            <span className="text-xs text-gray-500">
+                              {jobId}
+                            </span>
+                          )}
+                          {customerName && customerName !== projectName && (
+                            <span className="text-xs text-gray-600">
+                              {customerName}
+                            </span>
+                          )}
+                          {customerEmail && (
+                            <span className="text-xs text-gray-400">
+                              {customerEmail}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+
+                      {/* Building Type */}
+                      <TableCell className="px-6 py-4 text-sm text-gray-700">
+                        {quotation.buildingType || "—"}
+                      </TableCell>
+
+                      {/* Status */}
+                      <TableCell className="px-6 py-4 text-sm">
+                        <span
+                          className={`px-2 py-0.5 whitespace-nowrap rounded-full text-xs font-medium ${colors.bg} ${colors.text}`}
+                        >
+                          {status}
+                        </span>
+                      </TableCell>
+
+                      {/* Quotation Value */}
+                      <TableCell className="px-6 py-4 text-sm text-gray-900 font-medium">
+                        {formatMoney(quotation.finalPrice)}
+                      </TableCell>
+
+                      {/* Version Number */}
+                      <TableCell className="px-6 py-4 text-sm text-gray-700">
+                        v{quotation.versionNumber || 1}
+                      </TableCell>
+
+                      {/* Date */}
+                      <TableCell className="px-6 py-4 text-sm text-gray-500">
+                        {formatDate(quotation.sentAt ?? quotation.createdAt)}
+                      </TableCell>
+
+                      {/* Actions */}
+                      <TableCell className="px-6 py-4 text-sm">
+                        <Link
+                          to={`/leads/quotation-details/${quotation._id}`}
+                          className="text-purple-500 hover:text-purple-700 inline-block"
+                        >
+                          <Eye className="size-4" />
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             )}
           </Table>
@@ -347,7 +453,7 @@ export default function QuotationListPage() {
 
       <div className="bg-white">
         <Pagination
-          totalItems={data?.data.total || 0}
+          totalItems={data?.data?.total || 0}
           currentPage={currentPage}
           rowsPerPage={rowsPerPage}
           onPageChange={(p) => setCurrentPage(p)}
