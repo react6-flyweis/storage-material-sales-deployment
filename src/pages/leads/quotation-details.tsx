@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuotationQuery } from "@/modules/quotations/quotations.hooks";
+import { useLeadDetailQuery } from "@/modules/leads/leads.hooks";
 import { SubmitApprovalModal } from "@/modules/quotation-generator/components/submit-approval-modal";
 import { SendQuotationModal } from "@/modules/quotation-generator/components/send-quotation-modal";
 import { QuotationApprovalBanner } from "@/modules/quotation-generator/components/quotation-approval-banner";
@@ -56,6 +57,15 @@ export default function QuotationDetailsPage() {
     (quotationResponse?.data as { quotation?: QuotationItem })?.quotation ||
     (quotationResponse?.data as QuotationItem);
   const estimate = quotation?.sourceEstimate || quotation?.estimate;
+
+  const leadIdStr =
+    typeof quotation?.leadId === "object"
+      ? quotation?.leadId?._id
+      : quotation?.leadId;
+  const { data: leadDetailData } = useLeadDetailQuery(
+    leadIdStr || "",
+    Boolean(leadIdStr)
+  );
 
   const quoteNumber =
     quotation?.quoteNumber || estimate?.quoteNumber || "QUO-DRAFT";
@@ -112,9 +122,13 @@ export default function QuotationDetailsPage() {
     "Valued Customer";
 
   const customerEmail =
+    quotation?.sentTo ||
+    quotation?.customerEmail ||
+    quotation?.defaultToEmail ||
     (typeof quotation?.customerId === "object"
       ? quotation?.customerId?.email
-      : null) ||
+      : undefined) ||
+    leadDetailData?.data?.customer?.email ||
     (typeof quotation?.createdBy === "object"
       ? quotation?.createdBy?.email
       : null) ||
