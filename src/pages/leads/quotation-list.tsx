@@ -1,8 +1,9 @@
 import { Link } from "react-router";
 import { useMemo, useState } from "react";
-import { Eye, Loader2, PlusCircle } from "lucide-react";
+import { Eye, Loader2, PlusCircle, Search } from "lucide-react";
 import TitleSubtitle from "@/components/TitleSubtitle";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import BuildingTypeSelector from "@/components/building-type-selector";
 import {
   Select,
@@ -128,6 +129,7 @@ function EmptyState() {
 
 export default function QuotationListPage() {
   const [selectedFilters, setSelectedFilters] = useState({
+    search: "",
     status: "",
     buildingType: "",
   });
@@ -139,12 +141,16 @@ export default function QuotationListPage() {
     const params: {
       page: number;
       limit: number;
+      search?: string;
       status?: string;
       buildingType?: string;
     } = {
       page: currentPage,
       limit: rowsPerPage,
     };
+    if (selectedFilters.search && selectedFilters.search.trim()) {
+      params.search = selectedFilters.search.trim();
+    }
     if (selectedFilters.status && selectedFilters.status !== "all") {
       params.status = selectedFilters.status;
     }
@@ -236,6 +242,17 @@ export default function QuotationListPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-4">
+        {/* Search Input */}
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Search quotations..."
+            value={selectedFilters.search}
+            onChange={(e) => handleFilterChange("search", e.target.value)}
+            className="pl-9 bg-white text-xs h-9"
+          />
+        </div>
+
         {/* Building Type Selector */}
         <BuildingTypeSelector
           value={selectedFilters.buildingType}
