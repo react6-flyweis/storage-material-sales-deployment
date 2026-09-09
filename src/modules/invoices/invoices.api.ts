@@ -98,6 +98,7 @@ export type InvoiceDocument = {
   depositAmount?: number | null;
   totalAmount?: number | null;
   status?: InvoiceStatus | string | null;
+  invoiceStatus?: string | null;
   revision?: number | null;
   approval?: InvoiceApproval | null;
   workflowStatus?: WorkflowStatus | string | null;
@@ -159,6 +160,7 @@ export type InvoiceListItem = {
   dueDate: string;
   amount: number;
   status: InvoiceStatus | string;
+  invoiceStatus?: string | null;
   workflowStatus?: WorkflowStatus | string;
   approval?: InvoiceApproval;
   revision?: number;
