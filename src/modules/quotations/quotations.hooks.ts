@@ -12,10 +12,12 @@ import {
   sendQuotationProvider,
   markQuotationSentProvider,
   submitQuotationForApprovalProvider,
+  getLatestApprovedTaxByLeadProvider,
   type CreateQuotationPayload,
   type SendQuotationPayload,
   type MarkQuotationSentPayload,
   type GetQuotationsParams,
+  type LatestApprovedTaxResponse,
 } from "./quotations.api";
 
 export function useQuotationsQuery(
@@ -163,6 +165,19 @@ export function useMarkQuotationSentMutation() {
       void queryClient.invalidateQueries({ queryKey: ["leads"] });
       void queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
     },
+  });
+}
+
+export { type LatestApprovedTaxResponse };
+
+export function useLatestApprovedTaxByLeadQuery(
+  leadId: string | undefined,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: ["leads", leadId, "quotations", "latest-approved-tax"],
+    queryFn: () => getLatestApprovedTaxByLeadProvider(leadId!),
+    enabled: Boolean(leadId) && enabled,
   });
 }
 
