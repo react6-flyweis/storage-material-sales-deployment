@@ -324,6 +324,8 @@ export type GetQuotationsParams = {
   status?: string;
   buildingType?: string;
   search?: string;
+  lead?: string;
+  leadId?: string;
   [key: string]: unknown;
 };
 

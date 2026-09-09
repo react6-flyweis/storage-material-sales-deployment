@@ -271,13 +271,13 @@ export function QuotationApprovalBanner({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2 max-h-[350px] overflow-y-auto">
+          <div className="space-y-4 py-2 max-h-[350px] overflow-y-auto overflow-x-hidden pr-2 min-w-0">
             {history.length === 0 ? (
               <p className="text-sm text-slate-500 text-center py-6">
                 No approval events recorded yet.
               </p>
             ) : (
-              <div className="relative border-l-2 border-slate-200 ml-3 pl-4 space-y-4">
+              <div className="relative border-l-2 border-slate-200 ml-3 pl-4 space-y-4 min-w-0">
                 {history.map((item, idx) => {
                   const byName =
                     typeof item.by === "object" && item.by !== null
@@ -290,21 +290,21 @@ export function QuotationApprovalBanner({
                     : "—";
 
                   return (
-                    <div key={idx} className="relative group">
+                    <div key={idx} className="relative group min-w-0">
                       <span className="absolute -left-[23px] top-1 w-2.5 h-2.5 rounded-full bg-slate-400 border-2 border-white" />
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-semibold text-slate-800 capitalize">
+                      <div className="flex items-center justify-between gap-2 min-w-0">
+                        <span className="text-sm font-semibold text-slate-800 capitalize truncate">
                           {item.status.replace("_", " ")}
                         </span>
-                        <span className="text-xs text-slate-400">
+                        <span className="text-xs text-slate-400 shrink-0">
                           {dateStr}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-500 mt-0.5">
+                      <p className="text-xs text-slate-500 mt-0.5 truncate">
                         By: <span className="font-medium text-slate-700">{byName}</span>
                       </p>
                       {item.note && (
-                        <p className="text-xs text-slate-700 mt-1 bg-slate-50 p-2 rounded border border-slate-200">
+                        <p className="text-xs text-slate-700 mt-1 bg-slate-50 p-2 rounded border border-slate-200 whitespace-pre-wrap wrap-break-word min-w-0">
                           {item.note}
                         </p>
                       )}

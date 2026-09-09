@@ -3,7 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import UploadAgreementDialog from "@/components/leads/upload-agreement-dialog";
 import MoveToOrdersDialog from "@/components/leads/move-to-orders-dialog";
 import BasicDetails from "@/components/leads/basic-details";
-import QuotationCard from "@/components/leads/quotation-card";
+import LeadQuotationsCard from "@/components/leads/lead-quotations-card";
 import ChatCard from "@/components/leads/chat-card";
 import TimelineCard from "@/components/leads/timeline-card";
 import FollowUpsCard from "@/components/leads/follow-ups-card";
@@ -15,7 +15,7 @@ import { canCreatePO, type LeadStatusType } from "@/modules/leads/leads.utils";
 
 const TABS = [
   { value: "basic-info", label: "Basic info" },
-  // { value: "quotation", label: "Quotation" },
+  { value: "quotations", label: "Quotations" },
   { value: "chat", label: "Open Chat" },
   { value: "timeline", label: "Timeline" },
   { value: "follow-ups", label: "Follow Ups" },
@@ -96,10 +96,12 @@ export default function LeadDetails() {
     !detail?.lead.isRaisedToPO &&
     canCreatePO(detail?.lead.lifecycleStatus as LeadStatusType);
   const searchParams = new URLSearchParams(location.search);
-  const activeTabFromSearch = searchParams.get("tab") as LeadTab | null;
+  const rawTab = searchParams.get("tab");
+  const normalizedTab =
+    rawTab === "quotation" ? ("quotations" as LeadTab) : (rawTab as LeadTab | null);
   const activeTab: LeadTab =
-    activeTabFromSearch && TAB_VALUES.has(activeTabFromSearch)
-      ? activeTabFromSearch
+    normalizedTab && TAB_VALUES.has(normalizedTab)
+      ? normalizedTab
       : "basic-info";
 
   const handleTabChange = (tab: string) => {
@@ -203,14 +205,11 @@ export default function LeadDetails() {
             <TabsContent value="basic-info" className="mt-6">
               <BasicDetails lead={detail} />
             </TabsContent>
-            <TabsContent value="quotation" className="mt-6">
-              <QuotationCard
-                quotation={
-                  detail?.quotations.find((q) => q.isLatest) ??
-                  detail?.quotations[0]
-                }
-                lead={detail?.lead}
-                customer={detail?.customer}
+            <TabsContent value="quotations" className="mt-6">
+              <LeadQuotationsCard
+                leadId={detail.lead._id || leadId || ""}
+                lead={detail.lead}
+                customer={detail.customer}
               />
             </TabsContent>
             <TabsContent value="chat" className="mt-6">
