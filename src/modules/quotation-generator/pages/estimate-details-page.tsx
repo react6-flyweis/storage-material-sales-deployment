@@ -82,6 +82,12 @@ export function EstimateDetailPage() {
 
   const conversion = estimate?.conversion;
   const quoteNumber = conversion?.quoteNumber;
+  const effectiveWorkflowStatus =
+    conversion?.workflowStatus ||
+    estimate?.workflowStatus ||
+    estimate?.approval?.status ||
+    estimate?.status ||
+    "draft";
 
   // Server document preview request payload
   const previewPayload: PreviewDocumentRequest | null = useMemo(() => {
@@ -234,6 +240,46 @@ export function EstimateDetailPage() {
               <h1 className="text-2xl font-bold text-slate-900 leading-tight">
                 {customerLeadName}
               </h1>
+              {(() => {
+                switch (effectiveWorkflowStatus) {
+                  case "pending_approval":
+                    return (
+                      <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-xs border border-amber-300 shadow-2xs">
+                        Pending Approval
+                      </span>
+                    );
+                  case "approved":
+                    return (
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs border border-emerald-300 shadow-2xs">
+                        Approved
+                      </span>
+                    );
+                  case "rejected":
+                    return (
+                      <span
+                        className="px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold text-xs border border-rose-300 shadow-2xs"
+                        title={
+                          estimate?.approval?.rejectionReason ||
+                          "Approval Rejected"
+                        }
+                      >
+                        Rejected
+                      </span>
+                    );
+                  case "sent":
+                    return (
+                      <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold text-xs border border-blue-300 shadow-2xs">
+                        Sent
+                      </span>
+                    );
+                  default:
+                    return (
+                      <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold text-xs border border-slate-300">
+                        Draft
+                      </span>
+                    );
+                }
+              })()}
               {quoteNumber && (
                 <span className="px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 font-bold text-xs border border-blue-200">
                   Quote #{quoteNumber}
