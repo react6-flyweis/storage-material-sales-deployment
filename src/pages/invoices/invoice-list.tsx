@@ -516,7 +516,12 @@ export default function InvoiceListPage() {
                             inv.approval?.status ||
                             inv.invoice?.approval?.status
                           }
-                          invoiceStatus={inv.status || inv.invoice?.status}
+                          invoiceStatus={
+                            inv.invoiceStatus ||
+                            inv.invoice?.invoiceStatus ||
+                            inv.status ||
+                            inv.invoice?.status
+                          }
                           sendMethod={inv.invoice?.sendMethod || inv.sendMethod}
                         />
                       </TableCell>
