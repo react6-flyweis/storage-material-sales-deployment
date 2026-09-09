@@ -77,21 +77,20 @@ export default function AddDepositDialog({
     invoiceTotal,
   );
 
-  const validationError =
-    !value.trim()
-      ? ""
-      : type === "%"
-        ? exceedsPercentLimit(numericValue, maxDepositPercent)
-          ? reservedScheduleValue.trim()
-            ? "Deposit and payment schedule cannot exceed 100%"
-            : "Deposit exceeds 100%"
-          : ""
-        : hasMaxAmount &&
-            exceedsMoneyLimit(enteredDepositDollars, maxDepositDollars)
-          ? reservedScheduleValue.trim()
-            ? "Deposit and payment schedule cannot exceed the invoice total"
-            : "Deposit exceeds the invoice total"
-          : "";
+  const validationError = !value.trim()
+    ? ""
+    : type === "%"
+      ? exceedsPercentLimit(numericValue, maxDepositPercent)
+        ? reservedScheduleValue.trim()
+          ? "Deposit and payment schedule cannot exceed 100%"
+          : "Deposit exceeds 100%"
+        : ""
+      : hasMaxAmount &&
+          exceedsMoneyLimit(enteredDepositDollars, maxDepositDollars)
+        ? reservedScheduleValue.trim()
+          ? "Deposit and payment schedule cannot exceed the invoice total"
+          : "Deposit exceeds the invoice total"
+        : "";
 
   const remainingLabel = React.useMemo(() => {
     if (!value.trim()) {
@@ -109,7 +108,9 @@ export default function AddDepositDialog({
       return `${rem.toFixed(2)}% Remaining`;
     }
     if (hasMaxAmount) {
-      const rem = roundMoney(Math.max(0, maxDepositDollars - enteredDepositDollars));
+      const rem = roundMoney(
+        Math.max(0, maxDepositDollars - enteredDepositDollars),
+      );
       return `$${rem.toFixed(2)} Remaining`;
     }
     return `$${enteredDepositDollars.toFixed(2)}`;
@@ -177,6 +178,7 @@ export default function AddDepositDialog({
                 <Label>Deposit</Label>
                 <div className="relative">
                   <Input
+                    type="number"
                     value={value}
                     onChange={(e) => setValue(e.target.value)}
                     placeholder="10"
