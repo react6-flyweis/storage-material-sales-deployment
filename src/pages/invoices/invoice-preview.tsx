@@ -110,7 +110,7 @@ export default function InvoicePreview() {
             <WorkflowStatusBadge
               workflowStatus={workflowStatus}
               approvalStatus={approvalStatus}
-              invoiceStatus={invoice.status}
+              invoiceStatus={invoice.invoiceStatus || invoice.status}
               sendMethod={invoice.sendMethod}
             />
           </div>
