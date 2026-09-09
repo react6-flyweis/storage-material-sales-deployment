@@ -24,6 +24,7 @@ type PaymentInvoiceItem = {
   createdAt: string;
   totalAmount: number;
   status: string;
+  invoiceStatus?: string;
   workflowStatus: string;
   approvalStatus: string;
   isApproved: boolean;
@@ -164,7 +165,7 @@ export default function PaymentsCard({ leadId, leadDbId, paymentsData }: Props) 
                               variant="light"
                               workflowStatus={invoice.workflowStatus}
                               approvalStatus={invoice.approvalStatus}
-                              invoiceStatus={invoice.status}
+                              invoiceStatus={invoice.invoiceStatus || invoice.status}
                               sendMethod={invoice.sendMethod}
                             />
                             <span className="text-xs text-gray-500">
