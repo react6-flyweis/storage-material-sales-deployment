@@ -36,9 +36,9 @@ function getStatusConfig(
   sendMethod?: string | null,
 ) {
   const effective = (
+    invoiceStatus ||
     workflowStatus ||
     approvalStatus ||
-    invoiceStatus ||
     "draft"
   ).toLowerCase();
 
@@ -128,6 +128,7 @@ export function WorkflowStatusBadge({
   workflowStatus,
   approvalStatus,
   invoiceStatus,
+  status,
   sendMethod,
   className = "",
   variant = "pill",
@@ -135,6 +136,7 @@ export function WorkflowStatusBadge({
   workflowStatus?: WorkflowStatus | string | null;
   approvalStatus?: ApprovalStatus | string | null;
   invoiceStatus?: string | null;
+  status?: string | null;
   sendMethod?: "platform" | "manual" | string | null;
   className?: string;
   variant?: "pill" | "light";
@@ -142,7 +144,7 @@ export function WorkflowStatusBadge({
   const config = getStatusConfig(
     workflowStatus,
     approvalStatus,
-    invoiceStatus,
+    invoiceStatus || status,
     sendMethod,
   );
 
