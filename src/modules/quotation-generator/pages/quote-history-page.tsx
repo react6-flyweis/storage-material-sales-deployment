@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router";
 import {
   ArrowLeft,
@@ -16,6 +16,7 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { Card } from "@/components/ui/card";
+import Pagination from "@/components/Pagination";
 import {
   getEstimatesListProvider,
   getHistorySummaryProvider,
@@ -33,7 +34,12 @@ import {
 export function QuoteHistoryPage() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(8);
+  const [totalItems, setTotalItems] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSummaryLoading, setIsSummaryLoading] = useState(false);
   const [estimatesList, setEstimatesList] = useState<SaveEstimatePayload[]>([]);
   const [summaryData, setSummaryData] = useState<{
     totalQuotes?: number;
@@ -48,24 +54,19 @@ export function QuoteHistoryPage() {
     [key: string]: unknown;
   } | null>(null);
 
-  const fetchHistory = async () => {
-    setIsLoading(true);
+  // Debounce search term to avoid excessive requests
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1);
+    }, 350);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
+  const fetchSummary = useCallback(async () => {
+    setIsSummaryLoading(true);
     try {
-      const [listRes, summaryRes] = await Promise.all([
-        getEstimatesListProvider(30),
-        getHistorySummaryProvider().catch(() => null),
-      ]);
-
-      const rawList = listRes.data || listRes;
-      const items: SaveEstimatePayload[] = Array.isArray(rawList)
-        ? rawList
-        : ((rawList as Record<string, unknown>)
-            ?.estimates as SaveEstimatePayload[]) ||
-          ((rawList as Record<string, unknown>)
-            ?.items as SaveEstimatePayload[]) ||
-          [];
-      setEstimatesList(items);
-
+      const summaryRes = await getHistorySummaryProvider().catch(() => null);
       if (summaryRes) {
         const rawSummary = (summaryRes.data || summaryRes) as Record<
           string,
@@ -79,27 +80,62 @@ export function QuoteHistoryPage() {
         });
       }
     } catch (err) {
+      console.error("Failed to load history summary:", err);
+    } finally {
+      setIsSummaryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSummary();
+  }, [fetchSummary]);
+
+  const fetchHistory = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const listRes = await getEstimatesListProvider({
+        page: currentPage,
+        limit: rowsPerPage,
+        search: debouncedSearch,
+      });
+
+      const estimates = listRes.data?.estimates ?? [];
+      const total = listRes.data?.total ?? 0;
+      setEstimatesList(estimates);
+      setTotalItems(total);
+    } catch (err) {
       console.error("Failed to load history list:", err);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentPage, rowsPerPage, debouncedSearch]);
 
   useEffect(() => {
     fetchHistory();
-  }, []);
+  }, [fetchHistory]);
+
+  const totalPages = Math.max(1, Math.ceil(totalItems / rowsPerPage));
+
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const handleClearAll = () => {
     setEstimatesList([]);
+    setTotalItems(0);
   };
 
   const handleDeleteQuote = async (id?: string) => {
     if (!id) return;
     setEstimatesList((prev) => prev.filter((q) => q._id !== id));
+    setTotalItems((prev) => Math.max(0, prev - 1));
     try {
       await deleteEstimateProvider(id).catch((err) => {
         console.warn("Backend delete estimate warning:", err);
       });
+      fetchHistory();
     } catch (err) {
       console.error("Failed to delete estimate:", err);
     }
@@ -121,17 +157,6 @@ export function QuoteHistoryPage() {
       navigate(`/quotation/history/${item._id}`);
     }
   };
-
-  const filteredQuotes = estimatesList.filter((q) => {
-    const term = searchTerm.toLowerCase();
-    return (
-      (q.leadCompanyName || "").toLowerCase().includes(term) ||
-      (q.cityStateZip || "").toLowerCase().includes(term) ||
-      (q.jobNumber || "").toLowerCase().includes(term) ||
-      (q.buildingSize || "").toLowerCase().includes(term) ||
-      (q.sourceFileName || "").toLowerCase().includes(term)
-    );
-  });
 
   const totalQuotesCount = summaryData?.totalQuotes ?? 0;
   const totalPipelineVal = summaryData?.totalValue ?? 0;
@@ -196,12 +221,15 @@ export function QuoteHistoryPage() {
           <Button
             type="button"
             variant="outline"
-            onClick={fetchHistory}
-            disabled={isLoading}
+            onClick={() => {
+              fetchHistory();
+              fetchSummary();
+            }}
+            disabled={isLoading || isSummaryLoading}
             className="border border-slate-400 cursor-pointer"
           >
             <RefreshCw
-              className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`}
+              className={`h-3.5 w-3.5 ${isLoading || isSummaryLoading ? "animate-spin" : ""}`}
             />
             Refresh
           </Button>
@@ -228,20 +256,29 @@ export function QuoteHistoryPage() {
               August 2026
             </div>
           </div>
-          <div className="space-y-0.5">
-            <div className="text-3xl font-black text-[#1d5bd8] tracking-tight">
-              {formattedPipelineVal}
+          {isSummaryLoading ? (
+            <div className="space-y-2 py-1 animate-pulse">
+              <div className="h-7 w-28 bg-slate-200 rounded" />
+              <div className="h-3.5 w-24 bg-slate-200 rounded" />
+              <div className="h-3 w-20 bg-slate-200 rounded" />
+              <div className="h-3 w-16 bg-slate-200 rounded" />
             </div>
-            <div className="text-xs font-bold text-[#1d5bd8]">
-              {avgMarginVal}% avg margin
+          ) : (
+            <div className="space-y-0.5">
+              <div className="text-3xl font-black text-[#1d5bd8] tracking-tight">
+                {formattedPipelineVal}
+              </div>
+              <div className="text-xs font-bold text-[#1d5bd8]">
+                {avgMarginVal}% avg margin
+              </div>
+              <div className="text-[11px] font-medium text-slate-500">
+                {formattedProfitVal} profit
+              </div>
+              <div className="text-[11px] font-medium text-slate-500">
+                {totalQuotesCount} quotes
+              </div>
             </div>
-            <div className="text-[11px] font-medium text-slate-500">
-              {formattedProfitVal} profit
-            </div>
-            <div className="text-[11px] font-medium text-slate-500">
-              {totalQuotesCount} quotes
-            </div>
-          </div>
+          )}
         </Card>
 
         {/* Q3 2026 Card */}
@@ -254,20 +291,29 @@ export function QuoteHistoryPage() {
               This Quarter
             </div>
           </div>
-          <div className="space-y-0.5">
-            <div className="text-3xl font-black text-[#1d5bd8] tracking-tight">
-              {formattedPipelineVal}
+          {isSummaryLoading ? (
+            <div className="space-y-2 py-1 animate-pulse">
+              <div className="h-7 w-28 bg-slate-200 rounded" />
+              <div className="h-3.5 w-24 bg-slate-200 rounded" />
+              <div className="h-3 w-20 bg-slate-200 rounded" />
+              <div className="h-3 w-16 bg-slate-200 rounded" />
             </div>
-            <div className="text-xs font-bold text-[#1d5bd8]">
-              {avgMarginVal}% avg margin
+          ) : (
+            <div className="space-y-0.5">
+              <div className="text-3xl font-black text-[#1d5bd8] tracking-tight">
+                {formattedPipelineVal}
+              </div>
+              <div className="text-xs font-bold text-[#1d5bd8]">
+                {avgMarginVal}% avg margin
+              </div>
+              <div className="text-[11px] font-medium text-slate-500">
+                {formattedProfitVal} profit
+              </div>
+              <div className="text-[11px] font-medium text-slate-500">
+                {totalQuotesCount} quotes
+              </div>
             </div>
-            <div className="text-[11px] font-medium text-slate-500">
-              {formattedProfitVal} profit
-            </div>
-            <div className="text-[11px] font-medium text-slate-500">
-              {totalQuotesCount} quotes
-            </div>
-          </div>
+          )}
         </Card>
 
         {/* YTD 2026 Card */}
@@ -280,20 +326,29 @@ export function QuoteHistoryPage() {
               Year to Date
             </div>
           </div>
-          <div className="space-y-0.5">
-            <div className="text-3xl font-black text-[#1d5bd8] tracking-tight">
-              {formattedPipelineVal}
+          {isSummaryLoading ? (
+            <div className="space-y-2 py-1 animate-pulse">
+              <div className="h-7 w-28 bg-slate-200 rounded" />
+              <div className="h-3.5 w-24 bg-slate-200 rounded" />
+              <div className="h-3 w-20 bg-slate-200 rounded" />
+              <div className="h-3 w-16 bg-slate-200 rounded" />
             </div>
-            <div className="text-xs font-bold text-[#1d5bd8]">
-              {avgMarginVal}% avg margin
+          ) : (
+            <div className="space-y-0.5">
+              <div className="text-3xl font-black text-[#1d5bd8] tracking-tight">
+                {formattedPipelineVal}
+              </div>
+              <div className="text-xs font-bold text-[#1d5bd8]">
+                {avgMarginVal}% avg margin
+              </div>
+              <div className="text-[11px] font-medium text-slate-500">
+                {formattedProfitVal} profit
+              </div>
+              <div className="text-[11px] font-medium text-slate-500">
+                {totalQuotesCount} quotes
+              </div>
             </div>
-            <div className="text-[11px] font-medium text-slate-500">
-              {formattedProfitVal} profit
-            </div>
-            <div className="text-[11px] font-medium text-slate-500">
-              {totalQuotesCount} quotes
-            </div>
-          </div>
+          )}
         </Card>
 
         {/* PROFIT BY CATEGORY Card */}
@@ -301,12 +356,18 @@ export function QuoteHistoryPage() {
           <div className="text-[11px] font-black tracking-wider text-slate-700 uppercase">
             PROFIT BY CATEGORY
           </div>
-          <div className="flex-1 flex items-center pt-2">
-            <div className="flex items-center gap-2 text-xs font-extrabold text-slate-700">
-              <span className="w-4 h-4 bg-[#1d64d8] rounded-xs shrink-0 inline-block" />
-              <span>Metal/Bldgs 100%</span>
+          {isSummaryLoading ? (
+            <div className="flex-1 flex items-center pt-2 animate-pulse">
+              <div className="h-4 w-32 bg-slate-200 rounded" />
             </div>
-          </div>
+          ) : (
+            <div className="flex-1 flex items-center pt-2">
+              <div className="flex items-center gap-2 text-xs font-extrabold text-slate-700">
+                <span className="w-4 h-4 bg-[#1d64d8] rounded-xs shrink-0 inline-block" />
+                <span>Metal/Bldgs 100%</span>
+              </div>
+            </div>
+          )}
         </Card>
 
         {/* SUMMARY Card */}
@@ -314,55 +375,82 @@ export function QuoteHistoryPage() {
           <div className="text-[11px] font-black tracking-wider text-slate-700 uppercase">
             SUMMARY
           </div>
-          <div className="space-y-2.5">
-            <div className="grid grid-cols-2 gap-x-2 gap-y-2">
-              <div>
-                <div className="text-[10px] font-semibold text-slate-400">
-                  Total Quotes
+          {isSummaryLoading ? (
+            <div className="space-y-2.5 animate-pulse">
+              <div className="grid grid-cols-2 gap-x-2 gap-y-2">
+                <div>
+                  <div className="h-2.5 w-14 bg-slate-200 rounded mb-1" />
+                  <div className="h-4 w-10 bg-slate-200 rounded" />
                 </div>
-                <div className="text-sm font-extrabold text-slate-900 leading-none mt-0.5">
-                  {totalQuotesCount}
+                <div>
+                  <div className="h-2.5 w-14 bg-slate-200 rounded mb-1" />
+                  <div className="h-4 w-12 bg-slate-200 rounded" />
                 </div>
-              </div>
-              <div>
-                <div className="text-[10px] font-semibold text-slate-400">
-                  Avg Quote
+                <div>
+                  <div className="h-2.5 w-14 bg-slate-200 rounded mb-1" />
+                  <div className="h-3 w-10 bg-slate-200 rounded" />
                 </div>
-                <div className="text-sm font-extrabold text-slate-900 leading-none mt-0.5">
-                  {avgQuoteVal > 0
-                    ? `$${Math.round(avgQuoteVal).toLocaleString()}`
-                    : "$0"}
-                </div>
-              </div>
-              <div>
-                <div className="text-[10px] font-semibold text-slate-400">
-                  Avg Margin
-                </div>
-                <div className="text-xs font-extrabold text-[#1d5bd8] leading-none mt-0.5">
-                  {avgMarginVal}%
+                <div>
+                  <div className="h-2.5 w-14 bg-slate-200 rounded mb-1" />
+                  <div className="h-3 w-12 bg-slate-200 rounded" />
                 </div>
               </div>
               <div>
-                <div className="text-[10px] font-semibold text-slate-400">
-                  Total SF
-                </div>
-                <div className="text-xs font-extrabold text-slate-900 leading-none mt-0.5">
-                  {totalSfVal > 0
-                    ? `${totalSfVal.toLocaleString()} SF`
-                    : "0 SF"}
-                </div>
+                <div className="h-2.5 w-24 bg-slate-200 rounded mb-1" />
+                <div className="h-5 w-20 bg-slate-200 rounded" />
               </div>
             </div>
+          ) : (
+            <div className="space-y-2.5">
+              <div className="grid grid-cols-2 gap-x-2 gap-y-2">
+                <div>
+                  <div className="text-[10px] font-semibold text-slate-400">
+                    Total Quotes
+                  </div>
+                  <div className="text-sm font-extrabold text-slate-900 leading-none mt-0.5">
+                    {totalQuotesCount}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] font-semibold text-slate-400">
+                    Avg Quote
+                  </div>
+                  <div className="text-sm font-extrabold text-slate-900 leading-none mt-0.5">
+                    {avgQuoteVal > 0
+                      ? `$${Math.round(avgQuoteVal).toLocaleString()}`
+                      : "$0"}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] font-semibold text-slate-400">
+                    Avg Margin
+                  </div>
+                  <div className="text-xs font-extrabold text-[#1d5bd8] leading-none mt-0.5">
+                    {avgMarginVal}%
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] font-semibold text-slate-400">
+                    Total SF
+                  </div>
+                  <div className="text-xs font-extrabold text-slate-900 leading-none mt-0.5">
+                    {totalSfVal > 0
+                      ? `${totalSfVal.toLocaleString()} SF`
+                      : "0 SF"}
+                  </div>
+                </div>
+              </div>
 
-            <div>
-              <div className="text-[10px] font-semibold text-slate-400">
-                Total Profit Quoted
-              </div>
-              <div className="text-lg font-black text-[#10b981] leading-none mt-0.5">
-                ${totalProfitVal.toLocaleString()}
+              <div>
+                <div className="text-[10px] font-semibold text-slate-400">
+                  Total Profit Quoted
+                </div>
+                <div className="text-lg font-black text-[#10b981] leading-none mt-0.5">
+                  ${totalProfitVal.toLocaleString()}
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </Card>
       </div>
 
@@ -370,7 +458,7 @@ export function QuoteHistoryPage() {
       <div className="space-y-4 pt-2">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-slate-600 tracking-wide">
-            Quotation History ({filteredQuotes.length})
+            Quotation History ({totalItems})
           </h2>
           {isLoading && (
             <div className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -380,7 +468,7 @@ export function QuoteHistoryPage() {
           )}
         </div>
 
-        {filteredQuotes.length === 0 ? (
+        {estimatesList.length === 0 ? (
           <Card className="p-8 text-center bg-white border border-slate-200 rounded-2xl text-slate-500">
             {isLoading
               ? "Fetching saved quotes from database..."
@@ -388,7 +476,7 @@ export function QuoteHistoryPage() {
           </Card>
         ) : (
           <div className="space-y-4">
-            {filteredQuotes.map((quote) => {
+            {estimatesList.map((quote) => {
               const isStorage =
                 quote.jobType?.toUpperCase() === "STORAGE" ||
                 Boolean(quote.storageData);
@@ -472,28 +560,28 @@ export function QuoteHistoryPage() {
                   {/* Left Side Quote Details */}
                   <div className="flex flex-col justify-between space-y-1.5 min-w-0">
                     <div>
-                      <h3 className="text-sm font-bold text-slate-900 leading-snug">
-                        {quote.leadCompanyName || "Customer Quote"}
-                      </h3>
-                      <div className="text-xs text-slate-500 font-normal mt-1 flex flex-wrap items-center gap-1.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-sm font-bold text-slate-900 leading-snug">
+                          {quote.leadCompanyName || "Customer Quote"}
+                        </h3>
                         {(() => {
                           switch (effectiveWorkflowStatus) {
                             case "pending_approval":
                               return (
-                                <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px]">
+                                <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-xs border border-amber-300 shadow-2xs">
                                   Pending Approval
                                 </span>
                               );
                             case "approved":
                               return (
-                                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">
+                                <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs border border-emerald-300 shadow-2xs">
                                   Approved
                                 </span>
                               );
                             case "rejected":
                               return (
                                 <span
-                                  className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold text-[10px]"
+                                  className="px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold text-xs border border-rose-300 shadow-2xs"
                                   title={
                                     quote.approval?.rejectionReason ||
                                     "Approval Rejected"
@@ -504,13 +592,13 @@ export function QuoteHistoryPage() {
                               );
                             case "sent":
                               return (
-                                <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold text-[10px]">
+                                <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold text-xs border border-blue-300 shadow-2xs">
                                   Sent
                                 </span>
                               );
                             default:
                               return (
-                                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold text-[10px]">
+                                <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold text-xs border border-slate-300">
                                   Draft
                                 </span>
                               );
@@ -521,8 +609,8 @@ export function QuoteHistoryPage() {
                             Quote #{quoteNumber}
                           </span>
                         )}
-
-                        <span>·</span>
+                      </div>
+                      <div className="text-xs text-slate-500 font-normal mt-1 flex flex-wrap items-center gap-1.5">
                         <span>{quote.scope?.toUpperCase() || "SUPPLY"}</span>
                         <span>·</span>
                         <span>{formatNumber2(effectiveSqFt)} SF</span>
@@ -621,6 +709,22 @@ export function QuoteHistoryPage() {
                 </div>
               );
             })}
+
+            {totalItems > 0 && (
+              <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+                <Pagination
+                  totalItems={totalItems}
+                  currentPage={currentPage}
+                  rowsPerPage={rowsPerPage}
+                  rowsPerPageOptions={[8, 16, 24, 32]}
+                  onPageChange={setCurrentPage}
+                  onRowsPerPageChange={(rows) => {
+                    setRowsPerPage(rows);
+                    setCurrentPage(1);
+                  }}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>

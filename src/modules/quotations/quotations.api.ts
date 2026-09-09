@@ -461,4 +461,29 @@ export async function markQuotationSentProvider(
   return response.data;
 }
 
+export type LatestApprovedTaxResponse = {
+  quotationId?: string;
+  quoteNumber?: string;
+  quoteValue?: number;
+  tax?: number;
+  taxRate?: number;
+  salesTax?: {
+    amount?: number;
+    rate?: number;
+  };
+};
+
+export async function getLatestApprovedTaxByLeadProvider(leadId: string) {
+  const response = await apiClient.get<
+    LatestApprovedTaxResponse | { success?: boolean; data?: LatestApprovedTaxResponse }
+  >(`/api/leads/${encodeURIComponent(leadId)}/quotations/latest-approved-tax`);
+
+  const raw = response.data;
+  if (raw && typeof raw === "object" && "data" in raw && raw.data) {
+    return raw.data as LatestApprovedTaxResponse;
+  }
+  return raw as LatestApprovedTaxResponse;
+}
+
+
 

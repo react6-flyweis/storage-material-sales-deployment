@@ -33,10 +33,8 @@ export function QuotePreviewListPage() {
       const rawList = listRes.data || listRes;
       const items: SaveEstimatePayload[] = Array.isArray(rawList)
         ? rawList
-        : ((rawList as Record<string, unknown>)
-            ?.estimates as SaveEstimatePayload[]) ||
-          ((rawList as Record<string, unknown>)
-            ?.items as SaveEstimatePayload[]) ||
+        : rawList?.estimates ||
+          (rawList as unknown as { items?: SaveEstimatePayload[] })?.items ||
           [];
       setEstimatesList(items);
     } catch (err) {

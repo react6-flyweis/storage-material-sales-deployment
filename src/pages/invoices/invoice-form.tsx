@@ -22,6 +22,7 @@ import {
   useCreatePaymentScheduleMutation,
   useUpdatePaymentScheduleMutation,
 } from "@/modules/payment-schedules/payment-schedules.hooks";
+import { useLatestApprovedTaxByLeadQuery } from "@/modules/quotations/quotations.hooks";
 import {
   getDepositFromScheduleStages,
   isDepositStageName,
@@ -393,6 +394,7 @@ export default function InvoiceForm({
     paymentSchedule?._id ?? invoice?.paymentScheduleId ?? null,
   );
   const lastAppliedLeadScheduleIdRef = useRef<string | null>(null);
+  const lastAppliedLeadTaxIdRef = useRef<string | null>(null);
   const {
     register,
     control,
@@ -412,6 +414,10 @@ export default function InvoiceForm({
     leadIdForSchedule || undefined,
     Boolean(leadIdForSchedule) && !isSummaryReadOnly,
   );
+  const latestApprovedTaxQuery = useLatestApprovedTaxByLeadQuery(
+    leadIdForSchedule || undefined,
+    Boolean(leadIdForSchedule) && !isSummaryReadOnly,
+  );
 
   useEffect(() => {
     reset(invoiceToFormValues(invoice, paymentSchedule));
@@ -419,7 +425,79 @@ export default function InvoiceForm({
       paymentSchedule?._id ?? invoice?.paymentScheduleId ?? null,
     );
     lastAppliedLeadScheduleIdRef.current = invoice?.leadId ?? null;
+    lastAppliedLeadTaxIdRef.current = invoice?.leadId ?? null;
   }, [invoice, paymentSchedule, reset]);
+
+  useEffect(() => {
+    if (!leadIdForSchedule) {
+      lastAppliedLeadTaxIdRef.current = null;
+      return;
+    }
+
+    if (!latestApprovedTaxQuery.isSuccess) {
+      return;
+    }
+
+    if (lastAppliedLeadTaxIdRef.current === leadIdForSchedule) {
+      return;
+    }
+
+    lastAppliedLeadTaxIdRef.current = leadIdForSchedule;
+
+    const taxData = latestApprovedTaxQuery.data;
+    if (!taxData) {
+      return;
+    }
+
+    // Apply quote value to lineItems.0.rate
+    if (
+      typeof taxData.quoteValue === "number" &&
+      !Number.isNaN(taxData.quoteValue)
+    ) {
+      setValue("lineItems.0.rate", taxData.quoteValue);
+      setValue(
+        "lineItems.0.quantity",
+        getValues("lineItems.0.quantity") || 1,
+      );
+      if (!getValues("lineItems.0.description")) {
+        setValue("lineItems.0.description", "Project Quote");
+      }
+    }
+
+    // Apply tax and tax rate
+    const taxRate = taxData.taxRate ?? taxData.salesTax?.rate ?? 0;
+    const taxAmount = taxData.tax ?? taxData.salesTax?.amount;
+
+    if (taxRate > 0) {
+      const currentTaxes = (getValues("taxes") || []) as InvoiceFormValues["taxes"];
+      const rateStr = String(taxRate);
+      let matchingTax = currentTaxes.find((t) => parseFloat(t.rate) === taxRate);
+
+      if (!matchingTax) {
+        const name = `Tax ${rateStr}%`;
+        matchingTax = { name, rate: rateStr };
+        setValue("taxes", [...currentTaxes, matchingTax]);
+      }
+
+      setValue("lineItems.0.selectedTax", matchingTax.name);
+      setValue("lineItems.0.tax", taxRate);
+      setValue("lineItems.0.taxType", "percentage");
+      if (taxAmount != null) {
+        setValue("lineItems.0.taxAmount", taxAmount);
+      }
+    } else {
+      setValue("lineItems.0.selectedTax", "");
+      setValue("lineItems.0.tax", 0);
+      setValue("lineItems.0.taxType", "percentage");
+      setValue("lineItems.0.taxAmount", 0);
+    }
+  }, [
+    leadIdForSchedule,
+    latestApprovedTaxQuery.isSuccess,
+    latestApprovedTaxQuery.data,
+    setValue,
+    getValues,
+  ]);
 
   useEffect(() => {
     if (!leadIdForSchedule) {
