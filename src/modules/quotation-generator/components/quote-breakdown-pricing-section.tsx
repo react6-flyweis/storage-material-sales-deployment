@@ -124,6 +124,7 @@ export function QuoteBreakdownPricingSection({
     marginTargetMargin,
     marginFixedSellOverride,
     pembExtractedShipper,
+    setPembExtractedShipper,
     pembLeadId,
     pembEstimateId,
     setPembEstimateId,
@@ -153,18 +154,32 @@ export function QuoteBreakdownPricingSection({
     setIsManualSqFt(true);
   }, []);
 
+  const lastLoadedFileNameRef = useRef<string | null>(
+    effectiveInitial?.fileName || null
+  );
+  const shipperDataRef = useRef<ExtractShipperResponseData | undefined>(shipperData);
+  useEffect(() => {
+    shipperDataRef.current = shipperData;
+  }, [shipperData]);
+
   useEffect(() => {
     const s = initialShipper || pembExtractedShipper;
-    if (s) {
+    if (!s) {
+      lastLoadedFileNameRef.current = null;
+      setShipperData(undefined);
+      setFile(null);
+      setSqFt("");
+      return;
+    }
+
+    // Only sync if it is a genuinely different file or first load
+    if (s.fileName !== lastLoadedFileNameRef.current) {
+      lastLoadedFileNameRef.current = s.fileName;
       setShipperData(s);
       setFile({ name: s.fileName, size: `${s.totalWeightLbs} lbs` });
       if (s.squareFootage) {
         setSqFt(String(s.squareFootage));
       }
-    } else {
-      setShipperData(undefined);
-      setFile(null);
-      setSqFt("");
     }
   }, [initialShipper, pembExtractedShipper]);
 
@@ -359,16 +374,98 @@ export function QuoteBreakdownPricingSection({
   ]);
 
   const computeAbortRef = useRef<number | null>(null);
+  const lastComputedSignatureRef = useRef<string>("");
+  const isInitialMountRef = useRef<boolean>(true);
+
+  const buildComputeSignature = useCallback(() => {
+    const current = shipperDataRef.current;
+    if (!current?.parsedCategories && !current?.fileName) return "";
+    return JSON.stringify({
+      fileName: current.fileName || "",
+      catCount: current.parsedCategories ? Object.keys(current.parsedCategories).length : 0,
+      sqFt,
+      isManualSqFt,
+      jobType,
+      scope: normalizeScope(scope),
+      roof: normalizeRoof(roofType),
+      installDifficulty: installDifficulty || "easy",
+      installCost,
+      installSell,
+      blendPercentage,
+      concreteInclude,
+      concreteCostSf,
+      concreteMarginPct,
+      concreteSlabThickness,
+      concretePsiRating,
+      insulationInclude,
+      insulationSystem,
+      insulationRValueRoof,
+      insulationRValueWalls,
+      insulationCogsSf,
+      insulationMarginPct,
+      taxZip,
+      taxRate,
+      includeTax,
+      cogsOverrideApplied,
+      cogsCostInput,
+      cogsCostAdjustPercent,
+      cogsMaterialMargin,
+      cogsFixedSellPrice,
+      marginOverrideApplied,
+      marginLaborOverride,
+      marginTargetMargin,
+      marginFixedSellOverride,
+    });
+  }, [
+    sqFt,
+    isManualSqFt,
+    jobType,
+    scope,
+    roofType,
+    installDifficulty,
+    installCost,
+    installSell,
+    blendPercentage,
+    concreteInclude,
+    concreteCostSf,
+    concreteMarginPct,
+    concreteSlabThickness,
+    concretePsiRating,
+    insulationInclude,
+    insulationSystem,
+    insulationRValueRoof,
+    insulationRValueWalls,
+    insulationCogsSf,
+    insulationMarginPct,
+    taxZip,
+    taxRate,
+    includeTax,
+    cogsOverrideApplied,
+    cogsCostInput,
+    cogsCostAdjustPercent,
+    cogsMaterialMargin,
+    cogsFixedSellPrice,
+    marginOverrideApplied,
+    marginLaborOverride,
+    marginTargetMargin,
+    marginFixedSellOverride,
+  ]);
 
   // Compute estimate function
   const executeCompute = useCallback(
     async (overrides?: Partial<ComputeEstimateRequest>) => {
-      if (!shipperData) return;
+      const current = shipperDataRef.current;
+      if (!current) return;
+
+      if (computeAbortRef.current) {
+        window.clearTimeout(computeAbortRef.current);
+        computeAbortRef.current = null;
+      }
 
       setIsComputing(true);
       try {
         const storeState = useQuotationStore.getState();
-        const parsedSqFt = parseFloat(sqFt) || shipperData.squareFootage || 0;
+        const parsedSqFt = parseFloat(sqFt) || current.squareFootage || 0;
         const cogsCostVal = parseFloat(storeState.cogsCostInput) || undefined;
         const cogsSellVal = parseFloat(storeState.cogsFixedSellPrice) || undefined;
         const marginLaborVal = parseFloat(storeState.marginLaborOverride) || undefined;
@@ -376,7 +473,7 @@ export function QuoteBreakdownPricingSection({
         const marginSellVal = parseFloat(storeState.marginFixedSellOverride) || undefined;
 
         const payload: ComputeEstimateRequest = {
-          parsedCategories: shipperData.parsedCategories || {},
+          parsedCategories: current.parsedCategories || {},
           jobType,
           scope: normalizeScope(scope),
           squareFootage: parsedSqFt,
@@ -448,16 +545,15 @@ export function QuoteBreakdownPricingSection({
           const fullQuote = data.fullQuote || res.fullQuote;
           const pricing = data.pricing || res.pricing || fullQuote?.pricing;
           if (weightByCategory || pricing || fullQuote) {
-            setShipperData((prev) =>
-              prev
-                ? {
-                  ...prev,
-                  ...(weightByCategory ? { weightByCategory } : {}),
-                  ...(pricing ? { pricing } : {}),
-                  ...(fullQuote ? { fullQuote } : {}),
-                }
-                : prev
-            );
+            const updated: ExtractShipperResponseData = {
+              ...current,
+              ...(weightByCategory ? { weightByCategory } : {}),
+              ...(pricing ? { pricing } : {}),
+              ...(fullQuote ? { fullQuote } : {}),
+            };
+            shipperDataRef.current = updated;
+            setShipperData(updated);
+            setPembExtractedShipper(updated);
           }
         }
       } catch (err) {
@@ -467,7 +563,6 @@ export function QuoteBreakdownPricingSection({
       }
     },
     [
-      shipperData,
       jobType,
       scope,
       sqFt,
@@ -493,20 +588,37 @@ export function QuoteBreakdownPricingSection({
       taxZip,
       cogsOverrideApplied,
       marginOverrideApplied,
-      setIsComputing,
-      setShipperData,
+      setPembExtractedShipper,
     ]
   );
 
-  // Automatically trigger debounced re-compute when settings change
+  // Automatically trigger debounced re-compute when calculation settings change
   useEffect(() => {
-    if (!shipperData) return;
+    if (!shipperData?.parsedCategories && !shipperData?.fileName) return;
+
+    const signature = buildComputeSignature();
+    if (!signature) return;
+
+    // Skip if already computed with identical calculation inputs
+    if (lastComputedSignatureRef.current === signature) {
+      return;
+    }
+
+    // On initial mount or load, if pricing already exists, sync signature without computing
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      if (shipperData?.pricing) {
+        lastComputedSignatureRef.current = signature;
+        return;
+      }
+    }
 
     if (computeAbortRef.current) {
       window.clearTimeout(computeAbortRef.current);
     }
 
     computeAbortRef.current = window.setTimeout(() => {
+      lastComputedSignatureRef.current = signature;
       executeCompute();
     }, 300);
 
@@ -515,7 +627,13 @@ export function QuoteBreakdownPricingSection({
         window.clearTimeout(computeAbortRef.current);
       }
     };
-  }, [executeCompute, shipperData]);
+  }, [
+    shipperData?.parsedCategories,
+    shipperData?.fileName,
+    shipperData?.pricing,
+    buildComputeSignature,
+    executeCompute,
+  ]);
 
   const handleSelectSf = useCallback(
     (selectedSf: number) => {
@@ -523,7 +641,7 @@ export function QuoteBreakdownPricingSection({
       setIsManualSqFt(true);
       setShipperData((prev) => {
         if (!prev) return prev;
-        return {
+        const updated = {
           ...prev,
           squareFootage: selectedSf,
           squareFootageMeta: prev.squareFootageMeta
@@ -539,6 +657,8 @@ export function QuoteBreakdownPricingSection({
               inputSf: selectedSf,
             },
         };
+        shipperDataRef.current = updated;
+        return updated;
       });
       executeCompute({ squareFootage: selectedSf, sf: selectedSf, useManualSquareFootage: true });
     },
@@ -566,11 +686,53 @@ export function QuoteBreakdownPricingSection({
           sellPerSf: installSell,
         });
         if (res.success && res.data) {
+          lastLoadedFileNameRef.current = res.data.fileName;
+          shipperDataRef.current = res.data;
           setShipperData(res.data);
+          setPembExtractedShipper(res.data);
           if (res.data.squareFootage) {
             setSqFt(String(res.data.squareFootage));
           }
           setIsManualSqFt(false);
+
+          // Mark signature as already computed for this freshly uploaded file
+          lastComputedSignatureRef.current = JSON.stringify({
+            fileName: res.data.fileName || "",
+            catCount: res.data.parsedCategories ? Object.keys(res.data.parsedCategories).length : 0,
+            sqFt: res.data.squareFootage ? String(res.data.squareFootage) : "",
+            isManualSqFt: false,
+            jobType,
+            scope: normalizeScope(scope),
+            roof: normalizeRoof(roofType),
+            installDifficulty: installDifficulty || "easy",
+            installCost,
+            installSell,
+            blendPercentage,
+            concreteInclude,
+            concreteCostSf,
+            concreteMarginPct,
+            concreteSlabThickness,
+            concretePsiRating,
+            insulationInclude,
+            insulationSystem,
+            insulationRValueRoof,
+            insulationRValueWalls,
+            insulationCogsSf,
+            insulationMarginPct,
+            taxZip,
+            taxRate,
+            includeTax,
+            cogsOverrideApplied,
+            cogsCostInput,
+            cogsCostAdjustPercent,
+            cogsMaterialMargin,
+            cogsFixedSellPrice,
+            marginOverrideApplied,
+            marginLaborOverride,
+            marginTargetMargin,
+            marginFixedSellOverride,
+          });
+
           if (onShipperExtracted) {
             onShipperExtracted(res.data);
           }
