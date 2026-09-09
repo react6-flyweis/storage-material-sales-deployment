@@ -149,7 +149,9 @@ export function EstimateDetailPage() {
     setIsConverting(true);
     try {
       const res = await convertMutation.mutateAsync(id);
-      const resData = (res as { data?: { quotation?: { _id?: string }; _id?: string } })?.data;
+      const resData = (
+        res as { data?: { quotation?: { _id?: string }; _id?: string } }
+      )?.data;
       const quotationId = resData?.quotation?._id || resData?._id;
       if (quotationId) {
         navigate(`/leads/quotation-details/${quotationId}`);
@@ -257,7 +259,9 @@ export function EstimateDetailPage() {
               type="button"
               onClick={() => {
                 if (conversion?.quotationId) {
-                  navigate(`/leads/quotation-details/${conversion.quotationId}`);
+                  navigate(
+                    `/leads/quotation-details/${conversion.quotationId}`,
+                  );
                 } else {
                   navigate("/leads/quotation-list");
                 }
@@ -284,7 +288,7 @@ export function EstimateDetailPage() {
               ) : (
                 <ArrowRightCircle className="h-4 w-4" />
               )}
-              Convert to Quote
+              Send For Approval
             </Button>
           )}
 
