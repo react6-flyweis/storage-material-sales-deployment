@@ -590,20 +590,41 @@ export async function sendEstimateProvider(
 // ----------------------------------------------------------------------------
 // ESTIMATES HISTORY & LIBRARY
 // ----------------------------------------------------------------------------
+export interface GetEstimatesParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+}
+
+export interface EstimatesListData {
+  estimates: SaveEstimatePayload[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export interface EstimatesListResponse {
-  success?: boolean;
-  message?: string;
-  data?: SaveEstimatePayload[] | { estimates?: SaveEstimatePayload[]; items?: SaveEstimatePayload[] };
-  estimates?: SaveEstimatePayload[];
-  items?: SaveEstimatePayload[];
+  success: boolean;
+  message: string;
+  data: EstimatesListData;
 }
 
 export async function getEstimatesListProvider(
-  limit = 30
+  params?: number | GetEstimatesParams
 ): Promise<EstimatesListResponse> {
-  const response = await apiClient.get<EstimatesListResponse>(
-    `/api/sales/estimates?limit=${limit}`
-  );
+  let url = "/api/sales/estimates";
+  if (typeof params === "number") {
+    url += `?limit=${params}`;
+  } else if (params) {
+    const query = new URLSearchParams();
+    if (params.page !== undefined) query.set("page", String(params.page));
+    if (params.limit !== undefined) query.set("limit", String(params.limit));
+    if (params.search && params.search.trim())
+      query.set("search", params.search.trim());
+    const qs = query.toString();
+    if (qs) url += `?${qs}`;
+  }
+  const response = await apiClient.get<EstimatesListResponse>(url);
   return response.data;
 }
 
