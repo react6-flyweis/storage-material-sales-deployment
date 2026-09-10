@@ -24,6 +24,7 @@ import {
   type ExtractShipperResponseData,
   type ExtractDrawingResponseData,
   type ComputeEstimateRequest,
+  type Scope,
 } from "../estimates.api";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 
@@ -45,11 +46,11 @@ function normalizeRoof(roof: string): string {
   return r.replace(/\s+/g, "-") || "screw-down";
 }
 
-function normalizeScope(scope?: string): "supply" | "install" | "both" {
-  const s = (scope || "supply").toLowerCase();
-  if (s === "install") return "install";
-  if (s === "both") return "both";
-  return "supply";
+function normalizeScope(scope?: string): Scope {
+  const s = (scope || "Both").toLowerCase();
+  if (s === "supply") return "Supply";
+  if (s === "install") return "Install";
+  return "Both";
 }
 
 const tabs = [
