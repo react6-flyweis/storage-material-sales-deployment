@@ -264,7 +264,7 @@ export function QuoteSowTab({
         >
           Quote Preview →
         </Button>
-        <Button
+        {/* <Button
           type="button"
           variant="outline"
           onClick={handleDownloadSowPdf}
@@ -279,7 +279,7 @@ export function QuoteSowTab({
           ) : (
             <span>SOW Only (PDF)</span>
           )}
-        </Button>
+        </Button> */}
       </div>
     </div>
   );
