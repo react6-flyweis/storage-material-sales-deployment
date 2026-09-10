@@ -319,7 +319,7 @@ export function QuoteContractTab({
           >
             Quote Preview
           </Button>
-          <Button
+          {/* <Button
             type="button"
             onClick={handleGenerateFullPackage}
             disabled={isGeneratingPackage}
@@ -341,7 +341,7 @@ export function QuoteContractTab({
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : null}
             {isDownloadingContract ? "Downloading..." : "Contract Only (PDF)"}
-          </Button>
+          </Button> */}
         </div>
       </div>
 
