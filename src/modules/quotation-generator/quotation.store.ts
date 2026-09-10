@@ -2,12 +2,15 @@ import { create } from "zustand";
 import type {
   ExtractDrawingResponseData,
   ExtractShipperResponseData,
+  JobType,
+  Scope,
 } from "./estimates.api";
+import { DEFAULT_JOB_TYPE, DEFAULT_SCOPE } from "./estimates.api";
 
 export interface QuotationState {
   // Shared fields between Sidebar, Sticky Header, and Quotation Views
-  jobType: "PEMB" | "Storage";
-  scope: "Supply" | "Install" | "Both";
+  jobType: JobType;
+  scope: Scope;
   roofType: string;
   installCost: number;
   installSell: number;
@@ -83,8 +86,8 @@ export interface QuotationState {
   storageDrawings: Array<{ name: string; data: string; includeInPackage: boolean }>;
 
   // Actions
-  setJobType: (jobType: "PEMB" | "Storage") => void;
-  setScope: (scope: "Supply" | "Install" | "Both") => void;
+  setJobType: (jobType: JobType) => void;
+  setScope: (scope: Scope) => void;
   setRoofType: (roofType: string) => void;
   setInstallCost: (cost: number) => void;
   setInstallSell: (sell: number) => void;
@@ -178,8 +181,8 @@ export interface QuotationState {
 }
 
 export const useQuotationStore = create<QuotationState>((set) => ({
-  jobType: "PEMB",
-  scope: "Install",
+  jobType: DEFAULT_JOB_TYPE,
+  scope: DEFAULT_SCOPE,
   roofType: "screw-down",
   installCost: 5.5,
   installSell: 8.5,
