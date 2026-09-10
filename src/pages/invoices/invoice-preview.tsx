@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from "react-router";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Mail, Send, Edit } from "lucide-react";
 import {
@@ -28,6 +28,95 @@ export default function InvoicePreview() {
 
   const invoice = invoiceDetailResponse?.data.invoice;
   const paymentSchedule = invoiceDetailResponse?.data.paymentSchedule;
+
+  const timelineHistory = useMemo(() => {
+    if (!invoice) return undefined;
+    const rawHistory = invoice.approval?.history;
+    if (rawHistory && rawHistory.length > 0) {
+      const events = [...rawHistory];
+      if (
+        (invoice.sentAt || invoice.status === "sent") &&
+        !events.some(
+          (e) =>
+            e.status === "sent" ||
+            e.status === "marked_sent" ||
+            e.status === "sent_via_email",
+        )
+      ) {
+        events.push({
+          status: invoice.sendMethod === "manual" ? "marked_sent" : "sent",
+          at: invoice.sentAt || invoice.updatedAt || null,
+          by: invoice.createdBy || null,
+          note: invoice.sentMessage || undefined,
+          revision: invoice.approval?.approvedRevision ?? invoice.revision,
+        });
+      }
+      if (
+        (invoice.paidAt || invoice.status === "paid") &&
+        !events.some((e) => e.status === "paid")
+      ) {
+        events.push({
+          status: "paid",
+          at: invoice.paidAt || invoice.updatedAt || null,
+          by: invoice.paidBy || null,
+          revision: invoice.approval?.approvedRevision ?? invoice.revision,
+        });
+      }
+      return events;
+    }
+
+    // Fallback: build timeline items from approvalRequests if raw history is empty
+    const requests =
+      invoice.approvalRequests || invoice.approval?.approvalRequests;
+    if (requests && requests.length > 0) {
+      const fallback = [];
+      for (const req of requests) {
+        if (req.closedAt) {
+          fallback.push({
+            status: req.status || "approved",
+            at: req.closedAt,
+            by: req.reviewedBy || invoice.approval?.reviewedBy || null,
+            note: req.closedNote || undefined,
+            revision: req.revision,
+          });
+        }
+        if (req.submittedAt) {
+          fallback.push({
+            status: "pending_approval",
+            at: req.submittedAt,
+            by: req.submittedBy || invoice.approval?.submittedBy || null,
+            note: req.note || undefined,
+            revision: req.revision,
+          });
+        }
+      }
+      if (invoice.sentAt || invoice.status === "sent") {
+        fallback.push({
+          status: invoice.sendMethod === "manual" ? "marked_sent" : "sent",
+          at: invoice.sentAt || invoice.updatedAt || null,
+          by: invoice.createdBy || null,
+          note: invoice.sentMessage || undefined,
+          revision: invoice.approval?.approvedRevision ?? invoice.revision,
+        });
+      }
+      if (invoice.paidAt || invoice.status === "paid") {
+        fallback.push({
+          status: "paid",
+          at: invoice.paidAt || invoice.updatedAt || null,
+          by: invoice.paidBy || null,
+          revision: invoice.approval?.approvedRevision ?? invoice.revision,
+        });
+      }
+      fallback.sort((a, b) => {
+        const timeA = a.at ? new Date(a.at).getTime() : 0;
+        const timeB = b.at ? new Date(b.at).getTime() : 0;
+        return timeB - timeA;
+      });
+      return fallback;
+    }
+
+    return undefined;
+  }, [invoice]);
 
   if (!invoiceId) {
     return (
@@ -166,7 +255,11 @@ export default function InvoicePreview() {
         <InvoiceTemplate invoice={invoice} paymentSchedule={paymentSchedule} />
 
         {/* Approval History & Audit Trail */}
-        <ApprovalHistoryTimeline history={invoice.approval?.history} />
+        <ApprovalHistoryTimeline
+          history={timelineHistory}
+          approvalRequests={invoice.approvalRequests}
+          revision={invoice.revision}
+        />
       </div>
 
       {/* Submit for Approval Dialog */}
