@@ -1,4 +1,11 @@
-import { useState, useTransition, useEffect, useCallback, useRef, useMemo } from "react";
+import {
+  useState,
+  useTransition,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import { useNavigate, useLocation, useSearchParams } from "react-router";
 import {
   ArrowLeft,
@@ -27,7 +34,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useLeadsLookupQuery, useLeadDetailQuery } from "@/modules/leads/leads.hooks";
+import {
+  useLeadsLookupQuery,
+  useLeadDetailQuery,
+} from "@/modules/leads/leads.hooks";
 import { getLeadProjectName } from "@/modules/leads/leads.utils";
 import {
   extractStorageCogProvider,
@@ -103,7 +113,7 @@ export default function StorageQuotePage() {
         buildingSize?: string;
         squareFootage?: number;
       },
-    [location.state]
+    [location.state],
   );
 
   const {
@@ -163,20 +173,16 @@ export default function StorageQuotePage() {
     insulationRValueRoof,
 
     insulationRValueWalls,
-
   } = useQuotationStore();
 
   const storageData =
-    navState.storageData ||
-    (storeStorageData as StorageData | null) ||
-    null;
+    navState.storageData || (storeStorageData as StorageData | null) || null;
   const storagePricing =
     navState.storagePricing ||
     (storeStoragePricing as StoragePricing | null) ||
     null;
   const estimateId = navState.estimateId || storeStorageEstimateId || null;
-  const sourceFileName =
-    navState.sourceFileName || storeStorageFileName || "";
+  const sourceFileName = navState.sourceFileName || storeStorageFileName || "";
   const globalMarkup = storeGlobalMarkup ?? 0;
   const shippingVal = storeShipping ?? 0;
   const drawingsVal = storeDrawingsCost ?? 0;
@@ -190,8 +196,7 @@ export default function StorageQuotePage() {
     storeCustomerAddress ||
     storageData?.project?.location ||
     "";
-  const customerEmail =
-    navState.customerEmail || storeCustomerEmail || "";
+  const customerEmail = navState.customerEmail || storeCustomerEmail || "";
   const jobNumber =
     navState.jobNumber ||
     storeJobNumber ||
@@ -211,15 +216,26 @@ export default function StorageQuotePage() {
         setInstallSell(3.25);
       }
     }
-  }, [setJobType, setScope, installCost, installSell, setInstallCost, setInstallSell]);
+  }, [
+    setJobType,
+    setScope,
+    installCost,
+    installSell,
+    setInstallCost,
+    setInstallSell,
+  ]);
 
   useEffect(() => {
-    if (navState.storageData) setStorageData(navState.storageData as Record<string, unknown>);
-    if (navState.storagePricing) setStoragePricing(navState.storagePricing as Record<string, unknown>);
+    if (navState.storageData)
+      setStorageData(navState.storageData as Record<string, unknown>);
+    if (navState.storagePricing)
+      setStoragePricing(navState.storagePricing as Record<string, unknown>);
     if (navState.estimateId) setStorageEstimateId(navState.estimateId);
     if (navState.sourceFileName) setStorageFileName(navState.sourceFileName);
-    if (navState.customerLeadName) setStorageCustomerLeadName(navState.customerLeadName);
-    if (navState.customerAddress) setStorageCustomerAddress(navState.customerAddress);
+    if (navState.customerLeadName)
+      setStorageCustomerLeadName(navState.customerLeadName);
+    if (navState.customerAddress)
+      setStorageCustomerAddress(navState.customerAddress);
     if (navState.customerEmail) setStorageCustomerEmail(navState.customerEmail);
     if (navState.jobNumber) setStorageJobNumber(navState.jobNumber);
   }, [
@@ -255,15 +271,19 @@ export default function StorageQuotePage() {
   const [selectedLeadId, setSelectedLeadId] = useState<string>(initialLeadId);
 
   // Fetch leads lookup list
-  const { data: leadsLookupData, isLoading: isLeadsLoading } = useLeadsLookupQuery(undefined, 1, 100);
-  const leads = useMemo(() => leadsLookupData?.data?.leads || (Array.isArray(leadsLookupData?.data) ? leadsLookupData.data : []), [leadsLookupData]);
+  const { data: leadsLookupData, isLoading: isLeadsLoading } =
+    useLeadsLookupQuery(undefined, 1, 100);
+  const leads = useMemo(
+    () =>
+      leadsLookupData?.data?.leads ||
+      (Array.isArray(leadsLookupData?.data) ? leadsLookupData.data : []),
+    [leadsLookupData],
+  );
   const activeLeadId = selectedLeadId || leads[0]?._id || "";
 
   // Fetch detailed info for selected lead
-  const { data: leadDetailData, isLoading: isDetailLoading } = useLeadDetailQuery(
-    activeLeadId,
-    Boolean(activeLeadId)
-  );
+  const { data: leadDetailData, isLoading: isDetailLoading } =
+    useLeadDetailQuery(activeLeadId, Boolean(activeLeadId));
 
   const handleLeadChange = (leadId: string) => {
     setSelectedLeadId(leadId);
@@ -275,7 +295,8 @@ export default function StorageQuotePage() {
         lookupItem.projectName ||
         "";
       if (name) setCustomerLeadName(name);
-      if (lookupItem.customerId?.email) setCustomerEmail(lookupItem.customerId.email);
+      if (lookupItem.customerId?.email)
+        setCustomerEmail(lookupItem.customerId.email);
       if (lookupItem.location) setCustomerAddress(lookupItem.location);
       if (lookupItem.jobId) setJobNumber(lookupItem.jobId);
 
@@ -292,7 +313,9 @@ export default function StorageQuotePage() {
         sqft = Number(lookupItem.width) * Number(lookupItem.length);
       }
       if (!sqft && bSize) {
-        const match = bSize.toLowerCase().match(/(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/);
+        const match = bSize
+          .toLowerCase()
+          .match(/(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/);
         if (match) sqft = parseFloat(match[1]) * parseFloat(match[2]);
       }
       if (sqft > 0) setSquareFootage(sqft);
@@ -312,7 +335,7 @@ export default function StorageQuotePage() {
           buildingType: lead?.buildingType,
           location: lead?.location,
         },
-        customer ? { firstName: customer.firstName } : null
+        customer ? { firstName: customer.firstName } : null,
       ) ||
       customer?.firstName ||
       lookupItem?.projectName ||
@@ -335,7 +358,9 @@ export default function StorageQuotePage() {
     }
 
     if (!sqft && bSize) {
-      const match = bSize.toLowerCase().match(/(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/);
+      const match = bSize
+        .toLowerCase()
+        .match(/(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/);
       if (match) sqft = parseFloat(match[1]) * parseFloat(match[2]);
     }
 
@@ -345,7 +370,17 @@ export default function StorageQuotePage() {
     if (lead?.jobId) setJobNumber(lead.jobId);
     if (bSize) setBuildingSize(bSize);
     if (sqft > 0) setSquareFootage(sqft);
-  }, [selectedLeadId, leadDetailData, leads, setCustomerLeadName, setCustomerEmail, setCustomerAddress, setJobNumber, setBuildingSize, setSquareFootage]);
+  }, [
+    selectedLeadId,
+    leadDetailData,
+    leads,
+    setCustomerLeadName,
+    setCustomerEmail,
+    setCustomerAddress,
+    setJobNumber,
+    setBuildingSize,
+    setSquareFootage,
+  ]);
 
   const [activeTab, setActiveTab] = useState<
     | "breakdown"
@@ -382,8 +417,10 @@ export default function StorageQuotePage() {
             extras: currentStorageData.extras || [],
             shipping: shippingVal,
             drawings: drawingsVal,
-            installSellPerSf: scope.toLowerCase() === "supply" ? 0 : installSell,
-            installCostPerSf: scope.toLowerCase() === "supply" ? 0 : installCost,
+            installSellPerSf:
+              scope.toLowerCase() === "supply" ? 0 : installSell,
+            installCostPerSf:
+              scope.toLowerCase() === "supply" ? 0 : installCost,
           },
           concrete: {
             include: concreteInclude,
@@ -437,7 +474,7 @@ export default function StorageQuotePage() {
       taxRate,
       includeTax,
       setStoragePricing,
-    ]
+    ],
   );
 
   // Debounced API computation trigger when inputs change
@@ -457,7 +494,10 @@ export default function StorageQuotePage() {
   const handleFileUpload = async (file: File) => {
     if (!file) return;
     setIsUploading(true);
-    setFeedbackMsg({ type: "info", text: `Uploading and extracting ${file.name} via backend API...` });
+    setFeedbackMsg({
+      type: "info",
+      text: `Uploading and extracting ${file.name} via backend API...`,
+    });
 
     try {
       const base64 = await fileToBase64(file);
@@ -490,7 +530,8 @@ export default function StorageQuotePage() {
           cogs,
           cost: cogs,
           markup,
-          sellPrice: Number(b.sellPrice) || Math.round(cogs * (1 + markup / 100)),
+          sellPrice:
+            Number(b.sellPrice) || Math.round(cogs * (1 + markup / 100)),
           roofType: String(b.roofType || "screw-down"),
           wallPanel: String(b.wallPanel || b.wallColor || "26ga R-Loc"),
           roofPanel: String(b.roofPanel || "26ga Galvalume"),
@@ -499,53 +540,66 @@ export default function StorageQuotePage() {
         };
       });
 
-      const doorsList: StorageDoorItem[] = (
-        responsePayload.doors || []
-      ).map((d: Record<string, unknown>) => {
-        const qty = Number(d.qty || d.quantity || d.count || 0);
-        const unitCost = Number(d.unitCost || d.costPerUnit || 0);
-        const cogs = Number(d.cogs || d.totalCost || qty * unitCost);
-        const markup = Number(d.markup ?? 25);
-        return {
-          type: String(d.type || "Trac-Rite"),
-          size: String(d.size || "8' x 7'"),
-          unitCost,
-          costPerUnit: unitCost,
-          qty,
-          quantity: qty,
-          count: qty,
-          cogs,
-          totalCost: cogs,
-          markup,
-          sale: Number(d.sale || d.totalSell) || Math.round(cogs * (1 + markup / 100)),
-          sellPerUnit: Number(d.sellPerUnit) || Math.round(unitCost * (1 + markup / 100)),
-          totalSell: Number(d.sale || d.totalSell) || Math.round(cogs * (1 + markup / 100)),
-          color: String(d.color || "Standard"),
-        };
-      });
+      const doorsList: StorageDoorItem[] = (responsePayload.doors || []).map(
+        (d: Record<string, unknown>) => {
+          const qty = Number(d.qty || d.quantity || d.count || 0);
+          const unitCost = Number(d.unitCost || d.costPerUnit || 0);
+          const cogs = Number(d.cogs || d.totalCost || qty * unitCost);
+          const markup = Number(d.markup ?? 25);
+          return {
+            type: String(d.type || "Trac-Rite"),
+            size: String(d.size || "8' x 7'"),
+            unitCost,
+            costPerUnit: unitCost,
+            qty,
+            quantity: qty,
+            count: qty,
+            cogs,
+            totalCost: cogs,
+            markup,
+            sale:
+              Number(d.sale || d.totalSell) ||
+              Math.round(cogs * (1 + markup / 100)),
+            sellPerUnit:
+              Number(d.sellPerUnit) ||
+              Math.round(unitCost * (1 + markup / 100)),
+            totalSell:
+              Number(d.sale || d.totalSell) ||
+              Math.round(cogs * (1 + markup / 100)),
+            color: String(d.color || "Standard"),
+          };
+        },
+      );
 
-      const extrasList: StorageExtraItem[] = (
-        responsePayload.extras || []
-      ).map((x: Record<string, unknown>) => {
-        const cogs = Number(x.cogs || x.cost || 0);
-        const markup = Number(x.markup ?? 25);
-        return {
-          name: String(x.name || x.item || "Extra Item"),
-          item: String(x.item || x.name || "Extra Item"),
-          cogs,
-          cost: cogs,
-          markup,
-          sale: Number(x.sale || x.sellPrice) || Math.round(cogs * (1 + markup / 100)),
-          sellPrice: Number(x.sale || x.sellPrice) || Math.round(cogs * (1 + markup / 100)),
-          note: String(x.note || ""),
-          include: x.include !== false,
-        };
-      });
+      const extrasList: StorageExtraItem[] = (responsePayload.extras || []).map(
+        (x: Record<string, unknown>) => {
+          const cogs = Number(x.cogs || x.cost || 0);
+          const markup = Number(x.markup ?? 25);
+          return {
+            name: String(x.name || x.item || "Extra Item"),
+            item: String(x.item || x.name || "Extra Item"),
+            cogs,
+            cost: cogs,
+            markup,
+            sale:
+              Number(x.sale || x.sellPrice) ||
+              Math.round(cogs * (1 + markup / 100)),
+            sellPrice:
+              Number(x.sale || x.sellPrice) ||
+              Math.round(cogs * (1 + markup / 100)),
+            note: String(x.note || ""),
+            include: x.include !== false,
+          };
+        },
+      );
 
       const shipVal =
         typeof responsePayload.shippingDefault === "number"
           ? responsePayload.shippingDefault
-          : Number((responsePayload.shippingDefault as Record<string, unknown>)?.freightCost) || 0;
+          : Number(
+              (responsePayload.shippingDefault as Record<string, unknown>)
+                ?.freightCost,
+            ) || 0;
       setShippingVal(shipVal);
 
       const proj = responsePayload.project || {};
@@ -611,10 +665,10 @@ export default function StorageQuotePage() {
       const rateVal =
         typeof data === "number"
           ? data
-          : (data as { rate?: number; taxRate?: number })?.rate ??
-          (data as { rate?: number; taxRate?: number })?.taxRate ??
-          res.rate ??
-          0;
+          : ((data as { rate?: number; taxRate?: number })?.rate ??
+            (data as { rate?: number; taxRate?: number })?.taxRate ??
+            res.rate ??
+            0);
 
       setTaxRate(rateVal);
       setFeedbackMsg({
@@ -640,9 +694,16 @@ export default function StorageQuotePage() {
         _id: estimateId || undefined,
         leadId: selectedLeadId || activeLeadId || undefined,
         jobType: "Storage",
-        scope: scope.toLowerCase() === "supply" ? "Supply" : scope.toLowerCase() === "install" ? "Install" : "Both",
+        scope:
+          scope.toLowerCase() === "supply"
+            ? "Supply"
+            : scope.toLowerCase() === "install"
+              ? "Install"
+              : "Both",
         leadCompanyName:
-          customerLeadName || storageData?.project?.customer || "Storage Project",
+          customerLeadName ||
+          storageData?.project?.customer ||
+          "Storage Project",
         customerEmail,
         streetAddress: customerAddress,
         cityStateZip: customerAddress,
@@ -680,14 +741,13 @@ export default function StorageQuotePage() {
 
       const res = await saveEstimateProvider(payload, estimateId || undefined);
       const data = res.data || res;
-      const savedId = data?.estimate?._id || data?._id;
+      const savedId = data?.estimate?._id || data?._id || estimateId;
       if (savedId) {
         setStorageEstimateId(savedId);
+        navigate(`/quotation/history/${savedId}`);
+        return;
       }
-      setFeedbackMsg({
-        type: "success",
-        text: "✓ Storage estimate draft saved to database successfully!",
-      });
+      navigate("/quotation/history");
     } catch (err) {
       console.error("Failed to save storage estimate:", err);
       setFeedbackMsg({ type: "error", text: "Failed to save draft." });
@@ -716,7 +776,7 @@ export default function StorageQuotePage() {
   const handleUpdateBuilding = (
     index: number,
     field: keyof StorageBuildingItem,
-    value: string | number
+    value: string | number,
   ) => {
     if (!storageData?.buildings) return;
     const updated = [...storageData.buildings];
@@ -734,7 +794,12 @@ export default function StorageQuotePage() {
       b.cogs = psf * sqft;
       b.cost = psf * sqft;
     }
-    if (field === "markup" || field === "cost" || field === "cogs" || field === "psf") {
+    if (
+      field === "markup" ||
+      field === "cost" ||
+      field === "cogs" ||
+      field === "psf"
+    ) {
       const cogs = Number(b.cost || b.cogs || 0);
       const mu = Number(b.markup ?? 25);
       b.sellPrice = Math.round(cogs * (1 + mu / 100));
@@ -785,7 +850,7 @@ export default function StorageQuotePage() {
   const handleUpdateDoor = (
     index: number,
     field: keyof StorageDoorItem,
-    value: string | number
+    value: string | number,
   ) => {
     if (!storageData?.doors) return;
     const updated = [...storageData.doors];
@@ -839,7 +904,7 @@ export default function StorageQuotePage() {
   const handleUpdateExtra = (
     index: number,
     field: keyof StorageExtraItem,
-    value: string | number | boolean
+    value: string | number | boolean,
   ) => {
     if (!storageData?.extras) return;
     const updated = [...storageData.extras];
@@ -894,8 +959,8 @@ export default function StorageQuotePage() {
               });
             };
             reader.readAsDataURL(file);
-          }
-        )
+          },
+        ),
     );
 
     Promise.all(promises).then((newDrawings) => {
@@ -948,16 +1013,30 @@ export default function StorageQuotePage() {
         acc +
         (Number(b.sqft || b.squareFootage) ||
           Number(b.width || 0) * Number(b.length || 0)),
-      0
+      0,
     );
-  const grandTotal = Number(storagePricing?.grandTotal || storagePricing?.totSell || storagePricing?.totalSell || 0);
-  const totalCost = Number(storagePricing?.totalCost || storagePricing?.totCost || 0);
+  const grandTotal = Number(
+    storagePricing?.grandTotal ||
+      storagePricing?.totSell ||
+      storagePricing?.totalSell ||
+      0,
+  );
+  const totalCost = Number(
+    storagePricing?.totalCost || storagePricing?.totCost || 0,
+  );
   const totalProfit = Number(storagePricing?.profit || grandTotal - totalCost);
-  const marginPct = Number(storagePricing?.marginPercent || (grandTotal > 0 ? (totalProfit / grandTotal) * 100 : 0));
-  const sfPrice = Number(storagePricing?.pricePerSf || storagePricing?.sfPrice || (totalSqFt > 0 ? grandTotal / totalSqFt : 0));
+  const marginPct = Number(
+    storagePricing?.marginPercent ||
+      (grandTotal > 0 ? (totalProfit / grandTotal) * 100 : 0),
+  );
+  const sfPrice = Number(
+    storagePricing?.pricePerSf ||
+      storagePricing?.sfPrice ||
+      (totalSqFt > 0 ? grandTotal / totalSqFt : 0),
+  );
   const totalDoorsCount = doors.reduce(
     (acc, d) => acc + Number(d.qty || d.quantity || d.count || 0),
-    0
+    0,
   );
 
   const laborProfit = installSell - installCost;
@@ -967,15 +1046,15 @@ export default function StorageQuotePage() {
     scope.toLowerCase() === "supply"
       ? 0
       : Number(
-        storagePricing?.labor ??
-        storagePricing?.installation ??
-        storagePricing?.instSell ??
-        storagePricing?.installSell ??
-        storagePricing?.erection ??
-        storagePricing?.erectionSell ??
-        storagePricing?.laborSell ??
-        totalSqFt * installSell
-      );
+          storagePricing?.labor ??
+            storagePricing?.installation ??
+            storagePricing?.instSell ??
+            storagePricing?.installSell ??
+            storagePricing?.erection ??
+            storagePricing?.erectionSell ??
+            storagePricing?.laborSell ??
+            totalSqFt * installSell,
+        );
 
   const storageBasePayload: PreviewDocumentRequest = useMemo(
     () => ({
@@ -985,16 +1064,17 @@ export default function StorageQuotePage() {
         (scope || "Both").toLowerCase() === "supply"
           ? "Supply"
           : (scope || "Both").toLowerCase() === "install"
-          ? "Install"
-          : "Both",
+            ? "Install"
+            : "Both",
       leadCompanyName: customerLeadName || "Customer",
       customerEmail,
       streetAddress: customerAddress,
       cityStateZip: customerAddress,
       jobNumber: jobNumber || "8098",
       buildingSize:
-        storageData?.buildings?.map((b) => `${b.width}x${b.length}`).join(", ") ||
-        "Storage Complex",
+        storageData?.buildings
+          ?.map((b) => `${b.width}x${b.length}`)
+          .join(", ") || "Storage Complex",
       squareFootage:
         Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) ||
         storageData?.buildings?.reduce(
@@ -1002,7 +1082,7 @@ export default function StorageQuotePage() {
             acc +
             (Number(b.sqft || b.squareFootage) ||
               Number(b.width || 0) * Number(b.length || 0)),
-          0
+          0,
         ) ||
         0,
       sf:
@@ -1012,7 +1092,7 @@ export default function StorageQuotePage() {
             acc +
             (Number(b.sqft || b.squareFootage) ||
               Number(b.width || 0) * Number(b.length || 0)),
-          0
+          0,
         ) ||
         0,
       pricingResult: storagePricing as Record<string, unknown>,
@@ -1061,7 +1141,7 @@ export default function StorageQuotePage() {
       includeTax,
       taxRate,
       grandTotal,
-    ]
+    ],
   );
 
   const quotePreviewPayload: PreviewDocumentRequest = useMemo(
@@ -1069,7 +1149,7 @@ export default function StorageQuotePage() {
       ...storageBasePayload,
       sections: ["quote"],
     }),
-    [storageBasePayload]
+    [storageBasePayload],
   );
 
   const sowPreviewPayload: PreviewDocumentRequest = useMemo(
@@ -1077,7 +1157,7 @@ export default function StorageQuotePage() {
       ...storageBasePayload,
       sections: ["sow"],
     }),
-    [storageBasePayload]
+    [storageBasePayload],
   );
 
   const contractPreviewPayload: PreviewDocumentRequest = useMemo(
@@ -1085,7 +1165,7 @@ export default function StorageQuotePage() {
       ...storageBasePayload,
       sections: ["contract"],
     }),
-    [storageBasePayload]
+    [storageBasePayload],
   );
 
   const {
@@ -1176,12 +1256,13 @@ export default function StorageQuotePage() {
       {/* Feedback Alert */}
       {feedbackMsg && (
         <div
-          className={`p-3 rounded-lg text-xs flex items-center justify-between border ${feedbackMsg.type === "success"
-            ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-            : feedbackMsg.type === "error"
-              ? "bg-red-50 border-red-200 text-red-800"
-              : "bg-blue-50 border-blue-200 text-blue-800"
-            }`}
+          className={`p-3 rounded-lg text-xs flex items-center justify-between border ${
+            feedbackMsg.type === "success"
+              ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+              : feedbackMsg.type === "error"
+                ? "bg-red-50 border-red-200 text-red-800"
+                : "bg-blue-50 border-blue-200 text-blue-800"
+          }`}
         >
           <div className="flex items-center gap-2">
             {feedbackMsg.type === "success" && (
@@ -1303,10 +1384,7 @@ export default function StorageQuotePage() {
               </SelectTrigger>
               <SelectContent>
                 {leads.map((lead) => {
-                  const label = getLeadProjectName(
-                    lead,
-                    lead.customerId
-                  );
+                  const label = getLeadProjectName(lead, lead.customerId);
                   return (
                     <SelectItem key={lead._id} value={lead._id}>
                       {label} (
@@ -1334,7 +1412,8 @@ export default function StorageQuotePage() {
                 Customer & Project Information{" "}
                 {isDetailLoading ? (
                   <span className="text-blue-600 font-normal text-sm flex items-center gap-1">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Fetching details...
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Fetching
+                    details...
                   </span>
                 ) : (
                   <span className="text-blue-600 font-normal text-sm">
@@ -1343,7 +1422,8 @@ export default function StorageQuotePage() {
                 )}
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Customer details auto-populate Quote, Statement of Work & Contract documents
+                Customer details auto-populate Quote, Statement of Work &
+                Contract documents
               </p>
             </div>
           </div>
@@ -1403,13 +1483,20 @@ export default function StorageQuotePage() {
                 Building Size
               </label>
               <Input
-                value={storeBuildingSize || (navState.buildingSize as string) || (buildings.length > 0 ? `${buildings.length} Buildings` : "")}
+                value={
+                  storeBuildingSize ||
+                  (navState.buildingSize as string) ||
+                  (buildings.length > 0 ? `${buildings.length} Buildings` : "")
+                }
                 onChange={(e) => {
                   const val = e.target.value;
                   setBuildingSize(val);
-                  const match = val.toLowerCase().match(/(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/);
+                  const match = val
+                    .toLowerCase()
+                    .match(/(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/);
                   if (match) {
-                    const computed = parseFloat(match[1]) * parseFloat(match[2]);
+                    const computed =
+                      parseFloat(match[1]) * parseFloat(match[2]);
                     if (computed > 0) setSquareFootage(computed);
                   }
                 }}
@@ -1423,7 +1510,15 @@ export default function StorageQuotePage() {
                 Square Footage
               </label>
               <Input
-                value={totalSqFt > 0 ? String(totalSqFt) : storeSquareFootage > 0 ? String(storeSquareFootage) : (navState.squareFootage ? String(navState.squareFootage) : "")}
+                value={
+                  totalSqFt > 0
+                    ? String(totalSqFt)
+                    : storeSquareFootage > 0
+                      ? String(storeSquareFootage)
+                      : navState.squareFootage
+                        ? String(navState.squareFootage)
+                        : ""
+                }
                 onChange={(e) => setSquareFootage(Number(e.target.value) || 0)}
                 placeholder="e.g. 4000"
                 className="h-9 text-xs bg-slate-50"
@@ -1470,7 +1565,6 @@ export default function StorageQuotePage() {
               <h3 className="text-sm font-bold text-slate-900">
                 Step 1 — Upload COG Sheet Excel
               </h3>
-
             </div>
           </div>
           {sourceFileName && (
@@ -1485,10 +1579,13 @@ export default function StorageQuotePage() {
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();
-            if (e.dataTransfer.files?.[0]) handleFileUpload(e.dataTransfer.files[0]);
+            if (e.dataTransfer.files?.[0])
+              handleFileUpload(e.dataTransfer.files[0]);
           }}
           className="border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-xl p-6 text-center bg-slate-50/60 hover:bg-blue-50/30 transition-colors flex flex-col items-center justify-center cursor-pointer"
-          onClick={() => document.getElementById("storage-cog-file-input")?.click()}
+          onClick={() =>
+            document.getElementById("storage-cog-file-input")?.click()
+          }
         >
           <input
             id="storage-cog-file-input"
@@ -1530,14 +1627,14 @@ export default function StorageQuotePage() {
             onValueChange={(val) =>
               setActiveTab(
                 val as
-                | "breakdown"
-                | "quote"
-                | "sow"
-                | "margin"
-                | "concrete"
-                | "insulation"
-                | "drawings"
-                | "contract"
+                  | "breakdown"
+                  | "quote"
+                  | "sow"
+                  | "margin"
+                  | "concrete"
+                  | "insulation"
+                  | "drawings"
+                  | "contract",
               )
             }
             className="w-full space-y-6"
@@ -1577,7 +1674,8 @@ export default function StorageQuotePage() {
                         Add Building
                       </Button>
                       <span className="text-xs font-bold bg-blue-100 text-blue-900 px-3 py-1 rounded-full">
-                        {buildings.length} bldgs · {totalSqFt.toLocaleString()} SF
+                        {buildings.length} bldgs · {totalSqFt.toLocaleString()}{" "}
+                        SF
                       </span>
                     </div>
                   </div>
@@ -1607,14 +1705,19 @@ export default function StorageQuotePage() {
                           const bSqft = Number(b.sqft || 0);
                           const bCogs = Number(b.cost || b.cogs || 0);
                           const bSell = Number(b.sellPrice || 0);
-                          const psf = bSqft > 0 ? (bCogs / bSqft).toFixed(2) : "0.00";
+                          const psf =
+                            bSqft > 0 ? (bCogs / bSqft).toFixed(2) : "0.00";
                           return (
                             <tr key={idx} className="hover:bg-slate-50/50">
                               <td className="p-2">
                                 <Input
                                   value={b.name || ""}
                                   onChange={(e) =>
-                                    handleUpdateBuilding(idx, "name", e.target.value)
+                                    handleUpdateBuilding(
+                                      idx,
+                                      "name",
+                                      e.target.value,
+                                    )
                                   }
                                   className="h-8 w-24 text-xs font-semibold"
                                 />
@@ -1627,7 +1730,7 @@ export default function StorageQuotePage() {
                                     handleUpdateBuilding(
                                       idx,
                                       "width",
-                                      parseFloat(e.target.value) || 0
+                                      parseFloat(e.target.value) || 0,
                                     )
                                   }
                                   className="h-8 w-16 text-right text-xs"
@@ -1641,7 +1744,7 @@ export default function StorageQuotePage() {
                                     handleUpdateBuilding(
                                       idx,
                                       "length",
-                                      parseFloat(e.target.value) || 0
+                                      parseFloat(e.target.value) || 0,
                                     )
                                   }
                                   className="h-8 w-16 text-right text-xs"
@@ -1650,12 +1753,16 @@ export default function StorageQuotePage() {
                               <td className="p-2 text-right">
                                 <Input
                                   type="number"
-                                  value={b.loEave !== undefined ? b.loEave : (b.eaveHeight || "")}
+                                  value={
+                                    b.loEave !== undefined
+                                      ? b.loEave
+                                      : b.eaveHeight || ""
+                                  }
                                   onChange={(e) =>
                                     handleUpdateBuilding(
                                       idx,
                                       "loEave",
-                                      parseFloat(e.target.value) || 0
+                                      parseFloat(e.target.value) || 0,
                                     )
                                   }
                                   className="h-8 w-14 text-right text-xs"
@@ -1664,12 +1771,16 @@ export default function StorageQuotePage() {
                               <td className="p-2 text-right">
                                 <Input
                                   type="number"
-                                  value={b.hiEave !== undefined ? b.hiEave : (b.loEave || "")}
+                                  value={
+                                    b.hiEave !== undefined
+                                      ? b.hiEave
+                                      : b.loEave || ""
+                                  }
                                   onChange={(e) =>
                                     handleUpdateBuilding(
                                       idx,
                                       "hiEave",
-                                      parseFloat(e.target.value) || 0
+                                      parseFloat(e.target.value) || 0,
                                     )
                                   }
                                   className="h-8 w-14 text-right text-xs"
@@ -1679,7 +1790,11 @@ export default function StorageQuotePage() {
                                 <Input
                                   value={b.slope || b.roofPitch || "0.5:12"}
                                   onChange={(e) =>
-                                    handleUpdateBuilding(idx, "slope", e.target.value)
+                                    handleUpdateBuilding(
+                                      idx,
+                                      "slope",
+                                      e.target.value,
+                                    )
                                   }
                                   className="h-8 w-18 text-xs"
                                 />
@@ -1699,7 +1814,7 @@ export default function StorageQuotePage() {
                                     handleUpdateBuilding(
                                       idx,
                                       "psf",
-                                      parseFloat(e.target.value) || 0
+                                      parseFloat(e.target.value) || 0,
                                     )
                                   }
                                   className="h-8 w-18 text-right text-xs"
@@ -1713,7 +1828,7 @@ export default function StorageQuotePage() {
                                     handleUpdateBuilding(
                                       idx,
                                       "markup",
-                                      parseFloat(e.target.value) || 0
+                                      parseFloat(e.target.value) || 0,
                                     )
                                   }
                                   className="h-8 w-16 text-right text-xs font-bold text-emerald-700"
@@ -1723,18 +1838,26 @@ export default function StorageQuotePage() {
                                 {fmt(bSell)}
                               </td>
                               <td className="p-2 text-slate-600 font-medium">
-                                {String(b.wallPanel || b.wallColor || "26ga R-Loc")}
+                                {String(
+                                  b.wallPanel || b.wallColor || "26ga R-Loc",
+                                )}
                               </td>
                               <td className="p-2">
                                 <select
                                   value={b.roofType || "screw-down"}
                                   onChange={(e) =>
-                                    handleUpdateBuilding(idx, "roofType", e.target.value)
+                                    handleUpdateBuilding(
+                                      idx,
+                                      "roofType",
+                                      e.target.value,
+                                    )
                                   }
                                   className="h-8 rounded border border-slate-200 bg-white px-2 text-xs"
                                 >
                                   <option value="screw-down">Screw-Down</option>
-                                  <option value="standing-seam">Standing Seam</option>
+                                  <option value="standing-seam">
+                                    Standing Seam
+                                  </option>
                                   <option value="r-panel">R-Panel</option>
                                   <option value="galvalume">Galvalume</option>
                                 </select>
@@ -1756,9 +1879,15 @@ export default function StorageQuotePage() {
                         <tr className="bg-slate-50 font-bold border-t-2 border-slate-200">
                           <td className="p-2.5">Totals</td>
                           <td colSpan={5}></td>
-                          <td className="p-2.5 text-right">{totalSqFt.toLocaleString()} SF</td>
+                          <td className="p-2.5 text-right">
+                            {totalSqFt.toLocaleString()} SF
+                          </td>
                           <td className="p-2.5 text-right text-amber-700">
-                            {fmt(storagePricing?.buildingsSubtotal ? (storagePricing.buildingsSubtotal * 0.8) : 0)}
+                            {fmt(
+                              storagePricing?.buildingsSubtotal
+                                ? storagePricing.buildingsSubtotal * 0.8
+                                : 0,
+                            )}
                           </td>
                           <td></td>
                           <td></td>
@@ -1785,7 +1914,9 @@ export default function StorageQuotePage() {
                         min="0"
                         max="80"
                         value={globalMarkup}
-                        onChange={(e) => setGlobalMarkup(parseInt(e.target.value))}
+                        onChange={(e) =>
+                          setGlobalMarkup(parseInt(e.target.value))
+                        }
                         className="w-full accent-blue-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
                       />
                       <span className="text-sm font-bold text-blue-900 w-12 text-right">
@@ -1815,7 +1946,9 @@ export default function StorageQuotePage() {
                     <div className="space-y-1">
                       <div className="flex justify-between text-[11px] text-slate-600 font-semibold">
                         <span>Cost $/SF:</span>
-                        <span className="text-amber-700 font-bold">${installCost.toFixed(2)}</span>
+                        <span className="text-amber-700 font-bold">
+                          ${installCost.toFixed(2)}
+                        </span>
                       </div>
                       <input
                         type="range"
@@ -1823,14 +1956,18 @@ export default function StorageQuotePage() {
                         max="12"
                         step="0.25"
                         value={installCost}
-                        onChange={(e) => setInstallCost(parseFloat(e.target.value))}
+                        onChange={(e) =>
+                          setInstallCost(parseFloat(e.target.value))
+                        }
                         className="w-full accent-amber-500 cursor-pointer h-2 bg-slate-200 rounded-lg"
                       />
                     </div>
                     <div className="space-y-1">
                       <div className="flex justify-between text-[11px] text-slate-600 font-semibold">
                         <span>Sell $/SF:</span>
-                        <span className="text-emerald-700 font-bold">${installSell.toFixed(2)}</span>
+                        <span className="text-emerald-700 font-bold">
+                          ${installSell.toFixed(2)}
+                        </span>
                       </div>
                       <input
                         type="range"
@@ -1838,19 +1975,28 @@ export default function StorageQuotePage() {
                         max="15"
                         step="0.25"
                         value={installSell}
-                        onChange={(e) => setInstallSell(parseFloat(e.target.value))}
+                        onChange={(e) =>
+                          setInstallSell(parseFloat(e.target.value))
+                        }
                         className="w-full accent-emerald-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
                       />
                     </div>
                     <div className="p-2 bg-white/80 rounded text-[11px] font-bold text-emerald-700 border border-emerald-100 flex justify-between items-center">
                       <div>
                         <span>Labor Total: </span>
-                        <span className="text-emerald-900 font-extrabold">{fmt(laborSellTotal)}</span>
+                        <span className="text-emerald-900 font-extrabold">
+                          {fmt(laborSellTotal)}
+                        </span>
                       </div>
                       {scope === "Supply" ? (
-                        <span className="text-slate-500 font-normal">Excluded (Supply Only)</span>
+                        <span className="text-slate-500 font-normal">
+                          Excluded (Supply Only)
+                        </span>
                       ) : (
-                        <span>${laborProfit.toFixed(2)}/SF ({laborMarginPct.toFixed(1)}%)</span>
+                        <span>
+                          ${laborProfit.toFixed(2)}/SF (
+                          {laborMarginPct.toFixed(1)}%)
+                        </span>
                       )}
                     </div>
                   </Card>
@@ -1867,7 +2013,9 @@ export default function StorageQuotePage() {
                       <Input
                         type="number"
                         value={shippingVal}
-                        onChange={(e) => setShippingVal(parseFloat(e.target.value) || 0)}
+                        onChange={(e) =>
+                          setShippingVal(parseFloat(e.target.value) || 0)
+                        }
                         className="h-8 text-xs bg-slate-50 font-bold"
                       />
                     </div>
@@ -1878,7 +2026,9 @@ export default function StorageQuotePage() {
                       <Input
                         type="number"
                         value={drawingsVal}
-                        onChange={(e) => setDrawingsVal(parseFloat(e.target.value) || 0)}
+                        onChange={(e) =>
+                          setDrawingsVal(parseFloat(e.target.value) || 0)
+                        }
                         className="h-8 text-xs bg-slate-50 font-bold"
                       />
                     </div>
@@ -1898,16 +2048,24 @@ export default function StorageQuotePage() {
                           disabled={isTaxLookingUp}
                           className="h-7 px-2 text-[11px] font-bold cursor-pointer shrink-0"
                         >
-                          {isTaxLookingUp ? <Loader2 className="h-3 w-3 animate-spin" /> : "Lookup"}
+                          {isTaxLookingUp ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            "Lookup"
+                          )}
                         </Button>
                         <Input
                           type="number"
                           step="0.25"
                           value={taxRate}
-                          onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
+                          onChange={(e) =>
+                            setTaxRate(parseFloat(e.target.value) || 0)
+                          }
                           className="h-7 text-xs flex-1 font-bold"
                         />
-                        <span className="text-xs text-slate-500 font-bold">%</span>
+                        <span className="text-xs text-slate-500 font-bold">
+                          %
+                        </span>
                       </div>
                       <label className="flex items-center gap-1.5 text-[11px] font-semibold text-blue-900 cursor-pointer">
                         <input
@@ -1931,7 +2089,8 @@ export default function StorageQuotePage() {
                         {fmt(grandTotal)}
                       </div>
                       <div className="text-[11px] text-blue-200 mt-1 font-medium leading-tight">
-                        {fmtDec(sfPrice)}/SF · {totalSqFt.toLocaleString()} total SF
+                        {fmtDec(sfPrice)}/SF · {totalSqFt.toLocaleString()}{" "}
+                        total SF
                       </div>
                     </div>
                     <div className="pt-2 border-t border-white/20 mt-2">
@@ -1982,8 +2141,12 @@ export default function StorageQuotePage() {
                       <tbody className="divide-y divide-slate-100 text-slate-700">
                         {doors.map((d, idx) => {
                           const qty = Number(d.qty || d.quantity || 0);
-                          const uCost = Number(d.unitCost || d.costPerUnit || 0);
-                          const cogsTot = Number(d.cogs || d.totalCost || qty * uCost);
+                          const uCost = Number(
+                            d.unitCost || d.costPerUnit || 0,
+                          );
+                          const cogsTot = Number(
+                            d.cogs || d.totalCost || qty * uCost,
+                          );
                           const saleTot = Number(d.sale || d.totalSell || 0);
                           return (
                             <tr key={idx} className="hover:bg-slate-50/50">
@@ -1991,7 +2154,11 @@ export default function StorageQuotePage() {
                                 <Input
                                   value={d.type || ""}
                                   onChange={(e) =>
-                                    handleUpdateDoor(idx, "type", e.target.value)
+                                    handleUpdateDoor(
+                                      idx,
+                                      "type",
+                                      e.target.value,
+                                    )
                                   }
                                   className="h-8 w-32 text-xs"
                                 />
@@ -2000,7 +2167,11 @@ export default function StorageQuotePage() {
                                 <Input
                                   value={d.size || ""}
                                   onChange={(e) =>
-                                    handleUpdateDoor(idx, "size", e.target.value)
+                                    handleUpdateDoor(
+                                      idx,
+                                      "size",
+                                      e.target.value,
+                                    )
                                   }
                                   className="h-8 w-24 text-xs font-bold"
                                 />
@@ -2008,12 +2179,16 @@ export default function StorageQuotePage() {
                               <td className="p-2 text-right">
                                 <Input
                                   type="number"
-                                  value={d.unitCost !== undefined ? d.unitCost : (d.costPerUnit || "")}
+                                  value={
+                                    d.unitCost !== undefined
+                                      ? d.unitCost
+                                      : d.costPerUnit || ""
+                                  }
                                   onChange={(e) =>
                                     handleUpdateDoor(
                                       idx,
                                       "unitCost",
-                                      parseFloat(e.target.value) || 0
+                                      parseFloat(e.target.value) || 0,
                                     )
                                   }
                                   className="h-8 w-20 text-right text-xs"
@@ -2022,12 +2197,16 @@ export default function StorageQuotePage() {
                               <td className="p-2 text-right">
                                 <Input
                                   type="number"
-                                  value={d.qty !== undefined ? d.qty : (d.quantity || "")}
+                                  value={
+                                    d.qty !== undefined
+                                      ? d.qty
+                                      : d.quantity || ""
+                                  }
                                   onChange={(e) =>
                                     handleUpdateDoor(
                                       idx,
                                       "qty",
-                                      parseFloat(e.target.value) || 0
+                                      parseFloat(e.target.value) || 0,
                                     )
                                   }
                                   className="h-8 w-16 text-right text-xs font-bold text-blue-700"
@@ -2044,7 +2223,7 @@ export default function StorageQuotePage() {
                                     handleUpdateDoor(
                                       idx,
                                       "markup",
-                                      parseFloat(e.target.value) || 0
+                                      parseFloat(e.target.value) || 0,
                                     )
                                   }
                                   className="h-8 w-16 text-right text-xs font-bold"
@@ -2068,9 +2247,15 @@ export default function StorageQuotePage() {
                       </tbody>
                       <tfoot>
                         <tr className="bg-slate-50 font-bold border-t-2 border-slate-200">
-                          <td colSpan={4} className="p-2.5">Total Doors ({totalDoorsCount} Units)</td>
+                          <td colSpan={4} className="p-2.5">
+                            Total Doors ({totalDoorsCount} Units)
+                          </td>
                           <td className="p-2.5 text-right text-amber-700">
-                            {fmt(storagePricing?.doorsSubtotal ? storagePricing.doorsSubtotal * 0.8 : 0)}
+                            {fmt(
+                              storagePricing?.doorsSubtotal
+                                ? storagePricing.doorsSubtotal * 0.8
+                                : 0,
+                            )}
                           </td>
                           <td></td>
                           <td className="p-2.5 text-right text-blue-900">
@@ -2091,7 +2276,8 @@ export default function StorageQuotePage() {
                         ⚙️ Options & Add-ons
                       </h3>
                       <p className="text-[11px] text-slate-500">
-                        Insulation, concrete, seals, extras — check to include in total
+                        Insulation, concrete, seals, extras — check to include
+                        in total
                       </p>
                     </div>
                     <Button
@@ -2133,12 +2319,14 @@ export default function StorageQuotePage() {
                             <td className="p-2 text-right">
                               <Input
                                 type="number"
-                                value={x.cogs !== undefined ? x.cogs : (x.cost || "")}
+                                value={
+                                  x.cogs !== undefined ? x.cogs : x.cost || ""
+                                }
                                 onChange={(e) =>
                                   handleUpdateExtra(
                                     idx,
                                     "cogs",
-                                    parseFloat(e.target.value) || 0
+                                    parseFloat(e.target.value) || 0,
                                   )
                                 }
                                 className="h-8 w-24 text-right text-xs"
@@ -2152,7 +2340,7 @@ export default function StorageQuotePage() {
                                   handleUpdateExtra(
                                     idx,
                                     "markup",
-                                    parseFloat(e.target.value) || 0
+                                    parseFloat(e.target.value) || 0,
                                   )
                                 }
                                 className="h-8 w-16 text-right text-xs font-bold"
@@ -2176,7 +2364,11 @@ export default function StorageQuotePage() {
                                 type="checkbox"
                                 checked={x.include !== false}
                                 onChange={(e) =>
-                                  handleUpdateExtra(idx, "include", e.target.checked)
+                                  handleUpdateExtra(
+                                    idx,
+                                    "include",
+                                    e.target.checked,
+                                  )
                                 }
                                 className="h-4 w-4 rounded accent-blue-600 cursor-pointer"
                               />
@@ -2195,7 +2387,9 @@ export default function StorageQuotePage() {
                       </tbody>
                       <tfoot>
                         <tr className="bg-slate-50 font-bold border-t-2 border-slate-200">
-                          <td colSpan={3} className="p-2.5">Options Total (included)</td>
+                          <td colSpan={3} className="p-2.5">
+                            Options Total (included)
+                          </td>
                           <td className="p-2.5 text-right text-blue-900">
                             {fmt(storagePricing?.extrasSubtotal)}
                           </td>
@@ -2223,14 +2417,14 @@ export default function StorageQuotePage() {
                     disabled={isSaving}
                     className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 text-xs font-bold cursor-pointer"
                   >
-                    💾 Save to History
+                    {estimateId ? "Update Changes" : "Save to History"}
                   </Button>
                   <Button
                     type="button"
                     onClick={handleNavigatePreview}
                     className="bg-[#15803d] hover:bg-[#166534] text-white px-5 py-2.5 rounded-lg text-xs font-bold cursor-pointer shadow-xs"
                   >
-                    🗂 Generate Full Package
+                    Generate Full Package
                   </Button>
                 </div>
               </div>
@@ -2317,7 +2511,8 @@ export default function StorageQuotePage() {
                     <span>Margin Override</span>
                   </h3>
                   <span className="text-xs text-slate-400 font-medium">
-                    Override The Blended Project Margin — Overrides Per-Building Markups
+                    Override The Blended Project Margin — Overrides Per-Building
+                    Markups
                   </span>
                 </div>
 
@@ -2337,7 +2532,9 @@ export default function StorageQuotePage() {
                           min="0"
                           max="60"
                           value={globalMarkup}
-                          onChange={(e) => setGlobalMarkup(parseInt(e.target.value) || 0)}
+                          onChange={(e) =>
+                            setGlobalMarkup(parseInt(e.target.value) || 0)
+                          }
                           className="flex-1 accent-[#1976D2] cursor-pointer h-2 bg-slate-200 rounded-lg"
                         />
                         <div className="bg-slate-100 border border-slate-200/80 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-900 flex items-center gap-1 min-w-14 justify-center">
@@ -2376,7 +2573,13 @@ export default function StorageQuotePage() {
             {/* TAB 5: CONCRETE */}
             <TabsContent value="concrete" className="m-0 outline-none">
               <QuoteConcreteTab
-                sqFt={String(totalSqFt || buildings.reduce((sum, b) => sum + (Number(b.sqft) || 0), 0))}
+                sqFt={String(
+                  totalSqFt ||
+                    buildings.reduce(
+                      (sum, b) => sum + (Number(b.sqft) || 0),
+                      0,
+                    ),
+                )}
                 onTriggerCompute={() => triggerApiCompute(storageData)}
               />
             </TabsContent>
@@ -2384,7 +2587,13 @@ export default function StorageQuotePage() {
             {/* TAB 6: INSULATION */}
             <TabsContent value="insulation" className="m-0 outline-none">
               <QuoteInsulationTab
-                sqFt={String(totalSqFt || buildings.reduce((sum, b) => sum + (Number(b.sqft) || 0), 0))}
+                sqFt={String(
+                  totalSqFt ||
+                    buildings.reduce(
+                      (sum, b) => sum + (Number(b.sqft) || 0),
+                      0,
+                    ),
+                )}
                 onTriggerCompute={() => triggerApiCompute(storageData)}
               />
             </TabsContent>
@@ -2398,7 +2607,8 @@ export default function StorageQuotePage() {
                       📐 Building Drawings & Plans
                     </h3>
                     <p className="text-[11px] text-slate-500">
-                      Add layout plans or elevations to include in the quote package — checked drawings appear in the PDF
+                      Add layout plans or elevations to include in the quote
+                      package — checked drawings appear in the PDF
                     </p>
                   </div>
                   <label className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer shadow-xs flex items-center gap-1.5">
@@ -2423,9 +2633,13 @@ export default function StorageQuotePage() {
                     <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-500">
                       📐
                     </div>
-                    <div className="font-semibold text-slate-600">No drawings added yet</div>
+                    <div className="font-semibold text-slate-600">
+                      No drawings added yet
+                    </div>
                     <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
-                      Click "+ Add Drawings" to attach layout plans, elevations or architectural specs. Images or PDFs will append to the full quote package.
+                      Click "+ Add Drawings" to attach layout plans, elevations
+                      or architectural specs. Images or PDFs will append to the
+                      full quote package.
                     </p>
                   </div>
                 ) : (
@@ -2435,21 +2649,33 @@ export default function StorageQuotePage() {
                       return (
                         <div
                           key={i}
-                          className={`relative border rounded-xl overflow-hidden bg-white shadow-2xs transition-all ${d.includeInPackage ? "border-blue-500 ring-1 ring-blue-500/20" : "border-slate-200 opacity-70"
-                            }`}
+                          className={`relative border rounded-xl overflow-hidden bg-white shadow-2xs transition-all ${
+                            d.includeInPackage
+                              ? "border-blue-500 ring-1 ring-blue-500/20"
+                              : "border-slate-200 opacity-70"
+                          }`}
                         >
                           <div className="h-36 bg-slate-100 flex items-center justify-center overflow-hidden border-b border-slate-100">
                             {isImage ? (
-                              <img src={d.data} alt={d.name} className="w-full h-full object-cover" />
+                              <img
+                                src={d.data}
+                                alt={d.name}
+                                className="w-full h-full object-cover"
+                              />
                             ) : (
                               <div className="flex flex-col items-center gap-1 text-slate-500 p-3 text-center">
                                 <FileSpreadsheet className="h-8 w-8 text-blue-600" />
-                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700">PDF Document</span>
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                                  PDF Document
+                                </span>
                               </div>
                             )}
                           </div>
                           <div className="p-3 space-y-2">
-                            <div className="font-bold text-xs text-slate-800 truncate" title={d.name}>
+                            <div
+                              className="font-bold text-xs text-slate-800 truncate"
+                              title={d.name}
+                            >
                               {d.name}
                             </div>
                             <div className="flex items-center justify-between pt-1 border-t border-slate-100">
@@ -2459,7 +2685,8 @@ export default function StorageQuotePage() {
                                   checked={d.includeInPackage}
                                   onChange={(e) => {
                                     const updated = [...storageDrawings];
-                                    updated[i].includeInPackage = e.target.checked;
+                                    updated[i].includeInPackage =
+                                      e.target.checked;
                                     setStorageDrawings(updated);
                                   }}
                                   className="h-3.5 w-3.5 accent-blue-600 rounded cursor-pointer"
