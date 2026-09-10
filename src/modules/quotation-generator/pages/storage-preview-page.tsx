@@ -1,18 +1,25 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router";
-import { ArrowLeft, FolderUp, Loader2, RefreshCw, Printer } from "lucide-react";
+import {
+  ArrowLeft,
+  FolderUp,
+  Loader2,
+  //  RefreshCw, Printer
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
-  downloadPdfProvider,
+  // downloadPdfProvider,
   saveEstimateProvider,
   type PreviewDocumentRequest,
 } from "../estimates.api";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
 import { ServerDocumentPreview } from "../components/server-document-preview";
-import type { StorageData, StoragePricing } from "../components/storage-preview-document";
-
+import type {
+  StorageData,
+  StoragePricing,
+} from "../components/storage-preview-document";
 
 function fmt(n?: number | string | null): string {
   const num = Number(n) || 0;
@@ -56,29 +63,47 @@ export function StoragePreviewPage() {
     insulationInclude?: boolean;
     includeTax?: boolean;
     taxRate?: number;
-    drawingAttachments?: Array<{ name?: string; fileBase64?: string; data?: string; includeInQuote?: boolean }>;
-    drawings?: Array<{ name?: string; fileBase64?: string; data?: string; includeInQuote?: boolean }>;
+    drawingAttachments?: Array<{
+      name?: string;
+      fileBase64?: string;
+      data?: string;
+      includeInQuote?: boolean;
+    }>;
+    drawings?: Array<{
+      name?: string;
+      fileBase64?: string;
+      data?: string;
+      includeInQuote?: boolean;
+    }>;
   };
 
   useEffect(() => {
     const navDrawings = navState.drawingAttachments || navState.drawings;
-    if (navDrawings?.length && (!storageDrawings || storageDrawings.length === 0)) {
+    if (
+      navDrawings?.length &&
+      (!storageDrawings || storageDrawings.length === 0)
+    ) {
       setStorageDrawings(
         navDrawings.map((d) => ({
           name: d.name || "Drawing",
           data: d.fileBase64 || d.data || "",
           includeInPackage: d.includeInQuote !== false,
-        }))
+        })),
       );
     }
-  }, [navState.drawingAttachments, navState.drawings, storageDrawings, setStorageDrawings]);
+  }, [
+    navState.drawingAttachments,
+    navState.drawings,
+    storageDrawings,
+    setStorageDrawings,
+  ]);
 
   const storageData =
     (storeStorageData as StorageData | null) || navState.storageData;
   const storagePricing =
     (storeStoragePricing as StoragePricing | null) || navState.storagePricing;
   const [estimateId, setEstimateId] = useState<string | null>(
-    navState.estimateId || storeStorageEstimateId || null
+    navState.estimateId || storeStorageEstimateId || null,
   );
 
   useEffect(() => {
@@ -89,11 +114,13 @@ export function StoragePreviewPage() {
     }
   }, [navState.estimateId, storeStorageEstimateId, setStorageEstimateId]);
 
-  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  // const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  // const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSavingEstimate, setIsSavingEstimate] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const isEditing = Boolean(estimateId || storeStorageEstimateId || navState.estimateId);
+  const isEditing = Boolean(
+    estimateId || storeStorageEstimateId || navState.estimateId,
+  );
 
   const customerLeadName =
     storeCustomerLeadName ||
@@ -105,8 +132,7 @@ export function StoragePreviewPage() {
     navState.customerAddress ||
     storageData?.project?.location ||
     "Project Location";
-  const customerEmail =
-    storeCustomerEmail || navState.customerEmail || "";
+  const customerEmail = storeCustomerEmail || navState.customerEmail || "";
   const jobNumber =
     storeJobNumber ||
     navState.jobNumber ||
@@ -127,159 +153,175 @@ export function StoragePreviewPage() {
   });
 
   const grandTotal = Number(
-    storagePricing?.grandTotal ?? storagePricing?.totSell ?? storagePricing?.totalSell ?? 0
+    storagePricing?.grandTotal ??
+      storagePricing?.totSell ??
+      storagePricing?.totalSell ??
+      0,
   );
   const totalSellFormatted = fmt(grandTotal);
 
   const handleScrollToPreview = () => {
-    previewSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    previewSectionRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
   };
 
-  const handlePrint = () => {
-    const originalTitle = document.title;
-    const safeCustomer = (customerLeadName || "Storage_Quote").replace(/[^a-zA-Z0-9_-]/g, "_");
-    document.title = `Storage_Quote_${safeCustomer}`;
-    window.print();
-    document.title = originalTitle;
-  };
+  // const handlePrint = () => {
+  //   const originalTitle = document.title;
+  //   const safeCustomer = (customerLeadName || "Storage_Quote").replace(/[^a-zA-Z0-9_-]/g, "_");
+  //   document.title = `Storage_Quote_${safeCustomer}`;
+  //   window.print();
+  //   document.title = originalTitle;
+  // };
 
-  const handleDownloadPdf = async () => {
-    setIsDownloadingPdf(true);
-    try {
-      const activeDrawings = storageDrawings.filter((d) => d.includeInPackage !== false);
-      const drawingAttachments = activeDrawings.map((d) => ({
-        name: d.name,
-        fileBase64: d.data?.includes(",") ? d.data.split(",")[1] : d.data,
-        includeInQuote: true,
-      }));
+  // const handleDownloadPdf = async () => {
+  //   setIsDownloadingPdf(true);
+  //   try {
+  //     const activeDrawings = storageDrawings.filter((d) => d.includeInPackage !== false);
+  //     const drawingAttachments = activeDrawings.map((d) => ({
+  //       name: d.name,
+  //       fileBase64: d.data?.includes(",") ? d.data.split(",")[1] : d.data,
+  //       includeInQuote: true,
+  //     }));
 
-      const payload = {
-        jobType: "Storage",
-        estimateId: estimateId || undefined,
-        scope:
-          (scope || "Both").toLowerCase() === "supply"
-            ? "Supply"
-            : (scope || "Both").toLowerCase() === "install"
-            ? "Install"
-            : "Both",
-        leadCompanyName: customerLeadName || "Customer",
-        customerEmail,
-        streetAddress: customerAddress,
-        cityStateZip: customerAddress,
-        jobNumber: jobNumber || "8098",
-        buildingSize:
-          storageData?.buildings?.map((b) => `${b.width}x${b.length}`).join(", ") ||
-          "Storage Complex",
-        squareFootage:
-          Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) ||
-          storageData?.buildings?.reduce(
-            (acc, b) =>
-              acc +
-              (Number(b.sqft || b.squareFootage) ||
-                Number(b.width || 0) * Number(b.length || 0)),
-            0
-          ) ||
-          0,
-        sf:
-          Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) ||
-          storageData?.buildings?.reduce(
-            (acc, b) =>
-              acc +
-              (Number(b.sqft || b.squareFootage) ||
-                Number(b.width || 0) * Number(b.length || 0)),
-            0
-          ) ||
-          0,
-        pricingResult: storagePricing as Record<string, unknown>,
-        storagePricingResult: storagePricing as Record<string, unknown>,
-        storagePricing: storagePricing as Record<string, unknown>,
-        storageData: storageData as Record<string, unknown>,
-        concreteAddon: {
-          include: navState.concreteInclude,
-        },
-        insulationAddon: {
-          include: navState.insulationInclude,
-        },
-        salesTax: {
-          include: navState.includeTax,
-          rate: navState.taxRate,
-        },
-        drawingAttachments,
-        sections: drawingAttachments.length > 0
-          ? ["quote", "sow", "contract", "drawings"]
-          : ["quote", "sow", "contract"],
-        format: "pdf",
-      };
+  //     const payload = {
+  //       jobType: "Storage",
+  //       estimateId: estimateId || undefined,
+  //       scope:
+  //         (scope || "Both").toLowerCase() === "supply"
+  //           ? "Supply"
+  //           : (scope || "Both").toLowerCase() === "install"
+  //           ? "Install"
+  //           : "Both",
+  //       leadCompanyName: customerLeadName || "Customer",
+  //       customerEmail,
+  //       streetAddress: customerAddress,
+  //       cityStateZip: customerAddress,
+  //       jobNumber: jobNumber || "8098",
+  //       buildingSize:
+  //         storageData?.buildings?.map((b) => `${b.width}x${b.length}`).join(", ") ||
+  //         "Storage Complex",
+  //       squareFootage:
+  //         Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) ||
+  //         storageData?.buildings?.reduce(
+  //           (acc, b) =>
+  //             acc +
+  //             (Number(b.sqft || b.squareFootage) ||
+  //               Number(b.width || 0) * Number(b.length || 0)),
+  //           0
+  //         ) ||
+  //         0,
+  //       sf:
+  //         Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) ||
+  //         storageData?.buildings?.reduce(
+  //           (acc, b) =>
+  //             acc +
+  //             (Number(b.sqft || b.squareFootage) ||
+  //               Number(b.width || 0) * Number(b.length || 0)),
+  //           0
+  //         ) ||
+  //         0,
+  //       pricingResult: storagePricing as Record<string, unknown>,
+  //       storagePricingResult: storagePricing as Record<string, unknown>,
+  //       storagePricing: storagePricing as Record<string, unknown>,
+  //       storageData: storageData as Record<string, unknown>,
+  //       concreteAddon: {
+  //         include: navState.concreteInclude,
+  //       },
+  //       insulationAddon: {
+  //         include: navState.insulationInclude,
+  //       },
+  //       salesTax: {
+  //         include: navState.includeTax,
+  //         rate: navState.taxRate,
+  //       },
+  //       drawingAttachments,
+  //       sections: drawingAttachments.length > 0
+  //         ? ["quote", "sow", "contract", "drawings"]
+  //         : ["quote", "sow", "contract"],
+  //       format: "pdf",
+  //     };
 
-      const activeEstId =
-        estimateId || storeStorageEstimateId || navState.estimateId || undefined;
-      const res = await downloadPdfProvider(payload, activeEstId);
-      const pdfData = res.data || res;
+  //     const activeEstId =
+  //       estimateId || storeStorageEstimateId || navState.estimateId || undefined;
+  //     const res = await downloadPdfProvider(payload, activeEstId);
+  //     const pdfData = res.data || res;
 
-      const fileName =
-        pdfData?.fileName ||
-        `Storage_Quote_${(customerLeadName || "Customer").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
+  //     const fileName =
+  //       pdfData?.fileName ||
+  //       `Storage_Quote_${(customerLeadName || "Customer").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
 
-      // 1. Check for base64 string
-      const base64 =
-        typeof pdfData === "string"
-          ? pdfData
-          : pdfData?.fileBase64 ||
-            (pdfData as { base64?: string })?.base64 ||
-            (pdfData as { pdfBase64?: string })?.pdfBase64;
+  //     // 1. Check for base64 string
+  //     const base64 =
+  //       typeof pdfData === "string"
+  //         ? pdfData
+  //         : pdfData?.fileBase64 ||
+  //           (pdfData as { base64?: string })?.base64 ||
+  //           (pdfData as { pdfBase64?: string })?.pdfBase64;
 
-      if (base64) {
-        const cleanBase64 = base64.includes(",") ? base64.split(",")[1] : base64;
-        const byteCharacters = atob(cleanBase64);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: pdfData?.mimeType || "application/pdf" });
-        const blobUrl = URL.createObjectURL(blob);
+  //     if (base64) {
+  //       const cleanBase64 = base64.includes(",") ? base64.split(",")[1] : base64;
+  //       const byteCharacters = atob(cleanBase64);
+  //       const byteNumbers = new Array(byteCharacters.length);
+  //       for (let i = 0; i < byteCharacters.length; i++) {
+  //         byteNumbers[i] = byteCharacters.charCodeAt(i);
+  //       }
+  //       const byteArray = new Uint8Array(byteNumbers);
+  //       const blob = new Blob([byteArray], { type: pdfData?.mimeType || "application/pdf" });
+  //       const blobUrl = URL.createObjectURL(blob);
 
-        const a = document.createElement("a");
-        a.href = blobUrl;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(blobUrl);
-        return;
-      }
+  //       const a = document.createElement("a");
+  //       a.href = blobUrl;
+  //       a.download = fileName;
+  //       document.body.appendChild(a);
+  //       a.click();
+  //       document.body.removeChild(a);
+  //       URL.revokeObjectURL(blobUrl);
+  //       return;
+  //     }
 
-      // 2. Check for URL redirect
-      const downloadUrl =
-        (pdfData as { url?: string; downloadUrl?: string })?.url ||
-        (pdfData as { url?: string; downloadUrl?: string })?.downloadUrl;
-      if (downloadUrl) {
-        window.open(downloadUrl, "_blank");
-        return;
-      }
+  //     // 2. Check for URL redirect
+  //     const downloadUrl =
+  //       (pdfData as { url?: string; downloadUrl?: string })?.url ||
+  //       (pdfData as { url?: string; downloadUrl?: string })?.downloadUrl;
+  //     if (downloadUrl) {
+  //       window.open(downloadUrl, "_blank");
+  //       return;
+  //     }
 
-      // 3. Fallback to print dialog if stream was empty
-      console.warn("Backend did not return base64 PDF stream, falling back to print dialog.");
-      handlePrint();
-    } catch (err) {
-      console.error("Failed to generate PDF via server API:", err);
-      handlePrint();
-    } finally {
-      setIsDownloadingPdf(false);
-    }
-  };
+  //     // 3. Fallback to print dialog if stream was empty
+  //     console.warn("Backend did not return base64 PDF stream, falling back to print dialog.");
+  //     handlePrint();
+  //   } catch (err) {
+  //     console.error("Failed to generate PDF via server API:", err);
+  //     handlePrint();
+  //   } finally {
+  //     setIsDownloadingPdf(false);
+  //   }
+  // };
 
   const handleSaveToHistory = async () => {
     setIsSavingEstimate(true);
     try {
       const activeEstId =
-        estimateId || storeStorageEstimateId || navState.estimateId || undefined;
-      const activeDrawings = storageDrawings.filter((d) => d.includeInPackage !== false);
+        estimateId ||
+        storeStorageEstimateId ||
+        navState.estimateId ||
+        undefined;
+      const activeDrawings = storageDrawings.filter(
+        (d) => d.includeInPackage !== false,
+      );
       const res = await saveEstimateProvider(
         {
           _id: activeEstId,
           jobType: "Storage",
-          scope: (scope || "Both").toLowerCase() === "supply" ? "Supply" : (scope || "Both").toLowerCase() === "install" ? "Install" : "Both",
+          scope:
+            (scope || "Both").toLowerCase() === "supply"
+              ? "Supply"
+              : (scope || "Both").toLowerCase() === "install"
+                ? "Install"
+                : "Both",
           leadCompanyName: customerLeadName,
           customerEmail,
           streetAddress: customerAddress,
@@ -295,7 +337,7 @@ export function StoragePreviewPage() {
           })),
           status: "draft",
         },
-        activeEstId
+        activeEstId,
       );
 
       const data = res.data || res;
@@ -317,27 +359,32 @@ export function StoragePreviewPage() {
 
   const activeDrawings = useMemo(
     () => (storageDrawings || []).filter((d) => d.includeInPackage !== false),
-    [storageDrawings]
+    [storageDrawings],
   );
 
   const previewPayload: PreviewDocumentRequest = useMemo(
     () => ({
       jobType: "Storage",
-      estimateId: estimateId || storeStorageEstimateId || navState.estimateId || undefined,
+      estimateId:
+        estimateId ||
+        storeStorageEstimateId ||
+        navState.estimateId ||
+        undefined,
       scope:
         (scope || "Both").toLowerCase() === "supply"
           ? "Supply"
           : (scope || "Both").toLowerCase() === "install"
-          ? "Install"
-          : "Both",
+            ? "Install"
+            : "Both",
       leadCompanyName: customerLeadName || "Customer",
       customerEmail,
       streetAddress: customerAddress,
       cityStateZip: customerAddress,
       jobNumber: jobNumber || "8098",
       buildingSize:
-        storageData?.buildings?.map((b) => `${b.width}x${b.length}`).join(", ") ||
-        "Storage Complex",
+        storageData?.buildings
+          ?.map((b) => `${b.width}x${b.length}`)
+          .join(", ") || "Storage Complex",
       squareFootage:
         Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) ||
         storageData?.buildings?.reduce(
@@ -345,7 +392,7 @@ export function StoragePreviewPage() {
             acc +
             (Number(b.sqft || b.squareFootage) ||
               Number(b.width || 0) * Number(b.length || 0)),
-          0
+          0,
         ) ||
         0,
       sf:
@@ -355,7 +402,7 @@ export function StoragePreviewPage() {
             acc +
             (Number(b.sqft || b.squareFootage) ||
               Number(b.width || 0) * Number(b.length || 0)),
-          0
+          0,
         ) ||
         0,
       pricingResult: storagePricing as Record<string, unknown>,
@@ -383,8 +430,8 @@ export function StoragePreviewPage() {
           scope?.toLowerCase() === "both"
             ? "both"
             : scope?.toLowerCase() === "install"
-            ? "install"
-            : "supply",
+              ? "install"
+              : "supply",
         value: totalSellFormatted,
       },
       drawingAttachments: activeDrawings.map((d) => ({
@@ -415,7 +462,7 @@ export function StoragePreviewPage() {
       quoteDate,
       totalSellFormatted,
       activeDrawings,
-    ]
+    ],
   );
 
   const {
@@ -427,16 +474,16 @@ export function StoragePreviewPage() {
     payload: previewPayload,
   });
 
-  const handleRefreshPreview = async () => {
-    setIsRefreshing(true);
-    try {
-      await refetchPreview();
-    } catch (err) {
-      console.warn("Refresh preview notice:", err);
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
+  // const handleRefreshPreview = async () => {
+  //   setIsRefreshing(true);
+  //   try {
+  //     await refetchPreview();
+  //   } catch (err) {
+  //     console.warn("Refresh preview notice:", err);
+  //   } finally {
+  //     setIsRefreshing(false);
+  //   }
+  // };
 
   const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -497,7 +544,8 @@ export function StoragePreviewPage() {
               Storage Quote Preview
             </h1>
             <p className="text-xs text-slate-500 mt-0.5 font-medium">
-              Mini Storage Assembled Package — Quote · SOW · Contract · Layout Plans
+              Mini Storage Assembled Package — Quote · SOW · Contract · Layout
+              Plans
             </p>
           </div>
         </div>
@@ -532,7 +580,9 @@ export function StoragePreviewPage() {
             disabled={isSavingEstimate}
             className="bg-[#16A34A] hover:bg-[#15803D] text-white px-5 py-2.5 rounded-lg text-xs font-bold cursor-pointer shadow-xs flex items-center gap-1.5"
           >
-            {isSavingEstimate && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {isSavingEstimate && (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            )}
             {isSavingEstimate
               ? isEditing
                 ? "Updating Changes..."
@@ -554,7 +604,8 @@ export function StoragePreviewPage() {
                 Building drawings & layout plans
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Upload layout plans or elevations — they will be included in the server preview & final PDF.
+                Upload layout plans or elevations — they will be included in the
+                server preview & final PDF.
               </p>
             </div>
 
@@ -610,7 +661,8 @@ export function StoragePreviewPage() {
                     Drop drawings or layout plans here or click to browse
                   </div>
                   <p className="text-xs text-slate-500 font-medium">
-                    Unit mix layouts, anchor bolt plans, elevations (PDF or Images)
+                    Unit mix layouts, anchor bolt plans, elevations (PDF or
+                    Images)
                   </p>
                 </div>
               )}
@@ -629,7 +681,6 @@ export function StoragePreviewPage() {
             minHeight={800}
           />
         </div>
-
       </div>
     </div>
   );

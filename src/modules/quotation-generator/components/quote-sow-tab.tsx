@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react";
-import { Sparkles, Check, RotateCcw, Edit3, Save, Loader2 } from "lucide-react";
+import { Sparkles, Check, RotateCcw, Edit3, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  downloadPdfProvider,
+  // downloadPdfProvider,
   type ExtractShipperResponseData,
   type ExtractDrawingResponseData,
   type PreviewDocumentRequest,
@@ -36,7 +36,7 @@ export function QuoteSowTab({
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [isDownloadingSow, setIsDownloadingSow] = useState(false);
+  // const [isDownloadingSow, setIsDownloadingSow] = useState(false);
 
   const sow = useSowDocument({
     extractedShipper,
@@ -56,7 +56,10 @@ export function QuoteSowTab({
       cityStateZip: sow.pricingData.customerAddress,
       buildingSize: sow.pricingData.displayBuildingSize,
       squareFootage: sow.pricingData.effectiveSqFt,
-      jobNumber: quotationForm?.jobNumber || extractedDrawing?.extracted?.jobnumber || "",
+      jobNumber:
+        quotationForm?.jobNumber ||
+        extractedDrawing?.extracted?.jobnumber ||
+        "",
       pricingResult: extractedShipper?.pricing,
       fullQuote:
         extractedShipper?.fullQuote ||
@@ -77,7 +80,7 @@ export function QuoteSowTab({
       extractedDrawing?.extracted,
       extractedShipper?.pricing,
       extractedShipper?.fullQuote,
-    ]
+    ],
   );
 
   const {
@@ -98,44 +101,44 @@ export function QuoteSowTab({
     setTimeout(() => setAiFeedback(null), 4000);
   };
 
-  const handleDownloadSowPdf = async () => {
-    setIsDownloadingSow(true);
-    const customerName = sow.pricingData.customerLeadName || "Customer";
-    try {
-      const payload: PreviewDocumentRequest = {
-        leadCompanyName: customerName,
-        customerEmail: quotationForm?.email || sow.pricingData.customerEmail,
-        streetAddress: sow.pricingData.customerAddress,
-        cityStateZip: sow.pricingData.customerAddress,
-        buildingSize: sow.pricingData.displayBuildingSize,
-        squareFootage: sow.pricingData.effectiveSqFt,
-        jobNumber: quotationForm?.jobNumber || extractedDrawing?.extracted?.jobnumber || "",
-        pricingResult: extractedShipper?.pricing,
-        fullQuote:
-          extractedShipper?.fullQuote ||
-          (extractedShipper?.pricing as Record<string, unknown> | undefined),
-        extractedDrawingFields: extractedDrawing?.extracted,
-        drawingAttachments: [],
-        sections: ["sow"],
-      };
+  // const handleDownloadSowPdf = async () => {
+  //   setIsDownloadingSow(true);
+  //   const customerName = sow.pricingData.customerLeadName || "Customer";
+  //   try {
+  //     const payload: PreviewDocumentRequest = {
+  //       leadCompanyName: customerName,
+  //       customerEmail: quotationForm?.email || sow.pricingData.customerEmail,
+  //       streetAddress: sow.pricingData.customerAddress,
+  //       cityStateZip: sow.pricingData.customerAddress,
+  //       buildingSize: sow.pricingData.displayBuildingSize,
+  //       squareFootage: sow.pricingData.effectiveSqFt,
+  //       jobNumber: quotationForm?.jobNumber || extractedDrawing?.extracted?.jobnumber || "",
+  //       pricingResult: extractedShipper?.pricing,
+  //       fullQuote:
+  //         extractedShipper?.fullQuote ||
+  //         (extractedShipper?.pricing as Record<string, unknown> | undefined),
+  //       extractedDrawingFields: extractedDrawing?.extracted,
+  //       drawingAttachments: [],
+  //       sections: ["sow"],
+  //     };
 
-      const res = await downloadPdfProvider(payload, estimateId || undefined);
-      const pdfData = res.data || res;
+  //     const res = await downloadPdfProvider(payload, estimateId || undefined);
+  //     const pdfData = res.data || res;
 
-      if (pdfData?.fileBase64) {
-        const a = document.createElement("a");
-        a.href = `data:${pdfData.mimeType || "application/pdf"};base64,${pdfData.fileBase64}`;
-        a.download =
-          pdfData.fileName ||
-          `SOW_${customerName.replace(/\s+/g, "_")}.pdf`;
-        a.click();
-      }
-    } catch (err) {
-      console.error("Failed to download SOW PDF, opening print dialog:", err);
-    } finally {
-      setIsDownloadingSow(false);
-    }
-  };
+  //     if (pdfData?.fileBase64) {
+  //       const a = document.createElement("a");
+  //       a.href = `data:${pdfData.mimeType || "application/pdf"};base64,${pdfData.fileBase64}`;
+  //       a.download =
+  //         pdfData.fileName ||
+  //         `SOW_${customerName.replace(/\s+/g, "_")}.pdf`;
+  //       a.click();
+  //     }
+  //   } catch (err) {
+  //     console.error("Failed to download SOW PDF, opening print dialog:", err);
+  //   } finally {
+  //     setIsDownloadingSow(false);
+  //   }
+  // };
 
   return (
     <div className="space-y-6">
@@ -163,7 +166,8 @@ export function QuoteSowTab({
           </Button>
         </div>
         <p className="text-xs text-slate-600">
-          Describe a change and Claude will update the SOW instantly, or edit texts directly below.
+          Describe a change and Claude will update the SOW instantly, or edit
+          texts directly below.
         </p>
         <div className="flex flex-col sm:flex-row gap-3">
           <input
@@ -184,7 +188,8 @@ export function QuoteSowTab({
             onClick={handleApplyAiPrompt}
             className="bg-[#1E3A8A] hover:bg-[#1D4ED8] text-white px-5 py-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer shadow-xs shrink-0"
           >
-            Apply <Sparkles className="h-3.5 w-3.5 fill-amber-300 text-amber-300" />
+            Apply{" "}
+            <Sparkles className="h-3.5 w-3.5 fill-amber-300 text-amber-300" />
           </Button>
         </div>
         {aiFeedback && (
@@ -199,7 +204,10 @@ export function QuoteSowTab({
         <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2 text-amber-900 font-bold">
             <Edit3 className="h-4 w-4 text-amber-700 shrink-0" />
-            <span>Manual Edit Mode Active — You can edit all titles, grid info, overview, and list items.</span>
+            <span>
+              Manual Edit Mode Active — You can edit all titles, grid info,
+              overview, and list items.
+            </span>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <Button
@@ -208,7 +216,8 @@ export function QuoteSowTab({
               onClick={sow.resetToDefaults}
               className="border-amber-300 text-amber-900 bg-white hover:bg-amber-100/60 text-xs px-3 py-1.5 h-8 rounded-lg font-semibold flex items-center gap-1 cursor-pointer"
             >
-              <RotateCcw className="h-3.5 w-3.5 text-amber-700" /> Reset to Dynamic Data
+              <RotateCcw className="h-3.5 w-3.5 text-amber-700" /> Reset to
+              Dynamic Data
             </Button>
             <Button
               type="button"
@@ -244,10 +253,11 @@ export function QuoteSowTab({
           type="button"
           variant="outline"
           onClick={() => setIsEditing(!isEditing)}
-          className={`px-5 py-2.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer ${isEditing
+          className={`px-5 py-2.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer ${
+            isEditing
               ? "border-emerald-600 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
               : "border-amber-400 bg-amber-50/50 hover:bg-amber-100/60 text-amber-900"
-            }`}
+          }`}
         >
           {isEditing ? (
             <>

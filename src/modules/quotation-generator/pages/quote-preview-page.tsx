@@ -1,11 +1,11 @@
 import { useState, useRef, useMemo, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router";
-import { ArrowLeft, Printer, FolderUp, Loader2, FileSearch } from "lucide-react";
+import { ArrowLeft, FolderUp, Loader2, FileSearch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 import {
-  downloadPdfProvider,
+  // downloadPdfProvider,
   saveEstimateProvider,
   type ExtractDrawingResponseData,
   type ExtractShipperResponseData,
@@ -20,7 +20,7 @@ export function QuotePreviewPage() {
   const location = useLocation();
   const previewSectionRef = useRef<HTMLDivElement>(null);
 
-  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  // const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [isSavingEstimate, setIsSavingEstimate] = useState(false);
 
   const navState = (location.state || {}) as {
@@ -73,7 +73,7 @@ export function QuotePreviewPage() {
   } = useQuotationStore();
 
   const [estimateId, setEstimateId] = useState<string | null>(
-    navState.estimateId || pembEstimateId || null
+    navState.estimateId || pembEstimateId || null,
   );
 
   useEffect(() => {
@@ -102,7 +102,9 @@ export function QuotePreviewPage() {
     grandTotalFormatted: totalSellFormatted,
   } = pricingData;
 
-  const isEditing = Boolean(estimateId || pembEstimateId || navState.estimateId);
+  const isEditing = Boolean(
+    estimateId || pembEstimateId || navState.estimateId,
+  );
 
   const initialPdfName =
     navState.pdfFileName ||
@@ -138,7 +140,9 @@ export function QuotePreviewPage() {
       pricingResult: navState.extractedShipper?.pricing,
       fullQuote:
         navState.extractedShipper?.fullQuote ||
-        (navState.extractedShipper?.pricing as Record<string, unknown> | undefined),
+        (navState.extractedShipper?.pricing as
+          | Record<string, unknown>
+          | undefined),
       extractedDrawingFields: navState.extractedDrawing?.extracted,
       contract: {
         customer: customerLeadName,
@@ -151,8 +155,8 @@ export function QuotePreviewPage() {
           scope?.toLowerCase() === "both"
             ? "both"
             : scope?.toLowerCase() === "install"
-            ? "install"
-            : "supply",
+              ? "install"
+              : "supply",
         value: totalSellFormatted,
       },
       drawingAttachments: selectedPdf
@@ -177,7 +181,7 @@ export function QuotePreviewPage() {
       scope,
       totalSellFormatted,
       selectedPdf,
-    ]
+    ],
   );
 
   const {
@@ -196,83 +200,83 @@ export function QuotePreviewPage() {
     });
   };
 
-  const handlePrint = () => {
-    const originalTitle = document.title;
-    const safeCustomer = (customerLeadName || "Quote").replace(
-      /[^a-zA-Z0-9_-]/g,
-      "_"
-    );
-    document.title = `Quote_Package_${safeCustomer}`;
-    window.print();
-    document.title = originalTitle;
-  };
+  // const handlePrint = () => {
+  //   const originalTitle = document.title;
+  //   const safeCustomer = (customerLeadName || "Quote").replace(
+  //     /[^a-zA-Z0-9_-]/g,
+  //     "_"
+  //   );
+  //   document.title = `Quote_Package_${safeCustomer}`;
+  //   window.print();
+  //   document.title = originalTitle;
+  // };
 
-  const handleDownloadPdf = async () => {
-    setIsDownloadingPdf(true);
-    try {
-      const activeEstId =
-        estimateId || pembEstimateId || navState.estimateId || undefined;
-      const payload: PreviewDocumentRequest = {
-        estimateId: activeEstId,
-        jobType: "PEMB",
-        leadCompanyName: customerLeadName,
-        customerEmail,
-        streetAddress: customerAddress,
-        cityStateZip: customerAddress,
-        buildingSize: displayBuildingSize,
-        squareFootage: effectiveSqFt,
-        jobNumber:
-          navState.quotationForm?.jobNumber ||
-          navState.extractedDrawing?.extracted?.jobnumber ||
-          "",
-        pricingResult: navState.extractedShipper?.pricing,
-        fullQuote:
-          navState.extractedShipper?.fullQuote ||
-          (navState.extractedShipper?.pricing as
-            | Record<string, unknown>
-            | undefined),
-        contract: {
-          customer: customerLeadName,
-          address: customerAddress,
-          city: customerAddress,
-          email: customerEmail,
-          date: quoteDate,
-          deposit: "forty-percent (40%)",
-          type:
-            scope?.toLowerCase() === "both"
-              ? "both"
-              : scope?.toLowerCase() === "install"
-              ? "install"
-              : "supply",
-          value: totalSellFormatted,
-        },
-        extractedDrawingFields: navState.extractedDrawing?.extracted,
-        drawingAttachments: selectedPdf
-          ? [{ name: selectedPdf.name, includeInQuote: true }]
-          : [],
-        sections: selectedPdf
-          ? ["quote", "sow", "contract", "drawings"]
-          : ["quote", "sow", "contract"],
-      };
-      const res = await downloadPdfProvider(payload, activeEstId);
-      const pdfData = res.data || res;
-      if (pdfData?.fileBase64) {
-        const a = document.createElement("a");
-        a.href = `data:${pdfData.mimeType || "application/pdf"};base64,${pdfData.fileBase64}`;
-        a.download =
-          pdfData.fileName ||
-          `Quote_${(customerLeadName || "Package").replace(/\s+/g, "_")}.pdf`;
-        a.click();
-      } else {
-        handlePrint();
-      }
-    } catch (err) {
-      console.error("Failed to download PDF via API, opening print dialog:", err);
-      handlePrint();
-    } finally {
-      setIsDownloadingPdf(false);
-    }
-  };
+  // const handleDownloadPdf = async () => {
+  //   setIsDownloadingPdf(true);
+  //   try {
+  //     const activeEstId =
+  //       estimateId || pembEstimateId || navState.estimateId || undefined;
+  //     const payload: PreviewDocumentRequest = {
+  //       estimateId: activeEstId,
+  //       jobType: "PEMB",
+  //       leadCompanyName: customerLeadName,
+  //       customerEmail,
+  //       streetAddress: customerAddress,
+  //       cityStateZip: customerAddress,
+  //       buildingSize: displayBuildingSize,
+  //       squareFootage: effectiveSqFt,
+  //       jobNumber:
+  //         navState.quotationForm?.jobNumber ||
+  //         navState.extractedDrawing?.extracted?.jobnumber ||
+  //         "",
+  //       pricingResult: navState.extractedShipper?.pricing,
+  //       fullQuote:
+  //         navState.extractedShipper?.fullQuote ||
+  //         (navState.extractedShipper?.pricing as
+  //           | Record<string, unknown>
+  //           | undefined),
+  //       contract: {
+  //         customer: customerLeadName,
+  //         address: customerAddress,
+  //         city: customerAddress,
+  //         email: customerEmail,
+  //         date: quoteDate,
+  //         deposit: "forty-percent (40%)",
+  //         type:
+  //           scope?.toLowerCase() === "both"
+  //             ? "both"
+  //             : scope?.toLowerCase() === "install"
+  //             ? "install"
+  //             : "supply",
+  //         value: totalSellFormatted,
+  //       },
+  //       extractedDrawingFields: navState.extractedDrawing?.extracted,
+  //       drawingAttachments: selectedPdf
+  //         ? [{ name: selectedPdf.name, includeInQuote: true }]
+  //         : [],
+  //       sections: selectedPdf
+  //         ? ["quote", "sow", "contract", "drawings"]
+  //         : ["quote", "sow", "contract"],
+  //     };
+  //     const res = await downloadPdfProvider(payload, activeEstId);
+  //     const pdfData = res.data || res;
+  //     if (pdfData?.fileBase64) {
+  //       const a = document.createElement("a");
+  //       a.href = `data:${pdfData.mimeType || "application/pdf"};base64,${pdfData.fileBase64}`;
+  //       a.download =
+  //         pdfData.fileName ||
+  //         `Quote_${(customerLeadName || "Package").replace(/\s+/g, "_")}.pdf`;
+  //       a.click();
+  //     } else {
+  //       handlePrint();
+  //     }
+  //   } catch (err) {
+  //     console.error("Failed to download PDF via API, opening print dialog:", err);
+  //     handlePrint();
+  //   } finally {
+  //     setIsDownloadingPdf(false);
+  //   }
+  // };
 
   const handleSaveToHistory = async () => {
     setIsSavingEstimate(true);
@@ -293,14 +297,13 @@ export function QuotePreviewPage() {
             (scope || "Both").toLowerCase() === "supply"
               ? "Supply"
               : (scope || "Both").toLowerCase() === "install"
-              ? "Install"
-              : "Both",
+                ? "Install"
+                : "Both",
           roofType,
           leadCompanyName: customerLeadName,
           customerEmail,
           streetAddress: navState.quotationForm?.street || "",
-          cityStateZip:
-            navState.quotationForm?.cityStateZip || customerAddress,
+          cityStateZip: navState.quotationForm?.cityStateZip || customerAddress,
           buildingSize: displayBuildingSize,
           squareFootage: effectiveSqFt,
           sf: effectiveSqFt,
@@ -327,8 +330,7 @@ export function QuotePreviewPage() {
             navState.extractedShipper?.pricing?.rows ||
             pembExtractedShipper?.pricing?.rows,
           pricingResult:
-            navState.extractedShipper?.pricing ||
-            pembExtractedShipper?.pricing,
+            navState.extractedShipper?.pricing || pembExtractedShipper?.pricing,
           fullQuoteResult:
             navState.extractedShipper?.fullQuote ||
             pembExtractedShipper?.fullQuote ||
@@ -389,7 +391,7 @@ export function QuotePreviewPage() {
               },
           status: "draft",
         },
-        activeEstId
+        activeEstId,
       );
 
       const data = res.data || res;
@@ -435,7 +437,7 @@ export function QuotePreviewPage() {
     navState.quotationForm ||
     navState.extractedDrawing ||
     navState.sqFt ||
-    navState.buildingSize
+    navState.buildingSize,
   );
 
   return (
@@ -449,14 +451,15 @@ export function QuotePreviewPage() {
             className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2  text-sm font-semibold flex items-center gap-2 cursor-pointer shadow-xs"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back 
+            Back
           </Button>
           <div>
             <h1 className="text-2xl font-bold text-slate-900 leading-tight">
               Quote Preview
             </h1>
             <p className="text-xs text-slate-500 mt-0.5 font-medium">
-              Full assembled package — Quote · SOW · Contract · Building Drawings · Print or Save as PDF
+              Full assembled package — Quote · SOW · Contract · Building
+              Drawings · Print or Save as PDF
             </p>
           </div>
         </div>
@@ -481,7 +484,9 @@ export function QuotePreviewPage() {
             disabled={isSavingEstimate}
             className="bg-[#16A34A] hover:bg-[#15803D] text-white px-5 py-2.5 rounded-lg text-xs font-bold cursor-pointer shadow-xs flex items-center gap-1.5"
           >
-            {isSavingEstimate && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {isSavingEstimate && (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            )}
             {isSavingEstimate
               ? isEditing
                 ? "Updating Changes..."
@@ -502,7 +507,8 @@ export function QuotePreviewPage() {
                 Viewing Default Quote Template
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                You can select a specific quote package from the Quote Preview Hub to inspect its custom document.
+                You can select a specific quote package from the Quote Preview
+                Hub to inspect its custom document.
               </p>
             </div>
             <Button
@@ -606,4 +612,3 @@ export function QuotePreviewPage() {
 }
 
 export default QuotePreviewPage;
-
