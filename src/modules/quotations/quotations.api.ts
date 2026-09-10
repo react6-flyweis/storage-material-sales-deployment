@@ -3,6 +3,11 @@ import type { SaveEstimatePayload } from "@/modules/quotation-generator/estimate
 
 export const BUILDING_TYPE = ["PEMB", "Storage"] as const;
 export type BuildingType = (typeof BUILDING_TYPE)[number];
+export const DEFAULT_BUILDING_TYPE: BuildingType = "PEMB";
+
+export const QUOTATION_SCOPE = ["Supply", "Install", "Both"] as const;
+export type QuotationScope = (typeof QUOTATION_SCOPE)[number];
+export const DEFAULT_QUOTATION_SCOPE: QuotationScope = "Both";
 
 // Admin / Workflow statuses
 export const ADMIN_STATUS = [
