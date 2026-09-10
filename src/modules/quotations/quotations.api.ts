@@ -86,6 +86,9 @@ export type QuotationApprovalInfo = {
   } | string | null;
   reviewedAt?: string | null;
   rejectionReason?: string | null;
+  approvalMessage?: string | null;
+  approvalNote?: string | null;
+  note?: string | null;
   approvedVersionNumber?: number | null;
   history?: QuotationApprovalHistoryItem[];
 };
@@ -152,6 +155,8 @@ export type QuotationItem = {
   sentTo?: string | null;
   sentCc?: string[] | null;
   sentMessage?: string | null;
+  approvalMessage?: string | null;
+  approvalNote?: string | null;
   sourceEstimateId?: string | null;
   sourceEstimate?: SaveEstimatePayload | null;
   estimate?: SaveEstimatePayload | null;

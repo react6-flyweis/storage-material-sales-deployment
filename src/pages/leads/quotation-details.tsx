@@ -89,6 +89,10 @@ export default function QuotationDetailsPage() {
       status: (quotation?.approvalStatus || "not_submitted") as ApprovalStatus,
       rejectionReason: (quotation as { rejectionReason?: string })
         ?.rejectionReason,
+      approvalMessage: (quotation as { approvalMessage?: string })
+        ?.approvalMessage,
+      approvalNote: (quotation as { approvalNote?: string })
+        ?.approvalNote,
       approvedVersionNumber: (quotation as { approvedVersionNumber?: number })
         ?.approvedVersionNumber,
     };
@@ -115,7 +119,14 @@ export default function QuotationDetailsPage() {
         status: approvalInfo.status,
         at: approvalInfo.reviewedAt,
         by: approvalInfo.reviewedBy,
-        note: approvalInfo.rejectionReason || undefined,
+        note:
+          approvalInfo.rejectionReason ||
+          approvalInfo.approvalMessage ||
+          approvalInfo.approvalNote ||
+          approvalInfo.note ||
+          (quotation as { approvalMessage?: string })?.approvalMessage ||
+          (quotation as { approvalNote?: string })?.approvalNote ||
+          undefined,
         versionNumber: approvalInfo.approvedVersionNumber || versionNumber,
       });
     }
@@ -464,6 +475,8 @@ export default function QuotationDetailsPage() {
         sentTo={quotation?.sentTo}
         sentCc={quotation?.sentCc}
         sentMessage={quotation?.sentMessage}
+        approvalMessage={quotation?.approvalMessage || effectiveApprovalInfo?.approvalMessage}
+        approvalNote={quotation?.approvalNote || effectiveApprovalInfo?.approvalNote}
         onEdit={sourceEstimateId ? handleEditEstimate : undefined}
         onSubmitForApproval={canSubmit ? () => setShowSubmitModal(true) : undefined}
       />
