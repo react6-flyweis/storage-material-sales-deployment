@@ -449,12 +449,18 @@ export default function InvoiceForm({
       return;
     }
 
-    // Apply quote value to lineItems.0.rate
-    if (
-      typeof taxData.quoteValue === "number" &&
-      !Number.isNaN(taxData.quoteValue)
-    ) {
-      setValue("lineItems.0.rate", taxData.quoteValue);
+    // Apply amount without tax to lineItems.0.rate
+    const amountWithoutTax =
+      typeof taxData.quoteAmountMinusTax === "number" &&
+      !Number.isNaN(taxData.quoteAmountMinusTax)
+        ? taxData.quoteAmountMinusTax
+        : typeof taxData.quoteValue === "number" &&
+          !Number.isNaN(taxData.quoteValue)
+        ? taxData.quoteValue
+        : null;
+
+    if (amountWithoutTax != null) {
+      setValue("lineItems.0.rate", amountWithoutTax);
       setValue(
         "lineItems.0.quantity",
         getValues("lineItems.0.quantity") || 1,
@@ -1046,9 +1052,11 @@ export default function InvoiceForm({
                 value={leadId}
                 onValueChange={(lead) => {
                   setValue("leadId", lead?.id ?? "");
-                  if (lead && lead.quoteValue) {
-                    setValue("lineItems.0.rate", lead.quoteValue);
-                    setValue("lineItems.0.quantity", 1);
+                  if (lead) {
+                    setValue(
+                      "lineItems.0.quantity",
+                      getValues("lineItems.0.quantity") || 1,
+                    );
                     if (!getValues("lineItems.0.description")) {
                       setValue("lineItems.0.description", "Project Quote");
                     }
