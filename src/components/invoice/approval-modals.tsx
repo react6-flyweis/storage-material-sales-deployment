@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +25,7 @@ import type {
   ApprovalHistoryItem,
   ApprovalStatus,
   WorkflowStatus,
+  InvoiceApprovalRequest,
 } from "@/modules/invoices/invoices.api";
 import { getApiErrorMessage } from "@/lib/api-error";
 
@@ -44,6 +45,7 @@ function getStatusConfig(
 
   switch (effective) {
     case "pending_approval":
+    case "submitted":
       return {
         label: "Pending Approval",
         bg: "bg-amber-500",
@@ -68,13 +70,20 @@ function getStatusConfig(
         icon: XCircle,
       };
     case "sent":
+    case "sent_via_email":
       return {
         label:
           sendMethod === "manual"
             ? "Marked Sent"
-            : sendMethod === "platform"
-            ? "Sent via Email"
-            : "Sent",
+            : "Sent via Email",
+        bg: "bg-blue-600",
+        pillClass: "bg-blue-600 text-white",
+        lightClass: "bg-blue-50 text-blue-700 border-blue-200",
+        icon: Send,
+      };
+    case "marked_sent":
+      return {
+        label: "Marked Sent",
         bg: "bg-blue-600",
         pillClass: "bg-blue-600 text-white",
         lightClass: "bg-blue-50 text-blue-700 border-blue-200",
@@ -286,34 +295,201 @@ function formatTimelineDate(value?: string | null) {
   }).format(date);
 }
 
-function getActorName(by?: ApprovalHistoryItem["by"]) {
+function getActorName(by?: ApprovalHistoryItem["by"] | unknown) {
   if (!by) return "User";
   if (typeof by === "string") return by;
-  return by.name || by.email || by.role || "User";
+  if (typeof by === "object" && by !== null) {
+    const actor = by as {
+      firstName?: string;
+      lastName?: string;
+      name?: string;
+      email?: string;
+      role?: string;
+    };
+    const fullName = `${actor.firstName || ""} ${actor.lastName || ""}`.trim();
+    return fullName || actor.name || actor.email || actor.role || "User";
+  }
+  return "User";
+}
+
+function resolveEventVersion(
+  event: ApprovalHistoryItem,
+  approvalRequests?: InvoiceApprovalRequest[] | null,
+  fallbackRevision?: number | string | null,
+): number | string | null | undefined {
+  // 1. Direct version/revision on the event item itself
+  if (event.revision !== undefined && event.revision !== null) {
+    return event.revision;
+  }
+  if (event.version !== undefined && event.version !== null) {
+    return event.version;
+  }
+  if (event.versionNumber !== undefined && event.versionNumber !== null) {
+    return event.versionNumber;
+  }
+
+  // 2. Correlate with approvalRequests
+  if (approvalRequests && approvalRequests.length > 0) {
+    // 2a. Exact match on closedAt or submittedAt or notes
+    const exactMatch = approvalRequests.find((req) => {
+      if (event.at && req.closedAt && event.at === req.closedAt) return true;
+      if (event.at && req.submittedAt && event.at === req.submittedAt) return true;
+      if (
+        event.note &&
+        req.closedNote &&
+        event.note.trim() === req.closedNote.trim()
+      ) {
+        return true;
+      }
+      if (event.note && req.note && event.note.trim() === req.note.trim()) {
+        return true;
+      }
+      return false;
+    });
+
+    if (
+      exactMatch &&
+      exactMatch.revision !== undefined &&
+      exactMatch.revision !== null
+    ) {
+      return exactMatch.revision;
+    }
+
+    // 2b. Time-window correlation with approval requests
+    if (event.at) {
+      const eventTime = new Date(event.at).getTime();
+      if (!Number.isNaN(eventTime)) {
+        const sorted = [...approvalRequests]
+          .filter(
+            (r) =>
+              r.submittedAt &&
+              !Number.isNaN(new Date(r.submittedAt).getTime()),
+          )
+          .sort(
+            (a, b) =>
+              new Date(a.submittedAt!).getTime() -
+              new Date(b.submittedAt!).getTime(),
+          );
+
+        for (let i = sorted.length - 1; i >= 0; i--) {
+          const reqTime = new Date(sorted[i].submittedAt!).getTime();
+          if (eventTime >= reqTime) {
+            return sorted[i].revision;
+          }
+        }
+
+        if (sorted.length > 0 && sorted[0].revision !== undefined) {
+          return sorted[0].revision;
+        }
+      }
+    }
+
+    // 2c. If only 1 request exists
+    if (
+      approvalRequests.length === 1 &&
+      approvalRequests[0].revision !== undefined &&
+      approvalRequests[0].revision !== null
+    ) {
+      return approvalRequests[0].revision;
+    }
+  }
+
+  // 3. Fallback to invoice revision
+  if (fallbackRevision !== undefined && fallbackRevision !== null) {
+    return fallbackRevision;
+  }
+
+  return undefined;
+}
+
+export interface ApprovalHistoryTimelineProps {
+  history?: ApprovalHistoryItem[] | null;
+  approvalRequests?: InvoiceApprovalRequest[] | null;
+  revision?: number | null;
+  className?: string;
+  showEmpty?: boolean;
 }
 
 export function ApprovalHistoryTimeline({
   history,
-}: {
-  history?: ApprovalHistoryItem[] | null;
-}) {
-  if (!history || history.length === 0) {
-    return null;
+  approvalRequests,
+  revision,
+  className = "",
+  showEmpty = false,
+}: ApprovalHistoryTimelineProps) {
+  const events = useMemo(() => {
+    if (history && history.length > 0) {
+      return history;
+    }
+
+    // Fallback: build timeline items from approvalRequests if history is empty
+    if (approvalRequests && approvalRequests.length > 0) {
+      const synthetic: ApprovalHistoryItem[] = [];
+      approvalRequests.forEach((req) => {
+        if (req.closedAt) {
+          synthetic.push({
+            status: req.status || "approved",
+            at: req.closedAt,
+            by: req.reviewedBy || null,
+            note: req.closedNote || undefined,
+            revision: req.revision,
+          });
+        }
+        if (req.submittedAt) {
+          synthetic.push({
+            status: "pending_approval",
+            at: req.submittedAt,
+            by: req.submittedBy || null,
+            note: req.note || undefined,
+            revision: req.revision,
+          });
+        }
+      });
+      synthetic.sort((a, b) => {
+        const timeA = a.at ? new Date(a.at).getTime() : 0;
+        const timeB = b.at ? new Date(b.at).getTime() : 0;
+        return timeB - timeA;
+      });
+      return synthetic;
+    }
+
+    return [];
+  }, [history, approvalRequests]);
+
+  if (events.length === 0) {
+    if (!showEmpty) return null;
+    return (
+      <div
+        className={`rounded-lg border border-gray-200 bg-white p-5 shadow-xs text-center ${className}`}
+      >
+        <p className="text-xs text-gray-500 py-3">No approval events recorded yet.</p>
+      </div>
+    );
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-xs">
+    <div
+      className={`rounded-lg border border-gray-200 bg-white p-5 shadow-xs ${className}`}
+    >
       <div className="flex items-center justify-between mb-4">
         <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
           <Clock className="w-4 h-4 text-gray-500" />
           Approval History & Audit Trail
         </h4>
+        <span className="text-xs text-gray-400 font-medium">
+          {events.length} {events.length === 1 ? "event" : "events"}
+        </span>
       </div>
 
       <div className="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-200">
-        {history.map((event, index) => {
+        {events.map((event, index) => {
           const config = getStatusConfig(event.status);
           const Icon = config.icon;
+          const eventVersion = resolveEventVersion(
+            event,
+            approvalRequests,
+            revision,
+          );
 
           return (
             <div key={index} className="relative group">
@@ -330,6 +506,11 @@ export function ApprovalHistoryTimeline({
                     <span className="text-xs font-semibold text-gray-900">
                       {config.label}
                     </span>
+                    {eventVersion !== undefined && eventVersion !== null && (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                        v{eventVersion}
+                      </span>
+                    )}
                     <span className="text-xs text-gray-500 flex items-center gap-1">
                       <User className="w-3 h-3 text-gray-400" />
                       {getActorName(event.by)}
@@ -341,7 +522,7 @@ export function ApprovalHistoryTimeline({
                 </div>
 
                 {event.note && (
-                  <p className="text-xs text-gray-600 bg-gray-50 rounded-md p-2 border border-gray-100 mt-1">
+                  <p className="text-xs text-gray-600 bg-gray-50 rounded-md p-2 border border-gray-100 mt-1 whitespace-pre-wrap wrap-break-word">
                     {event.note}
                   </p>
                 )}
