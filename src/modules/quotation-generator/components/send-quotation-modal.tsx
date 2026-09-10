@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Mail, CheckSquare, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { getApiErrorMessage } from "@/lib/api-error";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -121,12 +123,12 @@ function SendQuotationDialogContent({
       onSuccess?.();
     } catch (error: unknown) {
       console.error("Failed to send quotation:", error);
-      const msg =
-        (error as { response?: { data?: { message?: string } }; message?: string })
-          ?.response?.data?.message ||
-        (error as { message?: string })?.message ||
-        "Failed to send quotation package. Please check email configuration.";
+      const msg = getApiErrorMessage(
+        error,
+        "Failed to send quotation package. Please check email configuration.",
+      );
       setErrorMessage(msg);
+      toast.error(msg);
     }
   };
 
@@ -154,12 +156,12 @@ function SendQuotationDialogContent({
       onSuccess?.();
     } catch (error: unknown) {
       console.error("Failed to mark quotation as sent:", error);
-      const msg =
-        (error as { response?: { data?: { message?: string } }; message?: string })
-          ?.response?.data?.message ||
-        (error as { message?: string })?.message ||
-        "Failed to mark quotation as sent.";
+      const msg = getApiErrorMessage(
+        error,
+        "Failed to mark quotation as sent.",
+      );
       setErrorMessage(msg);
+      toast.error(msg);
     }
   };
 

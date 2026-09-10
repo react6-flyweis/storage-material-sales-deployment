@@ -11,6 +11,8 @@ import {
   Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { getApiErrorMessage } from "@/lib/api-error";
 import { useQuotationQuery } from "@/modules/quotations/quotations.hooks";
 import { useLeadDetailQuery } from "@/modules/leads/leads.hooks";
 import { SubmitApprovalModal } from "@/modules/quotation-generator/components/submit-approval-modal";
@@ -87,6 +89,10 @@ export default function QuotationDetailsPage() {
       status: (quotation?.approvalStatus || "not_submitted") as ApprovalStatus,
       rejectionReason: (quotation as { rejectionReason?: string })
         ?.rejectionReason,
+      approvalMessage: (quotation as { approvalMessage?: string })
+        ?.approvalMessage,
+      approvalNote: (quotation as { approvalNote?: string })
+        ?.approvalNote,
       approvedVersionNumber: (quotation as { approvedVersionNumber?: number })
         ?.approvedVersionNumber,
     };
@@ -113,7 +119,14 @@ export default function QuotationDetailsPage() {
         status: approvalInfo.status,
         at: approvalInfo.reviewedAt,
         by: approvalInfo.reviewedBy,
-        note: approvalInfo.rejectionReason || undefined,
+        note:
+          approvalInfo.rejectionReason ||
+          approvalInfo.approvalMessage ||
+          approvalInfo.approvalNote ||
+          approvalInfo.note ||
+          (quotation as { approvalMessage?: string })?.approvalMessage ||
+          (quotation as { approvalNote?: string })?.approvalNote ||
+          undefined,
         versionNumber: approvalInfo.approvedVersionNumber || versionNumber,
       });
     }
@@ -150,6 +163,8 @@ export default function QuotationDetailsPage() {
 
   const isRejected =
     approvalInfo?.status === "rejected" || workflowStatus === "rejected";
+
+  const isDownloadAllowed = isApproved && !isStaleApproved;
 
   // If a version is rejected, it cannot be re-submitted directly — it must be edited first
   const canSubmit =
@@ -245,7 +260,7 @@ export default function QuotationDetailsPage() {
   }, [htmlPreviewUrl, loadHtmlPreview]);
 
   const handleDownloadPdf = async () => {
-    if (!pdfDownloadUrl) return;
+    if (!pdfDownloadUrl || !isDownloadAllowed) return;
     setIsDownloadingPdf(true);
     try {
       const res = await apiClient.get(pdfDownloadUrl, { responseType: "blob" });
@@ -261,16 +276,30 @@ export default function QuotationDetailsPage() {
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Failed to download PDF:", err);
+      const msg = getApiErrorMessage(
+        err,
+        "Failed to download PDF. Please try again.",
+      );
+      toast.error(msg);
     } finally {
       setIsDownloadingPdf(false);
     }
   };
 
-  const handleEditEstimate = () => {
-    if (estimate) {
-      loadAndEdit(estimate);
-    } else if (sourceEstimateId) {
-      loadAndEdit(sourceEstimateId);
+  const handleEditEstimate = async () => {
+    try {
+      if (estimate) {
+        await loadAndEdit(estimate);
+      } else if (sourceEstimateId) {
+        await loadAndEdit(sourceEstimateId);
+      }
+    } catch (err) {
+      console.error("Failed to load estimate for editing:", err);
+      const msg = getApiErrorMessage(
+        err,
+        "Failed to load estimate into editor. Please try again.",
+      );
+      toast.error(msg);
     }
   };
 
@@ -419,9 +448,13 @@ export default function QuotationDetailsPage() {
           <Button
             type="button"
             onClick={handleDownloadPdf}
-            disabled={isDownloadingPdf}
-            className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
-            title={"Download PDF file"}
+            disabled={isDownloadingPdf || !isDownloadAllowed}
+            className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+            title={
+              !isDownloadAllowed
+                ? "PDF download is disabled until the quotation is approved."
+                : "Download PDF file"
+            }
           >
             {isDownloadingPdf ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -442,6 +475,8 @@ export default function QuotationDetailsPage() {
         sentTo={quotation?.sentTo}
         sentCc={quotation?.sentCc}
         sentMessage={quotation?.sentMessage}
+        approvalMessage={quotation?.approvalMessage || effectiveApprovalInfo?.approvalMessage}
+        approvalNote={quotation?.approvalNote || effectiveApprovalInfo?.approvalNote}
         onEdit={sourceEstimateId ? handleEditEstimate : undefined}
         onSubmitForApproval={canSubmit ? () => setShowSubmitModal(true) : undefined}
       />

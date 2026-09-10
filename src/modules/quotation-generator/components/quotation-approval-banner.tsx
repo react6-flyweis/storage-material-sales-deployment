@@ -36,6 +36,8 @@ interface QuotationApprovalBannerProps {
   sentTo?: string | null;
   sentCc?: string[] | null;
   sentMessage?: string | null;
+  approvalMessage?: string | null;
+  approvalNote?: string | null;
   onViewTimeline?: () => void;
   onSubmitForApproval?: () => void;
   /** @deprecated Action buttons have been removed from this banner */
@@ -54,6 +56,8 @@ export function QuotationApprovalBanner({
   sentTo,
   sentCc,
   sentMessage,
+  approvalMessage,
+  approvalNote,
   onViewTimeline,
   onSubmitForApproval,
   onEdit,
@@ -78,6 +82,20 @@ export function QuotationApprovalBanner({
 
   const rejectionReason = approval?.rejectionReason;
   const history = approval?.history || [];
+
+  // Find approval note/message from props, approval object, or the approval event in history
+  const historyApprovedEvent = history.find(
+    (item) => item.status === "approved" && item.note
+  );
+  const effectiveApprovalMessage =
+    approvalMessage ||
+    approvalNote ||
+    approval?.approvalMessage ||
+    approval?.approvalNote ||
+    approval?.note ||
+    historyApprovedEvent?.note ||
+    null;
+
   const isStaleApproved =
     status === "approved" &&
     approval?.approvedVersionNumber !== undefined &&
@@ -129,7 +147,9 @@ export function QuotationApprovalBanner({
           title: `Admin Approved (v${approval?.approvedVersionNumber || versionNumber})`,
           badgeText: "Approved",
           badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-300",
-          description: "Quotation has been approved by admin and is ready to be sent to the customer.",
+          description: effectiveApprovalMessage
+            ? `Admin Note: "${effectiveApprovalMessage}" — Quotation is ready to be sent to the customer.`
+            : "Quotation has been approved by admin and is ready to be sent to the customer.",
           historyBtnClass: "text-emerald-900 hover:bg-emerald-100/80 border-emerald-300",
         };
       case "rejected":

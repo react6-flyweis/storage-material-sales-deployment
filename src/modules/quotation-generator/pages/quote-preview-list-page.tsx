@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { ArrowLeft, Search, Eye, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { getApiErrorMessage } from "@/lib/api-error";
 import {
   InputGroup,
   InputGroupAddon,
@@ -185,6 +187,11 @@ export function QuotePreviewListPage() {
       });
     } catch (err) {
       console.error("Failed to load estimate for preview:", err);
+      const msg = getApiErrorMessage(
+        err,
+        "Failed to load estimate for preview. Please try again.",
+      );
+      toast.error(msg);
     } finally {
       setIsLoadingItem(null);
     }

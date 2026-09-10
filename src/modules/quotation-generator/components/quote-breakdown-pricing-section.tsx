@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router";
+import { toast } from "sonner";
 import { FileSpreadsheet, Loader2, CheckCircle2 } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { getApiErrorMessage } from "@/lib/api-error";
 import {
   FileDropzoneCard,
   type FileItem,
@@ -22,6 +24,7 @@ import {
   type ExtractShipperResponseData,
   type ExtractDrawingResponseData,
   type ComputeEstimateRequest,
+  type Scope,
 } from "../estimates.api";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 
@@ -43,11 +46,11 @@ function normalizeRoof(roof: string): string {
   return r.replace(/\s+/g, "-") || "screw-down";
 }
 
-function normalizeScope(scope?: string): "supply" | "install" | "both" {
-  const s = (scope || "supply").toLowerCase();
-  if (s === "install") return "install";
-  if (s === "both") return "both";
-  return "supply";
+function normalizeScope(scope?: string): Scope {
+  const s = (scope || "Both").toLowerCase();
+  if (s === "supply") return "Supply";
+  if (s === "install") return "Install";
+  return "Both";
 }
 
 const tabs = [
@@ -334,7 +337,15 @@ export function QuoteBreakdownPricingSection({
       );
 
       const data = res.data || res;
+      if (res && (res as { success?: boolean }).success === false) {
+        throw new Error(res.message || "Failed to save draft estimate");
+      }
       const savedId = data?.estimate?._id || data?._id || activeEstimateId;
+      toast.success(
+        activeEstimateId
+          ? "Draft estimate updated successfully"
+          : "Draft estimate saved successfully",
+      );
       if (savedId) {
         setEstimateId(savedId);
         setPembEstimateId(savedId);
@@ -344,11 +355,11 @@ export function QuoteBreakdownPricingSection({
       navigate("/quotation/history");
     } catch (err) {
       console.error("Failed to save draft estimate:", err);
-      if (activeEstimateId) {
-        navigate(`/quotation/history/${activeEstimateId}`);
-      } else {
-        navigate("/quotation/history");
-      }
+      const msg = getApiErrorMessage(
+        err,
+        "Failed to save draft estimate. Please try again.",
+      );
+      toast.error(msg);
     } finally {
       setIsSavingDraft(false);
     }
