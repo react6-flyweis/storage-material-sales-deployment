@@ -25,6 +25,7 @@ interface QuoteBreakdownTabProps {
   extractedShipper?: ExtractShipperResponseData;
   onSelectSf?: (sf: number) => void;
   isManualSqFt?: boolean;
+  estimateId?: string | null;
 }
 
 function getCategoryBadgeStyle(cat?: string, label?: string): string {
@@ -67,8 +68,10 @@ export function QuoteBreakdownTab({
   extractedShipper,
   onSelectSf,
   isManualSqFt,
+  estimateId,
 }: QuoteBreakdownTabProps) {
-  const { scope } = useQuotationStore();
+  const { scope, pembEstimateId } = useQuotationStore();
+  const isEditing = Boolean(estimateId || pembEstimateId);
   const [isSfBannerDismissed, setIsSfBannerDismissed] = useState(false);
 
   const fullQuote = extractedShipper?.fullQuote;
@@ -448,7 +451,13 @@ export function QuoteBreakdownTab({
             className="bg-[#16A34A] hover:bg-[#15803D] text-white px-6 py-2.5 rounded-lg text-xs font-semibold cursor-pointer shadow-xs flex items-center gap-2"
           >
             {isSavingDraft && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            {isSavingDraft ? "Saving..." : "Save to History"}
+            {isSavingDraft
+              ? isEditing
+                ? "Updating Changes..."
+                : "Saving..."
+              : isEditing
+                ? "Update Changes"
+                : "Save to History"}
           </Button>
         )}
       </div>
