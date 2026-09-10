@@ -477,17 +477,23 @@ export async function markQuotationSentProvider(
 }
 
 export type LatestApprovedTaxResponse = {
-  quotationId?: string;
-  quoteNumber?: string;
-  quoteValue?: number;
-  quoteAmountIncludingTax?: number;
-  quoteAmountMinusTax?: number;
-  tax?: number;
-  taxRate?: number;
-  salesTax?: {
-    amount?: number;
-    rate?: number;
-  };
+  leadId: string;
+  quotationId: string;
+  quoteNumber: string;
+  amountWithoutMarkup: number;
+  subtotalWithoutMarkup: number;
+  markup: number;
+  subtotal: number;
+  subtotalWithMarkup: number;
+  tax: number;
+  total: number;
+  taxRate: number;
+  taxableBase: number;
+  taxNote?: string;
+  currency?: string;
+  approvalStatus: string;
+  versionNumber: number;
+  reviewedAt: string;
 };
 
 export async function getLatestApprovedTaxByLeadProvider(leadId: string) {
