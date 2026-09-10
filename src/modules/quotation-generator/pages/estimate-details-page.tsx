@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { toast } from "sonner";
+import { getApiErrorMessage } from "@/lib/api-error";
 import {
   getEstimateByIdProvider,
   downloadPdfProvider,
@@ -145,6 +147,11 @@ export function EstimateDetailPage() {
       });
     } catch (err) {
       console.error("Failed to generate PDF:", err);
+      const msg = getApiErrorMessage(
+        err,
+        "Failed to generate PDF. Please try again.",
+      );
+      toast.error(msg);
     } finally {
       setIsDownloadingPdf(false);
     }
@@ -155,27 +162,48 @@ export function EstimateDetailPage() {
     setIsConverting(true);
     try {
       const res = await convertMutation.mutateAsync(id);
+      if (res && (res as { success?: boolean }).success === false) {
+        throw new Error(
+          (res as { message?: string }).message ||
+            "Failed to convert estimate to quotation",
+        );
+      }
       const resData = (
         res as { data?: { quotation?: { _id?: string }; _id?: string } }
       )?.data;
       const quotationId = resData?.quotation?._id || resData?._id;
       if (quotationId) {
+        toast.success("Converted to quotation successfully");
         navigate(`/leads/quotation-details/${quotationId}`);
       } else {
         await fetchEstimateDetail();
       }
     } catch (err) {
       console.error("Failed to convert estimate to quotation:", err);
+      const msg = getApiErrorMessage(
+        err,
+        "Failed to convert estimate to quotation. Please try again.",
+      );
+      toast.error(msg);
     } finally {
       setIsConverting(false);
     }
   };
 
-  const handleEditClick = () => {
-    if (estimate) {
-      loadAndEdit(estimate);
-    } else if (id) {
-      loadAndEdit(id);
+  const handleEditClick = async () => {
+    try {
+      if (estimate) {
+        await loadAndEdit(estimate);
+      } else if (id) {
+        await loadAndEdit(id);
+      }
+    } catch (err) {
+      console.error("Failed to load estimate for editing:", err);
+      const msg = getApiErrorMessage(
+        err,
+        "Failed to load estimate into editor. Please try again.",
+      );
+      toast.error(msg);
     }
   };
 

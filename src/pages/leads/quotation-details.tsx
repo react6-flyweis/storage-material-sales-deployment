@@ -11,6 +11,8 @@ import {
   Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { getApiErrorMessage } from "@/lib/api-error";
 import { useQuotationQuery } from "@/modules/quotations/quotations.hooks";
 import { useLeadDetailQuery } from "@/modules/leads/leads.hooks";
 import { SubmitApprovalModal } from "@/modules/quotation-generator/components/submit-approval-modal";
@@ -261,16 +263,30 @@ export default function QuotationDetailsPage() {
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Failed to download PDF:", err);
+      const msg = getApiErrorMessage(
+        err,
+        "Failed to download PDF. Please try again.",
+      );
+      toast.error(msg);
     } finally {
       setIsDownloadingPdf(false);
     }
   };
 
-  const handleEditEstimate = () => {
-    if (estimate) {
-      loadAndEdit(estimate);
-    } else if (sourceEstimateId) {
-      loadAndEdit(sourceEstimateId);
+  const handleEditEstimate = async () => {
+    try {
+      if (estimate) {
+        await loadAndEdit(estimate);
+      } else if (sourceEstimateId) {
+        await loadAndEdit(sourceEstimateId);
+      }
+    } catch (err) {
+      console.error("Failed to load estimate for editing:", err);
+      const msg = getApiErrorMessage(
+        err,
+        "Failed to load estimate into editor. Please try again.",
+      );
+      toast.error(msg);
     }
   };
 

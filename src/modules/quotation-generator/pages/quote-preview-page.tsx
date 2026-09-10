@@ -1,8 +1,10 @@
 import { useState, useRef, useMemo, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router";
 import { ArrowLeft, FolderUp, Loader2, FileSearch } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { getApiErrorMessage } from "@/lib/api-error";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 import {
   // downloadPdfProvider,
@@ -395,7 +397,11 @@ export function QuotePreviewPage() {
       );
 
       const data = res.data || res;
+      if (res && (res as { success?: boolean }).success === false) {
+        throw new Error(res.message || "Failed to save estimate to history");
+      }
       const savedId = data?.estimate?._id || data?._id || activeEstId;
+      toast.success("Estimate saved to history successfully");
       if (savedId) {
         setEstimateId(savedId);
         setPembEstimateId(savedId);
@@ -405,7 +411,11 @@ export function QuotePreviewPage() {
       navigate("/quotation/history");
     } catch (err) {
       console.error("Failed to save estimate to history:", err);
-      navigate("/quotation/history");
+      const msg = getApiErrorMessage(
+        err,
+        "Failed to save estimate to history. Please try again.",
+      );
+      toast.error(msg);
     } finally {
       setIsSavingEstimate(false);
     }

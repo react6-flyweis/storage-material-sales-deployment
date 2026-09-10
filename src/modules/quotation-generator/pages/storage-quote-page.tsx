@@ -7,6 +7,8 @@ import {
   useMemo,
 } from "react";
 import { useNavigate, useLocation, useSearchParams } from "react-router";
+import { toast } from "sonner";
+import { getApiErrorMessage } from "@/lib/api-error";
 import {
   ArrowLeft,
   FileSpreadsheet,
@@ -740,8 +742,16 @@ export default function StorageQuotePage() {
       };
 
       const res = await saveEstimateProvider(payload, estimateId || undefined);
+      if (res && (res as { success?: boolean }).success === false) {
+        throw new Error(res.message || "Failed to save draft.");
+      }
       const data = res.data || res;
       const savedId = data?.estimate?._id || data?._id || estimateId;
+      toast.success(
+        estimateId
+          ? "Storage draft updated successfully"
+          : "Storage draft saved successfully",
+      );
       if (savedId) {
         setStorageEstimateId(savedId);
         navigate(`/quotation/history/${savedId}`);
@@ -750,7 +760,9 @@ export default function StorageQuotePage() {
       navigate("/quotation/history");
     } catch (err) {
       console.error("Failed to save storage estimate:", err);
-      setFeedbackMsg({ type: "error", text: "Failed to save draft." });
+      const msg = getApiErrorMessage(err, "Failed to save draft.");
+      setFeedbackMsg({ type: "error", text: msg });
+      toast.error(msg);
     } finally {
       setIsSaving(false);
     }

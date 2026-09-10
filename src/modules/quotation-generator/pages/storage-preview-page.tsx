@@ -6,8 +6,10 @@ import {
   Loader2,
   //  RefreshCw, Printer
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { getApiErrorMessage } from "@/lib/api-error";
 import {
   // downloadPdfProvider,
   saveEstimateProvider,
@@ -341,7 +343,11 @@ export function StoragePreviewPage() {
       );
 
       const data = res.data || res;
+      if (res && (res as { success?: boolean }).success === false) {
+        throw new Error(res.message || "Failed to save storage estimate");
+      }
       const savedId = data?.estimate?._id || data?._id || activeEstId;
+      toast.success("Storage estimate saved successfully");
       if (savedId) {
         setEstimateId(savedId);
         setStorageEstimateId(savedId);
@@ -351,7 +357,11 @@ export function StoragePreviewPage() {
       navigate("/quotation/history");
     } catch (err) {
       console.error("Failed to save storage estimate:", err);
-      navigate("/quotation/history");
+      const msg = getApiErrorMessage(
+        err,
+        "Failed to save storage estimate. Please try again.",
+      );
+      toast.error(msg);
     } finally {
       setIsSavingEstimate(false);
     }

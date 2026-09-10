@@ -10,6 +10,8 @@ import {
   Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { getApiErrorMessage } from "@/lib/api-error";
 import {
   InputGroup,
   InputGroupAddon,
@@ -129,15 +131,20 @@ export function QuoteHistoryPage() {
 
   const handleDeleteQuote = async (id?: string) => {
     if (!id) return;
-    setEstimatesList((prev) => prev.filter((q) => q._id !== id));
-    setTotalItems((prev) => Math.max(0, prev - 1));
     try {
-      await deleteEstimateProvider(id).catch((err) => {
-        console.warn("Backend delete estimate warning:", err);
-      });
+      await deleteEstimateProvider(id);
+      setEstimatesList((prev) => prev.filter((q) => q._id !== id));
+      setTotalItems((prev) => Math.max(0, prev - 1));
+      toast.success("Estimate deleted successfully");
       fetchHistory();
     } catch (err) {
       console.error("Failed to delete estimate:", err);
+      const msg = getApiErrorMessage(
+        err,
+        "Failed to delete estimate. Please try again.",
+      );
+      toast.error(msg);
+      fetchHistory();
     }
   };
 
@@ -149,6 +156,11 @@ export function QuoteHistoryPage() {
       await loadAndEdit(item);
     } catch (err) {
       console.error("Failed to load estimate detail:", err);
+      const msg = getApiErrorMessage(
+        err,
+        "Failed to load estimate. Please try again.",
+      );
+      toast.error(msg);
     }
   };
 
