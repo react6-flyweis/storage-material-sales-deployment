@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
-import { Calendar, Plus, AlertTriangle } from "lucide-react";
+import { Calendar, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router";
 import InvoiceLineItem from "./invoice-line-item";
 import AddMarkupDialog from "@/components/invoice/add-markup-dialog";
@@ -255,13 +255,17 @@ function invoiceToFormValues(
       ? invoice.customerId
       : null;
   const firstLineItemWithMarkup = invoice?.lineItems?.find(
-    (item) => item.markup && item.markup > 0
+    (item) => item.markup && item.markup > 0,
   );
   const isPercentMarkup = firstLineItemWithMarkup?.markupType === "percentage";
   const markupValue = isPercentMarkup
     ? String(firstLineItemWithMarkup?.markup)
     : dollarAmountToFormValue(invoice?.markupTotal);
-  const markupType = isPercentMarkup ? "%" : (markupValue ? "$" : defaultFormValues.markupType);
+  const markupType = isPercentMarkup
+    ? "%"
+    : markupValue
+      ? "$"
+      : defaultFormValues.markupType;
 
   const discountValue = dollarAmountToFormValue(invoice?.discount);
   const depositValue = resolveDepositFormValue(invoice);
@@ -308,34 +312,41 @@ function invoiceToFormValues(
     lineItems:
       invoice?.lineItems?.length && invoice.lineItems.length > 0
         ? invoice.lineItems.map((item, index) => {
-          const taxVal = item.tax ?? 0;
-          const matchingTax = taxesList.find((t: { name: string; rate: string }) => parseFloat(t.rate) === taxVal);
-          const rateVal = item.rate ?? 0;
-          const qtyVal = item.quantity ?? 1;
-          const markupPercent = item.markup || (markupType === "%" ? parseFloat(markupValue) || 0 : 0);
-          const markupAmt = item.markupAmount ?? (rateVal * (markupPercent / 100) * qtyVal);
-          const effRate = item.effectiveRate ?? (rateVal * (1 + markupPercent / 100));
-          const taxAmt = item.taxAmount ?? (effRate * qtyVal * (taxVal / 100));
-          const itemTotal = effRate * qtyVal;
-          return {
-            id: item._id ?? item.id ?? `${invoice._id ?? "invoice"}-${index}`,
-            description: item.description ?? "",
-            notes: item.notes ?? "",
-            rate: rateVal,
-            markup: markupPercent,
-            markupType: item.markupType ?? "percentage",
-            quantity: qtyVal,
-            tax: taxVal,
-            taxType: item.taxType ?? "percentage",
-            effectiveRate: effRate,
-            markupAmount: markupAmt,
-            taxAmount: taxAmt,
-            total: itemTotal,
-            selectedTax: matchingTax ? matchingTax.name : "",
-            images: item.images ?? item.photos ?? [],
-            items: item.items ?? [],
-          };
-        })
+            const taxVal = item.tax ?? 0;
+            const matchingTax = taxesList.find(
+              (t: { name: string; rate: string }) =>
+                parseFloat(t.rate) === taxVal,
+            );
+            const rateVal = item.rate ?? 0;
+            const qtyVal = item.quantity ?? 1;
+            const markupPercent =
+              item.markup ||
+              (markupType === "%" ? parseFloat(markupValue) || 0 : 0);
+            const markupAmt =
+              item.markupAmount ?? rateVal * (markupPercent / 100) * qtyVal;
+            const effRate =
+              item.effectiveRate ?? rateVal * (1 + markupPercent / 100);
+            const taxAmt = item.taxAmount ?? effRate * qtyVal * (taxVal / 100);
+            const itemTotal = effRate * qtyVal;
+            return {
+              id: item._id ?? item.id ?? `${invoice._id ?? "invoice"}-${index}`,
+              description: item.description ?? "",
+              notes: item.notes ?? "",
+              rate: rateVal,
+              markup: markupPercent,
+              markupType: item.markupType ?? "percentage",
+              quantity: qtyVal,
+              tax: taxVal,
+              taxType: item.taxType ?? "percentage",
+              effectiveRate: effRate,
+              markupAmount: markupAmt,
+              taxAmount: taxAmt,
+              total: itemTotal,
+              selectedTax: matchingTax ? matchingTax.name : "",
+              images: item.images ?? item.photos ?? [],
+              items: item.items ?? [],
+            };
+          })
         : defaultLineItems,
   };
 }
@@ -365,10 +376,7 @@ function getScheduleAllocatedTotal(
 ) {
   return payments
     .filter((payment) => !isDepositStageName(payment.name))
-    .reduce(
-      (sum, payment) => sum + parseNumericInput(payment.amount),
-      0,
-    );
+    .reduce((sum, payment) => sum + parseNumericInput(payment.amount), 0);
 }
 
 type InvoiceFormProps = {
@@ -449,39 +457,53 @@ export default function InvoiceForm({
       return;
     }
 
-    // Apply amount without tax to lineItems.0.rate
-    const amountWithoutTax =
-      typeof taxData.quoteAmountMinusTax === "number" &&
-      !Number.isNaN(taxData.quoteAmountMinusTax)
-        ? taxData.quoteAmountMinusTax
-        : typeof taxData.quoteValue === "number" &&
-          !Number.isNaN(taxData.quoteValue)
-        ? taxData.quoteValue
-        : null;
+    // Apply base amount without markup to lineItems.0.rate
+    const baseRate =
+      taxData.amountWithoutMarkup ?? taxData.subtotalWithoutMarkup ?? 0;
 
-    if (amountWithoutTax != null) {
-      setValue("lineItems.0.rate", amountWithoutTax);
+    setValue("lineItems.0.rate", baseRate);
+    setValue("lineItems.0.quantity", getValues("lineItems.0.quantity") || 1);
+    if (!getValues("lineItems.0.description")) {
       setValue(
-        "lineItems.0.quantity",
-        getValues("lineItems.0.quantity") || 1,
+        "lineItems.0.description",
+        taxData.quoteNumber
+          ? `Quotation ${taxData.quoteNumber}`
+          : "Project Quote",
       );
-      if (!getValues("lineItems.0.description")) {
-        setValue("lineItems.0.description", "Project Quote");
-      }
     }
 
-    // Apply tax and tax rate
-    const taxRate = taxData.taxRate ?? taxData.salesTax?.rate ?? 0;
-    const taxAmount = taxData.tax ?? taxData.salesTax?.amount;
+    // Apply markup directly
+    const markupAmount = taxData.markup ?? 0;
+    setValue("markupType", "$");
+    setValue("markupValue", markupAmount > 0 ? String(markupAmount) : "");
+    setValue("lineItems.0.markup", markupAmount);
+    setValue("lineItems.0.markupType", "amount");
+    setValue("lineItems.0.markupAmount", markupAmount);
+    const effectiveRate = baseRate + markupAmount;
+    setValue("lineItems.0.effectiveRate", effectiveRate);
+    setValue(
+      "lineItems.0.total",
+      baseRate * (getValues("lineItems.0.quantity") || 1),
+    );
 
-    if (taxRate > 0) {
-      const currentTaxes = (getValues("taxes") || []) as InvoiceFormValues["taxes"];
+    // Apply tax and tax rate directly
+    const taxRate = taxData.taxRate ?? 0;
+    const taxAmount = taxData.tax ?? 0;
+
+    if (taxRate > 0 || taxAmount > 0) {
+      const currentTaxes = (getValues("taxes") ||
+        []) as InvoiceFormValues["taxes"];
       const rateStr = String(taxRate);
-      let matchingTax = currentTaxes.find((t) => parseFloat(t.rate) === taxRate);
+      let matchingTax = currentTaxes.find(
+        (t) => parseFloat(t.rate) === taxRate,
+      );
 
-      if (!matchingTax) {
+      if (!matchingTax && taxRate > 0) {
         const name = `Tax ${rateStr}%`;
         matchingTax = { name, rate: rateStr };
+        setValue("taxes", [...currentTaxes, matchingTax]);
+      } else if (!matchingTax) {
+        matchingTax = { name: "Tax", rate: "0" };
         setValue("taxes", [...currentTaxes, matchingTax]);
       }
 
@@ -542,7 +564,8 @@ export default function InvoiceForm({
     }
 
     const scheduleValues = paymentScheduleToFormValues(schedule);
-    const depositValue = depositFromSchedule?.depositValue ?? currentDepositValue;
+    const depositValue =
+      depositFromSchedule?.depositValue ?? currentDepositValue;
 
     if (depositFromSchedule) {
       setValue("depositType", depositFromSchedule.depositType);
@@ -567,7 +590,7 @@ export default function InvoiceForm({
     getValues,
   ]);
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, remove } = useFieldArray({
     control,
     name: "lineItems",
     keyName: "fieldId",
@@ -609,23 +632,23 @@ export default function InvoiceForm({
   //   setNotesOpen((p) => ({ ...p, [id]: !p[id] }));
   // };
 
-  const addLineItem = () => {
-    append({
-      id: Date.now().toString(),
-      description: "",
-      notes: "",
-      rate: 0,
-      markup: 0,
-      markupType: "percentage",
-      quantity: 1,
-      tax: 0,
-      taxType: "percentage",
-      total: 0,
-      selectedTax: "",
-      images: [],
-      items: [],
-    });
-  };
+  // const addLineItem = () => {
+  //   append({
+  //     id: Date.now().toString(),
+  //     description: "",
+  //     notes: "",
+  //     rate: 0,
+  //     markup: 0,
+  //     markupType: "percentage",
+  //     quantity: 1,
+  //     tax: 0,
+  //     taxType: "percentage",
+  //     total: 0,
+  //     selectedTax: "",
+  //     images: [],
+  //     items: [],
+  //   });
+  // };
 
   // const removeImage = (index: number, imageIndex: number) => {
   //   const items = getValues("lineItems") || [];
@@ -639,35 +662,60 @@ export default function InvoiceForm({
     return items.reduce((sum, item) => {
       const rate = parseFloat(String(item.rate ?? 0)) || 0;
       const quantity = parseFloat(String(item.quantity ?? 1)) || 0;
-      return sum + (rate * quantity);
+      return sum + rate * quantity;
     }, 0);
   };
 
   const calculateTax = () => {
-    const markupPercent = markupType === "%" ? (parseFloat(markupValue) || 0) : 0;
+    const markupPercent = markupType === "%" ? parseFloat(markupValue) || 0 : 0;
+    const markupFixed = markupType === "$" ? parseFloat(markupValue) || 0 : 0;
     const items = watchLineItems || [];
     const available = taxes || [];
 
-    return items.reduce((sum, item) => {
-      const rate = parseFloat(String(item.rate || 0)) || 0;
-      const quantity = parseFloat(String(item.quantity || 1)) || 0;
-      const effectiveRate = rate * (1 + markupPercent / 100);
-      const total = effectiveRate * quantity;
-
+    return items.reduce((sum, item, idx) => {
       const selectedName = item.selectedTax;
       const t = available.find((a) => a.name === selectedName);
       const taxRate = t ? parseFloat(t.rate || "0") : 0;
-      return sum + (total * (taxRate / 100));
+
+      if (
+        typeof item.taxAmount === "number" &&
+        !Number.isNaN(item.taxAmount) &&
+        item.taxAmount > 0 &&
+        (item.tax === taxRate || taxRate === 0)
+      ) {
+        return sum + item.taxAmount;
+      }
+
+      if (!t || taxRate === 0) return sum;
+
+      const rate = parseFloat(String(item.rate || 0)) || 0;
+      const quantity = parseFloat(String(item.quantity || 1)) || 0;
+      const itemMarkup =
+        markupType === "%"
+          ? rate * (markupPercent / 100) * quantity
+          : idx === 0
+            ? markupFixed
+            : 0;
+      const effectiveRate =
+        quantity > 0 ? (rate * quantity + itemMarkup) / quantity : rate;
+      const total = effectiveRate * quantity;
+
+      return sum + total * (taxRate / 100);
     }, 0);
   };
 
   const calculateTotal = () => {
     const rawSubtotal = calculateSubtotal();
     const markup = getAdjustmentAmount(markupValue, markupType, rawSubtotal);
-    const discount = getAdjustmentAmount(discountValue, discountType, rawSubtotal);
+    const subtotalWithMarkup = rawSubtotal + markup;
+    const discount = getAdjustmentAmount(
+      discountValue,
+      discountType,
+      subtotalWithMarkup,
+    );
     const tax = calculateTax();
 
-    return Math.max(0, rawSubtotal + markup - discount + tax);
+    return Math.max(0, subtotalWithMarkup - discount + tax);
   };
 
   const invoiceTotal = calculateTotal();
@@ -715,10 +763,7 @@ export default function InvoiceForm({
     setValue("paymentScheduleType", payload.type);
     setValue(
       "paymentSchedulePayments",
-      ensureDepositInSchedulePayments(
-        payload.payments,
-        resolvedDepositValue,
-      ),
+      ensureDepositInSchedulePayments(payload.payments, resolvedDepositValue),
     );
   };
 
@@ -727,7 +772,6 @@ export default function InvoiceForm({
   ) => {
     applyPaymentScheduleToForm(payload);
   };
-
 
   const onSubmit = async (data: InvoiceFormValues) => {
     const isEdit = Boolean(invoice && invoice._id);
@@ -740,27 +784,43 @@ export default function InvoiceForm({
       return;
     }
 
-    const markupPercent = data.markupType === "%" ? parseNumericInput(data.markupValue) : 0;
+    const markupPercent =
+      data.markupType === "%" ? parseNumericInput(data.markupValue) : 0;
+    const markupFixed =
+      data.markupType === "$" ? parseNumericInput(data.markupValue) : 0;
 
-    let subtotal = 0;
+    let subtotalWithoutMarkup = 0;
     let markupTotal = 0;
     let taxTotal = 0;
 
-    const lineItemsPayload = (data.lineItems || []).map((item) => {
+    const lineItemsPayload = (data.lineItems || []).map((item, idx) => {
       const rate = parseNumericInput(String(item.rate ?? 0));
       const quantity = parseNumericInput(String(item.quantity ?? 1));
 
-      const effectiveRate = rate * (1 + markupPercent / 100);
-      const markupAmount = (effectiveRate - rate) * quantity;
+      const itemMarkupAmount =
+        data.markupType === "%"
+          ? rate * (markupPercent / 100) * quantity
+          : idx === 0
+            ? markupFixed
+            : 0;
+      const effectiveRate =
+        quantity > 0 ? (rate * quantity + itemMarkupAmount) / quantity : rate;
       const itemTotal = effectiveRate * quantity;
 
-      const matchingTax = (data.taxes || []).find((t) => t.name === item.selectedTax);
+      const matchingTax = (data.taxes || []).find(
+        (t) => t.name === item.selectedTax,
+      );
       const taxPercent = matchingTax ? parseNumericInput(matchingTax.rate) : 0;
-      const taxAmount = itemTotal * (taxPercent / 100);
+      const itemTaxAmount =
+        typeof item.taxAmount === "number" &&
+        item.taxAmount > 0 &&
+        (item.tax === taxPercent || taxPercent === 0)
+          ? item.taxAmount
+          : itemTotal * (taxPercent / 100);
 
-      subtotal += itemTotal;
-      markupTotal += markupAmount;
-      taxTotal += taxAmount;
+      subtotalWithoutMarkup += rate * quantity;
+      markupTotal += itemMarkupAmount;
+      taxTotal += itemTaxAmount;
 
       return {
         description: item.description?.trim() || "",
@@ -768,18 +828,21 @@ export default function InvoiceForm({
         images: item.images ?? [],
         items: item.items ?? [],
         rate,
-        markup: markupPercent,
-        markupType: "percentage",
+        markup: data.markupType === "%" ? markupPercent : itemMarkupAmount,
+        markupType: (data.markupType === "%" ? "percentage" : "amount") as
+          | "percentage"
+          | "amount",
         quantity,
         tax: taxPercent,
-        taxType: "percentage",
+        taxType: "percentage" as const,
         effectiveRate,
-        markupAmount,
-        taxAmount,
+        markupAmount: itemMarkupAmount,
+        taxAmount: itemTaxAmount,
         total: itemTotal,
       };
     });
 
+    const subtotal = subtotalWithoutMarkup + markupTotal;
     const discount = getAdjustmentAmount(
       data.discountValue,
       data.discountType,
@@ -806,13 +869,21 @@ export default function InvoiceForm({
 
     if (cleanedPayments.length > 0) {
       const stages = cleanedPayments.map((payment) => ({
-        ...((payment._id && String(payment._id).length > 5) ? { _id: String(payment._id) } : {}),
+        ...(payment._id && String(payment._id).length > 5
+          ? { _id: String(payment._id) }
+          : {}),
         stageName: payment.name,
         amount: parseFloat(payment.amount),
         amountType: (isDepositStageName(payment.name)
-          ? (data.depositType === "%" ? "percentage" : "fixed")
-          : (data.paymentScheduleType === "%" ? "percentage" : "fixed")) as "percentage" | "fixed",
-        dueDate: payment.dueDate ? new Date(payment.dueDate).toISOString() : undefined,
+          ? data.depositType === "%"
+            ? "percentage"
+            : "fixed"
+          : data.paymentScheduleType === "%"
+            ? "percentage"
+            : "fixed") as "percentage" | "fixed",
+        dueDate: payment.dueDate
+          ? new Date(payment.dueDate).toISOString()
+          : undefined,
       }));
 
       try {
@@ -853,11 +924,13 @@ export default function InvoiceForm({
       lineItems: lineItemsPayload,
       subtotal,
       markupTotal,
-      discount,
       tax: taxTotal,
+      discount,
       depositAmount,
       totalAmount,
-      ...(finalPaymentScheduleId ? { paymentScheduleId: finalPaymentScheduleId } : {}),
+      ...(finalPaymentScheduleId
+        ? { paymentScheduleId: finalPaymentScheduleId }
+        : {}),
     };
 
     try {
@@ -920,11 +993,15 @@ export default function InvoiceForm({
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
             {isEdit ? `Invoice#${invoiceNumber}` : "New Invoice"}
           </h1>
-          {isEdit && invoice?.revision !== undefined && invoice?.revision !== null && (
-            <p className="text-xs text-gray-500 mt-1">
-              Current Revision: <span className="font-semibold">v{invoice.revision}</span> (Saving will create v{invoice.revision + 1})
-            </p>
-          )}
+          {isEdit &&
+            invoice?.revision !== undefined &&
+            invoice?.revision !== null && (
+              <p className="text-xs text-gray-500 mt-1">
+                Current Revision:{" "}
+                <span className="font-semibold">v{invoice.revision}</span>{" "}
+                (Saving will create v{invoice.revision + 1})
+              </p>
+            )}
         </div>
         <div className="flex items-center gap-3 ml-auto">
           {isEdit && (
@@ -955,7 +1032,9 @@ export default function InvoiceForm({
           <AlertTriangle className="w-4 h-4 text-blue-600 shrink-0" />
           <span>
             <strong>Revision Note: </strong>
-            Saving edits will increment this invoice to revision <strong>v{(invoice?.revision ?? 1) + 1}</strong> and reset approval status to draft, requiring re-submission for admin approval.
+            Saving edits will increment this invoice to revision{" "}
+            <strong>v{(invoice?.revision ?? 1) + 1}</strong> and reset approval
+            status to draft, requiring re-submission for admin approval.
           </span>
         </div>
       )}
@@ -1178,8 +1257,8 @@ export default function InvoiceForm({
           })}
         </div>
 
-        {/* Add Line Item Button */}
-        <div className="mt-4">
+        {/* Add Line Item Button (commented out for now) */}
+        {/* <div className="mt-4">
           <Button
             variant="outline"
             onClick={addLineItem}
@@ -1190,7 +1269,7 @@ export default function InvoiceForm({
             </div>
             ADD LINE ITEM
           </Button>
-        </div>
+        </div> */}
 
         {/* Footer Summary */}
         <div className="mt-12 flex justify-end">
@@ -1350,7 +1429,9 @@ export default function InvoiceForm({
                             : ""
                         }
                         reservedScheduleType={paymentScheduleType}
-                        onDone={({ type, value }) => syncDepositToSchedule(type, value)}
+                        onDone={({ type, value }) =>
+                          syncDepositToSchedule(type, value)
+                        }
                       >
                         <button
                           type="button"
@@ -1384,7 +1465,9 @@ export default function InvoiceForm({
                       : ""
                   }
                   reservedScheduleType={paymentScheduleType}
-                  onDone={({ type, value }) => syncDepositToSchedule(type, value)}
+                  onDone={({ type, value }) =>
+                    syncDepositToSchedule(type, value)
+                  }
                 >
                   <button
                     type="button"
