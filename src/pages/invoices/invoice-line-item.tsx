@@ -57,7 +57,6 @@ export default function InvoiceLineItem({
   register,
   getValues,
   setValue,
-  remove,
   taxes = [],
   markupValue,
   markupType,
@@ -76,14 +75,27 @@ export default function InvoiceLineItem({
     const quantity = typeof rawQuantity === "number" && !Number.isNaN(rawQuantity) ? rawQuantity : 1;
 
     const markupPercent = markupType === "%" ? (parseFloat(markupValue) || 0) : 0;
-    const effectiveRate = rate * (1 + markupPercent / 100);
-    const markupAmount = (effectiveRate - rate) * quantity;
+    const markupFixed = markupType === "$" ? (parseFloat(markupValue) || 0) : 0;
+    const itemMarkup = markupType === "%"
+      ? (rate * (markupPercent / 100)) * quantity
+      : (index === 0 ? markupFixed : 0);
+    const effectiveRate = quantity > 0 ? (rate * quantity + itemMarkup) / quantity : rate;
+    const markupAmount = itemMarkup;
     const total = rate * quantity;
 
     const selectedTax = currentItem?.selectedTax;
     const matchingTax = taxes.find((tax) => tax.name === selectedTax);
     const taxPercent = matchingTax ? parseFloat(matchingTax.rate) || 0 : 0;
-    const taxAmount = (effectiveRate * quantity) * (taxPercent / 100);
+
+    // If tax amount was passed directly (e.g. from approved quotation) and tax rate is unchanged, preserve it
+    const existingTaxAmount = currentItem?.taxAmount;
+    const isDirectTax =
+      typeof existingTaxAmount === "number" &&
+      existingTaxAmount > 0 &&
+      (currentItem?.tax === taxPercent || taxPercent === 0);
+    const taxAmount = isDirectTax
+      ? existingTaxAmount
+      : (effectiveRate * quantity) * (taxPercent / 100);
 
     if (currentItem?.effectiveRate !== effectiveRate) {
       setValue(`lineItems.${index}.effectiveRate` as const, effectiveRate);
@@ -91,9 +103,9 @@ export default function InvoiceLineItem({
     if (currentItem?.markupAmount !== markupAmount) {
       setValue(`lineItems.${index}.markupAmount` as const, markupAmount);
     }
-    if (currentItem?.markup !== markupPercent) {
-      setValue(`lineItems.${index}.markup` as const, markupPercent);
-      setValue(`lineItems.${index}.markupType` as const, "percentage");
+    if (currentItem?.markup !== (markupType === "%" ? markupPercent : markupFixed)) {
+      setValue(`lineItems.${index}.markup` as const, markupType === "%" ? markupPercent : markupFixed);
+      setValue(`lineItems.${index}.markupType` as const, markupType === "%" ? "percentage" : "amount");
     }
     if (currentItem?.tax !== taxPercent) {
       setValue(`lineItems.${index}.tax` as const, taxPercent);
@@ -116,7 +128,7 @@ export default function InvoiceLineItem({
 
   return (
     <div className="relative group">
-      <button
+      {/* <button
         onClick={() => remove(index)}
         className="absolute md:-left-8 left-2 top-4 text-red-500 hover:text-red-700 group-hover:opacity-100 transition-opacity"
         title="Remove item"
@@ -124,7 +136,7 @@ export default function InvoiceLineItem({
         <div className="md:w-5 md:h-5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white">
           <span className="h-0.5 w-3 bg-white"></span>
         </div>
-      </button>
+      </button> */}
 
       <div className="border border-gray-200 rounded-lg overflow-hidden">
         {/* Main Item Row */}

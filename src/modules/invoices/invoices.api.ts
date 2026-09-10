@@ -258,6 +258,7 @@ export type CreateInvoiceDraftPayload = {
   lineItems?: CreateInvoiceLineItemPayload[];
   subtotal?: number;
   markupTotal?: number;
+  tax?: number;
   discount?: number;
   depositAmount?: number;
   totalAmount: number;
