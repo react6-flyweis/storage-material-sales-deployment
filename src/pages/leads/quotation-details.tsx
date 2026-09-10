@@ -153,6 +153,8 @@ export default function QuotationDetailsPage() {
   const isRejected =
     approvalInfo?.status === "rejected" || workflowStatus === "rejected";
 
+  const isDownloadAllowed = isApproved && !isStaleApproved;
+
   // If a version is rejected, it cannot be re-submitted directly — it must be edited first
   const canSubmit =
     !isRejected &&
@@ -247,7 +249,7 @@ export default function QuotationDetailsPage() {
   }, [htmlPreviewUrl, loadHtmlPreview]);
 
   const handleDownloadPdf = async () => {
-    if (!pdfDownloadUrl) return;
+    if (!pdfDownloadUrl || !isDownloadAllowed) return;
     setIsDownloadingPdf(true);
     try {
       const res = await apiClient.get(pdfDownloadUrl, { responseType: "blob" });
@@ -435,9 +437,13 @@ export default function QuotationDetailsPage() {
           <Button
             type="button"
             onClick={handleDownloadPdf}
-            disabled={isDownloadingPdf}
-            className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
-            title={"Download PDF file"}
+            disabled={isDownloadingPdf || !isDownloadAllowed}
+            className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+            title={
+              !isDownloadAllowed
+                ? "PDF download is disabled until the quotation is approved."
+                : "Download PDF file"
+            }
           >
             {isDownloadingPdf ? (
               <Loader2 className="h-4 w-4 animate-spin" />
