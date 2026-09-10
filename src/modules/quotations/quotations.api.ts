@@ -53,10 +53,15 @@ export type QuotationApprovalHistoryItem = {
         _id?: string;
         firstName?: string;
         lastName?: string;
+        name?: string;
         email?: string;
+        role?: string;
       }
     | null;
   at?: string | null;
+  versionNumber?: number | string | null;
+  version?: number | string | null;
+  revision?: number | string | null;
 };
 
 export type QuotationApprovalInfo = {
@@ -465,6 +470,8 @@ export type LatestApprovedTaxResponse = {
   quotationId?: string;
   quoteNumber?: string;
   quoteValue?: number;
+  quoteAmountIncludingTax?: number;
+  quoteAmountMinusTax?: number;
   tax?: number;
   taxRate?: number;
   salesTax?: {
