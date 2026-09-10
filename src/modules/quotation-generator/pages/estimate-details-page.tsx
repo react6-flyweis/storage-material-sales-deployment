@@ -358,8 +358,13 @@ export function EstimateDetailPage() {
           <Button
             type="button"
             onClick={handleDownloadPdf}
-            disabled={isDownloadingPdf}
-            className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
+            disabled={isDownloadingPdf || effectiveWorkflowStatus !== "approved"}
+            className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+            title={
+              effectiveWorkflowStatus !== "approved"
+                ? "PDF generation is disabled until the estimate is approved."
+                : "Generate and download or print PDF"
+            }
           >
             {isDownloadingPdf ? (
               <Loader2 className="h-4 w-4 animate-spin" />
