@@ -93,6 +93,8 @@ export function StoragePreviewPage() {
   const [isSavingEstimate, setIsSavingEstimate] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  const isEditing = Boolean(estimateId || storeStorageEstimateId || navState.estimateId);
+
   const customerLeadName =
     storeCustomerLeadName ||
     navState.customerLeadName ||
@@ -501,7 +503,7 @@ export function StoragePreviewPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Button
+          {/* <Button
             type="button"
             variant="outline"
             onClick={handleRefreshPreview}
@@ -523,7 +525,7 @@ export function StoragePreviewPage() {
               <Printer className="h-4 w-4" />
             )}
             {isDownloadingPdf ? "Generating PDF..." : "Generate & Print PDF"}
-          </Button>
+          </Button> */}
           <Button
             type="button"
             onClick={handleSaveToHistory}
@@ -531,7 +533,13 @@ export function StoragePreviewPage() {
             className="bg-[#16A34A] hover:bg-[#15803D] text-white px-5 py-2.5 rounded-lg text-xs font-bold cursor-pointer shadow-xs flex items-center gap-1.5"
           >
             {isSavingEstimate && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            {isSavingEstimate ? "Saving..." : "Save to History"}
+            {isSavingEstimate
+              ? isEditing
+                ? "Updating Changes..."
+                : "Saving..."
+              : isEditing
+                ? "Update Changes"
+                : "Save to History"}
           </Button>
         </div>
       </div>
