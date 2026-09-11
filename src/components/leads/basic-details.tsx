@@ -21,6 +21,7 @@ import {
   // User,
   FileText,
   CircleDollarSign,
+  Flag,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { LeadDetailData } from "@/modules/leads/leads.api";
@@ -29,10 +30,10 @@ import {
   formatLeadDate,
   formatLeadDateTime,
   formatLifecycleStatus,
-  formatPhone,
   getLeadProjectName,
   // getAssignedEmployeeName,
 } from "@/modules/leads/leads.utils";
+import { formatPhone } from "@/lib/utils";
 import { useUpdateLeadLifecycleMutation } from "@/modules/leads/leads.hooks";
 import AddBuildingDialog from "@/components/leads/add-building-dialog";
 import {
@@ -100,7 +101,14 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
   const createdOn = formatLeadDate(leadData?.createdAt);
   const location = leadData?.location || "—";
   const contactName = customer?.firstName?.trim() || "-";
-  const contactPhone = formatPhone(customer?.phone);
+  const contactPhone = formatPhone(
+    typeof customer?.phone === "string"
+      ? customer.phone
+      : customer?.phone?.number,
+    typeof customer?.phone === "object"
+      ? customer?.phone?.countryCode
+      : null,
+  );
   const contactEmail = customer?.email || "—";
   const contactAddress = leadData?.location || "—";
   // const assignedToName =
@@ -358,6 +366,92 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
           </div>
         </CardFooter>
       </Card>
+
+      {/* Project Specifications Card */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+        <div className="flex items-center gap-2.5 mb-6">
+          <div className="w-7 h-7 rounded-md bg-[#e8f5e9] flex items-center justify-center text-[#2e7d32]">
+            <Flag className="w-4 h-4" />
+          </div>
+          <h3 className="text-base font-semibold text-gray-900">
+            Project Specifications
+          </h3>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+          {/* 1. Width */}
+          <div className="flex items-center justify-between px-4 py-3 bg-[#f8fafc] rounded-lg border border-[#f1f5f9]">
+            <span className="text-sm text-gray-600">Width</span>
+            <span className="text-sm font-bold text-gray-900">
+              {leadData?.width ? `${leadData.width} ft` : "N/A"}
+            </span>
+          </div>
+
+          {/* 2. Length */}
+          <div className="flex items-center justify-between px-4 py-3 bg-[#f8fafc] rounded-lg border border-[#f1f5f9]">
+            <span className="text-sm text-gray-600">Length</span>
+            <span className="text-sm font-bold text-gray-900">
+              {leadData?.length ? `${leadData.length} ft` : "N/A"}
+            </span>
+          </div>
+
+          {/* 3. Height */}
+          <div className="flex items-center justify-between px-4 py-3 bg-[#f8fafc] rounded-lg border border-[#f1f5f9]">
+            <span className="text-sm text-gray-600">Height</span>
+            <span className="text-sm font-bold text-gray-900">
+              {leadData?.height ? `${leadData.height} ft` : "N/A"}
+            </span>
+          </div>
+
+          {/* 4. Doors */}
+          <div className="flex items-center justify-between px-4 py-3 bg-[#f8fafc] rounded-lg border border-[#f1f5f9]">
+            <span className="text-sm text-gray-600">Doors</span>
+            <span className="text-sm font-bold text-gray-900">
+              {leadData?.numDoors ?? "0"}
+            </span>
+          </div>
+
+          {/* 5. Windows */}
+          <div className="flex items-center justify-between px-4 py-3 bg-[#f8fafc] rounded-lg border border-[#f1f5f9]">
+            <span className="text-sm text-gray-600">Windows</span>
+            <span className="text-sm font-bold text-gray-900">
+              {leadData?.numWindows ?? "0"}
+            </span>
+          </div>
+
+          {/* 6. Insulation */}
+          <div className="flex items-center justify-between px-4 py-3 bg-[#f8fafc] rounded-lg border border-[#f1f5f9]">
+            <span className="text-sm text-gray-600">Insulation</span>
+            <span className="text-sm font-bold text-gray-900">
+              {leadData?.numInsulation ?? "0"}
+            </span>
+          </div>
+
+          {/* 7. Roof Pitch */}
+          <div className="flex items-center justify-between px-4 py-3 bg-[#f8fafc] rounded-lg border border-[#f1f5f9]">
+            <span className="text-sm text-gray-600">Roof Pitch</span>
+            <span className="text-sm font-bold text-gray-900">
+              {leadData?.roofPitch || "N/A"}
+            </span>
+          </div>
+
+          {/* 8. Roof Style */}
+          <div className="flex items-center justify-between px-4 py-3 bg-[#f8fafc] rounded-lg border border-[#f1f5f9]">
+            <span className="text-sm text-gray-600">Roof Style</span>
+            <span className="text-sm font-bold text-gray-900">
+              {leadData?.roofStyle || "N/A"}
+            </span>
+          </div>
+
+          {/* 9. Building Type */}
+          <div className="flex items-center justify-between px-4 py-3 bg-[#f8fafc] rounded-lg border border-[#f1f5f9]">
+            <span className="text-sm text-gray-600">Building Type</span>
+            <span className="text-sm font-bold text-gray-900">
+              {leadData?.buildingType || "N/A"}
+            </span>
+          </div>
+        </div>
+      </div>
 
       {/* Project Lifecycle */}
       <Card className="">

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm, useWatch, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useNavigate, useParams, useLocation } from "react-router";
@@ -17,9 +17,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft } from "lucide-react";
 import ClientSelector from "@/components/customers/client-selector";
 import { getApiErrorMessage } from "@/lib/api-error";
-import { useCreateMeetingMutation, useUpdateMeetingMutation } from "@/modules/meetings/meetings.hooks";
+import {
+  useCreateMeetingMutation,
+  useUpdateMeetingMutation,
+} from "@/modules/meetings/meetings.hooks";
 import SuccessDialog from "@/components/success-dialog";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 
 const meetingSchema = z
   .object({
@@ -31,6 +38,7 @@ const meetingSchema = z
       .string()
       .min(1, "Duration is required")
       .regex(/^[0-9]+$/, "Duration must be a number of minutes"),
+    reminderMinutes: z.string().optional(),
     mode: z.enum(["online", "in-person"]),
     link: z.string().optional(),
     notes: z.string().optional(),
@@ -76,8 +84,6 @@ const meetingSchema = z
 
 type MeetingFormData = z.infer<typeof meetingSchema>;
 
-
-
 export default function ScheduleMeeting() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -88,7 +94,9 @@ export default function ScheduleMeeting() {
   const [selectedClient, setSelectedClient] = useState(() => {
     if (isEditMode && passedMeeting?.rawMeeting) {
       const raw = passedMeeting.rawMeeting;
-      return typeof raw.leadId === "string" ? raw.leadId : (raw.leadId?._id || "");
+      return typeof raw.leadId === "string"
+        ? raw.leadId
+        : raw.leadId?._id || "";
     }
     const queryParams = new URLSearchParams(location.search);
     return queryParams.get("lead") || "";
@@ -98,7 +106,9 @@ export default function ScheduleMeeting() {
     if (isEditMode && passedMeeting?.rawMeeting) {
       const raw = passedMeeting.rawMeeting;
       if (raw.customerId) {
-        return typeof raw.customerId === "string" ? raw.customerId : (raw.customerId._id || "");
+        return typeof raw.customerId === "string"
+          ? raw.customerId
+          : raw.customerId._id || "";
       }
     }
     return "";
@@ -121,14 +131,18 @@ export default function ScheduleMeeting() {
         timeStr = `${hours}:${minutes}`;
       }
 
-      const leadIdStr = typeof raw.leadId === "string" ? raw.leadId : (raw.leadId?._id || "");
+      const leadIdStr =
+        typeof raw.leadId === "string" ? raw.leadId : raw.leadId?._id || "";
 
       return {
-        mode: raw.mode || "online",
+        mode: (raw.mode || "online") as "online" | "in-person",
         title: raw.title || "",
         date: dateStr,
         time: timeStr,
         duration: String(raw.duration || ""),
+        reminderMinutes: raw.reminderMinutes
+          ? String(raw.reminderMinutes)
+          : "30",
         link: raw.meetingLink || "",
         notes: raw.notes || "",
         client: leadIdStr,
@@ -142,6 +156,7 @@ export default function ScheduleMeeting() {
       date: "",
       time: "",
       duration: "",
+      reminderMinutes: "30",
       link: "",
       notes: "",
       client: leadIdParam,
@@ -183,6 +198,10 @@ export default function ScheduleMeeting() {
       meetingLink = `https://${meetingLink}`;
     }
 
+    const reminderMinutes = data.reminderMinutes
+      ? Number(data.reminderMinutes)
+      : undefined;
+
     try {
       let response;
       if (isEditMode && id) {
@@ -190,42 +209,52 @@ export default function ScheduleMeeting() {
           meetingId: id,
           payload: {
             leadId: data.client,
-            customerId,
+            customerId: customerId || undefined,
             title: data.title,
             meetingTime,
             duration: Number.parseInt(data.duration, 10),
             mode: data.mode,
             meetingLink,
+            reminderMinutes,
             notes: data.notes?.trim() || undefined,
           },
         });
       } else {
         response = await createMeetingMutation.mutateAsync({
           leadId: data.client,
-          customerId,
+          customerId: customerId || undefined,
           title: data.title,
           meetingTime,
           duration: Number.parseInt(data.duration, 10),
           mode: data.mode,
           meetingLink,
+          reminderMinutes,
           notes: data.notes?.trim() || undefined,
         });
       }
 
       if (!response.success) {
-        setErrorMessage(response.message || `Unable to ${isEditMode ? "update" : "schedule"} meeting.`);
+        setErrorMessage(
+          response.message ||
+            `Unable to ${isEditMode ? "update" : "schedule"} meeting.`,
+        );
         return;
       }
 
       setSuccessOpen(true);
       setTimeout(() => navigate("/meetings"), 500);
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, `Unable to ${isEditMode ? "update" : "schedule"} meeting.`));
+      setErrorMessage(
+        getApiErrorMessage(
+          error,
+          `Unable to ${isEditMode ? "update" : "schedule"} meeting.`,
+        ),
+      );
     }
   };
 
   return (
-    <div className="p-4 sm:p-6  w-full">
+    <div className="p-4 sm:p-6 w-full">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <Button
@@ -278,20 +307,27 @@ export default function ScheduleMeeting() {
             {/* Meeting title */}
             <div className="space-y-2">
               <Label htmlFor="title">Meeting title</Label>
-              <Select
-                onValueChange={(value) => setValue("title", value)}
-                {...register("title")}
-              >
-                <SelectTrigger className="w-full" id="title">
-                  <SelectValue placeholder="Meeting type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="project-review">Project Review</SelectItem>
-                  <SelectItem value="sales-meeting">Sales Meeting</SelectItem>
-                  <SelectItem value="follow-up">Follow-up</SelectItem>
-                  <SelectItem value="consultation">Consultation</SelectItem>
-                </SelectContent>
-              </Select>
+              <Controller
+                control={control}
+                name="title"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className="w-full" id="title">
+                      <SelectValue placeholder="Meeting type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Project Review">
+                        Project Review
+                      </SelectItem>
+                      <SelectItem value="Sales Meeting">
+                        Sales Meeting
+                      </SelectItem>
+                      <SelectItem value="Follow-up">Follow-up</SelectItem>
+                      <SelectItem value="Consultation">Consultation</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
               {errors.title && (
                 <p className="text-sm text-red-500">{errors.title.message}</p>
               )}
@@ -331,7 +367,6 @@ export default function ScheduleMeeting() {
               <Label htmlFor="duration">Duration (In Min)</Label>
               <InputGroup>
                 <InputGroupInput
-
                   id="duration"
                   type="number"
                   min={1}
@@ -339,8 +374,7 @@ export default function ScheduleMeeting() {
                   placeholder="60"
                   {...register("duration")}
                 />
-                <InputGroupAddon align="inline-end">
-                  Min</InputGroupAddon>
+                <InputGroupAddon align="inline-end">Min</InputGroupAddon>
               </InputGroup>
               {errors.duration && (
                 <p className="text-sm text-red-500">
@@ -349,8 +383,36 @@ export default function ScheduleMeeting() {
               )}
             </div>
 
-            {/* Meeting mode */}
+            {/* Reminder Timing */}
             <div className="space-y-2">
+              <Label htmlFor="reminderMinutes">Reminder Timing</Label>
+              <Controller
+                control={control}
+                name="reminderMinutes"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className="w-full" id="reminderMinutes">
+                      <SelectValue placeholder="Select reminder timing" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="15">15 minutes before</SelectItem>
+                      <SelectItem value="30">30 minutes before</SelectItem>
+                      <SelectItem value="60">1 hour before</SelectItem>
+                      <SelectItem value="120">2 hours before</SelectItem>
+                      <SelectItem value="1440">24 hours before</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.reminderMinutes && (
+                <p className="text-sm text-red-500">
+                  {errors.reminderMinutes.message}
+                </p>
+              )}
+            </div>
+
+            {/* Meeting mode */}
+            <div className="space-y-2 sm:col-span-2">
               <Label>Meeting mode</Label>
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pt-2">
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -384,7 +446,11 @@ export default function ScheduleMeeting() {
               <Label htmlFor="link">
                 Meeting Link <span className="text-red-500">*</span>
               </Label>
-              <Input id="link" placeholder="Zoom Meeting" {...register("link")} />
+              <Input
+                id="link"
+                placeholder="https://meet.google.com/xyz-abcd-efg"
+                {...register("link")}
+              />
               {errors.link && (
                 <p className="text-sm text-red-500">{errors.link.message}</p>
               )}
@@ -411,19 +477,25 @@ export default function ScheduleMeeting() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => navigate("/customers/meetings")}
+            onClick={() => navigate("/meetings")}
             className="w-full sm:w-auto px-6"
           >
             Cancel
           </Button>
           <Button
             type="submit"
-            disabled={createMeetingMutation.isPending || updateMeetingMutation.isPending}
-            className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto px-6"
+            disabled={
+              createMeetingMutation.isPending || updateMeetingMutation.isPending
+            }
+            className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto px-6"
           >
             {createMeetingMutation.isPending || updateMeetingMutation.isPending
-              ? isEditMode ? "Updating..." : "Scheduling..."
-              : isEditMode ? "Update meeting" : "Schedule meeting"}
+              ? isEditMode
+                ? "Updating..."
+                : "Scheduling..."
+              : isEditMode
+                ? "Update meeting"
+                : "Schedule meeting"}
           </Button>
         </div>
       </form>
@@ -432,7 +504,7 @@ export default function ScheduleMeeting() {
         open={successOpen}
         onClose={() => {
           setSuccessOpen(false);
-          navigate("/customers/meetings");
+          navigate("/meetings");
         }}
         title={isEditMode ? "Meeting updated" : "Meeting scheduled"}
         okLabel="Go to meetings"

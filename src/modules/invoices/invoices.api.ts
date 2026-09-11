@@ -10,6 +10,66 @@ export const InvoiceStatus = {
 
 export type InvoiceStatus = typeof InvoiceStatus[keyof typeof InvoiceStatus];
 
+export const ApprovalStatus = {
+  NOT_SUBMITTED: "not_submitted",
+  PENDING_APPROVAL: "pending_approval",
+  APPROVED: "approved",
+  REJECTED: "rejected",
+} as const;
+
+export type ApprovalStatus =
+  (typeof ApprovalStatus)[keyof typeof ApprovalStatus];
+
+export const WorkflowStatus = {
+  NOT_SUBMITTED: "not_submitted",
+  DRAFT: "draft",
+  PENDING_APPROVAL: "pending_approval",
+  APPROVED: "approved",
+  REJECTED: "rejected",
+  SENT: "sent",
+  PAID: "paid",
+  OVERDUE: "overdue",
+  CANCELLED: "cancelled",
+} as const;
+
+export type WorkflowStatus =
+  (typeof WorkflowStatus)[keyof typeof WorkflowStatus];
+
+export type ApprovalHistoryItem = {
+  status: ApprovalStatus | string;
+  note?: string | null;
+  by?: InvoiceReferencePerson | string | null;
+  at?: string | null;
+  revision?: number | null;
+  version?: number | null;
+  versionNumber?: number | null;
+};
+
+export type InvoiceApprovalRequest = {
+  _id?: string;
+  status: ApprovalStatus | string;
+  revision: number;
+  submittedAt?: string | null;
+  submittedBy?: InvoiceReferencePerson | string | null;
+  note?: string | null;
+  current?: boolean | null;
+  closedAt?: string | null;
+  closedNote?: string | null;
+  reviewedBy?: InvoiceReferencePerson | string | null;
+};
+
+export type InvoiceApproval = {
+  status?: ApprovalStatus | string | null;
+  submittedBy?: InvoiceReferencePerson | string | null;
+  submittedAt?: string | null;
+  reviewedBy?: InvoiceReferencePerson | string | null;
+  reviewedAt?: string | null;
+  rejectionReason?: string | null;
+  approvedRevision?: number | null;
+  history?: ApprovalHistoryItem[] | null;
+  approvalRequests?: InvoiceApprovalRequest[] | null;
+};
+
 type InvoiceReferencePerson = {
   _id?: string;
   name?: string | null;
@@ -55,10 +115,19 @@ export type InvoiceDocument = {
   depositAmount?: number | null;
   totalAmount?: number | null;
   status?: InvoiceStatus | string | null;
+  invoiceStatus?: string | null;
+  revision?: number | null;
+  approval?: InvoiceApproval | null;
+  approvalRequests?: InvoiceApprovalRequest[] | null;
+  workflowStatus?: WorkflowStatus | string | null;
   lineItems?: InvoiceLineItem[] | null;
   createdBy?: InvoiceReferencePerson | string | null;
   paidBy?: InvoiceReferencePerson | string | null;
   sentAt?: string | null;
+  sendMethod?: "platform" | "manual" | null;
+  sentTo?: string | null;
+  sentCc?: string[] | null;
+  sentMessage?: string | null;
   paidAt?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
@@ -108,7 +177,12 @@ export type InvoiceListItem = {
   projectName: string;
   dueDate: string;
   amount: number;
-  status: InvoiceStatus;
+  status: InvoiceStatus | string;
+  invoiceStatus?: string | null;
+  workflowStatus?: WorkflowStatus | string;
+  approval?: InvoiceApproval;
+  revision?: number;
+  sendMethod?: "platform" | "manual" | string | null;
   invoice: InvoiceDocument;
 };
 
@@ -126,7 +200,9 @@ export type InvoicesListResponse = {
 export type InvoiceListParams = {
   startDate?: string;
   endDate?: string;
-  status?: InvoiceStatus | "";
+  status?: InvoiceStatus | ApprovalStatus | string;
+  pending?: boolean | string;
+  approvalStatus?: string;
   leadId?: string;
   search?: string;
   page?: number;
@@ -182,6 +258,7 @@ export type CreateInvoiceDraftPayload = {
   lineItems?: CreateInvoiceLineItemPayload[];
   subtotal?: number;
   markupTotal?: number;
+  tax?: number;
   discount?: number;
   depositAmount?: number;
   totalAmount: number;
@@ -223,6 +300,8 @@ export async function getInvoicesProvider(params: InvoiceListParams = {}) {
       ...(params.startDate ? { startDate: params.startDate } : {}),
       ...(params.endDate ? { endDate: params.endDate } : {}),
       ...(params.status ? { status: params.status } : {}),
+      ...(params.pending !== undefined ? { pending: params.pending } : {}),
+      ...(params.approvalStatus ? { approvalStatus: params.approvalStatus } : {}),
       ...(params.leadId ? { leadId: params.leadId } : {}),
       ...(params.search ? { search: params.search } : {}),
     },
@@ -263,14 +342,72 @@ export async function editInvoiceDraftProvider(
   return response.data;
 }
 
+export type SendInvoicePayload = {
+  toEmail?: string;
+  to?: string;
+  cc?: string | string[];
+  ccEmail?: string | string[];
+  ccEmails?: string | string[];
+  message?: string;
+  note?: string;
+  emailMessage?: string;
+  coverNote?: string;
+  [key: string]: unknown;
+};
+
 export type SendInvoiceResponse = {
   success: boolean;
   message: string;
+  data?: {
+    invoice?: InvoiceDocument;
+    sendMethod?: "platform" | "manual";
+    sentTo?: string;
+    sentCc?: string[];
+    sentMessage?: string;
+    messageIncluded?: boolean;
+    messageSourceKey?: string;
+    pdfAttached?: boolean;
+    pdfWarning?: string | null;
+    [key: string]: unknown;
+  };
 };
 
-export async function sendInvoiceProvider(invoiceId: string) {
+export async function sendInvoiceProvider(
+  invoiceId: string,
+  payload?: SendInvoicePayload,
+) {
   const response = await apiClient.post<SendInvoiceResponse>(
-    `/api/invoices/${invoiceId}/send`,
+    `/api/invoices/${encodeURIComponent(invoiceId)}/send`,
+    payload || {},
+  );
+
+  return response.data;
+}
+
+export type MarkInvoiceSentPayload = {
+  note?: string;
+  message?: string;
+  sentAt?: string;
+  [key: string]: unknown;
+};
+
+export type MarkInvoiceSentResponse = {
+  success: boolean;
+  message: string;
+  data?: {
+    invoice?: InvoiceDocument;
+    sendMethod?: "manual";
+    [key: string]: unknown;
+  };
+};
+
+export async function markInvoiceSentProvider(
+  invoiceId: string,
+  payload?: MarkInvoiceSentPayload,
+) {
+  const response = await apiClient.post<MarkInvoiceSentResponse>(
+    `/api/invoices/${encodeURIComponent(invoiceId)}/mark-sent`,
+    payload || {},
   );
 
   return response.data;
@@ -292,7 +429,9 @@ export async function markInvoicePaidProvider(invoiceId: string) {
 export type InvoiceExportParams = {
   startDate?: string;
   endDate?: string;
-  status?: InvoiceStatus | "";
+  status?: InvoiceStatus | ApprovalStatus | string;
+  pending?: boolean | string;
+  approvalStatus?: string;
   leadId?: string;
   search?: string;
   format: "pdf" | "excel";
@@ -306,4 +445,25 @@ export async function exportInvoicesProvider(params: InvoiceExportParams) {
 
   return response.data;
 }
+
+export type SubmitApprovalResponse = {
+  success: boolean;
+  message: string;
+  data?: {
+    invoice: InvoiceDocument;
+  };
+};
+
+export async function submitInvoiceForApprovalProvider(
+  invoiceId: string,
+  payload?: { note?: string },
+) {
+  const response = await apiClient.post<SubmitApprovalResponse>(
+    `/api/invoices/${invoiceId}/submit-approval`,
+    payload || {},
+  );
+
+  return response.data;
+}
+
 

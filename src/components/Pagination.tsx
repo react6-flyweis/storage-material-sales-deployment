@@ -6,7 +6,7 @@ type PaginationProps = {
   rowsPerPage: number;
   rowsPerPageOptions?: number[];
   onPageChange: (page: number) => void;
-  onRowsPerPageChange: (rows: number) => void;
+  onRowsPerPageChange?: (rows: number) => void;
 };
 
 const Pagination: React.FC<PaginationProps> = ({
@@ -43,21 +43,23 @@ const Pagination: React.FC<PaginationProps> = ({
   return (
     <div className="p-4 flex flex-col md:flex-row items-center justify-between gap-4 border-t border-gray-100 text-sm text-gray-500">
       {/* Rows per page */}
-      <div className="flex items-center gap-2">
-        <span>Row Per Page</span>
-        <select
-          value={rowsPerPage}
-          onChange={(e) => onRowsPerPageChange(Number(e.target.value))}
-          className="border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-700 bg-white"
-        >
-          {rowsPerPageOptions.map((opt) => (
-            <option key={opt} value={opt}>
-              {opt}
-            </option>
-          ))}
-        </select>
-        <span>Entries</span>
-      </div>
+      {onRowsPerPageChange ? (
+        <div className="flex items-center gap-2">
+          <span>Row Per Page</span>
+          <select
+            value={rowsPerPage}
+            onChange={(e) => onRowsPerPageChange(Number(e.target.value))}
+            className="border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-700 bg-white"
+          >
+            {rowsPerPageOptions.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+          <span>Entries</span>
+        </div>
+      ) : <div />}
 
       {/* Pagination buttons */}
       <div className="flex items-center gap-1">

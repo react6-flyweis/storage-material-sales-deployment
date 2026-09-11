@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { useLoginMutation } from "@/modules/auth/auth.hooks";
 import { AuthLayout } from "@/components/auth-layout";
 import { Eye, EyeOff } from "lucide-react";
+import { getApiErrorMessage } from "@/lib/api-error";
+import * as Sentry from "@sentry/react";
 
 interface RedirectState {
   from?: {
@@ -27,7 +29,6 @@ export default function SignIn() {
   const navigate = useNavigate();
   const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const loginMutation = useLoginMutation();
 
@@ -35,6 +36,7 @@ export default function SignIn() {
     register,
     handleSubmit,
     formState: { errors },
+    setError,
   } = useForm<SignInFormValues>({
     resolver: zodResolver(signInSchema),
     defaultValues: {
@@ -44,22 +46,31 @@ export default function SignIn() {
   });
 
   const onSubmit = async (data: SignInFormValues) => {
-    setErrorMessage(null);
-
     try {
-      const response = await loginMutation.mutateAsync(data);
-
-      if (!response.success) {
-        setErrorMessage(response.message || "Login failed. Please try again.");
-        return;
-      }
+      await loginMutation.mutateAsync(data);
 
       const state = location.state as RedirectState | null;
       const nextPath = state?.from?.pathname || "/dashboard";
 
       navigate(nextPath, { replace: true });
-    } catch {
-      setErrorMessage("Unable to sign in. Please verify your credentials.");
+    } catch (error) {
+      const errorMessage = getApiErrorMessage(
+        error,
+        "Unable to sign in. Please try again",
+      );
+      setError("root", {
+        type: "manual",
+        message: errorMessage,
+      });
+      Sentry.captureMessage("Failed sign-in attempt", {
+        level: "warning",
+        extra: {
+          statusCode: 200,
+          authProvider: "local",
+          email: data.email,
+          responseMessage: errorMessage,
+        },
+      });
     }
   };
 
@@ -67,10 +78,7 @@ export default function SignIn() {
     <AuthLayout title="Sign In" subtitle="Let's build something great">
       <form onSubmit={handleSubmit(onSubmit)} className="my-6 space-y-6">
         <div>
-          <Label
-            htmlFor="email"
-            className="text-sm font-normal text-gray-700"
-          >
+          <Label htmlFor="email" className="text-sm font-normal text-gray-700">
             E-mail or phone number
           </Label>
           <Input
@@ -121,8 +129,8 @@ export default function SignIn() {
           ) : null}
         </div>
 
-        {errorMessage ? (
-          <p className="text-sm text-red-500">{errorMessage}</p>
+        {errors.root ? (
+          <p className="text-sm text-red-500">{errors.root.message}</p>
         ) : null}
 
         <Button

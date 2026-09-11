@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { AuthUser, LoginResponse } from "./auth.types";
 
-const AUTH_STORAGE_KEY = "steel-admin-auth";
+const AUTH_STORAGE_KEY = "steel-sales-auth";
 
 interface AuthState {
   accessToken: string | null;

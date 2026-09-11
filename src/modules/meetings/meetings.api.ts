@@ -1,15 +1,15 @@
 import { apiClient } from "@/modules/auth/auth.api";
 
 export type CreateMeetingPayload = {
-  customerId: string;
+  customerId?: string;
   leadId: string;
   title: string;
   meetingTime: string;
   duration: number;
   mode: "online" | "in-person";
-  meetingLink: string;
+  meetingLink?: string;
   notes?: string;
-
+  reminderMinutes?: number;
 };
 
 export type CreateMeetingResponse = {
@@ -46,6 +46,7 @@ export type Meeting = {
   mode: "online" | "in-person";
   meetingLink?: string;
   notes?: string;
+  reminderMinutes?: number;
   status: "scheduled" | "cancelled" | "completed" | string;
   completedAt?: string | null;
   createdAt?: string;

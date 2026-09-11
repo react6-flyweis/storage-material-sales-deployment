@@ -1,22 +1,194 @@
 import { apiClient } from "@/modules/auth/auth.api";
+import type { SaveEstimatePayload } from "@/modules/quotation-generator/estimates.api";
+
+export const BUILDING_TYPE = ["PEMB", "Storage"] as const;
+export type BuildingType = (typeof BUILDING_TYPE)[number];
+export const DEFAULT_BUILDING_TYPE: BuildingType = "PEMB";
+
+export const QUOTATION_SCOPE = ["Supply", "Install", "Both"] as const;
+export type QuotationScope = (typeof QUOTATION_SCOPE)[number];
+export const DEFAULT_QUOTATION_SCOPE: QuotationScope = "Both";
+
+// Admin / Workflow statuses
+export const ADMIN_STATUS = [
+  "draft",
+  "pending",
+  "pending_approval",
+  "approved",
+  "rejected",
+  "sent",
+  "accepted",
+] as const;
+export type AdminStatus = (typeof ADMIN_STATUS)[number];
+
+export type QuotationCustomer = {
+  _id: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  company?: string;
+  phone?: string;
+};
+
+export type QuotationLead = {
+  _id: string;
+  jobId?: string;
+  projectName?: string;
+};
+
+export type ApprovalStatus =
+  | "not_submitted"
+  | "pending_approval"
+  | "approved"
+  | "rejected";
+
+export type WorkflowStatus =
+  | "draft"
+  | "pending_approval"
+  | "approved"
+  | "rejected"
+  | "sent";
+
+export type QuotationApprovalHistoryItem = {
+  status: ApprovalStatus | string;
+  note?: string;
+  by?:
+    | string
+    | {
+        _id?: string;
+        firstName?: string;
+        lastName?: string;
+        name?: string;
+        email?: string;
+        role?: string;
+      }
+    | null;
+  at?: string | null;
+  versionNumber?: number | string | null;
+  version?: number | string | null;
+  revision?: number | string | null;
+};
+
+export type QuotationApprovalInfo = {
+  status: ApprovalStatus;
+  submittedBy?: {
+    _id?: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+  } | string | null;
+  submittedAt?: string | null;
+  reviewedBy?: {
+    _id?: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+  } | string | null;
+  reviewedAt?: string | null;
+  rejectionReason?: string | null;
+  approvalMessage?: string | null;
+  approvalNote?: string | null;
+  note?: string | null;
+  approvedVersionNumber?: number | null;
+  history?: QuotationApprovalHistoryItem[];
+};
+
+export type QuotationApproval = QuotationApprovalInfo;
 
 export type QuotationItem = {
   _id: string;
   quoteNumber?: string | null;
   versionNumber?: number;
-  status?: string | null;
+  workflowStatus?: WorkflowStatus;
+  approvalStatus?:
+    | "not_submitted"
+    | "pending_approval"
+    | "approved"
+    | "rejected"
+    | string
+    | null;
+  approval?: QuotationApproval;
+  status?:
+    | "draft"
+    | "pending"
+    | "pending_approval"
+    | "approved"
+    | "rejected"
+    | "sent"
+    | "accepted"
+    | string
+    | null;
+  proposalDate?: string | null;
+  companyName?: string | null;
+  customerName?: string | null;
+  customerEmail?: string | null;
+  defaultToEmail?: string | null;
+  projectName?: string | null;
+  jobId?: string | null;
+  projectId?: string | null;
+  location?: string | null;
+  buildingType?: string | null;
+  sqft?: string | number | null;
+  totalArea?: number | null;
+  basePrice?: number | null;
+  maxPrice?: number | null;
+  materialCost?: number | null;
+  freightCost?: number | null;
+  totalCOGS?: number | null;
+  markupPercent?: number | null;
+  markupValue?: number | null;
   finalPrice?: number | null;
-  leadId?: {
-    _id: string;
-    projectName?: string | null;
-  } | null;
-  customerId?: {
-    _id: string;
-    firstName?: string | null;
-    email?: string | null;
+  psf?: number | null;
+  currency?: string | null;
+  leadId?: string | QuotationLead | null;
+  customerId?: string | QuotationCustomer | null;
+  createdBy?: {
+    _id?: string;
+    name?: string;
+    email?: string;
+    role?: string;
   } | null;
   createdAt?: string | null;
+  updatedAt?: string | null;
   sentAt?: string | null;
+  sendMethod?: "platform" | "manual" | null;
+  sentTo?: string | null;
+  sentCc?: string[] | null;
+  sentMessage?: string | null;
+  approvalMessage?: string | null;
+  approvalNote?: string | null;
+  sourceEstimateId?: string | null;
+  sourceEstimate?: SaveEstimatePayload | null;
+  estimate?: SaveEstimatePayload | null;
+  pdfLink?: string | null;
+  htmlPreviewLink?: string | null;
+  documents?: Array<Record<string, unknown>> | null;
+  documentMeta?: {
+    source?: string;
+    sourceEstimateId?: string;
+    hasPricingData?: boolean;
+    previewEndpoint?: string;
+    pdfEndpoint?: string;
+    defaultSections?: string[];
+  } | null;
+};
+
+export type Quotation = QuotationItem;
+
+export type QuotationStats = {
+  total: number;
+  approved: number;
+  pendingApproval?: number;
+  pending_approval?: number;
+  rejected: number;
+  sent: number;
+  draft: number;
+};
+
+export type QuotationStatsResponse = {
+  success: boolean;
+  message?: string;
+  data: QuotationStats;
 };
 
 export type QuotationsListResponse = {
@@ -98,15 +270,137 @@ export type CreateQuotationPayload = {
 export type CreateQuotationResponse = {
   success: boolean;
   message: string;
-  data?: unknown;
+  data?: QuotationItem | unknown;
 };
 
-export async function getQuotationsProvider(page = 1, limit = 20) {
+export type SubmitApprovalPayload = {
+  note?: string;
+  estimateId?: string;
+};
+
+export type SubmitApprovalResponse = {
+  success: boolean;
+  message: string;
+  data?: QuotationItem;
+};
+
+export type SendQuotationPayload = {
+  toEmail?: string;
+  to?: string;
+  cc?: string | string[];
+  ccEmail?: string | string[];
+  ccEmails?: string | string[];
+  message?: string;
+  note?: string;
+  emailMessage?: string;
+  coverNote?: string;
+  notes?: string;
+  sections?: string[];
+  [key: string]: unknown;
+};
+
+export type SendQuotationResponse = {
+  success: boolean;
+  message: string;
+  data?: {
+    emailProvider?: "sendgrid" | "smtp_fallback" | string;
+    quotation?: QuotationItem;
+    sendMethod?: "platform" | "manual";
+    sentTo?: string;
+    sentCc?: string[];
+    messageIncluded?: boolean;
+    messageSourceKey?: string;
+    pdfAttached?: boolean;
+    pdfWarning?: string | null;
+    [key: string]: unknown;
+  };
+};
+
+export type MarkQuotationSentPayload = {
+  note?: string;
+  message?: string;
+  sentAt?: string;
+  [key: string]: unknown;
+};
+
+export type MarkQuotationSentResponse = {
+  success: boolean;
+  message: string;
+  data?: {
+    quotation?: QuotationItem;
+    sendMethod?: "manual";
+    [key: string]: unknown;
+  };
+};
+
+export type GetQuotationsParams = {
+  page?: number;
+  limit?: number;
+  status?: string;
+  buildingType?: string;
+  search?: string;
+  lead?: string;
+  leadId?: string;
+  [key: string]: unknown;
+};
+
+export async function getQuotationsProvider(
+  pageOrParams: number | GetQuotationsParams = 1,
+  limit = 20
+) {
+  const params: GetQuotationsParams =
+    typeof pageOrParams === "object"
+      ? pageOrParams
+      : { page: pageOrParams, limit };
+
   const response = await apiClient.get<QuotationsListResponse>(
     "/api/sales/quotations",
-    { params: { page, limit } },
+    { params },
   );
 
+  return response.data;
+}
+
+export async function getQuotationStatsProvider(): Promise<QuotationStatsResponse> {
+  const response = await apiClient.get<QuotationStatsResponse>(
+    "/api/sales/quotations/stats"
+  );
+  return response.data;
+}
+
+export async function getQuotationByIdProvider(
+  quotationId: string,
+  params?: { includeEstimate?: boolean; includeDocuments?: boolean }
+) {
+  const response = await apiClient.get<{
+    success: boolean;
+    message?: string;
+    data: QuotationItem | { quotation: QuotationItem };
+  }>(`/api/quotations/${encodeURIComponent(quotationId)}`, {
+    params: {
+      includeEstimate: params?.includeEstimate ?? true,
+      includeDocuments: params?.includeDocuments ?? true,
+      ...params,
+    },
+  });
+
+  const rawData = response.data?.data;
+  const quotation =
+    (rawData as { quotation?: QuotationItem })?.quotation ||
+    (rawData as QuotationItem);
+
+  return {
+    ...response.data,
+    data: quotation,
+  };
+}
+
+export async function convertEstimateToQuotationProvider(estimateId: string) {
+  const response = await apiClient.post<{
+    success: boolean;
+    message?: string;
+    data: QuotationItem;
+  }>(`/api/quotations/from-estimate/${encodeURIComponent(estimateId)}`);
   return response.data;
 }
 
@@ -118,3 +412,101 @@ export async function createQuotationProvider(payload: CreateQuotationPayload) {
 
   return response.data;
 }
+
+export async function updateQuotationProvider(
+  quotationId: string,
+  payload: Partial<CreateQuotationPayload>
+) {
+  const response = await apiClient.put<CreateQuotationResponse>(
+    `/api/quotations/${encodeURIComponent(quotationId)}`,
+    payload
+  );
+  return response.data;
+}
+
+export async function submitQuotationForApprovalProvider(
+  quotationId: string,
+  payloadOrNote?: SubmitApprovalPayload | string,
+  estimateId?: string
+) {
+  const payload: SubmitApprovalPayload =
+    typeof payloadOrNote === "string"
+      ? {
+          ...(payloadOrNote ? { note: payloadOrNote } : {}),
+          ...(estimateId ? { estimateId } : {}),
+        }
+      : {
+          ...(payloadOrNote?.note ? { note: payloadOrNote.note } : {}),
+          ...(payloadOrNote?.estimateId || estimateId
+            ? { estimateId: payloadOrNote?.estimateId || estimateId }
+            : {}),
+        };
+
+  const targetId = quotationId || payload.estimateId || "";
+
+  const response = await apiClient.post<SubmitApprovalResponse>(
+    `/api/quotations/${encodeURIComponent(targetId)}/submit-approval`,
+    payload
+  );
+
+  return response.data;
+}
+
+export async function sendQuotationProvider(
+  quotationId: string,
+  payload?: SendQuotationPayload
+) {
+  const response = await apiClient.post<SendQuotationResponse>(
+    `/api/quotations/${encodeURIComponent(quotationId)}/send`,
+    payload || {}
+  );
+
+  return response.data;
+}
+
+export async function markQuotationSentProvider(
+  quotationId: string,
+  payload?: MarkQuotationSentPayload
+) {
+  const response = await apiClient.post<MarkQuotationSentResponse>(
+    `/api/quotations/${encodeURIComponent(quotationId)}/mark-sent`,
+    payload || {}
+  );
+
+  return response.data;
+}
+
+export type LatestApprovedTaxResponse = {
+  leadId: string;
+  quotationId: string;
+  quoteNumber: string;
+  amountWithoutMarkup: number;
+  subtotalWithoutMarkup: number;
+  markup: number;
+  subtotal: number;
+  subtotalWithMarkup: number;
+  tax: number;
+  total: number;
+  taxRate: number;
+  taxableBase: number;
+  taxNote?: string;
+  currency?: string;
+  approvalStatus: string;
+  versionNumber: number;
+  reviewedAt: string;
+};
+
+export async function getLatestApprovedTaxByLeadProvider(leadId: string) {
+  const response = await apiClient.get<
+    LatestApprovedTaxResponse | { success?: boolean; data?: LatestApprovedTaxResponse }
+  >(`/api/leads/${encodeURIComponent(leadId)}/quotations/latest-approved-tax`);
+
+  const raw = response.data;
+  if (raw && typeof raw === "object" && "data" in raw && raw.data) {
+    return raw.data as LatestApprovedTaxResponse;
+  }
+  return raw as LatestApprovedTaxResponse;
+}
+
+
+

@@ -30,9 +30,10 @@ import {
 import { useCreateFollowUpMutation } from "@/modules/followups/followups.hooks";
 
 const followUpSchema = z.object({
-  leadId: z.string().min(1, "Client name is required"),
-  customerId: z.string().min(1, "Customer ID is required"),
-  type: z.enum(["call", "email", "meeting"]),
+  leadId: z.string().min(1, "Lead is required"),
+  customerId: z.string().optional(),
+  modeOfContact: z.enum(["call", "email", "sms"]),
+  reminderMinutes: z.string().optional(),
   date: z.string().min(1, "Follow-up date is required"),
   time: z.string().min(1, "Follow-up time is required"),
   notes: z.string().max(500).optional(),
@@ -46,13 +47,15 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   initialDate?: string | null;
   leadId?: string | null;
+  customerId?: string | null;
   onSuccess?: () => void;
 };
 
 const defaultFormValues = {
   leadId: "",
   customerId: "",
-  type: "call" as const,
+  modeOfContact: "call" as const,
+  reminderMinutes: "30",
   date: "",
   time: "",
   notes: "",
@@ -64,6 +67,7 @@ export default function AddFollowUpDialog({
   onOpenChange,
   initialDate,
   leadId,
+  customerId: initialCustomerId,
   onSuccess,
 }: Props) {
   const [showSuccess, setShowSuccess] = useState(false);
@@ -82,6 +86,7 @@ export default function AddFollowUpDialog({
       ...defaultFormValues,
       date: initialDate ?? "",
       leadId: leadId ?? "",
+      customerId: initialCustomerId ?? "",
     },
   });
 
@@ -100,18 +105,21 @@ export default function AddFollowUpDialog({
       ...defaultFormValues,
       date: initialDate ?? "",
       leadId: leadId ?? "",
+      customerId: initialCustomerId ?? "",
     });
-  }, [initialDate, leadId, open, reset]);
+  }, [initialDate, leadId, initialCustomerId, open, reset]);
 
   useEffect(() => {
     if (leadId) {
       setValue("leadId", leadId);
     }
-  }, [leadId, setValue]);
+    if (initialCustomerId) {
+      setValue("customerId", initialCustomerId);
+    }
+  }, [leadId, initialCustomerId, setValue]);
 
   const handleDialogOpenChange = (newOpen: boolean) => {
     if (!newOpen && isDirty) {
-      // Prevent closing if form has been touched
       return;
     }
     onOpenChange(newOpen);
@@ -130,15 +138,16 @@ export default function AddFollowUpDialog({
 
     const payload = {
       leadId: data.leadId,
-      customerId: data.customerId,
+      customerId: data.customerId || undefined,
       followUpDate,
-      modeOfContact: data.type,
-      notes: data.notes,
+      modeOfContact: data.modeOfContact,
+      notes: data.notes?.trim() || undefined,
       priority: data.priority,
+      reminderMinutes: data.reminderMinutes ? Number(data.reminderMinutes) : undefined,
     };
 
     try {
-      createFollowUp.mutateAsync(payload);
+      await createFollowUp.mutateAsync(payload);
       onOpenChange(false);
       reset(defaultFormValues);
       setShowSuccess(true);
@@ -200,7 +209,7 @@ export default function AddFollowUpDialog({
               <FieldContent>
                 <Controller
                   control={control}
-                  name="type"
+                  name="modeOfContact"
                   render={({ field }) => (
                     <Select value={field.value} onValueChange={field.onChange}>
                       <SelectTrigger className="w-full">
@@ -209,12 +218,41 @@ export default function AddFollowUpDialog({
                       <SelectContent>
                         <SelectItem value="call">Call</SelectItem>
                         <SelectItem value="email">Email</SelectItem>
-                        <SelectItem value="meeting">Meeting</SelectItem>
+                        <SelectItem value="sms">SMS</SelectItem>
                       </SelectContent>
                     </Select>
                   )}
                 />
-                {errors.type && <FieldError>{errors.type.message}</FieldError>}
+                {errors.modeOfContact && (
+                  <FieldError>{errors.modeOfContact.message}</FieldError>
+                )}
+              </FieldContent>
+            </Field>
+
+            <Field>
+              <FieldLabel>Reminder Timing</FieldLabel>
+              <FieldContent>
+                <Controller
+                  control={control}
+                  name="reminderMinutes"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select reminder time" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="15">15 minutes before</SelectItem>
+                        <SelectItem value="30">30 minutes before</SelectItem>
+                        <SelectItem value="60">1 hour before</SelectItem>
+                        <SelectItem value="120">2 hours before</SelectItem>
+                        <SelectItem value="1440">24 hours before</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.reminderMinutes && (
+                  <FieldError>{errors.reminderMinutes.message}</FieldError>
+                )}
               </FieldContent>
             </Field>
 
@@ -269,7 +307,7 @@ export default function AddFollowUpDialog({
                   placeholder="Add any additional notes or context..."
                 />
                 <div className="text-sm text-gray-500 mt-1">
-                  {notes?.length}/500 characters
+                  {notes?.length || 0}/500 characters
                 </div>
                 {errors.notes && (
                   <FieldError>{errors.notes.message}</FieldError>
@@ -291,10 +329,10 @@ export default function AddFollowUpDialog({
             <Button
               type="submit"
               size="lg"
-              className="w-40 bg-blue-600 hover:bg-blue-700"
-              disabled={isSubmitting}
+              className="w-40 bg-blue-600 hover:bg-blue-700 text-white"
+              disabled={isSubmitting || createFollowUp.isPending}
             >
-              {isSubmitting ? "Adding..." : "Add Follow up"}
+              {isSubmitting || createFollowUp.isPending ? "Adding..." : "Add Follow up"}
             </Button>
           </DialogFooter>
         </form>

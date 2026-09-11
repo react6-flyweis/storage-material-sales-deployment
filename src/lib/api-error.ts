@@ -2,16 +2,24 @@ import axios from "axios";
 
 type ApiErrorData = {
   message?: string;
+  error?: string;
+  msg?: string;
 };
 
 export function getApiErrorMessage(
   error: unknown,
   fallbackMessage = "Something went wrong. Please try again.",
 ) {
-  if (axios.isAxiosError<ApiErrorData>(error)) {
-    const message = error.response?.data?.message;
-    if (typeof message === "string" && message.trim().length > 0) {
-      return message;
+  if (axios.isAxiosError<ApiErrorData | string>(error)) {
+    const data = error.response?.data;
+    if (typeof data === "string" && data.trim().length > 0) {
+      return data;
+    }
+    if (data && typeof data === "object") {
+      const message = data.message || data.error || data.msg;
+      if (typeof message === "string" && message.trim().length > 0) {
+        return message;
+      }
     }
   }
 

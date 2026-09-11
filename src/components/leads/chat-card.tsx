@@ -14,6 +14,7 @@ import type {
   ChatStatusResponse,
 } from "@/modules/leads/leads.api";
 import { getLeadProjectName } from "@/modules/leads/leads.utils";
+import ChatDropOffDialog from "@/components/leads/chat-drop-off-dialog";
 
 function formatLastSeen(timestamp?: string | null) {
   if (!timestamp) return "";
@@ -133,6 +134,7 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
   const [customerTyping, setCustomerTyping] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [followUpOpen, setFollowUpOpen] = useState(false);
 
   const [customerOnline, setCustomerOnline] = useState<boolean>(
     customer.isOnline ?? false
@@ -469,40 +471,51 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
             ) : null}
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <Avatar className="h-10 w-10 bg-gray-100">
-              <AvatarFallback className="text-sm text-gray-600 font-medium">
-                {customer.firstName
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")}
-              </AvatarFallback>
-            </Avatar>
-            {leadOnline ? (
-              <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white animate-pulse" />
-            ) : customerOnline ? (
-              <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-white" />
-            ) : null}
-          </div>
-          <div>
-            <div className="text-base font-semibold">
-              Chat with {customer.firstName}
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-gray-500">
-              <span>{getLeadProjectName(lead as Record<string, unknown>, customer)}</span>
-              <span>•</span>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Avatar className="h-10 w-10 bg-gray-100">
+                <AvatarFallback className="text-sm text-gray-600 font-medium">
+                  {customer.firstName
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")}
+                </AvatarFallback>
+              </Avatar>
               {leadOnline ? (
-                <span className="text-emerald-600 font-medium">Active now</span>
+                <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white animate-pulse" />
               ) : customerOnline ? (
-                <span className="text-emerald-500 font-medium">Online on site</span>
-              ) : lastSeenAt ? (
-                <span>Last seen {formatLastSeen(lastSeenAt)}</span>
-              ) : (
-                <span>Offline</span>
-              )}
+                <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-white" />
+              ) : null}
+            </div>
+            <div>
+              <div className="text-base font-semibold">
+                Chat with {customer.firstName}
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                <span>{getLeadProjectName(lead as Record<string, unknown>, customer)}</span>
+                <span>•</span>
+                {leadOnline ? (
+                  <span className="text-emerald-600 font-medium">Active now</span>
+                ) : customerOnline ? (
+                  <span className="text-emerald-500 font-medium">Online on site</span>
+                ) : lastSeenAt ? (
+                  <span>Last seen {formatLastSeen(lastSeenAt)}</span>
+                ) : (
+                  <span>Offline</span>
+                )}
+              </div>
             </div>
           </div>
+
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs"
+            onClick={() => setFollowUpOpen(true)}
+          >
+            Follow-up
+          </Button>
         </div>
       </div>
 
@@ -669,6 +682,13 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
           </div>
         )}
       </div>
+
+      <ChatDropOffDialog
+        open={followUpOpen}
+        onOpenChange={setFollowUpOpen}
+        leadId={lead._id}
+        customerName={customer.firstName}
+      />
     </div>
   );
 }

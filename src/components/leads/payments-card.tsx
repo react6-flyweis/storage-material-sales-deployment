@@ -1,15 +1,15 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import SuccessDialog from "@/components/success-dialog";
 import type { LeadDetailPayments } from "@/modules/leads/leads.api";
 import {
   formatLeadCurrency,
   formatLeadDate,
   formatLeadDateTime,
 } from "@/modules/leads/leads.utils";
-import { useSendInvoiceMutation, useInvoicesQuery, useInvoiceStatsQuery } from "@/modules/invoices/invoices.hooks";
+import { useInvoicesQuery, useInvoiceStatsQuery } from "@/modules/invoices/invoices.hooks";
+import { WorkflowStatusBadge } from "@/components/invoice/approval-modals";
+import { SendInvoiceModal } from "@/components/invoice/send-invoice-modal";
 
 type Props = {
   leadId?: string;
@@ -17,12 +17,28 @@ type Props = {
   paymentsData?: LeadDetailPayments;
 };
 
+type PaymentInvoiceItem = {
+  _id: string;
+  invoiceNumber: string;
+  date?: string;
+  createdAt: string;
+  totalAmount: number;
+  status: string;
+  invoiceStatus?: string;
+  workflowStatus: string;
+  approvalStatus: string;
+  isApproved: boolean;
+  sendMethod: "platform" | "manual" | string | null;
+  sentAt: string | null;
+  paidAt: string | null;
+  revision: number | null;
+  approvedRevision: number | null;
+  customerEmail?: string | null;
+  customerName?: string | null;
+};
+
 export default function PaymentsCard({ leadId, leadDbId, paymentsData }: Props) {
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [sendFailedInvoiceId, setSendFailedInvoiceId] = useState<string | null>(
-    null,
-  );
-  const sendInvoiceMutation = useSendInvoiceMutation();
+  const [selectedInvoiceForSend, setSelectedInvoiceForSend] = useState<PaymentInvoiceItem | null>(null);
 
   const { data: invoicesResponse } = useInvoicesQuery({
     leadId: leadDbId,
@@ -31,29 +47,7 @@ export default function PaymentsCard({ leadId, leadDbId, paymentsData }: Props) 
 
   const { data: stats } = useInvoiceStatsQuery({ leadId: leadDbId });
 
-  const handleSendEmail = async (invoiceId: string) => {
-    if (sendInvoiceMutation.isPending) {
-      return;
-    }
-
-    setSendFailedInvoiceId(null);
-
-    try {
-      const response = await sendInvoiceMutation.mutateAsync(invoiceId);
-      if (!response.success) {
-        console.error("Failed to send invoice email:", response);
-        setSendFailedInvoiceId(invoiceId);
-        return;
-      }
-
-      setShowSuccess(true);
-    } catch (error) {
-      console.error("Failed to send invoice email:", error);
-      setSendFailedInvoiceId(invoiceId);
-    }
-  };
-
-  const invoices = invoicesResponse?.data
+  const invoices: PaymentInvoiceItem[] = invoicesResponse?.data
     ? invoicesResponse.data.invoices.map((item) => ({
         _id: item.invoice?._id ?? "",
         invoiceNumber: item.invoiceNumber ?? item.invoice?.invoiceNumber ?? "",
@@ -61,10 +55,36 @@ export default function PaymentsCard({ leadId, leadDbId, paymentsData }: Props) 
         createdAt: item.invoice?.createdAt ?? "",
         totalAmount: item.amount ?? item.invoice?.totalAmount ?? 0,
         status: item.status ?? item.invoice?.status ?? "",
-        sentAt: (item.invoice as { sentAt?: string | null })?.sentAt ?? null,
-        paidAt: (item.invoice as { paidAt?: string | null })?.paidAt ?? null,
+        workflowStatus: item.workflowStatus ?? item.invoice?.workflowStatus ?? item.status ?? item.invoice?.status ?? "",
+        approvalStatus: item.approval?.status ?? item.invoice?.approval?.status ?? "",
+        isApproved: (item.approval?.status ?? item.invoice?.approval?.status) === "approved",
+        sendMethod: item.invoice?.sendMethod ?? null,
+        sentAt: item.invoice?.sentAt ?? null,
+        paidAt: item.invoice?.paidAt ?? null,
+        revision: item.invoice?.revision ?? null,
+        approvedRevision: item.invoice?.approval?.approvedRevision ?? null,
+        customerEmail:
+          typeof item.invoice?.customerId === "object"
+            ? item.invoice.customerId?.email
+            : null,
+        customerName:
+          typeof item.invoice?.customerId === "object"
+            ? `${item.invoice.customerId?.firstName || ""} ${item.invoice.customerId?.lastName || ""}`.trim() || null
+            : null,
       }))
-    : (paymentsData?.invoices ?? []);
+    : (paymentsData?.invoices ?? []).map((inv) => ({
+        ...inv,
+        workflowStatus: inv.status,
+        approvalStatus: "",
+        isApproved: false,
+        sendMethod: null,
+        sentAt: null,
+        paidAt: null,
+        revision: null,
+        approvedRevision: null,
+        customerEmail: null,
+        customerName: null,
+      }));
 
   const total = formatLeadCurrency(stats?.totalAmount ?? 0);
   const paid = formatLeadCurrency(stats?.totalPaid ?? 0);
@@ -141,17 +161,14 @@ export default function PaymentsCard({ leadId, leadDbId, paymentsData }: Props) 
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-4">
-                            <Badge
-                              variant="secondary"
-                              className={`capitalize ${
-                                status === "draft"
-                                  ? "bg-yellow-50 text-yellow-700"
-                                  : "bg-green-50 text-green-700"
-                              }`}
-                            >
-                              {status}
-                            </Badge>
-                            <span className="text-xs">
+                            <WorkflowStatusBadge
+                              variant="light"
+                              workflowStatus={invoice.workflowStatus}
+                              approvalStatus={invoice.approvalStatus}
+                              invoiceStatus={invoice.invoiceStatus || invoice.status}
+                              sendMethod={invoice.sendMethod}
+                            />
+                            <span className="text-xs text-gray-500">
                               {
                                 status === "sent" && formatLeadDateTime(invoice.sentAt)
                               }
@@ -163,20 +180,23 @@ export default function PaymentsCard({ leadId, leadDbId, paymentsData }: Props) 
                               <div className="flex flex-col items-start">
                                 <Button
                                   variant="link"
-                                  className="text-sm h-auto p-0"
-                                  onClick={() => handleSendEmail(invoice._id)}
-                                  disabled={sendInvoiceMutation.isPending}
+                                  className="text-sm h-auto p-0 disabled:opacity-50 disabled:no-underline cursor-pointer text-blue-600"
+                                  onClick={() => setSelectedInvoiceForSend(invoice)}
+                                  disabled={!invoice.isApproved}
+                                  title={!invoice.isApproved ? "Requires admin approval before sending" : undefined}
                                 >
-                                  {sendInvoiceMutation.isPending &&
-                                    sendInvoiceMutation.variables === invoice._id
-                                    ? "Sending..."
-                                    : "Notify"}
+                                  Send Invoice
                                 </Button>
-                                {sendFailedInvoiceId === invoice._id && (
-                                  <span className="text-[10px] text-destructive">
-                                    Send failed
-                                  </span>
-                                )}
+                              </div>
+                            ) : status === "sent" ? (
+                              <div className="flex flex-col items-start">
+                                <Button
+                                  variant="link"
+                                  className="text-xs h-auto p-0 text-slate-500 hover:text-blue-600 cursor-pointer"
+                                  onClick={() => setSelectedInvoiceForSend(invoice)}
+                                >
+                                  Resend
+                                </Button>
                               </div>
                             ) : null}
                           </div>
@@ -190,12 +210,23 @@ export default function PaymentsCard({ leadId, leadDbId, paymentsData }: Props) 
           </div>
         </div>
       </Card>
-      <SuccessDialog
-        open={showSuccess}
-        onClose={() => setShowSuccess(false)}
-        title="Email Sent"
-        okLabel="Done"
-      />
+
+      {selectedInvoiceForSend && (
+        <SendInvoiceModal
+          open={Boolean(selectedInvoiceForSend)}
+          onOpenChange={(open) => {
+            if (!open) setSelectedInvoiceForSend(null);
+          }}
+          invoiceId={selectedInvoiceForSend._id}
+          customerEmail={selectedInvoiceForSend.customerEmail}
+          customerName={selectedInvoiceForSend.customerName}
+          approvalStatus={selectedInvoiceForSend.approvalStatus}
+          workflowStatus={selectedInvoiceForSend.workflowStatus}
+          status={selectedInvoiceForSend.status}
+          revision={selectedInvoiceForSend.revision}
+          approvedRevision={selectedInvoiceForSend.approvedRevision}
+        />
+      )}
     </>
   );
 }
