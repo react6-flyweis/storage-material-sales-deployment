@@ -72,11 +72,20 @@ export async function extractDrawingProvider(
   return response.data;
 }
 
+export const JOB_TYPE = ["PEMB", "Storage"] as const;
+export type JobType = (typeof JOB_TYPE)[number];
+export const DEFAULT_JOB_TYPE: JobType = "PEMB";
+
+export const SCOPE = ["Supply", "Install", "Both"] as const;
+export type Scope = (typeof SCOPE)[number];
+export type QuotationScope = Scope;
+export const DEFAULT_SCOPE: Scope = "Both";
+
 export interface ExtractShipperRequest {
   fileBase64: string;
   fileName: string;
-  jobType?: string;
-  scope?: "supply" | "install" | "both" | string;
+  jobType?: JobType;
+  scope?: Scope;
   roof?: "screw-down" | "standing-seam" | string;
   install?: string;
   squareFootage?: number;
@@ -226,8 +235,8 @@ export interface ShipperPricing {
   sfPrice?: string | number;
   sf?: number;
   quicken?: number;
-  jobType?: string;
-  scope?: string;
+  jobType?: JobType;
+  scope?: Scope;
   roof?: string;
   install?: string;
   isSS?: boolean;
@@ -282,8 +291,8 @@ export async function extractShipperProvider(
   const response = await apiClient.post<ExtractShipperResponse>(
     "/api/sales/estimates/extract-shipper",
     {
-      jobType: "PEMB",
-      scope: "supply",
+      jobType: DEFAULT_JOB_TYPE,
+      scope: DEFAULT_SCOPE,
       roof: "screw-down",
       install: "easy",
       squareFootage: 0,
@@ -364,8 +373,8 @@ export interface ComputeMarginOverrideConfig {
 
 export interface ComputeEstimateRequest {
   parsedCategories?: Record<string, unknown>;
-  jobType?: string;
-  scope?: string;
+  jobType?: JobType;
+  scope?: Scope;
   squareFootage?: number;
   sf?: number;
   useManualSquareFootage?: boolean;
@@ -455,8 +464,8 @@ export interface SaveEstimatePayload extends Record<string, unknown> {
   createdBy?: string;
   leadId?: string | null;
   conversion?: EstimateConversion;
-  jobType?: string;
-  scope?: string;
+  jobType?: JobType;
+  scope?: Scope;
   roofType?: string;
   leadCompanyName?: string;
   customerEmail?: string;
@@ -590,20 +599,41 @@ export async function sendEstimateProvider(
 // ----------------------------------------------------------------------------
 // ESTIMATES HISTORY & LIBRARY
 // ----------------------------------------------------------------------------
+export interface GetEstimatesParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+}
+
+export interface EstimatesListData {
+  estimates: SaveEstimatePayload[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export interface EstimatesListResponse {
-  success?: boolean;
-  message?: string;
-  data?: SaveEstimatePayload[] | { estimates?: SaveEstimatePayload[]; items?: SaveEstimatePayload[] };
-  estimates?: SaveEstimatePayload[];
-  items?: SaveEstimatePayload[];
+  success: boolean;
+  message: string;
+  data: EstimatesListData;
 }
 
 export async function getEstimatesListProvider(
-  limit = 30
+  params?: number | GetEstimatesParams
 ): Promise<EstimatesListResponse> {
-  const response = await apiClient.get<EstimatesListResponse>(
-    `/api/sales/estimates?limit=${limit}`
-  );
+  let url = "/api/sales/estimates";
+  if (typeof params === "number") {
+    url += `?limit=${params}`;
+  } else if (params) {
+    const query = new URLSearchParams();
+    if (params.page !== undefined) query.set("page", String(params.page));
+    if (params.limit !== undefined) query.set("limit", String(params.limit));
+    if (params.search && params.search.trim())
+      query.set("search", params.search.trim());
+    const qs = query.toString();
+    if (qs) url += `?${qs}`;
+  }
+  const response = await apiClient.get<EstimatesListResponse>(url);
   return response.data;
 }
 
@@ -896,8 +926,8 @@ export interface PreviewDocumentRequest {
   squareFootage?: number;
   sf?: number;
   jobNumber?: string;
-  jobType?: string;
-  scope?: string;
+  jobType?: JobType;
+  scope?: Scope;
   pricingResult?: ShipperPricing | Record<string, unknown>;
   fullQuote?: FullQuoteData | Record<string, unknown>;
   contract?: PreviewContractPayload | Record<string, unknown>;

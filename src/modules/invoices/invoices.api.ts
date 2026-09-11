@@ -40,6 +40,22 @@ export type ApprovalHistoryItem = {
   note?: string | null;
   by?: InvoiceReferencePerson | string | null;
   at?: string | null;
+  revision?: number | null;
+  version?: number | null;
+  versionNumber?: number | null;
+};
+
+export type InvoiceApprovalRequest = {
+  _id?: string;
+  status: ApprovalStatus | string;
+  revision: number;
+  submittedAt?: string | null;
+  submittedBy?: InvoiceReferencePerson | string | null;
+  note?: string | null;
+  current?: boolean | null;
+  closedAt?: string | null;
+  closedNote?: string | null;
+  reviewedBy?: InvoiceReferencePerson | string | null;
 };
 
 export type InvoiceApproval = {
@@ -51,6 +67,7 @@ export type InvoiceApproval = {
   rejectionReason?: string | null;
   approvedRevision?: number | null;
   history?: ApprovalHistoryItem[] | null;
+  approvalRequests?: InvoiceApprovalRequest[] | null;
 };
 
 type InvoiceReferencePerson = {
@@ -98,8 +115,10 @@ export type InvoiceDocument = {
   depositAmount?: number | null;
   totalAmount?: number | null;
   status?: InvoiceStatus | string | null;
+  invoiceStatus?: string | null;
   revision?: number | null;
   approval?: InvoiceApproval | null;
+  approvalRequests?: InvoiceApprovalRequest[] | null;
   workflowStatus?: WorkflowStatus | string | null;
   lineItems?: InvoiceLineItem[] | null;
   createdBy?: InvoiceReferencePerson | string | null;
@@ -159,6 +178,7 @@ export type InvoiceListItem = {
   dueDate: string;
   amount: number;
   status: InvoiceStatus | string;
+  invoiceStatus?: string | null;
   workflowStatus?: WorkflowStatus | string;
   approval?: InvoiceApproval;
   revision?: number;
@@ -238,6 +258,7 @@ export type CreateInvoiceDraftPayload = {
   lineItems?: CreateInvoiceLineItemPayload[];
   subtotal?: number;
   markupTotal?: number;
+  tax?: number;
   discount?: number;
   depositAmount?: number;
   totalAmount: number;

@@ -1,9 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router";
+import { toast } from "sonner";
 import { FileSpreadsheet, Loader2, CheckCircle2 } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { FileDropzoneCard, type FileItem } from "@/components/ui/file-dropzone-card";
+import { getApiErrorMessage } from "@/lib/api-error";
+import {
+  FileDropzoneCard,
+  type FileItem,
+} from "@/components/ui/file-dropzone-card";
 import { QuoteBreakdownTab } from "./quote-breakdown-tab";
 import { QuoteDetailTab } from "./quote-detail-tab";
 import { QuoteSowTab } from "./quote-sow-tab";
@@ -19,6 +24,7 @@ import {
   type ExtractShipperResponseData,
   type ExtractDrawingResponseData,
   type ComputeEstimateRequest,
+  type Scope,
 } from "../estimates.api";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 
@@ -40,11 +46,11 @@ function normalizeRoof(roof: string): string {
   return r.replace(/\s+/g, "-") || "screw-down";
 }
 
-function normalizeScope(scope?: string): "supply" | "install" | "both" {
-  const s = (scope || "supply").toLowerCase();
-  if (s === "install") return "install";
-  if (s === "both") return "both";
-  return "supply";
+function normalizeScope(scope?: string): Scope {
+  const s = (scope || "Both").toLowerCase();
+  if (s === "supply") return "Supply";
+  if (s === "install") return "Install";
+  return "Both";
 }
 
 const tabs = [
@@ -76,13 +82,16 @@ export function QuoteBreakdownPricingSection({
   onShipperExtracted,
 }: QuoteBreakdownPricingSectionProps) {
   const [activeTab, setActiveTab] = useState("breakdown");
-  const [shipperData, setShipperData] = useState<ExtractShipperResponseData | undefined>(
-    initialShipper
-  );
+  const [shipperData, setShipperData] = useState<
+    ExtractShipperResponseData | undefined
+  >(initialShipper);
   const [file, setFile] = useState<FileItem | null>(
     initialShipper
-      ? { name: initialShipper.fileName, size: `${initialShipper.totalWeightLbs} lbs` }
-      : null
+      ? {
+          name: initialShipper.fileName,
+          size: `${initialShipper.totalWeightLbs} lbs`,
+        }
+      : null,
   );
   const [isParsing, setIsParsing] = useState(false);
   const [isComputing, setIsComputing] = useState(false);
@@ -124,6 +133,7 @@ export function QuoteBreakdownPricingSection({
     marginTargetMargin,
     marginFixedSellOverride,
     pembExtractedShipper,
+    setPembExtractedShipper,
     pembLeadId,
     pembEstimateId,
     setPembEstimateId,
@@ -132,7 +142,7 @@ export function QuoteBreakdownPricingSection({
   const effectiveInitial = initialShipper || pembExtractedShipper || undefined;
 
   const [estimateId, setEstimateId] = useState<string | null>(
-    propEstimateId || pembEstimateId || null
+    propEstimateId || pembEstimateId || null,
   );
 
   useEffect(() => {
@@ -142,7 +152,9 @@ export function QuoteBreakdownPricingSection({
 
   // Page-specific local state
   const [sqFt, setSqFt] = useState(
-    effectiveInitial?.squareFootage ? String(effectiveInitial.squareFootage) : ""
+    effectiveInitial?.squareFootage
+      ? String(effectiveInitial.squareFootage)
+      : "",
   );
   const [isManualSqFt, setIsManualSqFt] = useState(false);
   const [buildingSize, setBuildingSize] = useState("");
@@ -153,18 +165,34 @@ export function QuoteBreakdownPricingSection({
     setIsManualSqFt(true);
   }, []);
 
+  const lastLoadedFileNameRef = useRef<string | null>(
+    effectiveInitial?.fileName || null,
+  );
+  const shipperDataRef = useRef<ExtractShipperResponseData | undefined>(
+    shipperData,
+  );
+  useEffect(() => {
+    shipperDataRef.current = shipperData;
+  }, [shipperData]);
+
   useEffect(() => {
     const s = initialShipper || pembExtractedShipper;
-    if (s) {
+    if (!s) {
+      lastLoadedFileNameRef.current = null;
+      setShipperData(undefined);
+      setFile(null);
+      setSqFt("");
+      return;
+    }
+
+    // Only sync if it is a genuinely different file or first load
+    if (s.fileName !== lastLoadedFileNameRef.current) {
+      lastLoadedFileNameRef.current = s.fileName;
       setShipperData(s);
       setFile({ name: s.fileName, size: `${s.totalWeightLbs} lbs` });
       if (s.squareFootage) {
         setSqFt(String(s.squareFootage));
       }
-    } else {
-      setShipperData(undefined);
-      setFile(null);
-      setSqFt("");
     }
   }, [initialShipper, pembExtractedShipper]);
 
@@ -204,12 +232,14 @@ export function QuoteBreakdownPricingSection({
   const handleSaveDraft = useCallback(async () => {
     if (!shipperData) return;
     setIsSavingDraft(true);
+    const activeEstimateId =
+      estimateId || propEstimateId || pembEstimateId || undefined;
     try {
-      const activeEstimateId =
-        estimateId || propEstimateId || pembEstimateId || undefined;
       const parsedSqFt = parseFloat(sqFt) || shipperData.squareFootage || 0;
-      const effectiveCostPerSf = installCost > 0 ? installCost : (jobType === "Storage" ? 2.5 : 5.5);
-      const effectiveSellPerSf = installSell > 0 ? installSell : (jobType === "Storage" ? 3.25 : 8.5);
+      const effectiveCostPerSf =
+        installCost > 0 ? installCost : jobType === "Storage" ? 2.5 : 5.5;
+      const effectiveSellPerSf =
+        installSell > 0 ? installSell : jobType === "Storage" ? 3.25 : 8.5;
       const cogsCostVal = parseFloat(cogsCostInput) || undefined;
       const cogsSellVal = parseFloat(cogsFixedSellPrice) || undefined;
       const marginLaborVal = parseFloat(marginLaborOverride) || undefined;
@@ -223,7 +253,10 @@ export function QuoteBreakdownPricingSection({
           jobType,
           scope: normalizeScope(scope),
           roofType: normalizeRoof(roofType),
-          leadCompanyName: quotationForm?.leadName || extractedDrawing?.extracted?.customer || "",
+          leadCompanyName:
+            quotationForm?.leadName ||
+            extractedDrawing?.extracted?.customer ||
+            "",
           customerEmail: quotationForm?.email || "",
           streetAddress: quotationForm?.street || "",
           cityStateZip: quotationForm?.cityStateZip || "",
@@ -231,7 +264,10 @@ export function QuoteBreakdownPricingSection({
           squareFootage: parsedSqFt,
           sf: parsedSqFt,
           useManualSquareFootage: isManualSqFt,
-          jobNumber: quotationForm?.jobNumber || extractedDrawing?.extracted?.jobnumber || "",
+          jobNumber:
+            quotationForm?.jobNumber ||
+            extractedDrawing?.extracted?.jobnumber ||
+            "",
           sourceFileName: pdfFileName || shipperData.fileName || "",
           blendPct: blendPercentage,
           installLevel: installDifficulty || "easy",
@@ -241,7 +277,9 @@ export function QuoteBreakdownPricingSection({
           tabSummary: shipperData.tabSummary,
           breakdownRows: shipperData.pricing?.rows,
           pricingResult: shipperData.pricing,
-          fullQuoteResult: shipperData.fullQuote || (shipperData.pricing as Record<string, unknown> | undefined),
+          fullQuoteResult:
+            shipperData.fullQuote ||
+            (shipperData.pricing as Record<string, unknown> | undefined),
           extractedDrawingFields: extractedDrawing?.extracted,
           concreteAddon: {
             include: concreteInclude,
@@ -274,60 +312,87 @@ export function QuoteBreakdownPricingSection({
           },
           cogsOverride: cogsOverrideApplied
             ? {
-              applied: true,
-              costDollar: cogsCostVal ?? null,
-              marginPct: cogsMaterialMargin,
-              sellDollar: cogsSellVal ?? null,
-              costPctAdj: cogsCostAdjustPercent,
-            }
+                applied: true,
+                costDollar: cogsCostVal ?? null,
+                marginPct: cogsMaterialMargin,
+                sellDollar: cogsSellVal ?? null,
+                costPctAdj: cogsCostAdjustPercent,
+              }
             : {
-              applied: false,
-            },
+                applied: false,
+              },
           marginOverride: marginOverrideApplied
             ? {
-              applied: true,
-              laborSF: marginLaborVal ?? null,
-              pct: marginTargetVal ?? null,
-              sellFixed: marginSellVal ?? null,
-            }
+                applied: true,
+                laborSF: marginLaborVal ?? null,
+                pct: marginTargetVal ?? null,
+                sellFixed: marginSellVal ?? null,
+              }
             : {
-              applied: false,
-            },
+                applied: false,
+              },
           status: "draft",
         },
-        activeEstimateId
+        activeEstimateId,
       );
 
       const data = res.data || res;
+      if (res && (res as { success?: boolean }).success === false) {
+        throw new Error(res.message || "Failed to save draft estimate");
+      }
       const savedId = data?.estimate?._id || data?._id || activeEstimateId;
+      toast.success(
+        activeEstimateId
+          ? "Draft estimate updated successfully"
+          : "Draft estimate saved successfully",
+      );
       if (savedId) {
         setEstimateId(savedId);
         setPembEstimateId(savedId);
+        navigate(`/quotation/history/${savedId}`);
+        return;
       }
+      navigate("/quotation/history");
     } catch (err) {
       console.error("Failed to save draft estimate:", err);
+      const msg = getApiErrorMessage(
+        err,
+        "Failed to save draft estimate. Please try again.",
+      );
+      toast.error(msg);
     } finally {
       setIsSavingDraft(false);
     }
   }, [
+    shipperData,
     estimateId,
     propEstimateId,
     pembEstimateId,
-    shipperData,
+    sqFt,
+    installCost,
     jobType,
+    installSell,
+    cogsCostInput,
+    cogsFixedSellPrice,
+    marginLaborOverride,
+    marginTargetMargin,
+    marginFixedSellOverride,
+    quotationForm?.leadId,
+    quotationForm?.leadName,
+    quotationForm?.email,
+    quotationForm?.street,
+    quotationForm?.cityStateZip,
+    quotationForm?.buildingSize,
+    quotationForm?.jobNumber,
+    pembLeadId,
     scope,
     roofType,
-    blendPercentage,
-    installDifficulty,
-    installCost,
-    installSell,
-    quotationForm,
-    pembLeadId,
-    extractedDrawing,
+    extractedDrawing?.extracted,
     buildingSize,
-    sqFt,
     isManualSqFt,
     pdfFileName,
+    blendPercentage,
+    installDifficulty,
     concreteInclude,
     concreteCostSf,
     concreteMarginPct,
@@ -347,6 +412,83 @@ export function QuoteBreakdownPricingSection({
     includeTax,
     taxZip,
     cogsOverrideApplied,
+    cogsMaterialMargin,
+    cogsCostAdjustPercent,
+    marginOverrideApplied,
+    navigate,
+    setPembEstimateId,
+  ]);
+
+  const computeAbortRef = useRef<number | null>(null);
+  const lastComputedSignatureRef = useRef<string>("");
+  const isInitialMountRef = useRef<boolean>(true);
+
+  const buildComputeSignature = useCallback(() => {
+    const current = shipperDataRef.current;
+    if (!current?.parsedCategories && !current?.fileName) return "";
+    return JSON.stringify({
+      fileName: current.fileName || "",
+      catCount: current.parsedCategories
+        ? Object.keys(current.parsedCategories).length
+        : 0,
+      sqFt,
+      isManualSqFt,
+      jobType,
+      scope: normalizeScope(scope),
+      roof: normalizeRoof(roofType),
+      installDifficulty: installDifficulty || "easy",
+      installCost,
+      installSell,
+      blendPercentage,
+      concreteInclude,
+      concreteCostSf,
+      concreteMarginPct,
+      concreteSlabThickness,
+      concretePsiRating,
+      insulationInclude,
+      insulationSystem,
+      insulationRValueRoof,
+      insulationRValueWalls,
+      insulationCogsSf,
+      insulationMarginPct,
+      taxZip,
+      taxRate,
+      includeTax,
+      cogsOverrideApplied,
+      cogsCostInput,
+      cogsCostAdjustPercent,
+      cogsMaterialMargin,
+      cogsFixedSellPrice,
+      marginOverrideApplied,
+      marginLaborOverride,
+      marginTargetMargin,
+      marginFixedSellOverride,
+    });
+  }, [
+    sqFt,
+    isManualSqFt,
+    jobType,
+    scope,
+    roofType,
+    installDifficulty,
+    installCost,
+    installSell,
+    blendPercentage,
+    concreteInclude,
+    concreteCostSf,
+    concreteMarginPct,
+    concreteSlabThickness,
+    concretePsiRating,
+    insulationInclude,
+    insulationSystem,
+    insulationRValueRoof,
+    insulationRValueWalls,
+    insulationCogsSf,
+    insulationMarginPct,
+    taxZip,
+    taxRate,
+    includeTax,
+    cogsOverrideApplied,
     cogsCostInput,
     cogsCostAdjustPercent,
     cogsMaterialMargin,
@@ -355,28 +497,35 @@ export function QuoteBreakdownPricingSection({
     marginLaborOverride,
     marginTargetMargin,
     marginFixedSellOverride,
-    setPembEstimateId,
   ]);
-
-  const computeAbortRef = useRef<number | null>(null);
 
   // Compute estimate function
   const executeCompute = useCallback(
     async (overrides?: Partial<ComputeEstimateRequest>) => {
-      if (!shipperData) return;
+      const current = shipperDataRef.current;
+      if (!current) return;
+
+      if (computeAbortRef.current) {
+        window.clearTimeout(computeAbortRef.current);
+        computeAbortRef.current = null;
+      }
 
       setIsComputing(true);
       try {
         const storeState = useQuotationStore.getState();
-        const parsedSqFt = parseFloat(sqFt) || shipperData.squareFootage || 0;
+        const parsedSqFt = parseFloat(sqFt) || current.squareFootage || 0;
         const cogsCostVal = parseFloat(storeState.cogsCostInput) || undefined;
-        const cogsSellVal = parseFloat(storeState.cogsFixedSellPrice) || undefined;
-        const marginLaborVal = parseFloat(storeState.marginLaborOverride) || undefined;
-        const marginTargetVal = parseFloat(storeState.marginTargetMargin) || undefined;
-        const marginSellVal = parseFloat(storeState.marginFixedSellOverride) || undefined;
+        const cogsSellVal =
+          parseFloat(storeState.cogsFixedSellPrice) || undefined;
+        const marginLaborVal =
+          parseFloat(storeState.marginLaborOverride) || undefined;
+        const marginTargetVal =
+          parseFloat(storeState.marginTargetMargin) || undefined;
+        const marginSellVal =
+          parseFloat(storeState.marginFixedSellOverride) || undefined;
 
         const payload: ComputeEstimateRequest = {
-          parsedCategories: shipperData.parsedCategories || {},
+          parsedCategories: current.parsedCategories || {},
           jobType,
           scope: normalizeScope(scope),
           squareFootage: parsedSqFt,
@@ -400,15 +549,15 @@ export function QuoteBreakdownPricingSection({
             include: insulationInclude,
             ...(insulationInclude
               ? {
-                system: insulationSystem,
-                rRoof: insulationRValueRoof,
-                rWall: insulationRValueWalls,
-                rValueRoof: insulationRValueRoof,
-                rValueWalls: insulationRValueWalls,
-                costSF: insulationCogsSf,
-                cogsSF: insulationCogsSf,
-                marginPct: insulationMarginPct,
-              }
+                  system: insulationSystem,
+                  rRoof: insulationRValueRoof,
+                  rWall: insulationRValueWalls,
+                  rValueRoof: insulationRValueRoof,
+                  rValueWalls: insulationRValueWalls,
+                  costSF: insulationCogsSf,
+                  cogsSF: insulationCogsSf,
+                  marginPct: insulationMarginPct,
+                }
               : {}),
           },
           salesTax: {
@@ -418,25 +567,25 @@ export function QuoteBreakdownPricingSection({
           },
           cogsOverride: cogsOverrideApplied
             ? {
-              applied: true,
-              costDollar: cogsCostVal ?? null,
-              marginPct: storeState.cogsMaterialMargin,
-              sellDollar: cogsSellVal ?? null,
-              costPctAdj: storeState.cogsCostAdjustPercent,
-            }
+                applied: true,
+                costDollar: cogsCostVal ?? null,
+                marginPct: storeState.cogsMaterialMargin,
+                sellDollar: cogsSellVal ?? null,
+                costPctAdj: storeState.cogsCostAdjustPercent,
+              }
             : {
-              applied: false,
-            },
+                applied: false,
+              },
           marginOverride: marginOverrideApplied
             ? {
-              applied: true,
-              laborSF: marginLaborVal ?? null,
-              pct: marginTargetVal ?? null,
-              sellFixed: marginSellVal ?? null,
-            }
+                applied: true,
+                laborSF: marginLaborVal ?? null,
+                pct: marginTargetVal ?? null,
+                sellFixed: marginSellVal ?? null,
+              }
             : {
-              applied: false,
-            },
+                applied: false,
+              },
           ...overrides,
         };
 
@@ -444,20 +593,20 @@ export function QuoteBreakdownPricingSection({
 
         if (res) {
           const data = res.data || res;
-          const weightByCategory = data.weightByCategory || res.weightByCategory;
+          const weightByCategory =
+            data.weightByCategory || res.weightByCategory;
           const fullQuote = data.fullQuote || res.fullQuote;
           const pricing = data.pricing || res.pricing || fullQuote?.pricing;
           if (weightByCategory || pricing || fullQuote) {
-            setShipperData((prev) =>
-              prev
-                ? {
-                  ...prev,
-                  ...(weightByCategory ? { weightByCategory } : {}),
-                  ...(pricing ? { pricing } : {}),
-                  ...(fullQuote ? { fullQuote } : {}),
-                }
-                : prev
-            );
+            const updated: ExtractShipperResponseData = {
+              ...current,
+              ...(weightByCategory ? { weightByCategory } : {}),
+              ...(pricing ? { pricing } : {}),
+              ...(fullQuote ? { fullQuote } : {}),
+            };
+            shipperDataRef.current = updated;
+            setShipperData(updated);
+            setPembExtractedShipper(updated);
           }
         }
       } catch (err) {
@@ -467,7 +616,6 @@ export function QuoteBreakdownPricingSection({
       }
     },
     [
-      shipperData,
       jobType,
       scope,
       sqFt,
@@ -493,20 +641,37 @@ export function QuoteBreakdownPricingSection({
       taxZip,
       cogsOverrideApplied,
       marginOverrideApplied,
-      setIsComputing,
-      setShipperData,
-    ]
+      setPembExtractedShipper,
+    ],
   );
 
-  // Automatically trigger debounced re-compute when settings change
+  // Automatically trigger debounced re-compute when calculation settings change
   useEffect(() => {
-    if (!shipperData) return;
+    if (!shipperData?.parsedCategories && !shipperData?.fileName) return;
+
+    const signature = buildComputeSignature();
+    if (!signature) return;
+
+    // Skip if already computed with identical calculation inputs
+    if (lastComputedSignatureRef.current === signature) {
+      return;
+    }
+
+    // On initial mount or load, if pricing already exists, sync signature without computing
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      if (shipperData?.pricing) {
+        lastComputedSignatureRef.current = signature;
+        return;
+      }
+    }
 
     if (computeAbortRef.current) {
       window.clearTimeout(computeAbortRef.current);
     }
 
     computeAbortRef.current = window.setTimeout(() => {
+      lastComputedSignatureRef.current = signature;
       executeCompute();
     }, 300);
 
@@ -515,7 +680,13 @@ export function QuoteBreakdownPricingSection({
         window.clearTimeout(computeAbortRef.current);
       }
     };
-  }, [executeCompute, shipperData]);
+  }, [
+    shipperData?.parsedCategories,
+    shipperData?.fileName,
+    shipperData?.pricing,
+    buildComputeSignature,
+    executeCompute,
+  ]);
 
   const handleSelectSf = useCallback(
     (selectedSf: number) => {
@@ -523,29 +694,38 @@ export function QuoteBreakdownPricingSection({
       setIsManualSqFt(true);
       setShipperData((prev) => {
         if (!prev) return prev;
-        return {
+        const updated = {
           ...prev,
           squareFootage: selectedSf,
           squareFootageMeta: prev.squareFootageMeta
             ? {
-              ...prev.squareFootageMeta,
-              source: "manual",
-              selected: selectedSf,
-              inputSf: selectedSf,
-            }
+                ...prev.squareFootageMeta,
+                source: "manual",
+                selected: selectedSf,
+                inputSf: selectedSf,
+              }
             : {
-              source: "manual",
-              selected: selectedSf,
-              inputSf: selectedSf,
-            },
+                source: "manual",
+                selected: selectedSf,
+                inputSf: selectedSf,
+              },
         };
+        shipperDataRef.current = updated;
+        return updated;
       });
-      executeCompute({ squareFootage: selectedSf, sf: selectedSf, useManualSquareFootage: true });
+      executeCompute({
+        squareFootage: selectedSf,
+        sf: selectedSf,
+        useManualSquareFootage: true,
+      });
     },
-    [executeCompute]
+    [executeCompute],
   );
 
-  const handleFileSelect = async (selected: FileItem | null, rawFile?: File | null) => {
+  const handleFileSelect = async (
+    selected: FileItem | null,
+    rawFile?: File | null,
+  ) => {
     setFile(selected);
     if (rawFile) {
       setIsParsing(true);
@@ -566,11 +746,55 @@ export function QuoteBreakdownPricingSection({
           sellPerSf: installSell,
         });
         if (res.success && res.data) {
+          lastLoadedFileNameRef.current = res.data.fileName;
+          shipperDataRef.current = res.data;
           setShipperData(res.data);
+          setPembExtractedShipper(res.data);
           if (res.data.squareFootage) {
             setSqFt(String(res.data.squareFootage));
           }
           setIsManualSqFt(false);
+
+          // Mark signature as already computed for this freshly uploaded file
+          lastComputedSignatureRef.current = JSON.stringify({
+            fileName: res.data.fileName || "",
+            catCount: res.data.parsedCategories
+              ? Object.keys(res.data.parsedCategories).length
+              : 0,
+            sqFt: res.data.squareFootage ? String(res.data.squareFootage) : "",
+            isManualSqFt: false,
+            jobType,
+            scope: normalizeScope(scope),
+            roof: normalizeRoof(roofType),
+            installDifficulty: installDifficulty || "easy",
+            installCost,
+            installSell,
+            blendPercentage,
+            concreteInclude,
+            concreteCostSf,
+            concreteMarginPct,
+            concreteSlabThickness,
+            concretePsiRating,
+            insulationInclude,
+            insulationSystem,
+            insulationRValueRoof,
+            insulationRValueWalls,
+            insulationCogsSf,
+            insulationMarginPct,
+            taxZip,
+            taxRate,
+            includeTax,
+            cogsOverrideApplied,
+            cogsCostInput,
+            cogsCostAdjustPercent,
+            cogsMaterialMargin,
+            cogsFixedSellPrice,
+            marginOverrideApplied,
+            marginLaborOverride,
+            marginTargetMargin,
+            marginFixedSellOverride,
+          });
+
           if (onShipperExtracted) {
             onShipperExtracted(res.data);
           }
@@ -599,7 +823,8 @@ export function QuoteBreakdownPricingSection({
                 Step 2 — Upload Xshipper file (excel)
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                All tabs read automatically — Columns & Rafters, Purlins, Sheeting, etc.
+                All tabs read automatically — Columns & Rafters, Purlins,
+                Sheeting, etc.
               </p>
             </div>
           </div>
@@ -644,118 +869,123 @@ export function QuoteBreakdownPricingSection({
         shipperData?.parsedCategories ||
         shipperData?.pricing ||
         (shipperData?.tabSummary && shipperData.tabSummary.length > 0) ||
-        (shipperData?.totalWeightLbs && shipperData.totalWeightLbs > 0)
+        (shipperData?.totalWeightLbs && shipperData.totalWeightLbs > 0),
       ) && (
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6 pt-4 border-t border-slate-200">
-            <div className="border-b border-slate-200 overflow-x-auto pb-1">
-              <TabsList variant="line" className="h-auto p-0 gap-6 min-w-max">
-                {tabs.map((tab) => (
-                  <TabsTrigger key={tab.id} value={tab.id}>
-                    {tab.label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </div>
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="w-full space-y-6 pt-4 border-t border-slate-200"
+        >
+          <div className="border-b border-slate-200 overflow-x-auto pb-1">
+            <TabsList variant="line" className="h-auto p-0 gap-6 min-w-max">
+              {tabs.map((tab) => (
+                <TabsTrigger key={tab.id} value={tab.id}>
+                  {tab.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
 
-            {/* Breakdown Tab */}
-            <TabsContent value="breakdown" className="m-0 outline-none">
-              <QuoteBreakdownTab
-                extractedShipper={shipperData}
-                onViewQuote={() => setActiveTab("quote")}
-                onViewSow={() => setActiveTab("sow")}
-                onQuotePreview={handleNavigateToPreview}
-                onSaveDraft={handleSaveDraft}
-                isSavingDraft={isSavingDraft}
-                onSelectSf={handleSelectSf}
-                isManualSqFt={isManualSqFt}
-              />
-            </TabsContent>
+          {/* Breakdown Tab */}
+          <TabsContent value="breakdown" className="m-0 outline-none">
+            <QuoteBreakdownTab
+              extractedShipper={shipperData}
+              onViewQuote={() => setActiveTab("quote")}
+              onViewSow={() => setActiveTab("sow")}
+              onQuotePreview={handleNavigateToPreview}
+              onSaveDraft={handleSaveDraft}
+              isSavingDraft={isSavingDraft}
+              onSelectSf={handleSelectSf}
+              isManualSqFt={isManualSqFt}
+              estimateId={estimateId || propEstimateId || pembEstimateId}
+            />
+          </TabsContent>
 
-            {/* Quote Tab */}
-            <TabsContent value="quote" className="m-0 outline-none">
-              <QuoteDetailTab
-                sqFt={sqFt}
-                setSqFt={handleSqFtChange}
-                buildingSize={buildingSize}
-                setBuildingSize={setBuildingSize}
-                additionalNotes={additionalNotes}
-                setAdditionalNotes={setAdditionalNotes}
-                extractedShipper={shipperData}
-                quotationForm={quotationForm}
-                extractedDrawing={extractedDrawing}
-                pdfFileName={pdfFileName}
-                estimateId={estimateId || propEstimateId || pembEstimateId}
-                onQuotePreview={handleNavigateToPreview}
-                onSaveDraft={handleSaveDraft}
-                isSavingDraft={isSavingDraft}
-                onBackToBreakdown={() => setActiveTab("breakdown")}
-              />
-            </TabsContent>
+          {/* Quote Tab */}
+          <TabsContent value="quote" className="m-0 outline-none">
+            <QuoteDetailTab
+              sqFt={sqFt}
+              setSqFt={handleSqFtChange}
+              buildingSize={buildingSize}
+              setBuildingSize={setBuildingSize}
+              additionalNotes={additionalNotes}
+              setAdditionalNotes={setAdditionalNotes}
+              extractedShipper={shipperData}
+              quotationForm={quotationForm}
+              extractedDrawing={extractedDrawing}
+              pdfFileName={pdfFileName}
+              estimateId={estimateId || propEstimateId || pembEstimateId}
+              onQuotePreview={handleNavigateToPreview}
+              onSaveDraft={handleSaveDraft}
+              isSavingDraft={isSavingDraft}
+              onBackToBreakdown={() => setActiveTab("breakdown")}
+            />
+          </TabsContent>
 
-            {/* Statement of Work Tab */}
-            <TabsContent value="sow" className="m-0 outline-none">
-              <QuoteSowTab
-                buildingSize={buildingSize}
-                sqFt={sqFt}
-                extractedShipper={shipperData}
-                quotationForm={quotationForm}
-                extractedDrawing={extractedDrawing}
-                pdfFileName={pdfFileName}
-                estimateId={estimateId || undefined}
-                onBackToBreakdown={() => setActiveTab("breakdown")}
-                onQuotePreview={handleNavigateToPreview}
-              />
-            </TabsContent>
+          {/* Statement of Work Tab */}
+          <TabsContent value="sow" className="m-0 outline-none">
+            <QuoteSowTab
+              buildingSize={buildingSize}
+              sqFt={sqFt}
+              extractedShipper={shipperData}
+              quotationForm={quotationForm}
+              extractedDrawing={extractedDrawing}
+              pdfFileName={pdfFileName}
+              estimateId={estimateId || undefined}
+              onBackToBreakdown={() => setActiveTab("breakdown")}
+              onQuotePreview={handleNavigateToPreview}
+            />
+          </TabsContent>
 
-            {/* Margin Tab */}
-            <TabsContent value="margin" className="m-0 outline-none">
-              <QuoteMarginTab
-                extractedShipper={shipperData}
-                onTriggerCompute={executeCompute}
-              />
-            </TabsContent>
+          {/* Margin Tab */}
+          <TabsContent value="margin" className="m-0 outline-none">
+            <QuoteMarginTab
+              extractedShipper={shipperData}
+              onTriggerCompute={executeCompute}
+            />
+          </TabsContent>
 
-            {/* COGS Tab */}
-            <TabsContent value="cogs" className="m-0 outline-none">
-              <QuoteCogsTab
-                extractedShipper={shipperData}
-                onTriggerCompute={executeCompute}
-              />
-            </TabsContent>
+          {/* COGS Tab */}
+          <TabsContent value="cogs" className="m-0 outline-none">
+            <QuoteCogsTab
+              extractedShipper={shipperData}
+              onTriggerCompute={executeCompute}
+            />
+          </TabsContent>
 
-            {/* Concrete Tab */}
-            <TabsContent value="concrete" className="m-0 outline-none">
-              <QuoteConcreteTab
-                extractedShipper={shipperData}
-                sqFt={sqFt}
-                onTriggerCompute={executeCompute}
-              />
-            </TabsContent>
+          {/* Concrete Tab */}
+          <TabsContent value="concrete" className="m-0 outline-none">
+            <QuoteConcreteTab
+              extractedShipper={shipperData}
+              sqFt={sqFt}
+              onTriggerCompute={executeCompute}
+            />
+          </TabsContent>
 
-            {/* Insulation Tab */}
-            <TabsContent value="insulation" className="m-0 outline-none">
-              <QuoteInsulationTab
-                extractedShipper={shipperData}
-                sqFt={sqFt}
-                onTriggerCompute={executeCompute}
-              />
-            </TabsContent>
+          {/* Insulation Tab */}
+          <TabsContent value="insulation" className="m-0 outline-none">
+            <QuoteInsulationTab
+              extractedShipper={shipperData}
+              sqFt={sqFt}
+              onTriggerCompute={executeCompute}
+            />
+          </TabsContent>
 
-            {/* Contract Tab */}
-            <TabsContent value="contract" className="m-0 outline-none">
-              <QuoteContractTab
-                extractedShipper={shipperData}
-                quotationForm={quotationForm}
-                extractedDrawing={extractedDrawing}
-                sqFt={sqFt}
-                pdfFileName={pdfFileName}
-                estimateId={estimateId || undefined}
-                onBackToBreakdown={() => setActiveTab("breakdown")}
-                onQuotePreview={handleNavigateToPreview}
-              />
-            </TabsContent>
-          </Tabs>
-        )}
+          {/* Contract Tab */}
+          <TabsContent value="contract" className="m-0 outline-none">
+            <QuoteContractTab
+              extractedShipper={shipperData}
+              quotationForm={quotationForm}
+              extractedDrawing={extractedDrawing}
+              sqFt={sqFt}
+              pdfFileName={pdfFileName}
+              estimateId={estimateId || undefined}
+              onBackToBreakdown={() => setActiveTab("breakdown")}
+              onQuotePreview={handleNavigateToPreview}
+            />
+          </TabsContent>
+        </Tabs>
+      )}
     </Card>
   );
 }

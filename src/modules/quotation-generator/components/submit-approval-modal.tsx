@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { getApiErrorMessage } from "@/lib/api-error";
 import {
   Dialog,
   DialogContent,
@@ -83,12 +85,12 @@ export function SubmitApprovalModal({
       onSuccess?.(result);
     } catch (error: unknown) {
       console.error("Failed to submit quotation for approval:", error);
-      const msg =
-        (error as { response?: { data?: { message?: string } }; message?: string })
-          ?.response?.data?.message ||
-        (error as { message?: string })?.message ||
-        "Failed to submit quotation for approval. Please try again.";
+      const msg = getApiErrorMessage(
+        error,
+        "Failed to submit quotation for approval. Please try again.",
+      );
       setErrorMessage(msg);
+      toast.error(msg);
     }
   };
 

@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { toast } from "sonner";
+import { getApiErrorMessage } from "@/lib/api-error";
 import {
   getEstimateByIdProvider,
   downloadPdfProvider,
@@ -82,6 +84,12 @@ export function EstimateDetailPage() {
 
   const conversion = estimate?.conversion;
   const quoteNumber = conversion?.quoteNumber;
+  const effectiveWorkflowStatus =
+    conversion?.workflowStatus ||
+    estimate?.workflowStatus ||
+    estimate?.approval?.status ||
+    estimate?.status ||
+    "draft";
 
   // Server document preview request payload
   const previewPayload: PreviewDocumentRequest | null = useMemo(() => {
@@ -139,6 +147,11 @@ export function EstimateDetailPage() {
       });
     } catch (err) {
       console.error("Failed to generate PDF:", err);
+      const msg = getApiErrorMessage(
+        err,
+        "Failed to generate PDF. Please try again.",
+      );
+      toast.error(msg);
     } finally {
       setIsDownloadingPdf(false);
     }
@@ -149,25 +162,48 @@ export function EstimateDetailPage() {
     setIsConverting(true);
     try {
       const res = await convertMutation.mutateAsync(id);
-      const resData = (res as { data?: { quotation?: { _id?: string }; _id?: string } })?.data;
+      if (res && (res as { success?: boolean }).success === false) {
+        throw new Error(
+          (res as { message?: string }).message ||
+            "Failed to convert estimate to quotation",
+        );
+      }
+      const resData = (
+        res as { data?: { quotation?: { _id?: string }; _id?: string } }
+      )?.data;
       const quotationId = resData?.quotation?._id || resData?._id;
       if (quotationId) {
+        toast.success("Converted to quotation successfully");
         navigate(`/leads/quotation-details/${quotationId}`);
       } else {
         await fetchEstimateDetail();
       }
     } catch (err) {
       console.error("Failed to convert estimate to quotation:", err);
+      const msg = getApiErrorMessage(
+        err,
+        "Failed to convert estimate to quotation. Please try again.",
+      );
+      toast.error(msg);
     } finally {
       setIsConverting(false);
     }
   };
 
-  const handleEditClick = () => {
-    if (estimate) {
-      loadAndEdit(estimate);
-    } else if (id) {
-      loadAndEdit(id);
+  const handleEditClick = async () => {
+    try {
+      if (estimate) {
+        await loadAndEdit(estimate);
+      } else if (id) {
+        await loadAndEdit(id);
+      }
+    } catch (err) {
+      console.error("Failed to load estimate for editing:", err);
+      const msg = getApiErrorMessage(
+        err,
+        "Failed to load estimate into editor. Please try again.",
+      );
+      toast.error(msg);
     }
   };
 
@@ -232,6 +268,46 @@ export function EstimateDetailPage() {
               <h1 className="text-2xl font-bold text-slate-900 leading-tight">
                 {customerLeadName}
               </h1>
+              {(() => {
+                switch (effectiveWorkflowStatus) {
+                  case "pending_approval":
+                    return (
+                      <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-xs border border-amber-300 shadow-2xs">
+                        Pending Approval
+                      </span>
+                    );
+                  case "approved":
+                    return (
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs border border-emerald-300 shadow-2xs">
+                        Approved
+                      </span>
+                    );
+                  case "rejected":
+                    return (
+                      <span
+                        className="px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold text-xs border border-rose-300 shadow-2xs"
+                        title={
+                          estimate?.approval?.rejectionReason ||
+                          "Approval Rejected"
+                        }
+                      >
+                        Rejected
+                      </span>
+                    );
+                  case "sent":
+                    return (
+                      <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold text-xs border border-blue-300 shadow-2xs">
+                        Sent
+                      </span>
+                    );
+                  default:
+                    return (
+                      <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold text-xs border border-slate-300">
+                        Draft
+                      </span>
+                    );
+                }
+              })()}
               {quoteNumber && (
                 <span className="px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 font-bold text-xs border border-blue-200">
                   Quote #{quoteNumber}
@@ -257,7 +333,9 @@ export function EstimateDetailPage() {
               type="button"
               onClick={() => {
                 if (conversion?.quotationId) {
-                  navigate(`/leads/quotation-details/${conversion.quotationId}`);
+                  navigate(
+                    `/leads/quotation-details/${conversion.quotationId}`,
+                  );
                 } else {
                   navigate("/leads/quotation-list");
                 }
@@ -284,7 +362,7 @@ export function EstimateDetailPage() {
               ) : (
                 <ArrowRightCircle className="h-4 w-4" />
               )}
-              Convert to Quote
+              Send For Approval
             </Button>
           )}
 
@@ -308,8 +386,13 @@ export function EstimateDetailPage() {
           <Button
             type="button"
             onClick={handleDownloadPdf}
-            disabled={isDownloadingPdf}
-            className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
+            disabled={isDownloadingPdf || effectiveWorkflowStatus !== "approved"}
+            className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+            title={
+              effectiveWorkflowStatus !== "approved"
+                ? "PDF generation is disabled until the estimate is approved."
+                : "Generate and download or print PDF"
+            }
           >
             {isDownloadingPdf ? (
               <Loader2 className="h-4 w-4 animate-spin" />

@@ -8,6 +8,7 @@ import {
   History,
   FileText,
   FileCheck,
+  FileEdit,
   Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ import type {
   WorkflowStatus,
   QuotationApprovalInfo,
 } from "@/modules/quotations/quotations.api";
+import { QuotationApprovalTimeline } from "./quotation-approval-timeline";
 
 interface QuotationApprovalBannerProps {
   workflowStatus?: WorkflowStatus | string;
@@ -34,14 +36,14 @@ interface QuotationApprovalBannerProps {
   sentTo?: string | null;
   sentCc?: string[] | null;
   sentMessage?: string | null;
-  /** @deprecated Action buttons have been removed from this banner */
+  approvalMessage?: string | null;
+  approvalNote?: string | null;
+  onViewTimeline?: () => void;
   onSubmitForApproval?: () => void;
   /** @deprecated Action buttons have been removed from this banner */
   onSendToCustomer?: () => void;
-  /** @deprecated Action buttons have been removed from this banner */
   isSubmitting?: boolean;
   isEdited?: boolean;
-  /** @deprecated Action buttons have been removed from this banner */
   onEdit?: () => void;
   className?: string;
 }
@@ -54,7 +56,11 @@ export function QuotationApprovalBanner({
   sentTo,
   sentCc,
   sentMessage,
+  approvalMessage,
+  approvalNote,
+  onViewTimeline,
   onSubmitForApproval,
+  onEdit,
   isSubmitting = false,
   isEdited = false,
   className = "",
@@ -76,6 +82,20 @@ export function QuotationApprovalBanner({
 
   const rejectionReason = approval?.rejectionReason;
   const history = approval?.history || [];
+
+  // Find approval note/message from props, approval object, or the approval event in history
+  const historyApprovedEvent = history.find(
+    (item) => item.status === "approved" && item.note
+  );
+  const effectiveApprovalMessage =
+    approvalMessage ||
+    approvalNote ||
+    approval?.approvalMessage ||
+    approval?.approvalNote ||
+    approval?.note ||
+    historyApprovedEvent?.note ||
+    null;
+
   const isStaleApproved =
     status === "approved" &&
     approval?.approvedVersionNumber !== undefined &&
@@ -86,11 +106,11 @@ export function QuotationApprovalBanner({
     Boolean(onSubmitForApproval) &&
     (status === "not_submitted" ||
       status === "draft" ||
-      status === "rejected" ||
+      (status === "rejected" && isEdited) ||
       (status === "approved" && isStaleApproved));
 
   const submitButtonText =
-    status === "rejected" || isStaleApproved
+    (status === "rejected" && isEdited) || isStaleApproved
       ? "Re-submit for Approval"
       : "Submit for Approval";
 
@@ -127,7 +147,9 @@ export function QuotationApprovalBanner({
           title: `Admin Approved (v${approval?.approvedVersionNumber || versionNumber})`,
           badgeText: "Approved",
           badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-300",
-          description: "Quotation has been approved by admin and is ready to be sent to the customer.",
+          description: effectiveApprovalMessage
+            ? `Admin Note: "${effectiveApprovalMessage}" — Quotation is ready to be sent to the customer.`
+            : "Quotation has been approved by admin and is ready to be sent to the customer.",
           historyBtnClass: "text-emerald-900 hover:bg-emerald-100/80 border-emerald-300",
         };
       case "rejected":
@@ -147,12 +169,12 @@ export function QuotationApprovalBanner({
           containerClass: "bg-rose-50/80 border-rose-200 text-rose-950",
           iconContainerClass: "bg-rose-100 text-rose-700",
           icon: <XCircle className="w-4 h-4" />,
-          title: "Approval Rejected by Admin",
-          badgeText: "Rejected",
+          title: `Approval Rejected by Admin (v${versionNumber})`,
+          badgeText: "Rejected — Edit Required",
           badgeClass: "bg-rose-100 text-rose-800 border-rose-300",
           description: rejectionReason
-            ? `Admin Note: "${rejectionReason}"`
-            : "Review feedback and make required adjustments before re-submitting.",
+            ? `Admin Note: "${rejectionReason}" — Please edit the estimate before re-submitting.`
+            : "Review feedback and edit the estimate before re-submitting for approval.",
           historyBtnClass: "text-rose-900 hover:bg-rose-100/80 border-rose-300",
         };
       case "sent":
@@ -224,7 +246,7 @@ export function QuotationApprovalBanner({
           </div>
         </div>
 
-        {(canSubmit || history.length > 0) && (
+        {(canSubmit || (status === "rejected" && !isEdited && Boolean(onEdit)) || history.length > 0) && (
           <div className="flex items-center gap-2 shrink-0">
             {canSubmit && (
               <Button
@@ -243,12 +265,35 @@ export function QuotationApprovalBanner({
               </Button>
             )}
 
+            {status === "rejected" && !isEdited && onEdit && (
+              <Button
+                type="button"
+                size="sm"
+                onClick={onEdit}
+                className="h-7.5 px-3 text-xs font-semibold shrink-0 cursor-pointer bg-rose-600 hover:bg-rose-700 text-white shadow-xs flex items-center gap-1.5"
+              >
+                <FileEdit className="w-3.5 h-3.5" />
+                Edit Estimate
+              </Button>
+            )}
+
             {history.length > 0 && (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setShowHistoryModal(true)}
+                onClick={() => {
+                  if (onViewTimeline) {
+                    onViewTimeline();
+                    return;
+                  }
+                  const el = document.getElementById("quotation-timeline-section");
+                  if (el) {
+                    el.scrollIntoView({ behavior: "smooth" });
+                  } else {
+                    setShowHistoryModal(true);
+                  }
+                }}
                 className={`h-7.5 px-2.5 text-xs font-semibold shrink-0 cursor-pointer bg-white/80 backdrop-blur-xs border ${config.historyBtnClass}`}
               >
                 <History className="w-3.5 h-3.5 mr-1" />
@@ -271,48 +316,13 @@ export function QuotationApprovalBanner({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2 max-h-[350px] overflow-y-auto">
-            {history.length === 0 ? (
-              <p className="text-sm text-slate-500 text-center py-6">
-                No approval events recorded yet.
-              </p>
-            ) : (
-              <div className="relative border-l-2 border-slate-200 ml-3 pl-4 space-y-4">
-                {history.map((item, idx) => {
-                  const byName =
-                    typeof item.by === "object" && item.by !== null
-                      ? `${item.by.firstName || ""} ${item.by.lastName || ""}`.trim() ||
-                        item.by.email
-                      : String(item.by || "User");
-
-                  const dateStr = item.at
-                    ? new Date(item.at).toLocaleString()
-                    : "—";
-
-                  return (
-                    <div key={idx} className="relative group">
-                      <span className="absolute -left-[23px] top-1 w-2.5 h-2.5 rounded-full bg-slate-400 border-2 border-white" />
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-semibold text-slate-800 capitalize">
-                          {item.status.replace("_", " ")}
-                        </span>
-                        <span className="text-xs text-slate-400">
-                          {dateStr}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        By: <span className="font-medium text-slate-700">{byName}</span>
-                      </p>
-                      {item.note && (
-                        <p className="text-xs text-slate-700 mt-1 bg-slate-50 p-2 rounded border border-slate-200">
-                          {item.note}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+          <div className="py-2 max-h-96 overflow-y-auto overflow-x-hidden pr-2 min-w-0">
+            <QuotationApprovalTimeline
+              history={history}
+              versionNumber={versionNumber}
+              showEmpty={true}
+              className="border-0 shadow-none p-0"
+            />
           </div>
 
           <DialogFooter>

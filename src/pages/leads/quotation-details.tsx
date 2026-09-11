@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router";
 import {
   ArrowLeft,
-  Printer,
   FileCheck,
   Send,
   Loader2,
@@ -12,6 +11,8 @@ import {
   Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { getApiErrorMessage } from "@/lib/api-error";
 import { useQuotationQuery } from "@/modules/quotations/quotations.hooks";
 import { useLeadDetailQuery } from "@/modules/leads/leads.hooks";
 import { SubmitApprovalModal } from "@/modules/quotation-generator/components/submit-approval-modal";
@@ -24,8 +25,10 @@ import type {
   WorkflowStatus,
   ApprovalStatus,
   QuotationApprovalInfo,
+  QuotationApprovalHistoryItem,
   QuotationItem,
 } from "@/modules/quotations/quotations.api";
+import { QuotationApprovalTimeline } from "@/modules/quotation-generator/components/quotation-approval-timeline";
 
 export default function QuotationDetailsPage() {
   const { id } = useParams<{ id: string }>();
@@ -86,10 +89,65 @@ export default function QuotationDetailsPage() {
       status: (quotation?.approvalStatus || "not_submitted") as ApprovalStatus,
       rejectionReason: (quotation as { rejectionReason?: string })
         ?.rejectionReason,
+      approvalMessage: (quotation as { approvalMessage?: string })
+        ?.approvalMessage,
+      approvalNote: (quotation as { approvalNote?: string })
+        ?.approvalNote,
       approvedVersionNumber: (quotation as { approvedVersionNumber?: number })
         ?.approvedVersionNumber,
     };
   }, [quotation]);
+
+  const timelineHistory = useMemo(() => {
+    const rawHistory = approvalInfo?.history || quotation?.approval?.history;
+    if (rawHistory && rawHistory.length > 0) {
+      return rawHistory;
+    }
+
+    // Synthesize fallback events if quotation has approval info but no history array
+    const fallback: QuotationApprovalHistoryItem[] = [];
+    if (approvalInfo?.submittedAt) {
+      fallback.push({
+        status: "pending_approval",
+        at: approvalInfo.submittedAt,
+        by: approvalInfo.submittedBy,
+        versionNumber: versionNumber,
+      });
+    }
+    if (approvalInfo?.reviewedAt) {
+      fallback.push({
+        status: approvalInfo.status,
+        at: approvalInfo.reviewedAt,
+        by: approvalInfo.reviewedBy,
+        note:
+          approvalInfo.rejectionReason ||
+          approvalInfo.approvalMessage ||
+          approvalInfo.approvalNote ||
+          approvalInfo.note ||
+          (quotation as { approvalMessage?: string })?.approvalMessage ||
+          (quotation as { approvalNote?: string })?.approvalNote ||
+          undefined,
+        versionNumber: approvalInfo.approvedVersionNumber || versionNumber,
+      });
+    }
+    if (workflowStatus === "sent") {
+      fallback.push({
+        status: quotation?.sendMethod === "manual" ? "marked_sent" : "sent",
+        at: quotation?.sentAt || quotation?.updatedAt || null,
+        by: quotation?.createdBy || null,
+        note: quotation?.sentMessage || undefined,
+        versionNumber: approvalInfo?.approvedVersionNumber || versionNumber,
+      });
+    }
+    return fallback.length > 0 ? fallback : undefined;
+  }, [approvalInfo, quotation, workflowStatus, versionNumber]);
+
+  const effectiveApprovalInfo = useMemo(() => {
+    return {
+      ...approvalInfo,
+      history: timelineHistory || approvalInfo?.history,
+    };
+  }, [approvalInfo, timelineHistory]);
 
   const isSent = workflowStatus === "sent";
 
@@ -103,12 +161,17 @@ export default function QuotationDetailsPage() {
     approvalInfo?.approvedVersionNumber !== null &&
     approvalInfo.approvedVersionNumber !== versionNumber;
 
+  const isRejected =
+    approvalInfo?.status === "rejected" || workflowStatus === "rejected";
+
+  const isDownloadAllowed = isApproved && !isStaleApproved;
+
+  // If a version is rejected, it cannot be re-submitted directly — it must be edited first
   const canSubmit =
-    workflowStatus === "draft" ||
-    approvalInfo?.status === "not_submitted" ||
-    approvalInfo?.status === "rejected" ||
-    workflowStatus === "rejected" ||
-    isStaleApproved;
+    !isRejected &&
+    (workflowStatus === "draft" ||
+      approvalInfo?.status === "not_submitted" ||
+      isStaleApproved);
 
   const customerName =
     quotation?.companyName ||
@@ -197,7 +260,7 @@ export default function QuotationDetailsPage() {
   }, [htmlPreviewUrl, loadHtmlPreview]);
 
   const handleDownloadPdf = async () => {
-    if (!pdfDownloadUrl) return;
+    if (!pdfDownloadUrl || !isDownloadAllowed) return;
     setIsDownloadingPdf(true);
     try {
       const res = await apiClient.get(pdfDownloadUrl, { responseType: "blob" });
@@ -213,20 +276,30 @@ export default function QuotationDetailsPage() {
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Failed to download PDF:", err);
+      const msg = getApiErrorMessage(
+        err,
+        "Failed to download PDF. Please try again.",
+      );
+      toast.error(msg);
     } finally {
       setIsDownloadingPdf(false);
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const handleEditEstimate = () => {
-    if (estimate) {
-      loadAndEdit(estimate);
-    } else if (sourceEstimateId) {
-      loadAndEdit(sourceEstimateId);
+  const handleEditEstimate = async () => {
+    try {
+      if (estimate) {
+        await loadAndEdit(estimate);
+      } else if (sourceEstimateId) {
+        await loadAndEdit(sourceEstimateId);
+      }
+    } catch (err) {
+      console.error("Failed to load estimate for editing:", err);
+      const msg = getApiErrorMessage(
+        err,
+        "Failed to load estimate into editor. Please try again.",
+      );
+      toast.error(msg);
     }
   };
 
@@ -316,7 +389,7 @@ export default function QuotationDetailsPage() {
             </Button>
           )}
 
-          {/* Submit / Re-submit for Approval Button */}
+          {/* Submit / Re-submit for Approval Button (Hidden when rejected — must edit first) */}
           {canSubmit && (
             <Button
               type="button"
@@ -324,7 +397,7 @@ export default function QuotationDetailsPage() {
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
             >
               <FileCheck className="h-4 w-4" />
-              {workflowStatus === "rejected" || isStaleApproved
+              {isStaleApproved
                 ? "Re-submit for Approval"
                 : "Submit for Approval"}
             </Button>
@@ -336,15 +409,23 @@ export default function QuotationDetailsPage() {
               type="button"
               onClick={handleEditEstimate}
               disabled={isEditingEstimate}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
-              title="Load estimate into generator editor to modify"
+              className={`px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs ${
+                isRejected
+                  ? "bg-rose-600 hover:bg-rose-700 text-white shadow-md ring-2 ring-rose-300"
+                  : "bg-blue-600 hover:bg-blue-700 text-white"
+              }`}
+              title={
+                isRejected
+                  ? "This quotation version was rejected. Click to edit estimate in generator editor before re-submitting."
+                  : "Load estimate into generator editor to modify"
+              }
             >
               {isEditingEstimate ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <FileEdit className="h-4 w-4" />
               )}
-              Edit Estimate
+              {isRejected ? "Edit Estimate to Revise" : "Edit Estimate"}
             </Button>
           )}
 
@@ -367,9 +448,13 @@ export default function QuotationDetailsPage() {
           <Button
             type="button"
             onClick={handleDownloadPdf}
-            disabled={isDownloadingPdf}
-            className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
-            title={"Download PDF file"}
+            disabled={isDownloadingPdf || !isDownloadAllowed}
+            className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+            title={
+              !isDownloadAllowed
+                ? "PDF download is disabled until the quotation is approved."
+                : "Download PDF file"
+            }
           >
             {isDownloadingPdf ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -378,30 +463,22 @@ export default function QuotationDetailsPage() {
             )}
             {isDownloadingPdf ? "Downloading..." : "Download PDF"}
           </Button>
-
-          {/* Print Button */}
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handlePrint}
-            className="border-slate-300 text-slate-700 hover:bg-slate-50 px-3.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer bg-white"
-          >
-            <Printer className="h-4 w-4" />
-            Print
-          </Button>
         </div>
       </div>
 
       {/* Approval Status & Workflow Banner */}
       <QuotationApprovalBanner
         workflowStatus={workflowStatus}
-        approval={approvalInfo}
+        approval={effectiveApprovalInfo}
         versionNumber={versionNumber}
         sendMethod={quotation?.sendMethod}
         sentTo={quotation?.sentTo}
         sentCc={quotation?.sentCc}
         sentMessage={quotation?.sentMessage}
-        onSubmitForApproval={() => setShowSubmitModal(true)}
+        approvalMessage={quotation?.approvalMessage || effectiveApprovalInfo?.approvalMessage}
+        approvalNote={quotation?.approvalNote || effectiveApprovalInfo?.approvalNote}
+        onEdit={sourceEstimateId ? handleEditEstimate : undefined}
+        onSubmitForApproval={canSubmit ? () => setShowSubmitModal(true) : undefined}
       />
 
       {/* Document HTML Preview Card */}
@@ -413,6 +490,14 @@ export default function QuotationDetailsPage() {
           onRetry={loadHtmlPreview}
           title={`Quotation Document — ${customerName}`}
           minHeight={850}
+        />
+      </div>
+
+      {/* Approval History & Audit Trail */}
+      <div id="quotation-timeline-section" className="no-print">
+        <QuotationApprovalTimeline
+          history={timelineHistory}
+          versionNumber={versionNumber}
         />
       </div>
 

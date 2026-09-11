@@ -3,6 +3,11 @@ import type { SaveEstimatePayload } from "@/modules/quotation-generator/estimate
 
 export const BUILDING_TYPE = ["PEMB", "Storage"] as const;
 export type BuildingType = (typeof BUILDING_TYPE)[number];
+export const DEFAULT_BUILDING_TYPE: BuildingType = "PEMB";
+
+export const QUOTATION_SCOPE = ["Supply", "Install", "Both"] as const;
+export type QuotationScope = (typeof QUOTATION_SCOPE)[number];
+export const DEFAULT_QUOTATION_SCOPE: QuotationScope = "Both";
 
 // Admin / Workflow statuses
 export const ADMIN_STATUS = [
@@ -53,10 +58,15 @@ export type QuotationApprovalHistoryItem = {
         _id?: string;
         firstName?: string;
         lastName?: string;
+        name?: string;
         email?: string;
+        role?: string;
       }
     | null;
   at?: string | null;
+  versionNumber?: number | string | null;
+  version?: number | string | null;
+  revision?: number | string | null;
 };
 
 export type QuotationApprovalInfo = {
@@ -76,6 +86,9 @@ export type QuotationApprovalInfo = {
   } | string | null;
   reviewedAt?: string | null;
   rejectionReason?: string | null;
+  approvalMessage?: string | null;
+  approvalNote?: string | null;
+  note?: string | null;
   approvedVersionNumber?: number | null;
   history?: QuotationApprovalHistoryItem[];
 };
@@ -142,6 +155,8 @@ export type QuotationItem = {
   sentTo?: string | null;
   sentCc?: string[] | null;
   sentMessage?: string | null;
+  approvalMessage?: string | null;
+  approvalNote?: string | null;
   sourceEstimateId?: string | null;
   sourceEstimate?: SaveEstimatePayload | null;
   estimate?: SaveEstimatePayload | null;
@@ -324,6 +339,8 @@ export type GetQuotationsParams = {
   status?: string;
   buildingType?: string;
   search?: string;
+  lead?: string;
+  leadId?: string;
   [key: string]: unknown;
 };
 
@@ -458,5 +475,38 @@ export async function markQuotationSentProvider(
 
   return response.data;
 }
+
+export type LatestApprovedTaxResponse = {
+  leadId: string;
+  quotationId: string;
+  quoteNumber: string;
+  amountWithoutMarkup: number;
+  subtotalWithoutMarkup: number;
+  markup: number;
+  subtotal: number;
+  subtotalWithMarkup: number;
+  tax: number;
+  total: number;
+  taxRate: number;
+  taxableBase: number;
+  taxNote?: string;
+  currency?: string;
+  approvalStatus: string;
+  versionNumber: number;
+  reviewedAt: string;
+};
+
+export async function getLatestApprovedTaxByLeadProvider(leadId: string) {
+  const response = await apiClient.get<
+    LatestApprovedTaxResponse | { success?: boolean; data?: LatestApprovedTaxResponse }
+  >(`/api/leads/${encodeURIComponent(leadId)}/quotations/latest-approved-tax`);
+
+  const raw = response.data;
+  if (raw && typeof raw === "object" && "data" in raw && raw.data) {
+    return raw.data as LatestApprovedTaxResponse;
+  }
+  return raw as LatestApprovedTaxResponse;
+}
+
 
 
