@@ -704,10 +704,15 @@ export default function InvoiceForm({
     }, 0);
   };
 
+  const rawSubtotal = calculateSubtotal();
+  const markupAmount = getAdjustmentAmount(
+    markupValue,
+    markupType,
+    rawSubtotal,
+  );
+  const subtotalWithMarkup = rawSubtotal + markupAmount;
+
   const calculateTotal = () => {
-    const rawSubtotal = calculateSubtotal();
-    const markup = getAdjustmentAmount(markupValue, markupType, rawSubtotal);
-    const subtotalWithMarkup = rawSubtotal + markup;
     const discount = getAdjustmentAmount(
       discountValue,
       discountType,
@@ -1353,7 +1358,7 @@ export default function InvoiceForm({
                     {formatAdjustmentDisplay(
                       discountValue,
                       discountType,
-                      calculateSubtotal(),
+                      subtotalWithMarkup,
                     )}
                   </span>
                   {!isSummaryReadOnly && (
@@ -1361,7 +1366,7 @@ export default function InvoiceForm({
                       <AddDiscountDialog
                         initialType={discountType}
                         initialValue={discountValue}
-                        maxAmount={calculateSubtotal()}
+                        maxAmount={subtotalWithMarkup}
                         onDone={({ type, value }) => {
                           setValue("discountType", type);
                           setValue("discountValue", value);
@@ -1390,7 +1395,7 @@ export default function InvoiceForm({
                 <AddDiscountDialog
                   initialType={discountType}
                   initialValue={discountValue}
-                  maxAmount={calculateSubtotal()}
+                  maxAmount={subtotalWithMarkup}
                   onDone={({ type, value }) => {
                     setValue("discountType", type);
                     setValue("discountValue", value);
