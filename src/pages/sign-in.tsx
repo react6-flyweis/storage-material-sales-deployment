@@ -11,12 +11,7 @@ import { AuthLayout } from "@/components/auth-layout";
 import { Eye, EyeOff } from "lucide-react";
 import { getApiErrorMessage } from "@/lib/api-error";
 import * as Sentry from "@sentry/react";
-
-interface RedirectState {
-  from?: {
-    pathname?: string;
-  };
-}
+import { getAuthRedirectPath } from "@/modules/auth/auth.utils";
 
 const signInSchema = z.object({
   email: z.string().trim().min(1, "Email or phone number is required"),
@@ -48,11 +43,7 @@ export default function SignIn() {
   const onSubmit = async (data: SignInFormValues) => {
     try {
       await loginMutation.mutateAsync(data);
-
-      const state = location.state as RedirectState | null;
-      const nextPath = state?.from?.pathname || "/dashboard";
-
-      navigate(nextPath, { replace: true });
+      navigate(getAuthRedirectPath(location), { replace: true });
     } catch (error) {
       const errorMessage = getApiErrorMessage(
         error,
