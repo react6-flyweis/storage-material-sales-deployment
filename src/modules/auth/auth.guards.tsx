@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useLocation } from "react-router";
 import { Loading } from "@/components/loading";
 import { useAuthStore } from "./auth.store";
+import { getAuthRedirectPath } from "./auth.utils";
 
 interface RouteGuardProps {
   redirectTo?: string;
@@ -32,6 +33,7 @@ export function ProtectedRoute({ redirectTo = "/sign-in" }: RouteGuardProps) {
 export function PublicOnlyRoute({
   redirectTo = "/dashboard",
 }: RouteGuardProps) {
+  const location = useLocation();
   const accessToken = useAuthStore((state) => state.accessToken);
   const isHydrated = useAuthStore((state) => state.isHydrated);
 
@@ -40,7 +42,8 @@ export function PublicOnlyRoute({
   }
 
   if (accessToken) {
-    return <Navigate to={redirectTo} replace />;
+    const target = getAuthRedirectPath(location, redirectTo);
+    return <Navigate to={target} replace />;
   }
 
   return <Outlet />;
