@@ -6,7 +6,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-type Option = { value: string; label: string };
+export type BuildingTypeOption = { value: string; label: string };
 
 type Props = {
   id?: string;
@@ -15,12 +15,12 @@ type Props = {
   className?: string;
   triggerClassName?: string;
   placeholder?: string;
-  options?: Option[];
+  options?: BuildingTypeOption[];
   includeAll?: boolean;
   allLabel?: string;
 };
 
-const DEFAULT_BUILDING_TYPES: Option[] = [
+export const DEFAULT_BUILDING_TYPES: BuildingTypeOption[] = [
   "Arch Buildings",
   "Warehouses",
   "Aviation",
