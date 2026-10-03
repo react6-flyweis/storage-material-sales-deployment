@@ -8,7 +8,7 @@ import CustomerSelector from "@/components/customers/customer-selector";
 import Counter from "@/components/counter-input";
 import SuccessDialog from "@/components/success-dialog";
 import { Button } from "@/components/ui/button";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -21,6 +21,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { useCreateLeadMutation, useLeadDetailQuery, useUpdateLeadMutation } from "@/modules/leads/leads.hooks";
 
+import BusinessUnitSelector from "@/components/business-unit-selector";
+import BuildingTypeSelector from "@/components/building-type-selector";
+
 const requiredNumber = (message: string) => z.number().min(0, message);
 
 const priorityValues = ["Low", "Medium", "High"] as const;
@@ -28,11 +31,12 @@ const priorityValues = ["Low", "Medium", "High"] as const;
 const addNewLeadSchema = z.object({
   customerId: z.string().trim().min(1, "Customer is required"),
   projectName: z.string().trim().min(1, "Project name is required"),
+  businessUnit: z.string().optional(),
   location: z.string().trim().min(1, "Location is required"),
   estimatedValue: z.string().trim(),
   priority: z.enum(priorityValues),
   roofStyle: z.enum(["gable", "arch"]),
-  buildingType: z.enum(["garage"]),
+  buildingType: z.string().trim().min(1, "Building type is required"),
   width: requiredNumber("Width is required"),
   length: requiredNumber("Length is required"),
   height: requiredNumber("Height is required"),
@@ -47,11 +51,12 @@ type AddNewLeadFormValues = z.infer<typeof addNewLeadSchema>;
 const defaultValues: AddNewLeadFormValues = {
   customerId: "",
   projectName: "",
+  businessUnit: "",
   location: "",
   estimatedValue: "",
   priority: "Medium",
   roofStyle: "gable",
-  buildingType: "garage",
+  buildingType: "",
   width: 0,
   length: 0,
   height: 0,
@@ -90,11 +95,12 @@ export default function AddNewLead() {
       reset({
         customerId: lead.customerId || "",
         projectName: lead.projectName || "",
+        businessUnit: lead.businessUnit || "",
         location: lead.location || "",
         estimatedValue: lead.quoteValue ? lead.quoteValue.toString() : "",
         priority: lead.priority || "Medium",
         roofStyle: lead.roofStyle === "Arch" ? "arch" : "gable",
-        buildingType: (lead.buildingType?.toLowerCase() === "garage" ? "garage" : "garage") as "garage",
+        buildingType: lead.buildingType || "",
         width: lead.width || 0,
         length: lead.length || 0,
         height: lead.height || 0,
@@ -110,8 +116,9 @@ export default function AddNewLead() {
     const payload = {
       customerId: values.customerId,
       projectName: values.projectName,
+      businessUnit: values.businessUnit ? values.businessUnit.trim().toLowerCase() : null,
       location: values.location,
-      buildingType: "Storage",
+      buildingType: values.buildingType,
       source: "manual",
       quoteValue: values.estimatedValue
         ? Number.parseInt(values.estimatedValue, 10)
@@ -222,7 +229,25 @@ export default function AddNewLead() {
                 {...register("projectName")}
               />
             </Field>
-            <Field className="md:col-span-2">
+            <Field>
+              <FieldLabel htmlFor="businessUnit">Business Unit</FieldLabel>
+              <Controller
+                control={control}
+                name="businessUnit"
+                render={({ field }) => (
+                  <BusinessUnitSelector
+                    id="businessUnit"
+                    value={field.value}
+                    onChange={field.onChange}
+                    includeClear
+                    clearLabel="Not set"
+                    placeholder="Select Business Unit"
+                    triggerClassName="w-full bg-white"
+                  />
+                )}
+              />
+            </Field>
+            <Field>
               <FieldLabel htmlFor="location">Location</FieldLabel>
               <Input
                 id="location"
@@ -338,22 +363,23 @@ export default function AddNewLead() {
                   )}
                 />
               </Field>
-              <Field>
+              <Field data-invalid={Boolean(errors.buildingType)}>
                 <FieldLabel htmlFor="buildingType">Building Type</FieldLabel>
                 <Controller
                   control={control}
                   name="buildingType"
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger id="buildingType" className="w-full">
-                        <SelectValue placeholder="Select Building Type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="garage">Garage</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <BuildingTypeSelector
+                      id="buildingType"
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder="Select Building Type"
+                    />
                   )}
                 />
+                {errors.buildingType && (
+                  <FieldError errors={[errors.buildingType]} />
+                )}
               </Field>
             </div>
 
