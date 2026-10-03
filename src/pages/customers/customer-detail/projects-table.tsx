@@ -26,10 +26,14 @@ import {
 import { ArrowUpDown, Search } from "lucide-react";
 import { useNavigate } from "react-router";
 import { getLeadLifecycleBadgeClassName } from "@/modules/leads/lifecycle-statuses";
+import BusinessUnitSelector from "@/components/business-unit-selector";
+import { formatBusinessUnit } from "@/modules/leads/business-unit";
+import { Badge } from "@/components/ui/badge";
 
 export type ProjectRow = {
   id: string;
   name: string;
+  businessUnit: string;
   building: string;
   startDate: string;
   stage: string;
@@ -48,6 +52,8 @@ function mapProjectToRow(
   project: {
     _id: string;
     projectName?: string;
+    businessUnit?: string | null;
+    businessUnitLabel?: string;
     lifecycleStatus?: string;
     numberOfBuildings?: number;
     createdAt?: string;
@@ -65,6 +71,7 @@ function mapProjectToRow(
   return {
     id: project._id,
     name: getLeadProjectName(project, { firstName: customerFirstName }),
+    businessUnit: project.businessUnitLabel || (project.businessUnit ? formatBusinessUnit(project.businessUnit) : "Not set"),
     building:
       typeof project.numberOfBuildings === "number"
         ? `${project.numberOfBuildings} building${project.numberOfBuildings === 1 ? "" : "s"
@@ -83,6 +90,7 @@ function mapProjectToRow(
 export default function ProjectsTable({ customerId, customerFirstName }: Props) {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
+  const [businessUnitFilter, setBusinessUnitFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
@@ -90,7 +98,12 @@ export default function ProjectsTable({ customerId, customerFirstName }: Props) 
     data: projectsResponse,
     isLoading,
     isError,
-  } = useSalesCustomerProjectsQuery(customerId);
+  } = useSalesCustomerProjectsQuery(
+    customerId,
+    currentPage,
+    rowsPerPage,
+    businessUnitFilter === "all" ? undefined : businessUnitFilter,
+  );
 
   const projectRows = useMemo(() => {
     const apiProjects = projectsResponse?.data.projects ?? [];
@@ -107,6 +120,7 @@ export default function ProjectsTable({ customerId, customerFirstName }: Props) 
     return projectRows.filter((row) => {
       return [
         row.name,
+        row.businessUnit,
         row.building,
         row.startDate,
         row.stage,
@@ -146,16 +160,26 @@ export default function ProjectsTable({ customerId, customerFirstName }: Props) 
             placeholder="Search"
           />
         </InputGroup>
-        {/* <Button type="button" variant="outline">
-          <Filter className="h-4 w-4" />
-          Filter
-        </Button> */}
-        {searchTerm !== "" && (
+        <BusinessUnitSelector
+          value={businessUnitFilter}
+          onChange={(val) => {
+            setBusinessUnitFilter(val);
+            setCurrentPage(1);
+          }}
+          includeAll
+          allLabel="All Business Units"
+          includeNone
+          noneLabel="Not set"
+          placeholder="Business Unit"
+          triggerClassName="w-48 bg-white"
+        />
+        {(searchTerm !== "" || businessUnitFilter !== "all") && (
           <Button
             type="button"
             variant="ghost"
             onClick={() => {
               setSearchTerm("");
+              setBusinessUnitFilter("all");
               setCurrentPage(1);
             }}
             className="text-red-600 hover:text-red-700 hover:bg-red-50 border border-red-200"
@@ -179,6 +203,9 @@ export default function ProjectsTable({ customerId, customerFirstName }: Props) 
                 </TableHead>
                 <TableHead className="font-medium text-slate-500">
                   Project Name
+                </TableHead>
+                <TableHead className="font-medium text-slate-500">
+                  Business Unit
                 </TableHead>
                 <TableHead className="font-medium text-slate-500">
                   Building
@@ -216,7 +243,7 @@ export default function ProjectsTable({ customerId, customerFirstName }: Props) 
                     key={`project-loading-${index}`}
                     className="border-0 animate-pulse"
                   >
-                    {Array.from({ length: 8 }).map((__, cellIndex) => (
+                    {Array.from({ length: 9 }).map((__, cellIndex) => (
                       <TableCell key={cellIndex} className="px-4 py-4">
                         <div className="h-4 w-full max-w-28 rounded bg-slate-200" />
                       </TableCell>
@@ -226,7 +253,7 @@ export default function ProjectsTable({ customerId, customerFirstName }: Props) 
               ) : isError ? (
                 <TableRow>
                   <TableCell
-                    colSpan={8}
+                    colSpan={9}
                     className="px-4 py-6 text-center text-sm text-red-600"
                   >
                     Failed to load projects. Please refresh and try again.
@@ -235,7 +262,7 @@ export default function ProjectsTable({ customerId, customerFirstName }: Props) 
               ) : visibleProjects.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={8}
+                    colSpan={9}
                     className="px-4 py-6 text-center text-sm text-slate-500"
                   >
                     No projects found.
@@ -256,6 +283,14 @@ export default function ProjectsTable({ customerId, customerFirstName }: Props) 
                     </TableCell>
                     <TableCell className="px-4 py-4 font-medium text-slate-700">
                       {project.name}
+                    </TableCell>
+                    <TableCell className="px-4 py-4">
+                      <Badge
+                        variant="outline"
+                        className="font-normal text-xs bg-slate-50 border-slate-200 text-slate-700"
+                      >
+                        {project.businessUnit}
+                      </Badge>
                     </TableCell>
                     <TableCell className="px-4 py-4 text-slate-700">
                       {project.building}
