@@ -45,6 +45,8 @@ export type UpcomingLeadRef = {
   projectName?: string;
   jobId?: string;
   buildingType?: string;
+  businessUnit?: string | null;
+  businessUnitLabel?: string;
   location?: string;
   projectId?: string;
 };

@@ -25,12 +25,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import BusinessUnitSelector from "@/components/business-unit-selector";
+
 const requiredNumber = (message: string) => z.number().min(0, message);
 
 const priorityValues = ["Low", "Medium", "High"] as const;
 
 const addNewProjectSchema = z.object({
   projectName: z.string().trim().min(1, "Project name is required"),
+  businessUnit: z.string().optional(),
   location: z.string().trim().min(1, "Location is required"),
   buildingType: z.string().trim().min(1, "Building type is required"),
   roofStyle: z.string().trim().min(1, "Roof style is required"),
@@ -48,6 +51,7 @@ type AddNewProjectFormValues = z.infer<typeof addNewProjectSchema>;
 
 const defaultValues: AddNewProjectFormValues = {
   projectName: "",
+  businessUnit: "",
   location: "",
   buildingType: "",
   roofStyle: "",
@@ -90,6 +94,7 @@ export default function AddNewProjectPage() {
     try {
       await createProjectMutation.mutateAsync({
         projectName: values.projectName,
+        businessUnit: values.businessUnit ? values.businessUnit.trim().toLowerCase() : null,
         buildingType: values.buildingType,
         location: values.location,
         roofStyle: values.roofStyle,
@@ -164,8 +169,26 @@ export default function AddNewProjectPage() {
               )}
             </Field>
 
+            <Field>
+              <FieldLabel htmlFor="businessUnit">Business Unit</FieldLabel>
+              <Controller
+                control={control}
+                name="businessUnit"
+                render={({ field }) => (
+                  <BusinessUnitSelector
+                    id="businessUnit"
+                    value={field.value}
+                    onChange={field.onChange}
+                    includeClear
+                    clearLabel="Not set"
+                    placeholder="Select Business Unit"
+                    triggerClassName="w-full bg-white"
+                  />
+                )}
+              />
+            </Field>
+
             <Field
-              className="md:col-span-2"
               data-invalid={Boolean(errors.location)}
             >
               <FieldLabel htmlFor="location">Location</FieldLabel>

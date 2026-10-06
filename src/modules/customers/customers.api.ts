@@ -37,6 +37,8 @@ export type AdminCustomerProject = {
   _id: string;
   customerId: string;
   buildingType?: string;
+  businessUnit?: string | null;
+  businessUnitLabel?: string;
   location?: string;
   source?: string;
   quoteValue?: number;
@@ -179,7 +181,12 @@ export async function getSalesCustomerDetailProvider(customerId: string) {
 
 export type SalesCustomerProject = {
   _id: string;
+  projectId?: string;
+  jobId?: string;
   projectName?: string;
+  businessUnit?: string | null;
+  businessUnitLabel?: string;
+  numberOfBuildings?: number;
   lifecycleStatus?: string;
   quoteValue?: number;
   budget?: number | null;
@@ -201,10 +208,18 @@ export async function getSalesCustomerProjectsProvider(
   customerId: string,
   page = 1,
   limit = 20,
+  businessUnit?: string,
 ) {
+  const params: { page: number; limit: number; businessUnit?: string } = {
+    page,
+    limit,
+  };
+  if (businessUnit && businessUnit !== "all") {
+    params.businessUnit = businessUnit;
+  }
   const response = await apiClient.get<GetSalesCustomerProjectsResponse>(
     `/api/sales/customers/${customerId}/projects`,
-    { params: { page, limit } },
+    { params },
   );
 
   return response.data;
@@ -213,6 +228,7 @@ export async function getSalesCustomerProjectsProvider(
 export type CreateSalesCustomerProjectPayload = {
   projectName: string;
   buildingType: string;
+  businessUnit?: string | null;
   location: string;
   roofStyle: string;
   quoteValue: number;

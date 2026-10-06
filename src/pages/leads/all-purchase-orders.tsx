@@ -23,6 +23,7 @@ const formatCurrency = (value: number) =>
 import { usePurchaseOrdersQuery } from "@/modules/purchase-orders/purchase-orders.hooks";
 import TitleSubtitle from "@/components/TitleSubtitle";
 import { getLeadProjectName } from "@/modules/leads/leads.utils";
+import { formatBusinessUnit } from "@/modules/leads/business-unit";
 
 function PurchaseOrdersSkeleton() {
   return (
@@ -186,9 +187,19 @@ export default function AllPurchaseOrdersPage() {
                           <span className="text-sm text-gray-500 uppercase">
                             {leadName}
                           </span>
-                          <span className="text-sm text-gray-500">
-                            {order.leadId?.jobId || "-"}
-                          </span>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-sm text-gray-500">
+                              {order.leadId?.jobId || "-"}
+                            </span>
+                            {(order.businessUnitLabel || order.leadId?.businessUnitLabel || order.businessUnit) && (
+                              <Badge
+                                variant="outline"
+                                className="text-[11px] font-normal px-1.5 py-0 border-slate-300 text-slate-700 bg-slate-50"
+                              >
+                                {order.businessUnitLabel || order.leadId?.businessUnitLabel || formatBusinessUnit(order.businessUnit || order.leadId?.businessUnit)}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
 

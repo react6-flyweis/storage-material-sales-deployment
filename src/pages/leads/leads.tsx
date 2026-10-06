@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import {
   UserPlus,
   Download,
@@ -12,10 +12,14 @@ import {
   Search,
   Edit,
   AlertCircle,
+  Archive,
+  RotateCcw,
 } from "lucide-react";
 import ImportLeadsDialog from "@/components/leads/import-leads-dialog";
 // import CreateQuotationDialog from "@/components/leads/create-quotation-dialog";
 import EscalateLeadDialog from "@/components/leads/escalate-lead-dialog";
+import ArchiveLeadDialog from "@/components/leads/archive-lead-dialog";
+import RestoreLeadDialog from "@/components/leads/restore-lead-dialog";
 import Pagination from "@/components/Pagination";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,6 +36,8 @@ import {
 import MoveToOrdersDialog from "@/components/leads/move-to-orders-dialog";
 import LeadLifecycleStatusSelect from "@/components/leads/lead-lifecycle-status-select";
 import BuildingTypeSelector from "@/components/building-type-selector";
+import BusinessUnitSelector from "@/components/business-unit-selector";
+import { formatBusinessUnit } from "@/modules/leads/business-unit";
 import SuccessDialog from "@/components/success-dialog";
 import ProgressDots from "@/components/ui/progress-dots";
 import {
@@ -41,7 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useLeadsQuery } from "@/modules/leads/leads.hooks";
+import { useLeadsQuery, useArchivedLeadsQuery } from "@/modules/leads/leads.hooks";
 import {
   exportLeadsProvider,
 } from "@/modules/leads/leads.api";
@@ -55,6 +61,7 @@ import {
 } from "@/modules/leads/leads.utils";
 import FilterTabs, { type Period } from "@/components/FilterTabs";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 10;
 
@@ -82,32 +89,53 @@ const formatFollowUpDate = (value?: string | null) => {
 };
 
 export default function LeadsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") === "archived" ? "archived" : "active";
+  const isArchived = activeTab === "archived";
 
   const [period, setPeriod] = useState<Period>();
   const [startDate, setStartDate] = useState<string | undefined>(undefined);
   const [endDate, setEndDate] = useState<string | undefined>(undefined);
   const [buildingType, setBuildingType] = useState("all");
+  const [businessUnit, setBusinessUnit] = useState("all");
   const [projectValue, setProjectValue] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const isFilterApplied =
-    searchQuery !== "" ||
-    buildingType !== "all" ||
-    projectValue !== "all" ||
-    statusFilter !== "all" ||
-    startDate !== undefined ||
-    endDate !== undefined;
+  const isFilterApplied = isArchived
+    ? searchQuery !== "" || businessUnit !== "all"
+    : searchQuery !== "" ||
+      buildingType !== "all" ||
+      businessUnit !== "all" ||
+      projectValue !== "all" ||
+      statusFilter !== "all" ||
+      startDate !== undefined ||
+      endDate !== undefined;
 
   const handleClearFilters = () => {
     setSearchQuery("");
     setBuildingType("all");
+    setBusinessUnit("all");
     setProjectValue("all");
     setStatusFilter("all");
     setPeriod(undefined);
     setStartDate(undefined);
     setEndDate(undefined);
     setCurrentPage(1);
+  };
+
+  const handleTabChange = (tab: "active" | "archived") => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (tab === "archived") {
+        next.set("tab", "archived");
+      } else {
+        next.delete("tab");
+      }
+      return next;
+    });
+    setCurrentPage(1);
+    setSelectedLeads([]);
   };
 
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
@@ -120,20 +148,42 @@ export default function LeadsPage() {
 
   const { data: metrics, isPending } = useLeadsStatsQuery();
   const loading = isPending && !metrics;
+
   const { data: leadsResponse, isPending: leadsLoading } = useLeadsQuery({
     page: currentPage,
     limit: rowsPerPage,
-    search: searchQuery ? searchQuery.trim() : undefined,
+    search: !isArchived && searchQuery ? searchQuery.trim() : undefined,
     buildingType: buildingType === "all" ? undefined : buildingType,
+    businessUnit: businessUnit === "all" ? undefined : businessUnit,
     lifecycleStatus: statusFilter === "all" ? undefined : statusFilter,
     startDate,
     endDate,
   });
 
-  const leadsData = leadsResponse?.data.leads;
-  const leads = useMemo(() => leadsData ?? [], [leadsData]);
-  const totalItems = leadsResponse?.data.total ?? 0;
+  const { data: archivedResponse, isPending: archivedLoading } = useArchivedLeadsQuery(
+    {
+      page: isArchived ? currentPage : 1,
+      limit: isArchived ? rowsPerPage : 1,
+      search: isArchived && searchQuery ? searchQuery.trim() : undefined,
+      businessUnit: isArchived && businessUnit !== "all" ? businessUnit : undefined,
+    },
+  );
+
+  const activeLeads = useMemo(
+    () => leadsResponse?.data.leads ?? [],
+    [leadsResponse?.data.leads],
+  );
+  const archivedLeads = useMemo(
+    () => archivedResponse?.data.leads ?? [],
+    [archivedResponse?.data.leads],
+  );
+
+  const leads = isArchived ? archivedLeads : activeLeads;
+  const totalItems = isArchived
+    ? (archivedResponse?.data.total ?? 0)
+    : (leadsResponse?.data.total ?? 0);
   const totalPages = Math.max(1, Math.ceil(totalItems / rowsPerPage));
+  const isTableLoading = isArchived ? archivedLoading : leadsLoading;
 
   useEffect(() => {
     setSelectedLeads([]);
@@ -141,11 +191,13 @@ export default function LeadsPage() {
     currentPage,
     rowsPerPage,
     buildingType,
+    businessUnit,
     projectValue,
     statusFilter,
     searchQuery,
     startDate,
     endDate,
+    activeTab,
   ]);
 
   useEffect(() => {
@@ -177,6 +229,7 @@ export default function LeadsPage() {
       const csv = await exportLeadsProvider({
         search: searchQuery ? searchQuery.trim() : undefined,
         buildingType: buildingType === "all" ? undefined : buildingType,
+        businessUnit: businessUnit === "all" ? undefined : businessUnit,
         lifecycleStatus: statusFilter === "all" ? undefined : statusFilter,
         startDate,
         endDate,
@@ -208,12 +261,58 @@ export default function LeadsPage() {
         }}
       />
       <div className="p-4 sm:p-6 space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-2xl sm:text-3xl text-gray-900">Assigned Leads</h1>
-          <p className="text-gray-500 mt-1">
-            Manage your assigned leads and track their progress.
-          </p>
+        {/* Header with Top Tab List */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl text-gray-900 font-semibold">
+              {isArchived ? "Archived Leads" : "Assigned Leads"}
+            </h1>
+            <p className="text-gray-500 mt-1">
+              {isArchived
+                ? "Review non-viable leads removed from the active pipeline and restore them if needed."
+                : "Manage your assigned leads and track their progress."}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-lg w-fit self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => handleTabChange("active")}
+              className={cn(
+                "px-4 py-2 text-sm font-medium rounded-md transition-all cursor-pointer",
+                !isArchived
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-600 hover:text-gray-900",
+              )}
+            >
+              Active Leads
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTabChange("archived")}
+              className={cn(
+                "px-4 py-2 text-sm font-medium rounded-md transition-all flex items-center gap-1.5 cursor-pointer",
+                isArchived
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-600 hover:text-gray-900",
+              )}
+            >
+              <Archive className="h-4 w-4" />
+              <span>Archived Leads</span>
+              {archivedResponse?.data?.total !== undefined && archivedResponse.data.total > 0 && (
+                <span
+                  className={cn(
+                    "ml-1 px-1.5 py-0.5 text-xs rounded-full",
+                    isArchived
+                      ? "bg-amber-100 text-amber-800 font-semibold"
+                      : "bg-gray-200 text-gray-700",
+                  )}
+                >
+                  {archivedResponse.data.total}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -251,30 +350,35 @@ export default function LeadsPage() {
         {/* Action Buttons and Filters */}
         <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
           <div className="flex flex-wrap gap-3">
-            <Link to="/leads/add" className="inline-block">
-              <Button className="bg-blue-600 hover:bg-blue-700">
-                <UserPlus className="" />
-                Add Lead
-              </Button>
-            </Link>
+            {!isArchived && (
+              <>
+                <Link to="/leads/add" className="inline-block">
+                  <Button className="bg-blue-600 hover:bg-blue-700">
+                    <UserPlus className="" />
+                    Add Lead
+                  </Button>
+                </Link>
 
-            <ImportLeadsDialog />
-            <Button
-              variant="outline"
-              className="bg-white"
-              onClick={handleExport}
-              disabled={exporting}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              {exporting ? "Exporting..." : "Export Data"}
-            </Button>
+                <ImportLeadsDialog />
+
+                <Button
+                  variant="outline"
+                  className="bg-white"
+                  onClick={handleExport}
+                  disabled={exporting}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  {exporting ? "Exporting..." : "Export Data"}
+                </Button>
+              </>
+            )}
           </div>
 
-          <div className="flex flex-wrap gap-3 ">
+          <div className="flex flex-wrap gap-3">
             <div className="relative w-full lg:w-54">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search leads..."
+                placeholder={isArchived ? "Search archived leads..." : "Search leads..."}
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
@@ -283,50 +387,69 @@ export default function LeadsPage() {
                 className="pl-10 bg-white"
               />
             </div>
-            <BuildingTypeSelector
-              value={buildingType}
-              onChange={(val) => {
-                setBuildingType(val);
-                setCurrentPage(1);
-              }}
-              includeAll
-              allLabel="All"
-              placeholder="Building types"
-              triggerClassName="w-full sm:w-40 bg-white"
-            />
 
-            <Select
-              value={projectValue}
-              onValueChange={(val) => {
-                setProjectValue(val);
-                setCurrentPage(1);
-              }}
-            >
-              <SelectTrigger className="w-full sm:w-40 bg-white">
-                <SelectValue placeholder="Project value" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="small">
-                  Small projects (&lt;$50,000)
-                </SelectItem>
-                <SelectItem value="medium">
-                  Medium ($50,000 - $200,000)
-                </SelectItem>
-                <SelectItem value="large">Large (&gt;$200,000)</SelectItem>
-              </SelectContent>
-            </Select>
+            {!isArchived && (
+              <>
+                <BuildingTypeSelector
+                  value={buildingType}
+                  onChange={(val) => {
+                    setBuildingType(val);
+                    setCurrentPage(1);
+                  }}
+                  includeAll
+                  allLabel="All"
+                  placeholder="Building types"
+                  triggerClassName="w-full sm:w-40 bg-white"
+                />
 
-            <LeadLifecycleStatusSelect
-              value={statusFilter}
-              onValueChange={(val) => {
-                setStatusFilter(val);
-                setCurrentPage(1);
-              }}
-              triggerClassName="w-full sm:w-40 bg-white"
-              placeholder="All Status"
-              allLabel="All Status"
-            />
+                <BusinessUnitSelector
+                  value={businessUnit}
+                  onChange={(val) => {
+                    setBusinessUnit(val);
+                    setCurrentPage(1);
+                  }}
+                  includeAll
+                  allLabel="All Business Units"
+                  includeNone
+                  noneLabel="Not set"
+                  placeholder="Business Unit"
+                  triggerClassName="w-full sm:w-40 bg-white"
+                />
+
+                <Select
+                  value={projectValue}
+                  onValueChange={(val) => {
+                    setProjectValue(val);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger className="w-full sm:w-40 bg-white">
+                    <SelectValue placeholder="Project value" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="small">
+                      Small projects (&lt;$50,000)
+                    </SelectItem>
+                    <SelectItem value="medium">
+                      Medium ($50,000 - $200,000)
+                    </SelectItem>
+                    <SelectItem value="large">Large (&gt;$200,000)</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <LeadLifecycleStatusSelect
+                  value={statusFilter}
+                  onValueChange={(val) => {
+                    setStatusFilter(val);
+                    setCurrentPage(1);
+                  }}
+                  triggerClassName="w-full sm:w-40 bg-white"
+                  placeholder="All Status"
+                  allLabel="All Status"
+                />
+              </>
+            )}
 
             {isFilterApplied && (
               <Button
@@ -370,7 +493,7 @@ export default function LeadsPage() {
                     PROJECT VALUE
                   </TableHead>
                   <TableHead className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    NEXT FOLLOW UP
+                    {isArchived ? "ARCHIVE INFO" : "NEXT FOLLOW UP"}
                   </TableHead>
                   <TableHead className="px-3 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     CHAT
@@ -381,7 +504,7 @@ export default function LeadsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {leadsLoading ? (
+                {isTableLoading ? (
                   <TableRow>
                     <TableCell
                       colSpan={8}
@@ -415,9 +538,17 @@ export default function LeadsPage() {
                           <span className="text-xs text-gray-500">
                             {lead.jobId}
                           </span>
-                          <span className="text-xs text-gray-500">
-                            {lead.buildingType || "-"} · {lead.location || "-"}
-                          </span>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <Badge
+                              variant="outline"
+                              className="text-[11px] font-normal px-1.5 py-0 border-slate-300 text-slate-700 bg-slate-50"
+                            >
+                              {lead.businessUnitLabel || (lead.businessUnit ? formatBusinessUnit(lead.businessUnit) : "Not set")}
+                            </Badge>
+                            <span className="text-xs text-gray-500">
+                              · {lead.buildingType || "-"} · {lead.location || "-"}
+                            </span>
+                          </div>
                         </div>
                       </TableCell>
 
@@ -440,8 +571,24 @@ export default function LeadsPage() {
                         </span>
                       </TableCell>
 
-                      <TableCell className=" text-sm text-gray-600">
-                        {formatFollowUpDate(lead.nextFollowUp?.followUpDate)}
+                      <TableCell className="text-sm text-gray-600">
+                        {isArchived ? (
+                          <div className="flex flex-col">
+                            <span className="font-medium text-gray-800">
+                              {formatFollowUpDate(lead.archivedAt)}
+                            </span>
+                            {lead.archiveReason && (
+                              <span
+                                className="text-xs text-gray-500 italic truncate max-w-40 block"
+                                title={lead.archiveReason}
+                              >
+                                {lead.archiveReason}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          formatFollowUpDate(lead.nextFollowUp?.followUpDate)
+                        )}
                       </TableCell>
 
                       <TableCell className="">
@@ -450,9 +597,15 @@ export default function LeadsPage() {
                             <MessageSquare className="h-4 w-4" />
                             <span className="text-sm">Chat</span>
                             {lead.isOnline ? (
-                              <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-white animate-pulse" title="Customer active in chat" />
+                              <span
+                                className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-white animate-pulse"
+                                title="Customer active in chat"
+                              />
                             ) : lead.customerId?.isOnline ? (
-                              <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 border-2 border-white" title="Customer online on site" />
+                              <span
+                                className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 border-2 border-white"
+                                title="Customer online on site"
+                              />
                             ) : null}
                           </button>
                         </Link>
@@ -462,42 +615,22 @@ export default function LeadsPage() {
                         <div className="flex items-center gap-1">
                           <Link to={`/leads/${lead._id}`}>
                             <Button variant="ghost" size="icon" title="View Lead">
-                              <Eye className=" text-purple-600 stroke-2" />
+                              <Eye className="text-purple-600 stroke-2" />
                             </Button>
                           </Link>
 
                           <Link to={`/leads/${lead._id}/edit`}>
                             <Button variant="ghost" size="icon" title="Edit Lead">
-                              <Edit className=" text-green-600 stroke-2" />
+                              <Edit className="text-green-600 stroke-2" />
                             </Button>
                           </Link>
 
-                          {/* <CreateQuotationDialog
-                            leadData={lead}
-                            mode="edit"
-                            trigger={
-                              <Button variant="ghost" size="icon">
-                                <Pen className=" text-green-600" />
-                              </Button>
-                            }
-                          />
-
-                          <CreateQuotationDialog
-                            leadData={lead}
-                            mode="create"
-                            trigger={
-                              <Button variant="ghost" size="icon">
-                                <FileText className=" text-red-800" />
-                              </Button>
-                            }
-                          /> */}
-
-                          {!lead.isRaisedToPO && canCreatePO(lead.lifecycleStatus as LeadStatusType) && (
+                          {!isArchived && !lead.isRaisedToPO && canCreatePO(lead.lifecycleStatus as LeadStatusType) && (
                             <MoveToOrdersDialog
                               leadId={lead._id}
                               trigger={
                                 <Button variant="ghost" size="icon">
-                                  <Redo className=" text-red-500" />
+                                  <Redo className="text-red-500" />
                                 </Button>
                               }
                             />
@@ -508,10 +641,41 @@ export default function LeadsPage() {
                             leadName={getLeadProjectName(lead)}
                             trigger={
                               <Button variant="ghost" size="icon">
-                                <AlertCircle className=" text-gray-500" />
+                                <AlertCircle className="text-gray-500" />
                               </Button>
                             }
                           />
+
+                          {isArchived ? (
+                            <RestoreLeadDialog
+                              leadId={lead._id}
+                              leadName={getLeadProjectName(lead)}
+                              trigger={
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  title="Restore Lead"
+                                >
+                                  <RotateCcw className="text-blue-600 stroke-2" />
+                                </Button>
+                              }
+                            />
+                          ) : (
+                            <ArchiveLeadDialog
+                              leadId={lead._id}
+                              leadName={getLeadProjectName(lead)}
+                              jobId={lead.jobId}
+                              trigger={
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  title="Archive Lead"
+                                >
+                                  <Archive className="text-gray-500 hover:text-red-600 stroke-2" />
+                                </Button>
+                              }
+                            />
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -524,9 +688,13 @@ export default function LeadsPage() {
                     >
                       <div className="flex flex-col items-center">
                         <Search className="h-12 w-12 text-gray-300 mb-3" />
-                        <p className="text-lg font-medium">No leads found</p>
+                        <p className="text-lg font-medium">
+                          {isArchived ? "No archived leads found" : "No leads found"}
+                        </p>
                         <p className="text-sm">
-                          Try adjusting your search or filters
+                          {isArchived
+                            ? "Non-viable leads archived from the pipeline will appear here."
+                            : "Try adjusting your search or filters"}
                         </p>
                       </div>
                     </TableCell>

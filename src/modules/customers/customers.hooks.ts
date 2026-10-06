@@ -47,10 +47,11 @@ export function useSalesCustomerProjectsQuery(
   customerId: string,
   page = 1,
   limit = 20,
+  businessUnit?: string,
 ) {
   return useQuery({
-    queryKey: ["customers", "sales-projects", customerId, page, limit],
-    queryFn: () => getSalesCustomerProjectsProvider(customerId, page, limit),
+    queryKey: ["customers", "sales-projects", customerId, page, limit, businessUnit],
+    queryFn: () => getSalesCustomerProjectsProvider(customerId, page, limit, businessUnit),
     enabled: Boolean(customerId) && customerId !== "unknown",
   });
 }

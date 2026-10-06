@@ -6,6 +6,8 @@ import {
 import { apiClient } from "@/modules/auth/auth.api";
 import {
   createLeadNoteProvider,
+  updateLeadNoteProvider,
+  deleteLeadNoteProvider,
   escalateLeadProvider,
   getLeadDetailProvider,
   getScoredLeadsProvider,
@@ -21,8 +23,12 @@ import {
   getLeadAgreementProvider,
   updateLeadBuildingsProvider,
   updateLeadProvider,
+  getArchivedLeadsProvider,
+  archiveLeadProvider,
+  unarchiveLeadProvider,
   type ImportLeadsPayload,
   type GetLeadsParams,
+  type GetArchivedLeadsParams,
   type UpdateLeadBuildingsPayload,
   type UpdateLeadPayload,
 } from "./leads.api";
@@ -32,6 +38,8 @@ type EscalationStatus = "pending" | "assigned" | "resolved";
 type EscalatedLeadResponse = {
   _id: string;
   projectName?: string;
+  businessUnit?: string | null;
+  businessUnitLabel?: string;
   lifecycleStatus?: string;
   quoteValue?: number;
   customerId: {
@@ -155,6 +163,55 @@ export function useCreateLeadNoteMutation() {
   return useMutation({
     mutationFn: ({ leadId, note }: CreateLeadNoteVariables) =>
       createLeadNoteProvider(leadId, { note }),
+    onSuccess: (response, variables) => {
+      if (!response.success) {
+        return;
+      }
+
+      void queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["sales", "leads", "detail", variables.leadId],
+      });
+    },
+  });
+}
+
+type UpdateLeadNoteVariables = {
+  leadId: string;
+  noteId: string;
+  note: string;
+};
+
+export function useUpdateLeadNoteMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ leadId, noteId, note }: UpdateLeadNoteVariables) =>
+      updateLeadNoteProvider(leadId, noteId, { note }),
+    onSuccess: (response, variables) => {
+      if (!response.success) {
+        return;
+      }
+
+      void queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["sales", "leads", "detail", variables.leadId],
+      });
+    },
+  });
+}
+
+type DeleteLeadNoteVariables = {
+  leadId: string;
+  noteId: string;
+};
+
+export function useDeleteLeadNoteMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ leadId, noteId }: DeleteLeadNoteVariables) =>
+      deleteLeadNoteProvider(leadId, noteId),
     onSuccess: (response, variables) => {
       if (!response.success) {
         return;
@@ -340,5 +397,61 @@ export function useUpdateLeadMutation() {
   });
 }
 
+export function useArchivedLeadsQuery(
+  params: GetArchivedLeadsParams,
+  options?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: ["sales", "leads", "archived", params],
+    queryFn: () => getArchivedLeadsProvider(params),
+    enabled: options?.enabled ?? true,
+  });
+}
 
+export function useArchiveLeadMutation() {
+  const queryClient = useQueryClient();
 
+  return useMutation({
+    mutationFn: ({ leadId, reason }: { leadId: string; reason?: string }) =>
+      archiveLeadProvider(leadId, { reason }),
+    onSuccess: (response, variables) => {
+      if (!response.success) {
+        return;
+      }
+
+      void queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["sales", "leads", "archived"],
+      });
+      if (variables?.leadId) {
+        void queryClient.invalidateQueries({
+          queryKey: ["sales", "leads", "detail", variables.leadId],
+        });
+      }
+    },
+  });
+}
+
+export function useUnarchiveLeadMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ leadId }: { leadId: string }) =>
+      unarchiveLeadProvider(leadId),
+    onSuccess: (response, variables) => {
+      if (!response.success) {
+        return;
+      }
+
+      void queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["sales", "leads", "archived"],
+      });
+      if (variables?.leadId) {
+        void queryClient.invalidateQueries({
+          queryKey: ["sales", "leads", "detail", variables.leadId],
+        });
+      }
+    },
+  });
+}
