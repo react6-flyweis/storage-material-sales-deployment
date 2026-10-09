@@ -26,6 +26,8 @@ import {
   getArchivedLeadsProvider,
   archiveLeadProvider,
   unarchiveLeadProvider,
+  getLeadMediaProvider,
+  type GetLeadMediaParams,
   type ImportLeadsPayload,
   type GetLeadsParams,
   type GetArchivedLeadsParams,
@@ -455,3 +457,20 @@ export function useUnarchiveLeadMutation() {
     },
   });
 }
+
+export function useLeadMediaQuery(
+  leadId?: string,
+  params?: GetLeadMediaParams,
+) {
+  return useQuery({
+    queryKey: ["sales", "leads", leadId, "media", params],
+    queryFn: () => {
+      if (!leadId) {
+        throw new Error("Lead ID is required");
+      }
+      return getLeadMediaProvider(leadId, params);
+    },
+    enabled: Boolean(leadId),
+  });
+}
+
