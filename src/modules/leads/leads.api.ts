@@ -929,3 +929,58 @@ export async function unarchiveLeadProvider(leadId: string) {
 
   return response.data;
 }
+
+export type LeadMediaUploadedBy = {
+  _id?: string;
+  name?: string;
+  email?: string;
+  role?: string;
+};
+
+export type LeadMediaItem = {
+  _id: string;
+  url: string;
+  name?: string;
+  type?: "photo" | "video" | string;
+  uploadedAt?: string;
+  approvalStatus?: string;
+  reviewedAt?: string | null;
+  uploadedBy?: LeadMediaUploadedBy | string;
+};
+
+export type LeadMediaData = {
+  leadId: string;
+  projectId?: string;
+  projectName?: string;
+  documents: LeadMediaItem[];
+  photos: LeadMediaItem[];
+  videos: LeadMediaItem[];
+  total: number;
+  photoCount: number;
+  videoCount: number;
+};
+
+export type LeadMediaResponse = {
+  success: boolean;
+  message?: string;
+  data: LeadMediaData;
+};
+
+export type GetLeadMediaParams = {
+  type?: "photo" | "video";
+};
+
+export async function getLeadMediaProvider(
+  leadId: string,
+  params?: GetLeadMediaParams,
+) {
+  const response = await apiClient.get<LeadMediaResponse>(
+    `/api/sales/leads/${leadId}/media`,
+    {
+      params,
+    },
+  );
+
+  return response.data;
+}
+
