@@ -65,9 +65,7 @@ const CustomerCommunication = lazy(
 const ContractDetail = lazy(() => import("@/pages/customers/contract-detail"));
 
 const Meetings = lazy(() => import("@/pages/meetings/meetings"));
-const ScheduleMeeting = lazy(
-  () => import("@/pages/meetings/schedule-meeting"),
-);
+const ScheduleMeeting = lazy(() => import("@/pages/meetings/schedule-meeting"));
 
 // leads section
 const Leads = lazy(() => import("@/pages/leads/leads"));
@@ -189,10 +187,6 @@ export const salesRoutes: RouteObject[] = [
             path: "customers",
             children: [
               { index: true, element: <Customers /> },
-              {
-                path: "request-delivery-change",
-                element: <RequestDeliveryChange />,
-              },
               { path: "projects/:id", element: <ProjectDetails /> },
               // /customers/meetings routes
               // /customers/:id routes
@@ -360,6 +354,10 @@ export const salesRoutes: RouteObject[] = [
             children: [
               { index: true, element: <CustomerDeliverySchedule /> },
               {
+                path: "request-delivery-change",
+                element: <RequestDeliveryChange />,
+              },
+              {
                 path: "projects",
                 children: [
                   { index: true, element: <Deliveries /> },
@@ -387,7 +385,10 @@ export const salesRoutes: RouteObject[] = [
             path: "quotation",
             // element: <QuotationLayout />,
             children: [
-              { index: true, element: <Navigate to="/quotation/pemb" replace={true} /> },
+              {
+                index: true,
+                element: <Navigate to="/quotation/pemb" replace={true} />,
+              },
               { path: "pemb/create", element: <CreateQuotationPage /> },
               { path: "pemb", element: <PembQuotePage /> },
 

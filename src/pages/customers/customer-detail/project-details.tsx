@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useLeadDetailQuery } from "@/modules/leads/leads.hooks";
 import { ArrowLeft } from "lucide-react";
 import BasicDetails from "@/components/leads/basic-details";
+import ProjectMediaCard from "@/components/leads/project-media-card";
 import { getLeadProjectName } from "@/modules/leads/leads.utils";
 
 const quickActionButtons = [
@@ -25,6 +26,8 @@ export default function ProjectDetailsPage() {
   if (isLoading || !detail) {
     return <ProjectDetailsSkeleton />;
   }
+
+  const activeLeadId = detail.lead._id || leadId;
 
   return (
     <div className="space-y-6 p-6">
@@ -65,6 +68,8 @@ export default function ProjectDetailsPage() {
       </div>
 
       <BasicDetails lead={detail} />
+
+      {activeLeadId && <ProjectMediaCard leadId={activeLeadId} />}
     </div>
   );
 }
@@ -97,6 +102,18 @@ function ProjectDetailsSkeleton() {
           <div className="h-4 w-full rounded bg-slate-200" />
           <div className="h-4 w-5/6 rounded bg-slate-200" />
           <div className="h-36 w-full rounded bg-slate-200" />
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-200/90 bg-white p-5 space-y-4">
+        <div className="h-5 w-48 rounded bg-slate-200 animate-pulse" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5">
+          {Array.from({ length: 5 }).map((_, idx) => (
+            <div
+              key={idx}
+              className="aspect-4/3 rounded-lg bg-slate-200 animate-pulse"
+            />
+          ))}
         </div>
       </div>
     </div>

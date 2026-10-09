@@ -20,7 +20,7 @@ import invoices from "@/assets/icons/sidebar/invoices.svg";
 
 import meetingsIcon from "@/assets/icons/sidebar/meetings.svg";
 
-// import deliveryIcon from "@/assets/icons/sidebar/delivery.svg";
+import deliveryIcon from "@/assets/icons/sidebar/delivery.svg";
 // import freightIcon from "@/assets/icons/sidebar/freights.svg";
 // import salesIcon from "@/assets/icons/sidebar/sales.svg";
 // import communicationIcon from "@/assets/icons/sidebar/communication.svg";
@@ -220,6 +220,25 @@ const navigationGroups: NavigationGroup[] = [
     ],
   },
   {
+    id: "deliveries" as NavGroup,
+    icon: deliveryIcon,
+    label: "Customer Delivery",
+    color: "bg-[#F54900]",
+    link: "/deliveries",
+    items: [
+      // project deliveries
+      {
+        path: "/deliveries/projects",
+        label: "Project Deliveries",
+      },
+      // request delivery/change
+      {
+        path: "/deliveries/request-delivery-change",
+        label: "Request Delivery / Change",
+      },
+    ],
+  },
+  {
     id: "messages" as NavGroup,
     icon: callIcon,
     label: "Communication",
@@ -238,25 +257,6 @@ const navigationGroups: NavigationGroup[] = [
     items: [],
   },
 
-  // {
-  //   id: "deliveries" as NavGroup,
-  //   icon: deliveryIcon,
-  //   label: "Customer Delivery",
-  //   color: "bg-[#F54900]",
-  //   link: "/deliveries",
-  //   items: [
-  //     // project deliveries
-  //     {
-  //       path: "/deliveries/projects",
-  //       label: "Project Deliveries",
-  //     },
-  //     // request delivery/change
-  //     {
-  //       path: "/customers/request-delivery-change",
-  //       label: "Request Delivery / Change",
-  //     },
-  //   ],
-  // },
   // awarded freight
   // {
   //   id: "awarded-freight" as NavGroup,
