@@ -38,6 +38,7 @@ interface QuotationApprovalBannerProps {
   sentMessage?: string | null;
   approvalMessage?: string | null;
   approvalNote?: string | null;
+  clientNotes?: string | null;
   onViewTimeline?: () => void;
   onSubmitForApproval?: () => void;
   /** @deprecated Action buttons have been removed from this banner */
@@ -58,6 +59,7 @@ export function QuotationApprovalBanner({
   sentMessage,
   approvalMessage,
   approvalNote,
+  clientNotes,
   onViewTimeline,
   onSubmitForApproval,
   onEdit,
@@ -70,6 +72,12 @@ export function QuotationApprovalBanner({
   const status: ApprovalStatus | string =
     (workflowStatus === "sent"
       ? "sent"
+      : workflowStatus === "customer_rejected"
+      ? "customer_rejected"
+      : workflowStatus === "customer_accepted"
+      ? "customer_accepted"
+      : workflowStatus === "admin_rejected"
+      ? "admin_rejected"
       : workflowStatus === "pending_approval"
       ? "pending_approval"
       : workflowStatus === "rejected"
@@ -102,20 +110,52 @@ export function QuotationApprovalBanner({
     approval?.approvedVersionNumber !== null &&
     approval.approvedVersionNumber !== versionNumber;
 
+  const isAnyRejected =
+    status === "rejected" ||
+    status === "admin_rejected" ||
+    status === "customer_rejected";
+
   const canSubmit =
     Boolean(onSubmitForApproval) &&
     (status === "not_submitted" ||
       status === "draft" ||
-      (status === "rejected" && isEdited) ||
+      ((status === "rejected" || status === "admin_rejected") && isEdited) ||
       (status === "approved" && isStaleApproved));
 
   const submitButtonText =
-    (status === "rejected" && isEdited) || isStaleApproved
+    ((status === "rejected" || status === "admin_rejected") && isEdited) ||
+    isStaleApproved
       ? "Re-submit for Approval"
       : "Submit for Approval";
 
   const getConfig = () => {
     switch (status) {
+      case "customer_rejected":
+        return {
+          containerClass: "bg-rose-50/80 border-rose-200 text-rose-950",
+          iconContainerClass: "bg-rose-100 text-rose-700",
+          icon: <XCircle className="w-4 h-4" />,
+          title: `Quotation Declined by Customer (v${versionNumber})`,
+          badgeText: "Declined by Customer",
+          badgeClass: "bg-rose-100 text-rose-800 border-rose-300",
+          description: clientNotes
+            ? `Customer Reason: "${clientNotes}" — Revise quotation specs/pricing and re-send.`
+            : "The customer declined this quotation in their portal.",
+          historyBtnClass: "text-rose-900 hover:bg-rose-100/80 border-rose-300",
+        };
+      case "customer_accepted":
+        return {
+          containerClass: "bg-emerald-50/80 border-emerald-200 text-emerald-950",
+          iconContainerClass: "bg-emerald-100 text-emerald-700",
+          icon: <CheckCircle2 className="w-4 h-4" />,
+          title: `Accepted by Customer (v${versionNumber})`,
+          badgeText: "Accepted by Customer",
+          badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-300",
+          description: clientNotes
+            ? `Customer Note: "${clientNotes}"`
+            : "The customer accepted this quotation.",
+          historyBtnClass: "text-emerald-900 hover:bg-emerald-100/80 border-emerald-300",
+        };
       case "pending_approval":
         return {
           containerClass: "bg-amber-50/80 border-amber-200 text-amber-950",
@@ -152,6 +192,7 @@ export function QuotationApprovalBanner({
             : "Quotation has been approved by admin and is ready to be sent to the customer.",
           historyBtnClass: "text-emerald-900 hover:bg-emerald-100/80 border-emerald-300",
         };
+      case "admin_rejected":
       case "rejected":
         if (isEdited) {
           return {
@@ -246,7 +287,7 @@ export function QuotationApprovalBanner({
           </div>
         </div>
 
-        {(canSubmit || (status === "rejected" && !isEdited && Boolean(onEdit)) || history.length > 0) && (
+        {(canSubmit || (isAnyRejected && !isEdited && Boolean(onEdit)) || history.length > 0) && (
           <div className="flex items-center gap-2 shrink-0">
             {canSubmit && (
               <Button
@@ -265,7 +306,7 @@ export function QuotationApprovalBanner({
               </Button>
             )}
 
-            {status === "rejected" && !isEdited && onEdit && (
+            {isAnyRejected && !isEdited && onEdit && (
               <Button
                 type="button"
                 size="sm"
