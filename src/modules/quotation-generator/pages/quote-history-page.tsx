@@ -25,6 +25,7 @@ import {
   deleteEstimateProvider,
   type SaveEstimatePayload,
 } from "../estimates.api";
+import { resolveQuotationLifecycle } from "@/modules/quotations/quotations.api";
 import { useLoadEstimateToEditor } from "../hooks/use-load-estimate-to-editor";
 import {
   formatCurrency2,
@@ -557,12 +558,6 @@ export function QuoteHistoryPage() {
 
               const quoteNumber =
                 quote.conversion?.quoteNumber || quote.quoteNumber;
-              const effectiveWorkflowStatus =
-                quote.conversion?.workflowStatus ||
-                quote.workflowStatus ||
-                quote.approval?.status ||
-                quote.status ||
-                "draft";
 
               return (
                 <div
@@ -610,7 +605,32 @@ export function QuoteHistoryPage() {
                     <div className="text-right leading-tight space-y-0.5">
                       <div className="flex items-center justify-end gap-2">
                         {(() => {
-                          switch (effectiveWorkflowStatus) {
+                          const lifecycle = resolveQuotationLifecycle(quote);
+                          switch (lifecycle.lifecycleStatus) {
+                            case "customer_rejected":
+                              return (
+                                <span className="px-3 py-1 rounded-md bg-rose-100 text-rose-800 font-bold text-sm border border-rose-300 shadow-2xs">
+                                  Declined by Customer
+                                </span>
+                              );
+                            case "admin_rejected":
+                              return (
+                                <span
+                                  className="px-3 py-1 rounded-md bg-red-100 text-red-800 font-bold text-sm border border-red-300 shadow-2xs"
+                                  title={
+                                    quote.approval?.rejectionReason ||
+                                    "Approval Rejected"
+                                  }
+                                >
+                                  Admin Rejected
+                                </span>
+                              );
+                            case "customer_accepted":
+                              return (
+                                <span className="px-3 py-1 rounded-md bg-emerald-100 text-emerald-800 font-bold text-sm border border-emerald-300 shadow-2xs">
+                                  Accepted by Customer
+                                </span>
+                              );
                             case "pending_approval":
                               return (
                                 <span className="px-3 py-1 rounded-md bg-amber-100 text-amber-800 font-bold text-sm border border-amber-300 shadow-2xs">
@@ -621,18 +641,6 @@ export function QuoteHistoryPage() {
                               return (
                                 <span className="px-3 py-1 rounded-md bg-emerald-100 text-emerald-800 font-bold text-sm border border-emerald-300 shadow-2xs">
                                   Approved
-                                </span>
-                              );
-                            case "rejected":
-                              return (
-                                <span
-                                  className="px-3 py-1 rounded-md bg-rose-100 text-rose-800 font-bold text-sm border border-rose-300 shadow-2xs"
-                                  title={
-                                    quote.approval?.rejectionReason ||
-                                    "Approval Rejected"
-                                  }
-                                >
-                                  Rejected
                                 </span>
                               );
                             case "sent":

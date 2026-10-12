@@ -16,8 +16,11 @@ export const ADMIN_STATUS = [
   "pending_approval",
   "approved",
   "rejected",
+  "admin_rejected",
   "sent",
   "accepted",
+  "customer_rejected",
+  "customer_accepted",
 ] as const;
 export type AdminStatus = (typeof ADMIN_STATUS)[number];
 
@@ -47,7 +50,11 @@ export type WorkflowStatus =
   | "pending_approval"
   | "approved"
   | "rejected"
-  | "sent";
+  | "admin_rejected"
+  | "sent"
+  | "customer_rejected"
+  | "customer_accepted"
+  | "accepted";
 
 export type QuotationApprovalHistoryItem = {
   status: ApprovalStatus | string;
@@ -118,6 +125,8 @@ export type QuotationItem = {
     | "accepted"
     | string
     | null;
+  quotationStatus?: string | null;
+  quotation_status?: string | null;
   proposalDate?: string | null;
   companyName?: string | null;
   customerName?: string | null;
@@ -171,7 +180,13 @@ export type QuotationItem = {
     pdfEndpoint?: string;
     defaultSections?: string[];
   } | null;
+  clientNotes?: string | null;
+  customerDecisionAt?: string | null;
+  customerRejectedAt?: string | null;
+  customerAcceptedAt?: string | null;
 };
+
+export * from "./quotations.utils";
 
 export type Quotation = QuotationItem;
 
@@ -353,6 +368,27 @@ export async function getQuotationsProvider(
       ? pageOrParams
       : { page: pageOrParams, limit };
 
+  try {
+    const response = await apiClient.get<QuotationsListResponse>(
+      "/api/quotations/approval/pending",
+      { params },
+    );
+    if (response.data?.success && response.data?.data?.quotations) {
+      const rawData = response.data.data;
+      const pagination = (rawData as { pagination?: { total?: number } }).pagination;
+      const total = pagination?.total ?? rawData.total ?? rawData.quotations.length;
+      return {
+        ...response.data,
+        data: {
+          ...rawData,
+          total,
+        },
+      };
+    }
+  } catch {
+    // Fall back to /api/sales/quotations if /api/quotations/approval/pending is not accessible
+  }
+
   const response = await apiClient.get<QuotationsListResponse>(
     "/api/sales/quotations",
     { params },
@@ -362,6 +398,17 @@ export async function getQuotationsProvider(
 }
 
 export async function getQuotationStatsProvider(): Promise<QuotationStatsResponse> {
+  try {
+    const response = await apiClient.get<QuotationStatsResponse>(
+      "/api/quotations/stats"
+    );
+    if (response.data?.success && response.data?.data) {
+      return response.data;
+    }
+  } catch {
+    // Fall back to /api/sales/quotations/stats
+  }
+
   const response = await apiClient.get<QuotationStatsResponse>(
     "/api/sales/quotations/stats"
   );

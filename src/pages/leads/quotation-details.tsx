@@ -28,6 +28,7 @@ import type {
   QuotationApprovalHistoryItem,
   QuotationItem,
 } from "@/modules/quotations/quotations.api";
+import { resolveQuotationLifecycle } from "@/modules/quotations/quotations.api";
 import { QuotationApprovalTimeline } from "@/modules/quotation-generator/components/quotation-approval-timeline";
 
 export default function QuotationDetailsPage() {
@@ -72,12 +73,11 @@ export default function QuotationDetailsPage() {
 
   const quoteNumber =
     quotation?.quoteNumber || estimate?.quoteNumber || "QUO-DRAFT";
-  const workflowStatus: WorkflowStatus =
-    quotation?.workflowStatus ||
-    (quotation?.status as WorkflowStatus) ||
-    (quotation?.approval?.status as WorkflowStatus) ||
-    (quotation?.approvalStatus as WorkflowStatus) ||
-    "draft";
+  const lifecycle = useMemo(
+    () => resolveQuotationLifecycle(quotation),
+    [quotation]
+  );
+  const workflowStatus: WorkflowStatus = lifecycle.lifecycleStatus;
   const versionNumber =
     quotation?.versionNumber || estimate?.versionNumber || 1;
 
@@ -139,8 +139,26 @@ export default function QuotationDetailsPage() {
         versionNumber: approvalInfo?.approvedVersionNumber || versionNumber,
       });
     }
+    if (lifecycle.isCustomerRejected) {
+      fallback.push({
+        status: "customer_rejected",
+        at: lifecycle.customerDecisionAt || quotation?.updatedAt || null,
+        by: quotation?.customerName || "Customer",
+        note: lifecycle.clientNotes || undefined,
+        versionNumber,
+      });
+    }
+    if (lifecycle.isCustomerAccepted) {
+      fallback.push({
+        status: "customer_accepted",
+        at: lifecycle.customerDecisionAt || quotation?.updatedAt || null,
+        by: quotation?.customerName || "Customer",
+        note: lifecycle.clientNotes || undefined,
+        versionNumber,
+      });
+    }
     return fallback.length > 0 ? fallback : undefined;
-  }, [approvalInfo, quotation, workflowStatus, versionNumber]);
+  }, [approvalInfo, quotation, workflowStatus, versionNumber, lifecycle]);
 
   const effectiveApprovalInfo = useMemo(() => {
     return {
@@ -149,22 +167,24 @@ export default function QuotationDetailsPage() {
     };
   }, [approvalInfo, timelineHistory]);
 
-  const isSent = workflowStatus === "sent";
+  const isCustomerRejected = lifecycle.isCustomerRejected;
+  const isAdminRejected = lifecycle.isAdminRejected;
+  const isRejected = isCustomerRejected || isAdminRejected;
+
+  const isSent =
+    lifecycle.isSent || isCustomerRejected || lifecycle.isCustomerAccepted;
 
   const isApproved =
-    approvalInfo?.status === "approved" ||
-    workflowStatus === "approved" ||
-    isSent;
+    lifecycle.isApproved ||
+    lifecycle.isSent ||
+    lifecycle.isCustomerAccepted;
   const isStaleApproved =
     (approvalInfo?.status === "approved" || workflowStatus === "approved") &&
     approvalInfo?.approvedVersionNumber !== undefined &&
     approvalInfo?.approvedVersionNumber !== null &&
     approvalInfo.approvedVersionNumber !== versionNumber;
 
-  const isRejected =
-    approvalInfo?.status === "rejected" || workflowStatus === "rejected";
-
-  const isDownloadAllowed = isApproved && !isStaleApproved;
+  const isDownloadAllowed = (isApproved || isSent) && !isStaleApproved;
 
   // If a version is rejected, it cannot be re-submitted directly — it must be edited first
   const canSubmit =
@@ -377,8 +397,8 @@ export default function QuotationDetailsPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {/* Send to Customer Button (if approved & not stale) */}
-          {isApproved && !isStaleApproved && (
+          {/* Send to Customer Button (if approved & not stale & not customer rejected) */}
+          {isApproved && !isStaleApproved && !isCustomerRejected && (
             <Button
               type="button"
               onClick={() => setShowSendModal(true)}
@@ -415,7 +435,9 @@ export default function QuotationDetailsPage() {
                   : "bg-blue-600 hover:bg-blue-700 text-white"
               }`}
               title={
-                isRejected
+                isCustomerRejected
+                  ? "The customer declined this quotation. Click to edit estimate in generator editor before re-submitting."
+                  : isRejected
                   ? "This quotation version was rejected. Click to edit estimate in generator editor before re-submitting."
                   : "Load estimate into generator editor to modify"
               }
@@ -475,10 +497,17 @@ export default function QuotationDetailsPage() {
         sentTo={quotation?.sentTo}
         sentCc={quotation?.sentCc}
         sentMessage={quotation?.sentMessage}
-        approvalMessage={quotation?.approvalMessage || effectiveApprovalInfo?.approvalMessage}
-        approvalNote={quotation?.approvalNote || effectiveApprovalInfo?.approvalNote}
+        approvalMessage={
+          quotation?.approvalMessage || effectiveApprovalInfo?.approvalMessage
+        }
+        approvalNote={
+          quotation?.approvalNote || effectiveApprovalInfo?.approvalNote
+        }
+        clientNotes={lifecycle.clientNotes}
         onEdit={sourceEstimateId ? handleEditEstimate : undefined}
-        onSubmitForApproval={canSubmit ? () => setShowSubmitModal(true) : undefined}
+        onSubmitForApproval={
+          canSubmit ? () => setShowSubmitModal(true) : undefined
+        }
       />
 
       {/* Document HTML Preview Card */}
