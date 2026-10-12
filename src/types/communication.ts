@@ -7,7 +7,10 @@ export interface TeamAttachment {
 
 export interface TeamMessage {
   _id: string;
-  channelType: "direct" | "group";
+  messageId?: string;
+  customerId?: string;
+  channelType: "direct" | "group" | "customer";
+  senderType?: "customer" | "admin" | "sales" | string;
   groupId?: string;
   directKey?: string;
   participants?: string[];
@@ -18,6 +21,8 @@ export interface TeamMessage {
   content: string;
   attachments?: TeamAttachment[];
   readBy?: string[];
+  isReadByCustomer?: boolean;
+  isReadByStaff?: boolean;
   createdAt: string;
   updatedAt?: string;
   isOptimistic?: boolean;
