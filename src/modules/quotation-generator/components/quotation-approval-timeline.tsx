@@ -58,9 +58,17 @@ function getStatusConfig(status?: string | null) {
         bg: "bg-emerald-600",
         icon: CheckCircle2,
       };
+    case "admin_rejected":
     case "rejected":
       return {
-        label: "Rejected",
+        label: "Admin Rejected",
+        bg: "bg-rose-600",
+        icon: XCircle,
+      };
+    case "customer_rejected":
+    case "declined":
+      return {
+        label: "Declined by Customer",
         bg: "bg-rose-600",
         icon: XCircle,
       };
@@ -83,17 +91,12 @@ function getStatusConfig(status?: string | null) {
         bg: "bg-green-600",
         icon: FileCheck,
       };
+    case "customer_accepted":
     case "accepted":
       return {
         label: "Accepted by Customer",
         bg: "bg-emerald-600",
         icon: CheckCircle2,
-      };
-    case "declined":
-      return {
-        label: "Declined",
-        bg: "bg-rose-600",
-        icon: XCircle,
       };
     case "overdue":
       return {
