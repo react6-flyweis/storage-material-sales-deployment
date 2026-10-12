@@ -56,6 +56,13 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
                 `${activeChat.membersCount || 4} members • ${
                   activeChat.category || "Department"
                 }`
+              ) : activeChat.type === "customer" ? (
+                <span className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span className="text-slate-600 font-medium">Customer</span>
+                  {activeChat.email && <span>• {activeChat.email}</span>}
+                  {activeChat.phone && <span>• {activeChat.phone}</span>}
+                </span>
               ) : (
                 <span className="flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
