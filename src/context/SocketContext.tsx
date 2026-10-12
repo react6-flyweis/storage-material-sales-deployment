@@ -85,6 +85,15 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       window.dispatchEvent(new CustomEvent("socket_group_members_updated", { detail: data }));
     });
 
+    // 5. Customer Direct Chat Updated Notice
+    sock.on("customer_direct_chat_updated", (data: unknown) => {
+      console.log("[SocketContext] customer_direct_chat_updated", data);
+      queryClient.invalidateQueries({ queryKey: ["customer-direct-chat"] });
+      window.dispatchEvent(
+        new CustomEvent("socket_customer_direct_chat_updated", { detail: data })
+      );
+    });
+
     return () => {
       sock.disconnect();
       socketRef.current = null;
@@ -127,6 +136,18 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   }, []);
 
+  const joinCustomerDirect = useCallback((customerId: string) => {
+    if (socketRef.current?.connected && customerId) {
+      socketRef.current.emit("join_customer_direct", { customerId });
+    }
+  }, []);
+
+  const leaveCustomerDirect = useCallback((customerId: string) => {
+    if (socketRef.current?.connected && customerId) {
+      socketRef.current.emit("leave_customer_direct", { customerId });
+    }
+  }, []);
+
   return (
     <SocketContext.Provider
       value={{
@@ -137,6 +158,8 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         sendTypingStart,
         sendTypingStop,
         sendMessage,
+        joinCustomerDirect,
+        leaveCustomerDirect,
       }}
     >
       {children}
