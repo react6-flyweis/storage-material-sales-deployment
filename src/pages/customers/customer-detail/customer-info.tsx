@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams } from "react-router";
-import { ArrowLeft, Clock3, DollarSign, FileText } from "lucide-react";
+import { ArrowLeft, Clock3, DollarSign, FileText, MessageSquare } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import StatCard from "@/components/ui/stat-card";
@@ -120,6 +120,15 @@ export default function CustomerDetailLayout() {
           <h1 className="text-lg ">Customer Details</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          <Button
+            asChild
+            className="w-full sm:w-auto bg-[#4285F4] hover:bg-blue-600 text-white shadow-xs"
+          >
+            <Link to={`/communication?customerId=${customerData?._id || id}`}>
+              <MessageSquare className="h-4 w-4 mr-1.5" />
+              Message Customer
+            </Link>
+          </Button>
           <Link to={`/customers/${id}/projects/new`}>
             <Button className="w-full sm:w-auto bg-[#1F86D5] hover:bg-[#1769A7]">
               Create new Project
