@@ -107,8 +107,9 @@ if (typeof window !== "undefined") {
   window.addEventListener("vite:preloadError", (event: Event) => {
     // Prevent Vite's default preload-error handling.
     event.preventDefault();
-
-    const payload = (event as CustomEvent).payload;
+    const payload =
+      (event as { payload?: unknown })?.payload ??
+      (event as CustomEvent)?.detail;
     const now = Date.now();
 
     let tracker: ReloadTracker;
