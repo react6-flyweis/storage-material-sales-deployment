@@ -12,7 +12,7 @@ import { useLeadsLookupQuery } from "@/modules/leads/leads.hooks";
 import { formatLifecycleStatus, getStatusBadgeClassName, getLeadProjectName } from "@/modules/leads/leads.utils";
 import { isLeadInLifecycleRange, type LeadLifecycleStatusValue } from "@/modules/leads/lifecycle-statuses";
 
-type Client = {
+export type Client = {
   id: string;
   name: string;
   customer: string;
@@ -20,6 +20,7 @@ type Client = {
   lifecycleStatus?: string;
   jobId?: string;
   quoteValue?: number;
+  location?: string;
 };
 
 type Props = {
@@ -55,6 +56,7 @@ export default function ClientSelector({
         lifecycleStatus: lead.lifecycleStatus,
         jobId: lead.jobId,
         quoteValue: lead.quoteValue,
+        location: lead.location || "",
       })) || [];
 
 
