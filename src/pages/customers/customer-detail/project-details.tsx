@@ -67,7 +67,11 @@ export default function ProjectDetailsPage() {
         </div>
       </div>
 
-      <BasicDetails lead={detail} />
+      <BasicDetails
+        lead={detail}
+        leadId={activeLeadId}
+        showConstructionTasks={true}
+      />
 
       {activeLeadId && <ProjectMediaCard leadId={activeLeadId} />}
     </div>
