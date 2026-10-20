@@ -20,6 +20,7 @@ const EditProfile = lazy(() => import("@/pages/edit-profile"));
 // const EscalatedQueries = lazy(() => import("@/pages/escalated-queries"));
 
 const Dashboard = lazy(() => import("@/pages/dashboard"));
+const CalendarPage = lazy(() => import("@/pages/calendar/calendar-page"));
 const Deliveries = lazy(() => import("@/pages/deliveries/deliveries"));
 const DeliveryDetails = lazy(
   () => import("@/pages/deliveries/delivery-details"),
@@ -366,6 +367,10 @@ export const salesRoutes: RouteObject[] = [
                 ],
               },
             ],
+          },
+          {
+            path: "calendar",
+            element: <CalendarPage />,
           },
           {
             path: "awarded-freight",

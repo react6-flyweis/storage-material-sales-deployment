@@ -66,12 +66,23 @@ import {
   getLeadScoreTextColorClass,
 } from "@/modules/leads/leads.scoring";
 import { Badge } from "@/components/ui/badge";
+import ProjectConstructionTasksCard, {
+  type ConstructionTask,
+} from "@/components/leads/project-construction-tasks-card";
 
 type BasicDetailsProps = {
   lead: LeadDetailData;
+  leadId?: string;
+  constructionTasks?: ConstructionTask[];
+  showConstructionTasks?: boolean;
 };
 
-export default function BasicDetails({ lead }: BasicDetailsProps) {
+export default function BasicDetails({
+  lead,
+  leadId,
+  constructionTasks,
+  showConstructionTasks = false,
+}: BasicDetailsProps) {
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
@@ -812,6 +823,14 @@ export default function BasicDetails({ lead }: BasicDetailsProps) {
           />
         </CardContent>
       </Card>
+
+      {/* Project Construction Task */}
+      {showConstructionTasks && (
+        <ProjectConstructionTasksCard
+          leadId={leadId || leadData?._id}
+          tasks={constructionTasks}
+        />
+      )}
 
       {/* Grid: Status, Activity */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

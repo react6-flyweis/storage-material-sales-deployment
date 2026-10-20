@@ -8,11 +8,12 @@ import {
     matchRoutes,
 } from "react-router";
 
-Sentry.init({
-    dsn: import.meta.env.VITE_SENTRY_DSN,
-    environment: import.meta.env.MODE,
-    initialScope: {
-        tags: {
+if (import.meta.env.PROD) {
+    Sentry.init({
+        dsn: import.meta.env.VITE_SENTRY_DSN,
+        environment: import.meta.env.MODE,
+        initialScope: {
+            tags: {
             panel: "sales"
         }
     },
@@ -49,3 +50,4 @@ Sentry.init({
     replaysSessionSampleRate: 0.1,
     replaysOnErrorSampleRate: 1.0,
 });
+}

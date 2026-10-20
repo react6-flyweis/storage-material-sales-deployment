@@ -20,7 +20,8 @@ import invoices from "@/assets/icons/sidebar/invoices.svg";
 
 import meetingsIcon from "@/assets/icons/sidebar/meetings.svg";
 
-import deliveryIcon from "@/assets/icons/sidebar/delivery.svg";
+// import deliveryIcon from "@/assets/icons/sidebar/delivery.svg";
+import calendarIcon from "@/assets/icons/sidebar/calendar.svg";
 // import freightIcon from "@/assets/icons/sidebar/freights.svg";
 // import salesIcon from "@/assets/icons/sidebar/sales.svg";
 // import communicationIcon from "@/assets/icons/sidebar/communication.svg";
@@ -68,6 +69,7 @@ type NavGroup =
   | "construction"
   | "ai-marketing"
   | "deliveries"
+  | "calendar"
   | "notifications"
   | "awarded-freight"
   | "sales"
@@ -219,22 +221,35 @@ const navigationGroups: NavigationGroup[] = [
       // },
     ],
   },
+  // {
+  //   id: "deliveries" as NavGroup,
+  //   icon: deliveryIcon,
+  //   label: "Customer Delivery",
+  //   color: "bg-[#F54900]",
+  //   link: "/deliveries",
+  //   items: [
+  //     // project deliveries
+  //     {
+  //       path: "/deliveries/projects",
+  //       label: "Project Deliveries",
+  //     },
+  //     // request delivery/change
+  //     {
+  //       path: "/deliveries/request-delivery-change",
+  //       label: "Request Delivery / Change",
+  //     },
+  //   ],
+  // },
   {
-    id: "deliveries" as NavGroup,
-    icon: deliveryIcon,
-    label: "Customer Delivery",
-    color: "bg-[#F54900]",
-    link: "/deliveries",
+    id: "calendar" as NavGroup,
+    icon: calendarIcon,
+    label: "Calendar",
+    color: "bg-[#2563EB]",
+    link: "/calendar",
     items: [
-      // project deliveries
       {
-        path: "/deliveries/projects",
-        label: "Project Deliveries",
-      },
-      // request delivery/change
-      {
-        path: "/deliveries/request-delivery-change",
-        label: "Request Delivery / Change",
+        path: "/calendar",
+        label: "Delivery Schedule",
       },
     ],
   },

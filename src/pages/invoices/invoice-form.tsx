@@ -1,21 +1,26 @@
 import { useEffect, useRef, useState } from "react";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
-import { Calendar, AlertTriangle } from "lucide-react";
+import {
+  Calendar,
+  AlertTriangle,
+} from "lucide-react";
 import { useNavigate } from "react-router";
 import InvoiceLineItem from "./invoice-line-item";
 import AddMarkupDialog from "@/components/invoice/add-markup-dialog";
 import AddDiscountDialog from "@/components/invoice/add-discount-dialog";
 import AddDepositDialog from "@/components/invoice/add-deposit-dialog";
 import PaymentScheduleDialog from "@/components/invoice/payment-schedule-dialog";
+import EditAddressDialog from "@/components/invoice/edit-address-dialog";
+import EditBankInfoDialog from "@/components/invoice/edit-bank-info-dialog";
 // import AddClientDialog from "@/components/invoice/add-client-dialog";
 // import CustomerProjectSelector from "@/components/invoice/customer-project-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import steelLogo from "@/assets/steel-building-depot-logo.png";
 import { getApiErrorMessage } from "@/lib/api-error";
 import {
   useCreateInvoiceMutation,
   useEditInvoiceMutation,
+  useInvoiceBillingDefaultsQuery,
 } from "@/modules/invoices/invoices.hooks";
 import {
   usePaymentScheduleByLeadQuery,
@@ -32,6 +37,8 @@ import type {
   InvoiceDetail,
   InvoiceLineItem as ApiInvoiceLineItem,
   PaymentScheduleDocument,
+  InvoiceAddress,
+  InvoiceBankDetails,
 } from "@/modules/invoices/invoices.api";
 import SuccessDialog from "@/components/success-dialog";
 import ClientSelector from "@/components/customers/client-selector";
@@ -48,6 +55,27 @@ type LineItem = Omit<ApiInvoiceLineItem, "markup" | "tax"> & {
   taxAmount?: number;
   total?: number;
 };
+
+export interface InvoiceAddressFormValues {
+  companyName: string;
+  line1: string;
+  line2: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+}
+
+export interface InvoiceBankDetailsFormValues {
+  bankName: string;
+  accountName: string;
+  accountNumber: string;
+  routingNumber: string;
+  swiftCode: string;
+  iban: string;
+  branchAddress: string;
+  paymentInstructions: string;
+}
 
 export interface InvoiceFormValues {
   invoiceNumber: string;
@@ -74,6 +102,9 @@ export interface InvoiceFormValues {
   clientName: string;
   clientAvatar: string;
   taxes: { name: string; rate: string }[];
+  billingAddress: InvoiceAddressFormValues;
+  recipientAddress: InvoiceAddressFormValues;
+  bankDetails: InvoiceBankDetailsFormValues;
 }
 
 const defaultLineItems: InvoiceFormValues["lineItems"] = [
@@ -93,6 +124,37 @@ const defaultLineItems: InvoiceFormValues["lineItems"] = [
     items: [],
   },
 ];
+
+export const defaultBillingAddressFormValues: InvoiceAddressFormValues = {
+  companyName: "STEEL BUILDING DEPOT",
+  line1: "1851 Madison Ave Suite 300",
+  line2: "",
+  city: "Council Bluffs",
+  state: "IA",
+  postalCode: "51503",
+  country: "United States",
+};
+
+export const defaultRecipientAddressFormValues: InvoiceAddressFormValues = {
+  companyName: "",
+  line1: "",
+  line2: "",
+  city: "",
+  state: "",
+  postalCode: "",
+  country: "United States",
+};
+
+export const defaultBankDetailsFormValues: InvoiceBankDetailsFormValues = {
+  bankName: "",
+  accountName: "",
+  accountNumber: "",
+  routingNumber: "",
+  swiftCode: "",
+  iban: "",
+  branchAddress: "",
+  paymentInstructions: "",
+};
 
 const defaultFormValues: InvoiceFormValues = {
   invoiceNumber: "",
@@ -114,6 +176,9 @@ const defaultFormValues: InvoiceFormValues = {
   clientAvatar: "",
   taxes: [],
   lineItems: defaultLineItems,
+  billingAddress: defaultBillingAddressFormValues,
+  recipientAddress: defaultRecipientAddressFormValues,
+  bankDetails: defaultBankDetailsFormValues,
 };
 
 function formatDateForInput(value?: string | null) {
@@ -285,6 +350,65 @@ function invoiceToFormValues(
     });
   }
 
+  const billingAddr = invoice?.billingAddress;
+  const recipientAddr = invoice?.recipientAddress;
+  const bankDet = invoice?.bankDetails;
+
+  const resolvedBillingAddress: InvoiceAddressFormValues = {
+    companyName:
+      billingAddr?.companyName || defaultBillingAddressFormValues.companyName,
+    line1:
+      billingAddr?.line1 ||
+      (billingAddr?.lines?.[0] ?? defaultBillingAddressFormValues.line1),
+    line2:
+      billingAddr?.line2 ||
+      (billingAddr?.lines && billingAddr.lines.length > 2
+        ? billingAddr.lines[1]
+        : ""),
+    city: billingAddr?.city || defaultBillingAddressFormValues.city,
+    state: billingAddr?.state || defaultBillingAddressFormValues.state,
+    postalCode:
+      billingAddr?.postalCode || defaultBillingAddressFormValues.postalCode,
+    country:
+      billingAddr?.country || defaultBillingAddressFormValues.country,
+  };
+
+  const customerName = getCustomerName(customer);
+
+  const resolvedRecipientAddress: InvoiceAddressFormValues = {
+    companyName:
+      recipientAddr?.companyName ||
+      customerName ||
+      defaultRecipientAddressFormValues.companyName,
+    line1:
+      recipientAddr?.line1 ||
+      (recipientAddr?.lines?.[0] ?? ""),
+    line2:
+      recipientAddr?.line2 ||
+      (recipientAddr?.lines && recipientAddr.lines.length > 2
+        ? recipientAddr.lines[1]
+        : ""),
+    city: recipientAddr?.city || "",
+    state: recipientAddr?.state || "",
+    postalCode: recipientAddr?.postalCode || "",
+    country:
+      recipientAddr?.country || defaultRecipientAddressFormValues.country,
+  };
+
+  const resolvedBankDetails: InvoiceBankDetailsFormValues = {
+    bankName: bankDet?.bankName || defaultBankDetailsFormValues.bankName,
+    accountName:
+      bankDet?.accountName || defaultBankDetailsFormValues.accountName,
+    accountNumber: bankDet?.accountNumber || "",
+    routingNumber: bankDet?.routingNumber || "",
+    swiftCode: bankDet?.swiftCode || "",
+    iban: bankDet?.iban || "",
+    branchAddress: bankDet?.branchAddress || "",
+    paymentInstructions:
+      bankDet?.paymentInstructions ||
+      defaultBankDetailsFormValues.paymentInstructions,
+  };
+
   return {
     ...defaultFormValues,
     invoiceNumber: invoice?.invoiceNumber ?? defaultFormValues.invoiceNumber,
@@ -304,6 +428,9 @@ function invoiceToFormValues(
     depositType,
     depositValue,
     taxes: taxesList,
+    billingAddress: resolvedBillingAddress,
+    recipientAddress: resolvedRecipientAddress,
+    bankDetails: resolvedBankDetails,
     ...scheduleValues,
     paymentSchedulePayments: ensureDepositInSchedulePayments(
       scheduleValues.paymentSchedulePayments,
@@ -349,6 +476,38 @@ function invoiceToFormValues(
           })
         : defaultLineItems,
   };
+}
+
+function parseLocationToAddress(location?: string): {
+  line1?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+} {
+  if (!location || location === "N/A" || location === "—" || location === "-") {
+    return {};
+  }
+  const parts = location.split(",").map((p) => p.trim()).filter(Boolean);
+  if (parts.length === 1) {
+    return { line1: parts[0] };
+  }
+  if (parts.length === 2) {
+    const [city, stateZip] = parts;
+    const szParts = stateZip.split(/\s+/).filter(Boolean);
+    const state = szParts[0] || "";
+    const postalCode = szParts.slice(1).join(" ") || "";
+    return { city, state, postalCode };
+  }
+  if (parts.length >= 3) {
+    const line1 = parts.slice(0, parts.length - 2).join(", ");
+    const city = parts[parts.length - 2];
+    const stateZip = parts[parts.length - 1];
+    const szParts = stateZip.split(/\s+/).filter(Boolean);
+    const state = szParts[0] || "";
+    const postalCode = szParts.slice(1).join(" ") || "";
+    return { line1, city, state, postalCode };
+  }
+  return { line1: location };
 }
 
 function parseNumericInput(value: string, fallback = 0) {
@@ -418,6 +577,9 @@ export default function InvoiceForm({
 
   const formValues = useWatch({ control }) as Partial<InvoiceFormValues>;
   const leadIdForSchedule = formValues?.leadId ?? defaultFormValues.leadId;
+  const billingDefaultsQuery = useInvoiceBillingDefaultsQuery(
+    leadIdForSchedule || undefined,
+  );
   const leadScheduleQuery = usePaymentScheduleByLeadQuery(
     leadIdForSchedule || undefined,
     Boolean(leadIdForSchedule) && !isSummaryReadOnly,
@@ -435,6 +597,81 @@ export default function InvoiceForm({
     lastAppliedLeadScheduleIdRef.current = invoice?.leadId ?? null;
     lastAppliedLeadTaxIdRef.current = invoice?.leadId ?? null;
   }, [invoice, paymentSchedule, reset]);
+
+  useEffect(() => {
+    if (!isEdit && billingDefaultsQuery.data) {
+      const def = billingDefaultsQuery.data;
+      if (def.billingAddress) {
+        setValue(
+          "billingAddress.companyName",
+          def.billingAddress.companyName || defaultBillingAddressFormValues.companyName,
+        );
+        setValue(
+          "billingAddress.line1",
+          def.billingAddress.line1 || defaultBillingAddressFormValues.line1,
+        );
+        setValue("billingAddress.line2", def.billingAddress.line2 || "");
+        setValue(
+          "billingAddress.city",
+          def.billingAddress.city || defaultBillingAddressFormValues.city,
+        );
+        setValue(
+          "billingAddress.state",
+          def.billingAddress.state || defaultBillingAddressFormValues.state,
+        );
+        setValue(
+          "billingAddress.postalCode",
+          def.billingAddress.postalCode || defaultBillingAddressFormValues.postalCode,
+        );
+        setValue(
+          "billingAddress.country",
+          def.billingAddress.country || defaultBillingAddressFormValues.country,
+        );
+      }
+      if (def.bankDetails) {
+        setValue(
+          "bankDetails.bankName",
+          def.bankDetails.bankName || defaultBankDetailsFormValues.bankName,
+        );
+        setValue(
+          "bankDetails.accountName",
+          def.bankDetails.accountName || defaultBankDetailsFormValues.accountName,
+        );
+        setValue("bankDetails.accountNumber", def.bankDetails.accountNumber || "");
+        setValue("bankDetails.routingNumber", def.bankDetails.routingNumber || "");
+        setValue("bankDetails.swiftCode", def.bankDetails.swiftCode || "");
+        setValue("bankDetails.iban", def.bankDetails.iban || "");
+        setValue("bankDetails.branchAddress", def.bankDetails.branchAddress || "");
+        setValue(
+          "bankDetails.paymentInstructions",
+          def.bankDetails.paymentInstructions || defaultBankDetailsFormValues.paymentInstructions,
+        );
+      }
+      if (def.recipientAddress) {
+        if (def.recipientAddress.companyName) {
+          setValue("recipientAddress.companyName", def.recipientAddress.companyName);
+        }
+        if (def.recipientAddress.line1) {
+          setValue("recipientAddress.line1", def.recipientAddress.line1);
+        }
+        if (def.recipientAddress.line2) {
+          setValue("recipientAddress.line2", def.recipientAddress.line2);
+        }
+        if (def.recipientAddress.city) {
+          setValue("recipientAddress.city", def.recipientAddress.city);
+        }
+        if (def.recipientAddress.state) {
+          setValue("recipientAddress.state", def.recipientAddress.state);
+        }
+        if (def.recipientAddress.postalCode) {
+          setValue("recipientAddress.postalCode", def.recipientAddress.postalCode);
+        }
+        if (def.recipientAddress.country) {
+          setValue("recipientAddress.country", def.recipientAddress.country);
+        }
+      }
+    }
+  }, [billingDefaultsQuery.data, isEdit, setValue]);
 
   useEffect(() => {
     if (!leadIdForSchedule) {
@@ -625,6 +862,12 @@ export default function InvoiceForm({
   // const clientName = formValues?.clientName ?? defaultFormValues.clientName;
   const taxes = (formValues.taxes ??
     defaultFormValues.taxes) as InvoiceFormValues["taxes"];
+  const billingAddress = (formValues?.billingAddress ??
+    defaultBillingAddressFormValues) as InvoiceAddressFormValues;
+  const recipientAddress = (formValues?.recipientAddress ??
+    defaultRecipientAddressFormValues) as InvoiceAddressFormValues;
+  const bankDetails = (formValues?.bankDetails ??
+    defaultBankDetailsFormValues) as InvoiceBankDetailsFormValues;
 
   // const [notesOpen, setNotesOpen] = useState<Record<string, boolean>>({});
 
@@ -923,6 +1166,54 @@ export default function InvoiceForm({
       }
     }
 
+    const buildAddressLines = (addr: InvoiceAddressFormValues) => {
+      const lines: string[] = [];
+      if (addr.line1?.trim()) lines.push(addr.line1.trim());
+      if (addr.line2?.trim()) lines.push(addr.line2.trim());
+      const cityStateZip = [
+        addr.city?.trim(),
+        [addr.state?.trim(), addr.postalCode?.trim()].filter(Boolean).join(" "),
+      ]
+        .filter(Boolean)
+        .join(", ");
+      if (cityStateZip) lines.push(cityStateZip);
+      if (addr.country?.trim()) lines.push(addr.country.trim());
+      return lines;
+    };
+
+    const billingAddressPayload: InvoiceAddress = {
+      companyName: data.billingAddress?.companyName?.trim() || undefined,
+      line1: data.billingAddress?.line1?.trim() || undefined,
+      line2: data.billingAddress?.line2?.trim() || undefined,
+      city: data.billingAddress?.city?.trim() || undefined,
+      state: data.billingAddress?.state?.trim() || undefined,
+      postalCode: data.billingAddress?.postalCode?.trim() || undefined,
+      country: data.billingAddress?.country?.trim() || undefined,
+      lines: data.billingAddress ? buildAddressLines(data.billingAddress) : undefined,
+    };
+
+    const recipientAddressPayload: InvoiceAddress = {
+      companyName: data.recipientAddress?.companyName?.trim() || undefined,
+      line1: data.recipientAddress?.line1?.trim() || undefined,
+      line2: data.recipientAddress?.line2?.trim() || undefined,
+      city: data.recipientAddress?.city?.trim() || undefined,
+      state: data.recipientAddress?.state?.trim() || undefined,
+      postalCode: data.recipientAddress?.postalCode?.trim() || undefined,
+      country: data.recipientAddress?.country?.trim() || undefined,
+      lines: data.recipientAddress ? buildAddressLines(data.recipientAddress) : undefined,
+    };
+
+    const bankDetailsPayload: InvoiceBankDetails = {
+      bankName: data.bankDetails?.bankName?.trim() || undefined,
+      accountName: data.bankDetails?.accountName?.trim() || undefined,
+      accountNumber: data.bankDetails?.accountNumber?.trim() || undefined,
+      routingNumber: data.bankDetails?.routingNumber?.trim() || undefined,
+      swiftCode: data.bankDetails?.swiftCode?.trim() || undefined,
+      iban: data.bankDetails?.iban?.trim() || undefined,
+      branchAddress: data.bankDetails?.branchAddress?.trim() || undefined,
+      paymentInstructions: data.bankDetails?.paymentInstructions?.trim() || undefined,
+    };
+
     const payload = {
       date: data.date || undefined,
       daysToPay: Number.isFinite(parsedDaysToPay) ? parsedDaysToPay : undefined,
@@ -933,6 +1224,9 @@ export default function InvoiceForm({
       discount,
       depositAmount,
       totalAmount,
+      billingAddress: billingAddressPayload,
+      recipientAddress: recipientAddressPayload,
+      bankDetails: bankDetailsPayload,
       ...(finalPaymentScheduleId
         ? { paymentScheduleId: finalPaymentScheduleId }
         : {}),
@@ -1054,26 +1348,58 @@ export default function InvoiceForm({
         {/* Top Section: Client Info & Invoice Details */}
         <div className="flex flex-col lg:flex-row justify-between gap-10 mb-12">
           {/* Left: Organization Info */}
-          <div className="space-y-6">
-            <div className="flex items-center gap-2">
-              <div className="flex items-center shrink-0">
-                <img src={steelLogo} alt="The Steel" className="h-10" />
-              </div>
+          <div className="space-y-4">
+            <div className="text-base font-bold text-gray-900 tracking-tight">
+              {billingAddress.companyName || "STEEL BUILDING DEPOT"}
             </div>
 
-            <div className="text-sm text-gray-500 leading-relaxed max-w-62.5">
-              1851 Madison Ave Suite 300
-              <br />
-              Council Bluffs, IA
-              <br />
-              51503
-              <br />
-              United States
-              <br />
-              travis@storagematerials.com
-              <br />
-              www.storagematerials.com
+            <div className="text-sm text-gray-600 leading-relaxed space-y-0.5">
+              {billingAddress.line1 ? (
+                <div>{billingAddress.line1}</div>
+              ) : (
+                <div>1851 Madison Ave Suite 300</div>
+              )}
+              {billingAddress.line2 && <div>{billingAddress.line2}</div>}
+              {billingAddress.city || billingAddress.state || billingAddress.postalCode ? (
+                <div>
+                  {[
+                    billingAddress.city,
+                    [billingAddress.state, billingAddress.postalCode]
+                      .filter(Boolean)
+                      .join(" "),
+                  ]
+                    .filter(Boolean)
+                    .join(", ")}
+                </div>
+              ) : (
+                <div>Council Bluffs, IA 51503</div>
+              )}
+              {billingAddress.country ? (
+                <div>{billingAddress.country}</div>
+              ) : (
+                <div>United States</div>
+              )}
+              <div>travis@storagematerials.com</div>
+              <div>www.storagematerials.com</div>
             </div>
+
+            {!isSummaryReadOnly && (
+              <EditAddressDialog
+                initialValues={billingAddress}
+                title="Edit Address"
+                description="Update the seller address details for this invoice."
+                onDone={(newAddr) => {
+                  setValue("billingAddress", newAddr, { shouldDirty: true });
+                }}
+              >
+                <button
+                  type="button"
+                  className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline cursor-pointer block pt-1 text-left"
+                >
+                  Edit address
+                </button>
+              </EditAddressDialog>
+            )}
           </div>
 
           {/* Right: Invoice Meta & Client Add */}
@@ -1144,9 +1470,92 @@ export default function InvoiceForm({
                     if (!getValues("lineItems.0.description")) {
                       setValue("lineItems.0.description", "Project Quote");
                     }
+                    if (lead.customer && lead.customer !== "N/A") {
+                      setValue("clientName", lead.customer);
+                    }
+                    if (lead.customerId) {
+                      setValue("clientId", lead.customerId);
+                    }
+
+                    // Populate recipient address default values on lead selection
+                    const customerName =
+                      lead.customer && lead.customer !== "N/A"
+                        ? lead.customer
+                        : lead.name;
+                    setValue("recipientAddress.companyName", customerName);
+
+                    if (lead.location) {
+                      const parsed = parseLocationToAddress(lead.location);
+                      if (parsed.line1) {
+                        setValue("recipientAddress.line1", parsed.line1);
+                      }
+                      if (parsed.city) {
+                        setValue("recipientAddress.city", parsed.city);
+                      }
+                      if (parsed.state) {
+                        setValue("recipientAddress.state", parsed.state);
+                      }
+                      if (parsed.postalCode) {
+                        setValue("recipientAddress.postalCode", parsed.postalCode);
+                      }
+                    }
+                    if (!getValues("recipientAddress.country")) {
+                      setValue("recipientAddress.country", "United States");
+                    }
                   }
                 }}
               />
+
+              {/* Recipient Address Preview */}
+              {Boolean(
+                recipientAddress.companyName ||
+                  recipientAddress.line1 ||
+                  recipientAddress.city,
+              ) && (
+                <div className="w-full max-w-xs space-y-1 text-left self-end pt-1">
+                  <div className="text-base font-bold text-gray-900 tracking-tight">
+                    {recipientAddress.companyName}
+                  </div>
+
+                  <div className="text-sm text-gray-600 leading-relaxed space-y-0.5">
+                    {recipientAddress.line1 && <div>{recipientAddress.line1}</div>}
+                    {recipientAddress.line2 && <div>{recipientAddress.line2}</div>}
+                    {(recipientAddress.city ||
+                      recipientAddress.state ||
+                      recipientAddress.postalCode) && (
+                      <div>
+                        {[
+                          recipientAddress.city,
+                          [recipientAddress.state, recipientAddress.postalCode]
+                            .filter(Boolean)
+                            .join(" "),
+                        ]
+                          .filter(Boolean)
+                          .join(", ")}
+                      </div>
+                    )}
+                    {recipientAddress.country && <div>{recipientAddress.country}</div>}
+                  </div>
+
+                  {!isSummaryReadOnly && (
+                    <EditAddressDialog
+                      initialValues={recipientAddress}
+                      title="Edit Recipient Address"
+                      description="Update the bill-to / customer address details for this invoice."
+                      onDone={(newAddr) => {
+                        setValue("recipientAddress", newAddr, { shouldDirty: true });
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline cursor-pointer block pt-1 text-left"
+                      >
+                        Edit address
+                      </button>
+                    </EditAddressDialog>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
@@ -1204,6 +1613,7 @@ export default function InvoiceForm({
             </div>
           </div>
         </div>
+
 
         {/* Section Headers */}
         <div className="hidden md:grid grid-cols-12 gap-4 bg-gray-50/50 py-3 px-4 rounded-lg mb-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
@@ -1277,7 +1687,83 @@ export default function InvoiceForm({
         </div> */}
 
         {/* Footer Summary */}
-        <div className="mt-12 flex justify-end">
+        <div className="mt-12 flex flex-col lg:flex-row justify-between items-start gap-10">
+          {/* Left: Banking & Wire Info */}
+          <div className="w-full max-w-md bg-white">
+            <div className="flex justify-between items-center pb-2 border-b border-gray-200">
+              <h3 className="text-base font-bold text-gray-900">
+                Banking & Wire Info
+              </h3>
+              {!isSummaryReadOnly && (
+                <EditBankInfoDialog
+                  initialValues={bankDetails}
+                  onDone={(newBank) => {
+                    setValue("bankDetails", newBank, { shouldDirty: true });
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+                  >
+                    Edit
+                  </button>
+                </EditBankInfoDialog>
+              )}
+            </div>
+
+            <div className="py-2.5 space-y-2 text-sm">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-500">Bank</span>
+                <span className="font-semibold text-gray-900">
+                  {bankDetails.bankName || "-"}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-500">Account Name</span>
+                <span className="font-semibold text-gray-900">
+                  {bankDetails.accountName || "-"}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-500">Account #</span>
+                <span className="font-semibold text-gray-900">
+                  {bankDetails.accountNumber || "-"}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-500">Routing #</span>
+                <span className="font-semibold text-gray-900">
+                  {bankDetails.routingNumber || "-"}
+                </span>
+              </div>
+              {Boolean(bankDetails.swiftCode) && (
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-500">SWIFT</span>
+                  <span className="font-semibold text-gray-900">
+                    {bankDetails.swiftCode}
+                  </span>
+                </div>
+              )}
+              {Boolean(bankDetails.iban) && (
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-500">IBAN</span>
+                  <span className="font-semibold text-gray-900">
+                    {bankDetails.iban}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {Boolean(bankDetails.paymentInstructions) && (
+              <div className="pt-2 border-t border-gray-200">
+                <p className="text-sm text-gray-500 italic">
+                  Memo: {bankDetails.paymentInstructions}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Right: Totals Summary */}
           <div className="w-full max-w-sm space-y-3">
             <div className="flex justify-between text-sm">
               <span className="text-gray-500">Subtotal</span>

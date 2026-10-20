@@ -1,11 +1,17 @@
-import { Link, useNavigate, useParams } from "react-router";
-import { ArrowLeft, Clock3, DollarSign, FileText, MessageSquare } from "lucide-react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
+import { ArrowLeft, Clock3, DollarSign, FileText, FolderKanban, MessageSquare } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import StatCard from "@/components/ui/stat-card";
 import ProfileCard from "@/components/profile-card";
 import ProjectsTable from "./projects-table";
-import { useSalesCustomerDetailQuery } from "@/modules/customers/customers.hooks";
+import { CustomerDocumentsTab } from "@/components/customers/customer-documents/customer-documents-tab";
+import {
+  useCustomerDocumentsQuery,
+  useSalesCustomerDetailQuery,
+} from "@/modules/customers/customers.hooks";
 
 function formatCurrency(value = 0) {
   return new Intl.NumberFormat("en-US", {
@@ -32,6 +38,7 @@ export default function CustomerDetailLayout() {
   const navigate = useNavigate();
   const params = useParams();
   const id = params.id ?? "unknown";
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const {
     data: customerDetailResponse,
@@ -41,6 +48,28 @@ export default function CustomerDetailLayout() {
 
   const customerData = customerDetailResponse?.data.customer;
   const financials = customerDetailResponse?.data.financials;
+
+  const customerMongoId = customerData?._id || (id !== "unknown" ? id : "");
+  const { data: customerDocumentsResponse } = useCustomerDocumentsQuery(customerMongoId);
+  const documentsCount = customerDocumentsResponse?.data?.documents?.length;
+
+  const currentTab =
+    searchParams.get("tab") === "documents" ? "documents" : "projects";
+
+  const handleTabChange = (value: string) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (value === "projects") {
+          next.delete("tab");
+        } else {
+          next.set("tab", value);
+        }
+        return next;
+      },
+      { replace: true },
+    );
+  };
 
   const customerName =
     `${customerData?.firstName ?? ""} ${customerData?.lastName ?? ""}`.trim() ||
@@ -162,7 +191,53 @@ export default function CustomerDetailLayout() {
         ))}
       </div>
 
-      <ProjectsTable customerId={id} customerFirstName={customerData?.firstName} />
+      {/* Tabs: Projects and Customer Documents */}
+      <Tabs
+        value={currentTab}
+        onValueChange={handleTabChange}
+        className="space-y-4"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200 pb-2">
+          <TabsList className="bg-slate-100 p-1 rounded-lg inline-flex">
+            <TabsTrigger
+              value="projects"
+              className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:text-[#1D51A4] data-[state=active]:shadow-xs px-4 py-2 text-sm font-medium transition-all"
+            >
+              <FolderKanban className="h-4 w-4" />
+              <span>Projects</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="documents"
+              className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:text-[#1D51A4] data-[state=active]:shadow-xs px-4 py-2 text-sm font-medium transition-all"
+            >
+              <FileText className="h-4 w-4" />
+              <span>Customer Documents</span>
+              {typeof documentsCount === "number" && (
+                <Badge
+                  variant="secondary"
+                  className="ml-1 text-[11px] px-1.5 py-0 bg-slate-200 text-slate-700 font-semibold"
+                >
+                  {documentsCount}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="projects" className="mt-0 focus-visible:outline-none">
+          <ProjectsTable
+            customerId={id}
+            customerFirstName={customerData?.firstName}
+          />
+        </TabsContent>
+
+        <TabsContent value="documents" className="mt-0 focus-visible:outline-none">
+          <CustomerDocumentsTab
+            customerId={customerMongoId}
+            customerName={customerName}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
