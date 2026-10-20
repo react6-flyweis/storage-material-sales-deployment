@@ -95,6 +95,46 @@ type InvoiceCustomerReference = {
   email?: string | null;
 };
 
+export type InvoiceAddress = {
+  companyName?: string;
+  line1?: string;
+  line2?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+  lines?: string[];
+};
+
+export type InvoiceBankDetails = {
+  bankName?: string;
+  accountName?: string;
+  accountNumber?: string;
+  routingNumber?: string;
+  swiftCode?: string;
+  iban?: string;
+  branchAddress?: string;
+  paymentInstructions?: string;
+};
+
+export type InvoiceBillingDefaults = {
+  billingAddress?: InvoiceAddress;
+  recipientAddress?: InvoiceAddress;
+  bankDetails?: InvoiceBankDetails;
+};
+
+export type InvoiceBillingDefaultsResponse = {
+  success: boolean;
+  message?: string;
+  data: InvoiceBillingDefaults;
+};
+
+export type UpdateInvoiceBillingPayload = {
+  billingAddress?: InvoiceAddress;
+  recipientAddress?: InvoiceAddress;
+  bankDetails?: InvoiceBankDetails;
+};
+
 export type InvoiceDocument = {
   _id: string;
   leadId?: string | null;
@@ -123,6 +163,9 @@ export type InvoiceDocument = {
   lineItems?: InvoiceLineItem[] | null;
   createdBy?: InvoiceReferencePerson | string | null;
   paidBy?: InvoiceReferencePerson | string | null;
+  billingAddress?: InvoiceAddress | null;
+  recipientAddress?: InvoiceAddress | null;
+  bankDetails?: InvoiceBankDetails | null;
   sentAt?: string | null;
   sendMethod?: "platform" | "manual" | null;
   sentTo?: string | null;
@@ -264,6 +307,9 @@ export type CreateInvoiceDraftPayload = {
   totalAmount: number;
   paymentScheduleId?: string;
   paymentScheduleStageId?: string;
+  billingAddress?: InvoiceAddress;
+  recipientAddress?: InvoiceAddress;
+  bankDetails?: InvoiceBankDetails;
 };
 
 export type CreateInvoiceDraftResponse = {
@@ -281,6 +327,55 @@ export type CreateInvoiceDraftResponse = {
   };
 };
 
+export async function getInvoiceBillingDefaultsProvider(
+  leadId?: string,
+): Promise<InvoiceBillingDefaults> {
+  try {
+    const response = await apiClient.get<InvoiceBillingDefaultsResponse>(
+      "/api/common/invoices/billing-defaults",
+      {
+        params: leadId ? { leadId } : undefined,
+      },
+    );
+    return response.data.data;
+  } catch (err: unknown) {
+    const axiosError = err as { response?: { status?: number } };
+    if (axiosError?.response?.status === 404) {
+      const fallbackResponse = await apiClient.get<InvoiceBillingDefaultsResponse>(
+        "/api/invoices/billing-defaults",
+        {
+          params: leadId ? { leadId } : undefined,
+        },
+      );
+      return fallbackResponse.data.data;
+    }
+    throw err;
+  }
+}
+
+export async function updateInvoiceBillingProvider(
+  invoiceId: string,
+  payload: UpdateInvoiceBillingPayload,
+) {
+  try {
+    const response = await apiClient.put<CreateInvoiceDraftResponse>(
+      `/api/common/invoices/${invoiceId}`,
+      payload,
+    );
+    return response.data;
+  } catch (err: unknown) {
+    const axiosError = err as { response?: { status?: number } };
+    if (axiosError?.response?.status === 404) {
+      const fallbackResponse = await apiClient.put<CreateInvoiceDraftResponse>(
+        `/api/invoices/${invoiceId}`,
+        payload,
+      );
+      return fallbackResponse.data;
+    }
+    throw err;
+  }
+}
+
 export async function getInvoiceStatsProvider(params?: {
   leadId?: string;
 }): Promise<InvoiceStats> {
@@ -293,53 +388,99 @@ export async function getInvoiceStatsProvider(params?: {
 }
 
 export async function getInvoicesProvider(params: InvoiceListParams = {}) {
-  const response = await apiClient.get<InvoicesListResponse>("/api/invoices", {
-    params: {
-      page: params.page ?? 1,
-      limit: Math.min(params.limit ?? 20, 100),
-      ...(params.startDate ? { startDate: params.startDate } : {}),
-      ...(params.endDate ? { endDate: params.endDate } : {}),
-      ...(params.status ? { status: params.status } : {}),
-      ...(params.pending !== undefined ? { pending: params.pending } : {}),
-      ...(params.approvalStatus ? { approvalStatus: params.approvalStatus } : {}),
-      ...(params.leadId ? { leadId: params.leadId } : {}),
-      ...(params.search ? { search: params.search } : {}),
-    },
-  });
+  const queryParams = {
+    page: params.page ?? 1,
+    limit: Math.min(params.limit ?? 20, 100),
+    ...(params.startDate ? { startDate: params.startDate } : {}),
+    ...(params.endDate ? { endDate: params.endDate } : {}),
+    ...(params.status ? { status: params.status } : {}),
+    ...(params.pending !== undefined ? { pending: params.pending } : {}),
+    ...(params.approvalStatus ? { approvalStatus: params.approvalStatus } : {}),
+    ...(params.leadId ? { leadId: params.leadId } : {}),
+    ...(params.search ? { search: params.search } : {}),
+  };
 
-  return response.data;
+  try {
+    const response = await apiClient.get<InvoicesListResponse>(
+      "/api/common/invoices",
+      { params: queryParams },
+    );
+    return response.data;
+  } catch (err: unknown) {
+    const axiosError = err as { response?: { status?: number } };
+    if (axiosError?.response?.status === 404) {
+      const fallbackResponse = await apiClient.get<InvoicesListResponse>(
+        "/api/invoices",
+        { params: queryParams },
+      );
+      return fallbackResponse.data;
+    }
+    throw err;
+  }
 }
 
 export async function getInvoiceDetailProvider(invoiceId: string) {
-  const response = await apiClient.get<InvoiceDetailResponse>(
-    `/api/invoices/${invoiceId}`,
-  );
-
-  return response.data;
+  try {
+    const response = await apiClient.get<InvoiceDetailResponse>(
+      `/api/common/invoices/${invoiceId}`,
+    );
+    return response.data;
+  } catch (err: unknown) {
+    const axiosError = err as { response?: { status?: number } };
+    if (axiosError?.response?.status === 404) {
+      const fallbackResponse = await apiClient.get<InvoiceDetailResponse>(
+        `/api/invoices/${invoiceId}`,
+      );
+      return fallbackResponse.data;
+    }
+    throw err;
+  }
 }
 
 export async function createInvoiceDraftProvider(
   leadId: string,
   payload: CreateInvoiceDraftPayload,
 ) {
-  const response = await apiClient.post<CreateInvoiceDraftResponse>(
-    `/api/leads/${leadId}/invoices`,
-    payload,
-  );
-
-  return response.data;
+  try {
+    const response = await apiClient.post<CreateInvoiceDraftResponse>(
+      `/api/common/leads/${leadId}/invoices`,
+      payload,
+    );
+    return response.data;
+  } catch (err: unknown) {
+    const axiosError = err as { response?: { status?: number } };
+    if (axiosError?.response?.status === 404) {
+      const fallbackResponse = await apiClient.post<CreateInvoiceDraftResponse>(
+        `/api/leads/${leadId}/invoices`,
+        payload,
+      );
+      return fallbackResponse.data;
+    }
+    throw err;
+  }
 }
 
 export async function editInvoiceDraftProvider(
   invoiceId: string,
   payload: CreateInvoiceDraftPayload,
 ) {
-  const response = await apiClient.put<CreateInvoiceDraftResponse>(
-    `/api/invoices/${invoiceId}`,
-    payload,
-  );
-
-  return response.data;
+  try {
+    const response = await apiClient.put<CreateInvoiceDraftResponse>(
+      `/api/common/invoices/${invoiceId}`,
+      payload,
+    );
+    return response.data;
+  } catch (err: unknown) {
+    const axiosError = err as { response?: { status?: number } };
+    if (axiosError?.response?.status === 404) {
+      const fallbackResponse = await apiClient.put<CreateInvoiceDraftResponse>(
+        `/api/invoices/${invoiceId}`,
+        payload,
+      );
+      return fallbackResponse.data;
+    }
+    throw err;
+  }
 }
 
 export type SendInvoicePayload = {
