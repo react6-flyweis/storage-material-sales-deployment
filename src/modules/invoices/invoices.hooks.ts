@@ -5,6 +5,7 @@ import {
 } from "@tanstack/react-query";
 import {
   createInvoiceDraftProvider,
+  getInvoiceBillingDefaultsProvider,
   getInvoiceDetailProvider,
   getInvoiceStatsProvider,
   getInvoicesProvider,
@@ -12,11 +13,20 @@ import {
   markInvoiceSentProvider,
   markInvoicePaidProvider,
   submitInvoiceForApprovalProvider,
+  updateInvoiceBillingProvider,
   type CreateInvoiceDraftPayload,
   type InvoiceListParams,
   type SendInvoicePayload,
   type MarkInvoiceSentPayload,
+  type UpdateInvoiceBillingPayload,
 } from "./invoices.api";
+
+export function useInvoiceBillingDefaultsQuery(leadId?: string) {
+  return useQuery({
+    queryKey: ["invoices", "billing-defaults", leadId],
+    queryFn: () => getInvoiceBillingDefaultsProvider(leadId),
+  });
+}
 
 export function useInvoiceStatsQuery(params?: { leadId?: string }) {
   return useQuery({
@@ -122,6 +132,26 @@ export function useEditInvoiceMutation() {
   });
 }
 
+export function useUpdateInvoiceBillingMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      invoiceId,
+      payload,
+    }: {
+      invoiceId: string;
+      payload: UpdateInvoiceBillingPayload;
+    }) => updateInvoiceBillingProvider(invoiceId, payload),
+    onSuccess: (response) => {
+      if (!response.success) return;
+
+      void queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      void queryClient.invalidateQueries({ queryKey: ["invoices", "detail"] });
+    },
+  });
+}
+
 export function useSubmitInvoiceForApprovalMutation() {
   const queryClient = useQueryClient();
 
@@ -143,7 +173,11 @@ export function useSubmitInvoiceForApprovalMutation() {
   });
 }
 
-export { type SendInvoicePayload, type MarkInvoiceSentPayload };
+export {
+  type SendInvoicePayload,
+  type MarkInvoiceSentPayload,
+  type UpdateInvoiceBillingPayload,
+};
 
 export function useSendInvoiceMutation() {
   const queryClient = useQueryClient();
