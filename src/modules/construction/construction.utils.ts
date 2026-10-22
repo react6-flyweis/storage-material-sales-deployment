@@ -10,10 +10,15 @@ export type AnyConstructionTask = {
   estDate?: string | null;
   dueDate?: string | null;
   completedDate?: string | null;
+  completedAt?: string | null;
+  onTimeStatus?: "in_progress" | "on_time" | "delayed" | "overdue" | string | null;
+  onTime?: boolean | null;
+  daysLateOrEarly?: number;
   priority?: string | null;
-  assignedTo?: { _id?: string; name?: string; email?: string } | null;
-  createdBy?: { _id?: string; name?: string; email?: string } | null;
+  assignedTo?: { _id?: string; name?: string; email?: string } | string | null;
+  createdBy?: { _id?: string; name?: string; email?: string } | string | null;
   description?: string | null;
+  attachments?: string[];
   details?: {
     description?: string;
     team?: string;
