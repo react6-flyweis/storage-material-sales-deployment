@@ -81,7 +81,7 @@ export default function BasicDetails({
   lead,
   leadId,
   constructionTasks,
-  showConstructionTasks = false,
+  showConstructionTasks = true,
 }: BasicDetailsProps) {
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);

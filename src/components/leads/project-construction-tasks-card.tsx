@@ -1,35 +1,23 @@
 import { useState, useMemo } from "react";
 import axios from "axios";
-import {
-  Eye,
-  Calendar,
-  Users,
-  User,
-  FileText,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-  Loader2,
-} from "lucide-react";
+import { Eye, Clock, AlertCircle, ImageIcon, ExternalLink } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
-  DialogClose,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
   useProjectConstructionTasksQuery,
   useConstructionTaskDetailQuery,
 } from "@/modules/construction/construction.hooks";
+import { useLeadMediaQuery } from "@/modules/leads/leads.hooks";
 import {
   type AnyConstructionTask,
   formatConstructionDate,
   getTimelineToneClass,
   getTimelineLabel,
-  getPriorityBadgeClass,
 } from "@/modules/construction/construction.utils";
 
 export type ConstructionTask = AnyConstructionTask;
@@ -41,6 +29,78 @@ type ProjectConstructionTasksCardProps = {
   maxHeightClass?: string;
 };
 
+function getModalStatusDisplay(task?: ConstructionTask | null) {
+  if (!task) return { text: "—", className: "text-slate-700" };
+
+  const days = task.daysLateOrEarly;
+  const onTime = task.onTimeStatus?.toLowerCase().trim();
+  const statusStr =
+    typeof task.status === "string" ? task.status.toLowerCase().trim() : "";
+
+  // 1. If days late > 0
+  if (days !== undefined && days !== null && days > 0) {
+    return {
+      text: `${days} Day${days > 1 ? "s" : ""} Delayed`,
+      className: "text-red-600 font-semibold",
+    };
+  }
+
+  // 2. Delayed or overdue
+  if (onTime === "delayed" || onTime === "overdue" || statusStr === "overdue") {
+    return {
+      text: "Delayed",
+      className: "text-red-600 font-semibold",
+    };
+  }
+
+  // 3. Completed
+  if (
+    statusStr === "done" ||
+    statusStr === "completed" ||
+    Boolean(task.completedDate)
+  ) {
+    return {
+      text: "Completed",
+      className: "text-green-600 font-semibold",
+    };
+  }
+
+  // 4. On time
+  if (onTime === "on_time") {
+    return {
+      text: "On Time",
+      className: "text-green-600 font-semibold",
+    };
+  }
+
+  // 5. Timeline badge label
+  if (task.timelineBadge?.label) {
+    const tone = task.timelineBadge.tone?.toLowerCase().trim();
+    const colorClass =
+      tone === "danger"
+        ? "text-red-600 font-semibold"
+        : tone === "success"
+          ? "text-green-600 font-semibold"
+          : "text-[#1D51A4] font-semibold";
+    return {
+      text: task.timelineBadge.label,
+      className: colorClass,
+    };
+  }
+
+  if (statusStr === "in_progress") {
+    return {
+      text: "In Progress",
+      className: "text-[#1D51A4] font-semibold",
+    };
+  }
+
+  return {
+    text: getTimelineLabel(task),
+    className: "text-[#1D51A4] font-semibold",
+  };
+}
+
 export default function ProjectConstructionTasksCard({
   leadId,
   tasks: propTasks,
@@ -48,30 +108,43 @@ export default function ProjectConstructionTasksCard({
   maxHeightClass = "max-h-[540px]",
 }: ProjectConstructionTasksCardProps) {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const [selectedTaskFallback, setSelectedTaskFallback] = useState<ConstructionTask | null>(null);
+  const [selectedTaskFallback, setSelectedTaskFallback] =
+    useState<ConstructionTask | null>(null);
+  const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
 
   // Load from backend when leadId is provided and no static tasks passed
   const shouldFetch = Boolean(leadId) && !propTasks;
-  const { data: queryResponse, isLoading, isError, error } = useProjectConstructionTasksQuery(
-    leadId,
-    undefined,
-    shouldFetch
+  const {
+    data: queryResponse,
+    isLoading,
+    isError,
+    error,
+  } = useProjectConstructionTasksQuery(leadId, undefined, shouldFetch);
+
+  const { data: taskDetailResponse } = useConstructionTaskDetailQuery(
+    selectedTaskId ?? undefined,
+    Boolean(selectedTaskId),
   );
 
-  const { data: taskDetailResponse, isLoading: isLoadingDetail } = useConstructionTaskDetailQuery(
-    selectedTaskId ?? undefined,
-    Boolean(selectedTaskId)
-  );
+  // Load project media as fallback photos for task detail modal
+  const { data: mediaResponse } = useLeadMediaQuery(leadId || "");
+  const projectPhotos = useMemo(() => {
+    return (mediaResponse?.data?.photos ?? [])
+      .map((p) => p.url)
+      .filter(Boolean);
+  }, [mediaResponse]);
 
   const rawTasks: ConstructionTask[] = useMemo(() => {
     if (propTasks) return propTasks;
-    if (queryResponse?.data?.constructionTasks) {
-      return queryResponse.data.constructionTasks;
-    }
+    const data = queryResponse?.data;
+    if (!data) return [];
+    if (Array.isArray(data.timelineTasks)) return data.timelineTasks;
+    if (Array.isArray(data.constructionTasks)) return data.constructionTasks;
+    if (Array.isArray(data.tasks)) return data.tasks;
     return [];
   }, [propTasks, queryResponse]);
 
-  // Client sort by startDate ascending (as per spec)
+  // Client sort by startDate ascending
   const sortedTasks = useMemo(() => {
     return [...rawTasks].sort((a, b) => {
       const timeA = a.startDate ? new Date(a.startDate).getTime() : 0;
@@ -79,8 +152,6 @@ export default function ProjectConstructionTasksCard({
       return timeA - timeB;
     });
   }, [rawTasks]);
-
-  const stats = queryResponse?.data?.stats;
 
   const handleOpenTask = (task: ConstructionTask) => {
     const taskId = task._id || task.id;
@@ -98,6 +169,18 @@ export default function ProjectConstructionTasksCard({
   const activeTask: ConstructionTask | null | undefined =
     taskDetailResponse?.data?.task ?? selectedTaskFallback;
 
+  const statusDisplay = getModalStatusDisplay(activeTask);
+
+  const displayPhotos: string[] = useMemo(() => {
+    const taskAttachments = (activeTask?.attachments ?? []).filter(
+      (item): item is string => typeof item === "string" && Boolean(item),
+    );
+    if (taskAttachments.length > 0) {
+      return taskAttachments;
+    }
+    return projectPhotos;
+  }, [activeTask, projectPhotos]);
+
   // 1. Loading state
   if (shouldFetch && isLoading) {
     return <ProjectConstructionTasksSkeleton className={className} />;
@@ -110,10 +193,12 @@ export default function ProjectConstructionTasksCard({
 
     if (status === 404) {
       return (
-        <div className={`rounded-2xl border border-slate-200/90 bg-white p-5 md:p-6 shadow-xs ${className}`}>
+        <div
+          className={`rounded-2xl border border-slate-200/90 bg-white p-5 md:p-6 shadow-xs ${className}`}
+        >
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-[17px] font-bold text-[#0B192C] tracking-tight">
-              Project Construction Task
+              Project Construction Tasks
             </h2>
           </div>
           <div className="flex items-center gap-3 p-4 rounded-xl bg-slate-50 border border-slate-200/70 text-slate-600">
@@ -128,10 +213,12 @@ export default function ProjectConstructionTasksCard({
 
     if (status === 403) {
       return (
-        <div className={`rounded-2xl border border-amber-200/90 bg-amber-50/30 p-5 md:p-6 shadow-xs ${className}`}>
+        <div
+          className={`rounded-2xl border border-amber-200/90 bg-amber-50/30 p-5 md:p-6 shadow-xs ${className}`}
+        >
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-[17px] font-bold text-[#0B192C] tracking-tight">
-              Project Construction Task
+              Project Construction Tasks
             </h2>
           </div>
           <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800">
@@ -145,10 +232,12 @@ export default function ProjectConstructionTasksCard({
     }
 
     return (
-      <div className={`rounded-2xl border border-slate-200/90 bg-white p-5 md:p-6 shadow-xs ${className}`}>
+      <div
+        className={`rounded-2xl border border-slate-200/90 bg-white p-5 md:p-6 shadow-xs ${className}`}
+      >
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-[17px] font-bold text-[#0B192C] tracking-tight">
-            Project Construction Task
+            Project Construction Tasks
           </h2>
         </div>
         <div className="flex items-center gap-3 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700">
@@ -164,14 +253,22 @@ export default function ProjectConstructionTasksCard({
   // 3. Empty state
   if (sortedTasks.length === 0) {
     return (
-      <div className={`rounded-2xl border border-slate-200/90 bg-white p-5 md:p-6 shadow-xs ${className}`}>
+      <div
+        className={`rounded-2xl border border-slate-200/90 bg-white p-5 md:p-6 shadow-xs ${className}`}
+      >
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-[17px] font-bold text-[#0B192C] tracking-tight">
-            Project Construction Task
+            Project Construction Tasks
           </h2>
         </div>
-        <div className="text-center py-8 text-slate-400 text-sm">
-          No construction tasks found for this project.
+        <div className="text-center py-8 text-slate-500 text-sm space-y-1">
+          <p className="font-medium text-slate-700">
+            No construction tasks scheduled yet
+          </p>
+          <p className="text-xs text-slate-400">
+            Tasks will appear here once created and scheduled by the
+            construction team.
+          </p>
         </div>
       </div>
     );
@@ -183,50 +280,31 @@ export default function ProjectConstructionTasksCard({
         className={`rounded-2xl border border-slate-200/90 bg-white p-5 md:p-6 shadow-xs ${className}`}
       >
         <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-          <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-[17px] font-bold text-[#0B192C] tracking-tight">
-              Project Construction Task
-            </h2>
-            {stats && (
-              <div className="hidden sm:flex items-center gap-2 text-xs">
-                <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-medium">
-                  Total: {stats.total}
-                </span>
-                {stats.inProgress > 0 && (
-                  <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium border border-blue-100">
-                    In Progress: {stats.inProgress}
-                  </span>
-                )}
-                {stats.done > 0 && (
-                  <span className="px-2.5 py-0.5 rounded-full bg-green-50 text-green-700 font-medium border border-green-100">
-                    Done: {stats.done}
-                  </span>
-                )}
-                {stats.overdue > 0 && (
-                  <span className="px-2.5 py-0.5 rounded-full bg-red-50 text-red-700 font-medium border border-red-100">
-                    Overdue: {stats.overdue}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
+          <h2 className="text-[17px] font-bold text-[#0B192C] tracking-tight">
+            Project Construction Tasks
+          </h2>
 
           <span className="text-xs text-slate-500 font-medium bg-slate-100 px-2.5 py-0.5 rounded-full">
             {sortedTasks.length} {sortedTasks.length === 1 ? "task" : "tasks"}
           </span>
         </div>
 
-        <div className={`overflow-y-auto thin-scrollbar pr-1.5 -mr-1.5 ${maxHeightClass}`}>
+        <div
+          className={`overflow-y-auto thin-scrollbar pr-1.5 -mr-1.5 ${maxHeightClass}`}
+        >
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {sortedTasks.map((task) => {
               const taskId = task._id || task.id || task.title;
               const toneClass = getTimelineToneClass(
                 task.timelineBadge?.tone,
-                task.status
+                task.status,
               );
               const statusLabel = getTimelineLabel(task);
               const estDateVal =
-                task.estimatedEndDate || task.estEndDate || task.dueDate || task.estDate;
+                task.estimatedEndDate ||
+                task.estEndDate ||
+                task.dueDate ||
+                task.estDate;
 
               return (
                 <div
@@ -291,176 +369,166 @@ export default function ProjectConstructionTasksCard({
         </div>
       </div>
 
-      {/* Task Details Dialog */}
+      {/* Task Details Dialog (Exact UI as per user design) */}
       <Dialog
         open={Boolean(selectedTaskId || selectedTaskFallback)}
         onOpenChange={(isOpen) => {
           if (!isOpen) handleCloseModal();
         }}
       >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <div className="flex items-start justify-between gap-3 pr-6">
-              <div>
-                <DialogTitle className="text-lg font-bold text-slate-900">
-                  {activeTask?.title}
-                </DialogTitle>
-                <DialogDescription className="text-xs text-slate-500 mt-1">
-                  Construction task milestone details and current status
-                </DialogDescription>
-              </div>
-              {isLoadingDetail && (
-                <Loader2 className="h-4 w-4 text-slate-400 animate-spin shrink-0 mt-1" />
-              )}
-            </div>
+        <DialogContent className="sm:max-w-2xl p-5 md:p-6 rounded-2xl bg-white shadow-xl space-y-4">
+          <DialogHeader className="p-0 space-y-0">
+            <DialogTitle className="text-xl md:text-[22px] font-bold text-[#0B192C] tracking-tight">
+              {activeTask?.title}
+            </DialogTitle>
           </DialogHeader>
 
           {activeTask && (
-            <div className="space-y-4 pt-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs text-slate-500">Status:</span>
-                <span
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[6px] text-xs font-semibold text-white ${getTimelineToneClass(
-                    activeTask.timelineBadge?.tone,
-                    activeTask.status
-                  )}`}
-                >
-                  <span className="h-1.5 w-1.5 rounded-full bg-white shrink-0" />
-                  {getTimelineLabel(activeTask)}
-                </span>
-
-                {activeTask.priority && (
-                  <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded-[6px] text-xs font-medium border capitalize ${getPriorityBadgeClass(
-                      activeTask.priority
-                    )}`}
-                  >
-                    Priority: {activeTask.priority}
-                  </span>
-                )}
-              </div>
-
-              {activeTask.details?.progressPercentage !== undefined && (
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-500 font-medium">Progress</span>
-                    <span className="text-slate-800 font-semibold">
-                      {activeTask.details.progressPercentage}%
-                    </span>
-                  </div>
-                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-300 ${
-                        activeTask.details.progressPercentage === 100
-                          ? "bg-green-600"
-                          : getTimelineToneClass(
-                              activeTask.timelineBadge?.tone,
-                              activeTask.status
-                            )
-                      }`}
-                      style={{ width: `${activeTask.details.progressPercentage}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="bg-slate-50 rounded-xl p-3.5 space-y-2 text-xs border border-slate-100">
-                <div className="flex items-center gap-2 text-slate-700">
-                  <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                  <span className="text-slate-500">Start Date:</span>
-                  <span className="font-semibold text-slate-800">
+            <div className="space-y-4 pt-0.5">
+              {/* Top 4-Column Metric Box */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-[#EEF4FB] rounded-xl p-3 md:p-3.5">
+                {/* 1. Start Date */}
+                <div className="md:border-r border-slate-200/90 md:pr-3 space-y-0.5">
+                  <p className="text-xs text-slate-500 font-normal">
+                    Start Date
+                  </p>
+                  <p className="text-xs md:text-sm font-semibold text-[#1D51A4]">
                     {formatConstructionDate(activeTask.startDate)}
-                  </span>
+                  </p>
                 </div>
-                {(activeTask.estimatedEndDate ||
-                  activeTask.estEndDate ||
-                  activeTask.dueDate ||
-                  activeTask.estDate) && (
-                  <div className="flex items-center gap-2 text-slate-700">
-                    <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                    <span className="text-slate-500">Estimated End:</span>
-                    <span className="font-semibold text-slate-800">
-                      {formatConstructionDate(
-                        activeTask.estimatedEndDate ||
-                          activeTask.estEndDate ||
-                          activeTask.dueDate ||
-                          activeTask.estDate
-                      )}
-                    </span>
-                  </div>
-                )}
-                {activeTask.completedDate && (
-                  <div className="flex items-center gap-2 text-slate-700">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0" />
-                    <span className="text-slate-500">Completed On:</span>
-                    <span className="font-semibold text-slate-800">
-                      {formatConstructionDate(activeTask.completedDate)}
-                    </span>
-                  </div>
-                )}
+
+                {/* 2. Est Date */}
+                <div className="md:border-r border-slate-200/90 md:px-3 space-y-0.5">
+                  <p className="text-xs text-slate-500 font-normal">Est Date</p>
+                  <p className="text-xs md:text-sm font-semibold text-[#1D51A4]">
+                    {formatConstructionDate(
+                      activeTask.estimatedEndDate ||
+                        activeTask.estEndDate ||
+                        activeTask.dueDate ||
+                        activeTask.estDate,
+                    )}
+                  </p>
+                </div>
+
+                {/* 3. Completed Date */}
+                <div className="md:border-r border-slate-200/90 md:px-3 space-y-0.5">
+                  <p className="text-xs text-slate-500 font-normal">
+                    Completed Date
+                  </p>
+                  <p className="text-xs md:text-sm font-semibold text-[#1D51A4]">
+                    {activeTask.completedDate
+                      ? formatConstructionDate(activeTask.completedDate)
+                      : "-"}
+                  </p>
+                </div>
+
+                {/* 4. Status */}
+                <div className="md:pl-3 space-y-0.5">
+                  <p className="text-xs text-slate-500 font-normal">Status</p>
+                  <p
+                    className={`text-xs md:text-sm ${statusDisplay.className}`}
+                  >
+                    {statusDisplay.text}
+                  </p>
+                </div>
               </div>
 
-              {(activeTask.assignedTo || activeTask.details?.team) && (
-                <div className="flex items-start gap-2 text-xs">
-                  <Users className="h-4 w-4 text-slate-400 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="text-slate-500">Assigned To: </span>
-                    <span className="font-medium text-slate-800">
-                      {activeTask.assignedTo?.name ||
-                        activeTask.assignedTo?.email ||
-                        activeTask.details?.team}
-                    </span>
-                  </div>
-                </div>
-              )}
+              {/* Work Description Box */}
+              <div className="rounded-xl border border-slate-200/90 bg-white p-3.5 md:p-4 min-h-[90px] md:min-h-[100px]">
+                <p className="text-xs md:text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">
+                  {activeTask.description ||
+                    activeTask.details?.description ||
+                    "Work Description"}
+                </p>
+              </div>
 
-              {activeTask.createdBy && (
-                <div className="flex items-start gap-2 text-xs">
-                  <User className="h-4 w-4 text-slate-400 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="text-slate-500">Created By: </span>
-                    <span className="font-medium text-slate-800">
-                      {activeTask.createdBy.name || activeTask.createdBy.email}
-                    </span>
-                  </div>
-                </div>
-              )}
+              {/* Photos Section */}
+              <div className="space-y-2 pt-0.5">
+                <h4 className="text-sm font-semibold text-slate-900">Photos</h4>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {displayPhotos.slice(0, 4).map((photoUrl, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setPreviewPhotoUrl(photoUrl)}
+                      className="block h-16 w-24 md:h-18 md:w-28 rounded-lg overflow-hidden border border-slate-200 shadow-2xs hover:opacity-90 transition-opacity cursor-pointer shrink-0"
+                      title="Click to preview image"
+                    >
+                      <img
+                        src={photoUrl}
+                        alt={`Photo ${idx + 1}`}
+                        className="h-full w-full object-cover"
+                      />
+                    </button>
+                  ))}
 
-              {(activeTask.description || activeTask.details?.description) && (
-                <div className="flex items-start gap-2 text-xs">
-                  <FileText className="h-4 w-4 text-slate-400 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="text-slate-500 block mb-0.5">Description:</span>
-                    <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">
-                      {activeTask.description || activeTask.details?.description}
-                    </p>
-                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 px-3 rounded-lg border border-[#1D51A4] text-[#1D51A4] hover:bg-blue-50 font-medium text-xs md:text-sm flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    onClick={() => {
+                      if (displayPhotos.length > 0) {
+                        setPreviewPhotoUrl(displayPhotos[0]);
+                      }
+                    }}
+                  >
+                    <ImageIcon className="h-3.5 w-3.5 text-[#1D51A4]" />
+                    View All Media
+                  </Button>
                 </div>
-              )}
-
-              {activeTask.details?.notes && (
-                <div className="bg-amber-50/60 border border-amber-200/60 rounded-lg p-3 text-xs text-amber-900">
-                  <span className="font-semibold block mb-0.5">Site Notes:</span>
-                  <p className="leading-relaxed">{activeTask.details.notes}</p>
-                </div>
-              )}
+              </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
 
-          <div className="flex justify-end pt-2">
-            <DialogClose asChild>
-              <Button type="button" variant="outline" size="sm">
-                Close
-              </Button>
-            </DialogClose>
-          </div>
+      {/* Image Preview Lightbox */}
+      <Dialog
+        open={Boolean(previewPhotoUrl)}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setPreviewPhotoUrl(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl p-4 bg-white rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold text-slate-800">
+              Photo Preview
+            </DialogTitle>
+          </DialogHeader>
+          {previewPhotoUrl && (
+            <div className="space-y-3 pt-2">
+              <div className="rounded-xl overflow-hidden border border-slate-200 max-h-[70vh] flex items-center justify-center bg-slate-950">
+                <img
+                  src={previewPhotoUrl}
+                  alt="Construction photo"
+                  className="max-h-[68vh] w-auto object-contain"
+                />
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-xs"
+                  onClick={() => window.open(previewPhotoUrl, "_blank")}
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Open in New Tab
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </>
   );
 }
 
-function ProjectConstructionTasksSkeleton({ className = "" }: { className?: string }) {
+function ProjectConstructionTasksSkeleton({
+  className = "",
+}: {
+  className?: string;
+}) {
   return (
     <div
       className={`rounded-2xl border border-slate-200/90 bg-white p-5 md:p-6 shadow-xs ${className}`}
