@@ -9,6 +9,7 @@ import {
 import { useNavigate, useLocation, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/lib/api-error";
+import { formatInstallAddress } from "@/lib/address";
 import {
   ArrowLeft,
   FileSpreadsheet,
@@ -368,7 +369,8 @@ export default function StorageQuotePage() {
 
     if (name) setCustomerLeadName(name);
     if (customer?.email) setCustomerEmail(customer.email);
-    if (lead?.location) setCustomerAddress(lead.location);
+    const resolvedAddress = formatInstallAddress(lead?.installAddress, lead?.location);
+    if (resolvedAddress && resolvedAddress !== "—") setCustomerAddress(resolvedAddress);
     if (lead?.jobId) setJobNumber(lead.jobId);
     if (bSize) setBuildingSize(bSize);
     if (sqft > 0) setSquareFootage(sqft);
