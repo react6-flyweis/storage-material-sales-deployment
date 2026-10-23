@@ -23,6 +23,9 @@ export interface TeamMessage {
   readBy?: string[];
   isReadByCustomer?: boolean;
   isReadByStaff?: boolean;
+  mirroredFrom?: string;
+  leadId?: string;
+  channel?: string;
   createdAt: string;
   updatedAt?: string;
   isOptimistic?: boolean;
