@@ -227,6 +227,9 @@ export const CommunicationView: React.FC = () => {
           updatedAt: m.updatedAt,
           isReadByCustomer: m.isReadByCustomer,
           isReadByStaff: m.isReadByStaff,
+          mirroredFrom: m.mirroredFrom,
+          leadId: m.leadId,
+          channel: m.channel,
         };
       });
     }
@@ -387,6 +390,9 @@ export const CommunicationView: React.FC = () => {
           createdAt: msg.createdAt,
           isReadByCustomer: msg.isReadByCustomer,
           isReadByStaff: msg.isReadByStaff,
+          mirroredFrom: msg.mirroredFrom,
+          leadId: msg.leadId,
+          channel: msg.channel,
         };
 
         setLiveMessages((prev) => {
@@ -403,6 +409,43 @@ export const CommunicationView: React.FC = () => {
       queryClient.invalidateQueries({
         queryKey: customerDirectChatQueryKeys.all,
       });
+    };
+
+    // 2b. customer_direct_chat_updated
+    const handleCustomerDirectChatUpdated = (data: { customerId?: string }) => {
+      console.log("[CommunicationView] customer_direct_chat_updated:", data);
+      queryClient.invalidateQueries({
+        queryKey: customerDirectChatQueryKeys.all,
+      });
+      if (
+        activeChat?.type === "customer" &&
+        data?.customerId &&
+        activeChat.id === data.customerId
+      ) {
+        queryClient.invalidateQueries({
+          queryKey: customerDirectChatQueryKeys.messages(activeChat.id),
+        });
+      }
+    };
+
+    // 2c. new_customer_message (mirrored project message)
+    const handleNewCustomerMsg = (data: {
+      leadId?: string;
+      message?: CustomerDirectMessage;
+    }) => {
+      console.log("[CommunicationView] new_customer_message:", data);
+      queryClient.invalidateQueries({
+        queryKey: customerDirectChatQueryKeys.all,
+      });
+      if (
+        activeChat?.type === "customer" &&
+        data?.message?.customerId &&
+        activeChat.id === data.message.customerId
+      ) {
+        queryClient.invalidateQueries({
+          queryKey: customerDirectChatQueryKeys.messages(activeChat.id),
+        });
+      }
     };
 
     // 3. team_typing
@@ -450,6 +493,8 @@ export const CommunicationView: React.FC = () => {
 
     socket.on("new_team_message", handleNewMessage);
     socket.on("customer_direct_message", handleCustomerDirectMessage);
+    socket.on("customer_direct_chat_updated", handleCustomerDirectChatUpdated);
+    socket.on("new_customer_message", handleNewCustomerMsg);
     socket.on("team_typing", handleTyping);
     socket.on("team_messages_read", handleMessagesRead);
     socket.on("team_chat_error", handleChatError);
@@ -457,6 +502,8 @@ export const CommunicationView: React.FC = () => {
     return () => {
       socket.off("new_team_message", handleNewMessage);
       socket.off("customer_direct_message", handleCustomerDirectMessage);
+      socket.off("customer_direct_chat_updated", handleCustomerDirectChatUpdated);
+      socket.off("new_customer_message", handleNewCustomerMsg);
       socket.off("team_typing", handleTyping);
       socket.off("team_messages_read", handleMessagesRead);
       socket.off("team_chat_error", handleChatError);
