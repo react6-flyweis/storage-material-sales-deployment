@@ -1,21 +1,12 @@
 import { useMemo, useRef, useEffect, useState } from "react";
 import dayjs from "dayjs";
-import {
-  ChevronLeft,
-  ChevronRight,
-  ArrowRight,
-  PackageX,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowRight, PackageX } from "lucide-react";
 import { useNavigate } from "react-router";
 import DeliveryDetailsModal from "./delivery-details-modal";
 import ProjectSelector from "./project-selector";
-import {
-  useCalendarDeliveries,
-  useCalendarProjectDeliveries,
-} from "@/modules/calendar/calendar.hooks";
+import { useCalendarDeliveries } from "@/modules/calendar/calendar.hooks";
 import type {
   CalendarDelivery,
-  ConstructionDelivery,
   CalendarProject,
 } from "@/modules/calendar/calendar.types";
 
@@ -49,45 +40,41 @@ export default function Calendar({
   onProjectChange,
 }: CalendarProps) {
   const navigate = useNavigate();
-  const [selectedProjectId, setSelectedProjectId] = useState<string>(initialProjectId);
+  const [selectedProjectId, setSelectedProjectId] =
+    useState<string>(initialProjectId);
   const [selectedLeadId, setSelectedLeadId] = useState<string>(initialLeadId);
-  const [selectedProjectObj, setSelectedProjectObj] = useState<CalendarProject | null>(null);
+  const [selectedProjectObj, setSelectedProjectObj] =
+    useState<CalendarProject | null>(null);
 
   const [showDetails, setShowDetails] = useState(false);
-  const [selectedDeliveryId, setSelectedDeliveryId] = useState<string | null>(null);
+  const [selectedDeliveryId, setSelectedDeliveryId] = useState<string | null>(
+    null,
+  );
+  const [selectedDeliveryLeadId, setSelectedDeliveryLeadId] = useState<
+    string | null
+  >(null);
   const [currentMonth, setCurrentMonth] = useState(dayjs());
   const [selectedDate, setSelectedDate] = useState(dayjs());
 
   const isProjectSelected = Boolean(selectedProjectId || selectedLeadId);
 
-  // 1. Fetch project-specific deliveries when a project is selected to identify delivery dates
-  const {
-    data: projectDeliveriesRes,
-    isLoading: isLoadingProjectDeliveries,
-    isFetched: isDeliveriesFetched,
-  } = useCalendarProjectDeliveries({
-    projectId: selectedProjectId || undefined,
+  // Fetch calendar data for current month/year filtered by leadId / projectId
+  const { data, isLoading, error, isFetched } = useCalendarDeliveries({
+    month: currentMonth.month() + 1,
+    year: currentMonth.year(),
     leadId: selectedLeadId || undefined,
+    projectId: selectedProjectId || undefined,
   });
 
-  const projectDeliveries: ConstructionDelivery[] = useMemo(() => {
-    return projectDeliveriesRes?.data?.deliveries || [];
-  }, [projectDeliveriesRes]);
+  const calendarData = useMemo(() => data?.data?.calendar || {}, [data]);
 
-  // Extract all valid delivery dates (YYYY-MM-DD) sorted ascending
-  const validDeliveryDates = useMemo(() => {
-    const dates = projectDeliveries
-      .map(
-        (d) =>
-          d.schedule?.deliveryDate ||
-          (d as unknown as { deliveryDate?: string }).deliveryDate
-      )
-      .filter((d): d is string => Boolean(d && dayjs(d).isValid()))
-      .map((d) => dayjs(d).format("YYYY-MM-DD"));
-    return Array.from(new Set(dates)).sort(
-      (a, b) => dayjs(a).valueOf() - dayjs(b).valueOf()
-    );
-  }, [projectDeliveries]);
+  // Extract all valid delivery dates (YYYY-MM-DD) sorted ascending for current view
+  const validDeliveryDates = useMemo<string[]>(() => {
+    return Object.entries(calendarData)
+      .filter(([, deliveries]) => deliveries && deliveries.length > 0)
+      .map(([dateStr]) => dateStr)
+      .sort((a, b) => dayjs(a).valueOf() - dayjs(b).valueOf());
+  }, [calendarData]);
 
   // Target delivery date: prefer the earliest upcoming delivery (today or later);
   // fallback to the most recent delivery if all are in the past
@@ -118,33 +105,22 @@ export default function Calendar({
     }
 
     // A project is selected
-    if (autoJumpedProjectRef.current !== currentKey && isDeliveriesFetched) {
+    if (autoJumpedProjectRef.current !== currentKey && isFetched) {
       autoJumpedProjectRef.current = currentKey;
       if (targetDeliveryDate) {
         const targetDay = dayjs(targetDeliveryDate);
         setTimeout(() => {
-          setCurrentMonth(targetDay.startOf("month"));
           setSelectedDate(targetDay);
         }, 0);
       }
     }
-  }, [selectedProjectId, selectedLeadId, isDeliveriesFetched, targetDeliveryDate]);
+  }, [selectedProjectId, selectedLeadId, isFetched, targetDeliveryDate]);
 
   const hasNoDeliveries =
     isProjectSelected &&
-    isDeliveriesFetched &&
-    !isLoadingProjectDeliveries &&
-    projectDeliveries.length === 0;
-
-  // 2. Fetch calendar data for current month/year
-  const { data, isLoading, error } = useCalendarDeliveries({
-    month: currentMonth.month() + 1,
-    year: currentMonth.year(),
-    leadId: selectedLeadId || undefined,
-    projectId: selectedProjectId || undefined,
-  });
-
-  const calendarData = data?.data?.calendar || {};
+    isFetched &&
+    !isLoading &&
+    validDeliveryDates.length === 0;
 
   const daysInMonth = currentMonth.daysInMonth();
   const firstDayOfMonth = currentMonth.startOf("month").day();
@@ -181,21 +157,8 @@ export default function Calendar({
   }
 
   const selectedDateStr = selectedDate.format("YYYY-MM-DD");
-  const monthDeliveries: CalendarDelivery[] = calendarData[selectedDateStr] || [];
-
-  // Match deliveries from projectDeliveries if calendarData doesn't have it for this date
-  const matchingProjectDeliveries = useMemo(() => {
-    if (!isProjectSelected) return [];
-    return projectDeliveries.filter((d) => {
-      const dDate =
-        d.schedule?.deliveryDate ||
-        (d as unknown as { deliveryDate?: string }).deliveryDate;
-      return dDate && dayjs(dDate).format("YYYY-MM-DD") === selectedDateStr;
-    });
-  }, [isProjectSelected, projectDeliveries, selectedDateStr]);
-
-  const deliveriesForSelectedDate =
-    monthDeliveries.length > 0 ? monthDeliveries : matchingProjectDeliveries;
+  const deliveriesForSelectedDate: CalendarDelivery[] =
+    calendarData[selectedDateStr] || [];
 
   const currentProjectName =
     selectedProjectObj?.projectName ||
@@ -290,18 +253,7 @@ export default function Calendar({
                 ? calendarData[dateStr] || []
                 : [];
 
-              // Check if selected project has deliveries on this day
-              const projectDeliveriesOnDay = isProjectSelected
-                ? projectDeliveries.filter((d) => {
-                    const dDate =
-                      d.schedule?.deliveryDate ||
-                      (d as unknown as { deliveryDate?: string }).deliveryDate;
-                    return dDate && dayjs(dDate).format("YYYY-MM-DD") === dateStr;
-                  })
-                : [];
-
-              const hasAnyDeliveries =
-                dayDeliveries.length > 0 || projectDeliveriesOnDay.length > 0;
+              const hasAnyDeliveries = dayDeliveries.length > 0;
               const isTargetDay =
                 isProjectSelected &&
                 targetDeliveryDate &&
@@ -319,12 +271,12 @@ export default function Calendar({
                     isSelected
                       ? "ring-2 ring-blue-600 ring-inset z-10 bg-blue-50/40"
                       : isTargetDay
-                      ? "bg-blue-50/50 ring-2 ring-blue-400/80 ring-dashed ring-inset z-10 hover:bg-blue-50/70"
-                      : hasAnyDeliveries && isProjectSelected
-                      ? "bg-blue-50/20 hover:bg-blue-50/40"
-                      : item.current
-                      ? "bg-white hover:bg-gray-50/60"
-                      : "bg-gray-50/40"
+                        ? "bg-blue-50/50 ring-2 ring-blue-400/80 ring-dashed ring-inset z-10 hover:bg-blue-50/70"
+                        : hasAnyDeliveries && isProjectSelected
+                          ? "bg-blue-50/20 hover:bg-blue-50/40"
+                          : item.current
+                            ? "bg-white hover:bg-gray-50/60"
+                            : "bg-gray-50/40"
                   }`}
                 >
                   {/* Day Number and Delivery Count Badge */}
@@ -334,12 +286,12 @@ export default function Calendar({
                         !item.current
                           ? "text-gray-300 font-normal"
                           : isSelected
-                          ? "bg-blue-600 text-white w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center font-bold shadow-xs"
-                          : isTargetDay
-                          ? "bg-blue-100 text-blue-800 border border-blue-400 w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center font-bold shadow-2xs"
-                          : hasAnyDeliveries && isProjectSelected
-                          ? "text-blue-700 font-bold bg-blue-100/70 w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center"
-                          : "text-gray-800"
+                            ? "bg-blue-600 text-white w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center font-bold shadow-xs"
+                            : isTargetDay
+                              ? "bg-blue-100 text-blue-800 border border-blue-400 w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center font-bold shadow-2xs"
+                              : hasAnyDeliveries && isProjectSelected
+                                ? "text-blue-700 font-bold bg-blue-100/70 w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center"
+                                : "text-gray-800"
                       }`}
                     >
                       {item.day}
@@ -358,15 +310,12 @@ export default function Calendar({
                   {/* Delivery Event Bullet Items */}
                   <div className="space-y-1">
                     {item.current &&
-                      (dayDeliveries.length > 0
-                        ? dayDeliveries
-                        : projectDeliveriesOnDay
-                      )
+                      dayDeliveries
                         .slice(0, 3)
                         .map(
                           (
-                            delivery: CalendarDelivery | ConstructionDelivery,
-                            dIdx: number
+                            delivery: CalendarDelivery,
+                            dIdx: number,
                           ) => (
                             <div
                               key={delivery.deliveryId || dIdx}
@@ -383,10 +332,11 @@ export default function Calendar({
                                 }}
                               />
                               <span className="text-[10px] sm:text-[11px] font-semibold text-gray-800 truncate">
-                                {delivery.description || delivery.deliveryNumber}
+                                {delivery.description ||
+                                  delivery.deliveryNumber}
                               </span>
                             </div>
-                          )
+                          ),
                         )}
                     {item.current && dayDeliveries.length > 3 && (
                       <div className="text-[9px] font-semibold text-gray-400 pl-3">
@@ -414,7 +364,7 @@ export default function Calendar({
 
           {/* Delivery Cards List */}
           <div className="space-y-3 flex-1 overflow-y-auto max-h-[580px] pr-0.5">
-            {isLoading || isLoadingProjectDeliveries ? (
+            {isLoading ? (
               <div className="flex flex-col items-center justify-center py-10 text-center gap-2">
                 <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
                 <p className="text-xs text-gray-500 font-medium">
@@ -454,7 +404,7 @@ export default function Calendar({
                       Jump to project deliveries:
                     </p>
                     <div className="flex flex-wrap justify-center gap-1.5">
-                      {validDeliveryDates.slice(0, 4).map((dStr) => (
+                      {validDeliveryDates.slice(0, 4).map((dStr: string) => (
                         <button
                           key={dStr}
                           type="button"
@@ -475,13 +425,19 @@ export default function Calendar({
             ) : (
               deliveriesForSelectedDate.map(
                 (
-                  delivery: CalendarDelivery | ConstructionDelivery,
-                  idx: number
+                  delivery: CalendarDelivery,
+                  idx: number,
                 ) => (
                   <div
                     key={delivery.deliveryId || idx}
                     onClick={() => {
                       setSelectedDeliveryId(delivery.deliveryId);
+                      setSelectedDeliveryLeadId(
+                        delivery.project?.leadId ||
+                          selectedLeadId ||
+                          selectedProjectId ||
+                          null,
+                      );
                       setShowDetails(true);
                     }}
                     className="p-3.5 rounded-lg border border-gray-200/90 bg-white shadow-2xs hover:border-blue-300 hover:shadow-xs transition-all cursor-pointer space-y-2.5"
@@ -534,7 +490,7 @@ export default function Calendar({
                       </span>
                     </div>
                   </div>
-                )
+                ),
               )
             )}
           </div>
@@ -557,8 +513,10 @@ export default function Calendar({
         onClose={() => {
           setShowDetails(false);
           setSelectedDeliveryId(null);
+          setSelectedDeliveryLeadId(null);
         }}
         deliveryId={selectedDeliveryId}
+        leadId={selectedDeliveryLeadId}
       />
     </div>
   );
