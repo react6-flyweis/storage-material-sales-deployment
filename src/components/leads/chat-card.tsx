@@ -376,9 +376,19 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
       setLastSeenAt(payload.lastSeenAt);
     };
 
+    const handleNewCustomerMessage = (payload: {
+      leadId?: string;
+      message?: LeadChatMessagePayload;
+    }) => {
+      if (payload?.leadId === lead._id && payload.message) {
+        handleNewMessage(payload.message);
+      }
+    };
+
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
     socket.on("new_message", handleNewMessage);
+    socket.on("new_customer_message", handleNewCustomerMessage);
     socket.on("customer_typing", handleCustomerTyping);
     socket.on("chat_status", handleChatStatus);
     socket.on("customer_online_status", handleCustomerOnlineStatus);
@@ -393,6 +403,7 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
       socket.off("new_message", handleNewMessage);
+      socket.off("new_customer_message", handleNewCustomerMessage);
       socket.off("customer_typing", handleCustomerTyping);
       socket.off("chat_status", handleChatStatus);
       socket.off("customer_online_status", handleCustomerOnlineStatus);

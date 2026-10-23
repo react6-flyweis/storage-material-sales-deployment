@@ -421,6 +421,9 @@ export interface TaxLookupResponseData {
   zip?: string;
   rate?: number;
   taxRate?: number;
+  label?: string;
+  source?: string;
+  message?: string;
   state?: string;
   city?: string;
   [key: string]: unknown;

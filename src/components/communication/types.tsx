@@ -14,6 +14,7 @@ export interface ActiveChatState {
   membersCount?: number;
   members?: ChatUser[];
   color?: string;
+  leadId?: string;
 }
 
 export const getDepartmentIcon = (category?: string): React.ReactElement => {

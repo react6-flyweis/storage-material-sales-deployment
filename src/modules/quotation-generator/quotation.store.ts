@@ -12,6 +12,7 @@ export interface QuotationState {
   jobType: JobType;
   scope: Scope;
   roofType: string;
+  steelFinish: "red-iron" | "galvanized";
   installCost: number;
   installSell: number;
   blendPercentage: number;
@@ -58,6 +59,10 @@ export interface QuotationState {
   includeTax: boolean;
   isTaxLoading: boolean;
 
+  // Shipping & Drawings settings
+  freightOverride: string;
+  engineeringDrawings: string;
+
   // COGS Override settings
   cogsOverrideApplied: boolean;
   cogsCostInput: string;
@@ -89,6 +94,7 @@ export interface QuotationState {
   setJobType: (jobType: JobType) => void;
   setScope: (scope: Scope) => void;
   setRoofType: (roofType: string) => void;
+  setSteelFinish: (steelFinish: "red-iron" | "galvanized") => void;
   setInstallCost: (cost: number) => void;
   setInstallSell: (sell: number) => void;
   setBlendPercentage: (percentage: number) => void;
@@ -163,6 +169,8 @@ export interface QuotationState {
   setTaxRate: (taxRate: number) => void;
   setIncludeTax: (includeTax: boolean) => void;
   setIsTaxLoading: (isTaxLoading: boolean) => void;
+  setFreightOverride: (freightOverride: string) => void;
+  setEngineeringDrawings: (engineeringDrawings: string) => void;
 
   // COGS Actions
   setCogsOverrideApplied: (applied: boolean) => void;
@@ -184,6 +192,7 @@ export const useQuotationStore = create<QuotationState>((set) => ({
   jobType: DEFAULT_JOB_TYPE,
   scope: DEFAULT_SCOPE,
   roofType: "screw-down",
+  steelFinish: "red-iron",
   installCost: 5.5,
   installSell: 8.5,
   blendPercentage: 50,
@@ -227,6 +236,8 @@ export const useQuotationStore = create<QuotationState>((set) => ({
   taxRate: 7,
   includeTax: true,
   isTaxLoading: false,
+  freightOverride: "",
+  engineeringDrawings: "",
 
   // COGS Override initial state
   cogsOverrideApplied: false,
@@ -295,6 +306,7 @@ export const useQuotationStore = create<QuotationState>((set) => ({
     })),
   setScope: (scope) => set({ scope }),
   setRoofType: (roofType) => set({ roofType }),
+  setSteelFinish: (steelFinish) => set({ steelFinish }),
   setInstallCost: (installCost) => set({ installCost }),
   setInstallSell: (installSell) => set({ installSell }),
   setBlendPercentage: (blendPercentage) => set({ blendPercentage }),
@@ -488,6 +500,8 @@ export const useQuotationStore = create<QuotationState>((set) => ({
   setTaxRate: (taxRate) => set({ taxRate }),
   setIncludeTax: (includeTax) => set({ includeTax }),
   setIsTaxLoading: (isTaxLoading) => set({ isTaxLoading }),
+  setFreightOverride: (freightOverride) => set({ freightOverride }),
+  setEngineeringDrawings: (engineeringDrawings) => set({ engineeringDrawings }),
 
   // COGS Actions
   setCogsOverrideApplied: (cogsOverrideApplied) => set({ cogsOverrideApplied }),

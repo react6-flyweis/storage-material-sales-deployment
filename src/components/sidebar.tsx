@@ -6,9 +6,10 @@ import {
   ChevronUpIcon,
   XIcon,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuthStore } from "@/modules/auth/auth.store";
 import { useChatUnreadCountQuery } from "@/modules/team-chat/team-chat.hooks";
+import { useCustomerDirectConversationsQuery } from "@/modules/customer-direct-chat/customer-direct-chat.hooks";
 
 // icons
 import dashboardIcon from "@/assets/icons/sidebar/dashboard.svg";
@@ -318,7 +319,17 @@ export function Sidebar({
   const navigate = useNavigate();
   const currentUser = useAuthStore((state) => state.user);
   const { data: unreadData } = useChatUnreadCountQuery();
-  const unreadCount = unreadData?.count ?? unreadData?.total ?? 0;
+  const teamUnreadCount = unreadData?.count ?? unreadData?.total ?? 0;
+
+  const { data: customerConversations } = useCustomerDirectConversationsQuery();
+  const customerUnreadCount = useMemo(() => {
+    return (customerConversations || []).reduce(
+      (acc, c) => acc + (c.unreadCount || 0),
+      0
+    );
+  }, [customerConversations]);
+
+  const unreadCount = teamUnreadCount + customerUnreadCount;
 
   const [hoveredGroup, setHoveredGroup] = useState<{
     label: string;

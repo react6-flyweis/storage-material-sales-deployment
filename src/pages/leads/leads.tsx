@@ -38,6 +38,7 @@ import LeadLifecycleStatusSelect from "@/components/leads/lead-lifecycle-status-
 import BuildingTypeSelector from "@/components/building-type-selector";
 import BusinessUnitSelector from "@/components/business-unit-selector";
 import { formatBusinessUnit } from "@/modules/leads/business-unit";
+import { formatInstallAddress } from "@/lib/address";
 import SuccessDialog from "@/components/success-dialog";
 import ProgressDots from "@/components/ui/progress-dots";
 import {
@@ -546,7 +547,7 @@ export default function LeadsPage() {
                               {lead.businessUnitLabel || (lead.businessUnit ? formatBusinessUnit(lead.businessUnit) : "Not set")}
                             </Badge>
                             <span className="text-xs text-gray-500">
-                              · {lead.buildingType || "-"} · {lead.location || "-"}
+                              · {lead.buildingType || "-"} · {formatInstallAddress(lead.installAddress, lead.location)}
                             </span>
                           </div>
                         </div>

@@ -5,6 +5,7 @@ import type {
   LeadDetailLead,
   LeadDetailCustomer,
 } from "@/modules/leads/leads.api";
+import { formatInstallAddress } from "@/lib/address";
 
 interface QuotationCardProps {
   quotation?: LeadDetailQuotation;
@@ -371,8 +372,8 @@ export default function QuotationCard({
       ...defaultQuotationData.proposalInfo,
       projectTitle: lead?.projectName || "—",
       preparedFor: customer?.firstName || "—",
-      projectLocation: lead?.location || quotation?.location || "—",
-      siteLocation: lead?.location || quotation?.location || "—",
+      projectLocation: formatInstallAddress(lead?.installAddress, lead?.location || quotation?.location),
+      siteLocation: formatInstallAddress(lead?.installAddress, lead?.location || quotation?.location),
       date: dateStr,
       validity: validityStr,
       preparedBy: {
@@ -383,7 +384,7 @@ export default function QuotationCard({
     overview: {
       ...defaultQuotationData.overview,
       projectName: lead?.projectName || "—",
-      projectLocation: lead?.location || quotation?.location || "—",
+      projectLocation: formatInstallAddress(lead?.installAddress, lead?.location || quotation?.location),
       buildingCode: quotation?.buildingType || "—",
       description: quotation?.specialNote || quotation?.clientNotes || quotation?.internalNotes || "—",
     },

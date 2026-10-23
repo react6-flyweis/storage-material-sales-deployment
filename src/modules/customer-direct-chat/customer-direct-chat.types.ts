@@ -5,6 +5,8 @@ export interface CustomerDirectConversation {
   customerName?: string;
   email?: string;
   phone?: string;
+  company?: string;
+  leadId?: string;
   lastMessage?: string | null;
   lastMessageAt?: string | null;
   unreadCount?: number;
@@ -19,6 +21,9 @@ export interface CustomerDirectMessage {
   senderId?: string | null;
   senderName?: string;
   content: string;
+  mirroredFrom?: string;
+  leadId?: string;
+  channel?: string;
   isReadByCustomer?: boolean;
   isReadByStaff?: boolean;
   createdAt: string;

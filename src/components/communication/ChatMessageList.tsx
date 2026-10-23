@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router";
 import {
   MessageCircle,
   Loader2,
@@ -6,6 +7,7 @@ import {
   CheckCheck,
   FileText,
   Download,
+  ExternalLink,
 } from "lucide-react";
 import type { TeamMessage } from "@/types/communication";
 import { formatMessageTime, formatMessageDateHeader } from "./types";
@@ -175,12 +177,27 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                     </div>
                   )}
 
-                  {/* Message Footer: Timestamp & Read receipts */}
+                  {/* Message Footer: Timestamp, optional lead redirect icon & Read receipts */}
                   <div
-                    className={`flex items-center justify-end gap-1 mt-1 text-[10px] ${
+                    className={`flex items-center justify-end gap-1.5 mt-1 text-[10px] ${
                       isFromOurSide ? "text-blue-100" : "text-slate-400"
                     }`}
                   >
+                    {(msg.leadId || msg.mirroredFrom) && (
+                      <Link
+                        to={`/leads/${msg.leadId || msg.mirroredFrom}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`inline-flex items-center p-0.5 rounded transition-opacity cursor-pointer ${
+                          isFromOurSide
+                            ? "text-blue-100 hover:text-white"
+                            : "text-slate-400 hover:text-blue-600"
+                        }`}
+                        title="View Lead Chat"
+                      >
+                        <ExternalLink size={11} />
+                      </Link>
+                    )}
                     <span>{formatMessageTime(msg.createdAt)}</span>
                     {isFromOurSide && (
                       <span>

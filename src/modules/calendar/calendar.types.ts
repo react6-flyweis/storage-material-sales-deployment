@@ -38,6 +38,72 @@ export interface DeliverySchedule {
   timings: string;
 }
 
+export interface DeliveryCustomerPhone {
+  number?: string;
+  countryCode?: string;
+}
+
+export interface DeliveryCustomer {
+  customerId?: string;
+  customerName?: string;
+  email?: string;
+  phone?: DeliveryCustomerPhone | null;
+}
+
+export interface DeliveryOverview {
+  status?: string;
+  projectName?: string;
+  customerName?: string;
+  deliveryDate?: string | null;
+  timeWindow?: string;
+  siteAddress?: string;
+}
+
+export interface DeliveryInformation {
+  description?: string;
+  materialCategory?: string;
+  pickupDate?: string | null;
+}
+
+export interface DeliveryReceivingPocInfo {
+  name?: string;
+  phone?: string;
+  email?: string;
+}
+
+export interface DeliveryVendor {
+  company?: string;
+  contactName?: string;
+  phone?: string;
+  email?: string;
+}
+
+export interface DeliveryCompany {
+  companyName?: string;
+  driverName?: string;
+  driverPhone?: string;
+  truckNumber?: string;
+  phone?: string;
+  email?: string;
+}
+
+export interface DeliverySiteCoordination {
+  siteInstructions?: string;
+  requiredEquipment?: string;
+  equipmentConfirmationStatus?: string;
+  specialNotes?: string;
+}
+
+export interface DeliveryDocuments {
+  documentUrl?: string;
+  attachments?: unknown[];
+  items?: unknown[];
+}
+
+export interface DeliveryQuickActions {
+  viewDocuments?: unknown[];
+}
+
 export interface DeliveryCarrier {
   phone?: string;
   email?: string;
@@ -74,23 +140,33 @@ export interface ConstructionDelivery {
   _id?: string;
   deliveryId: string;
   deliveryNumber: string;
+  title?: string;
   status: string;
   statusHistory?: DeliveryStatusHistoryItem[];
-  description: string;
+  description?: string;
   materialType?: string;
   loadWeight?: number;
   packageCount?: number | null;
   loadingEquipment?: string[];
-  schedule: DeliverySchedule;
+  schedule?: DeliverySchedule;
   pickupLocation?: string;
   deliveryLocation?: string;
   stagingArea?: string;
   notes?: string;
-  receivingPoc?: string;
+  receivingPoc?: DeliveryReceivingPocInfo | string | null;
   pickupContactPhone?: string;
   siteContact?: DeliverySiteContact | null;
   carrier?: DeliveryCarrier | null;
   project?: DeliveryProject | null;
+  customer?: DeliveryCustomer | null;
+  overview?: DeliveryOverview | null;
+  deliveryInformation?: DeliveryInformation | null;
+  vendor?: DeliveryVendor | null;
+  deliveryCompany?: DeliveryCompany | null;
+  siteCoordination?: DeliverySiteCoordination | null;
+  documents?: DeliveryDocuments | null;
+  quickActions?: DeliveryQuickActions | null;
+  freightLoadId?: string | null;
 }
 
 export interface DeliveryDetailsResponseData {

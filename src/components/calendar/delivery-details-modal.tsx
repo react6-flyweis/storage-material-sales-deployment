@@ -23,6 +23,7 @@ interface DeliveryDetailsModalProps {
   open: boolean;
   onClose: () => void;
   deliveryId?: string | null;
+  leadId?: string | null;
 }
 
 const formatDateTime = (dateStr?: string | null, timeStr?: string | null) => {
@@ -45,13 +46,14 @@ export default function DeliveryDetailsModal({
   open,
   onClose,
   deliveryId,
+  leadId,
 }: DeliveryDetailsModalProps) {
   const [downloadSuccessMessage, setDownloadSuccessMessage] = useState<string | null>(null);
 
   const { data: detailData, isLoading, isError } = useQuery({
-    queryKey: ["delivery-details", deliveryId],
-    queryFn: () => getDeliveryDetailsApi(deliveryId!),
-    enabled: Boolean(open && deliveryId),
+    queryKey: ["delivery-details", leadId, deliveryId],
+    queryFn: () => getDeliveryDetailsApi(leadId!, deliveryId!),
+    enabled: Boolean(open && leadId && deliveryId),
   });
 
   const downloadPackingListMutation = useMutation({
@@ -141,15 +143,33 @@ export default function DeliveryDetailsModal({
     ? activeStatus.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
     : "-";
 
-  const etaText = delivery?.schedule?.deliveryTime
-    ? `ETA ${delivery.schedule.deliveryTime}`
-    : delivery?.schedule?.timings
-    ? delivery.schedule.timings
-    : null;
+  const timeWindowOrEta =
+    delivery?.overview?.timeWindow
+      ? `Time Window: ${delivery.overview.timeWindow}`
+      : delivery?.schedule?.deliveryTime
+      ? `ETA: ${delivery.schedule.deliveryTime}`
+      : null;
 
-  const formattedWeight = delivery?.loadWeight
-    ? `${Number(delivery.loadWeight).toLocaleString()} lbs`
-    : "-";
+  const receivingPocName =
+    typeof delivery?.receivingPoc === "object" && delivery?.receivingPoc !== null
+      ? delivery.receivingPoc.name || "-"
+      : (delivery?.receivingPoc as string) || "-";
+
+  const receivingPocPhone =
+    typeof delivery?.receivingPoc === "object" && delivery?.receivingPoc !== null
+      ? delivery.receivingPoc.phone
+      : null;
+
+  const customerPhone =
+    delivery?.customer?.phone
+      ? `${delivery.customer.phone.countryCode || ""} ${delivery.customer.phone.number || ""}`.trim()
+      : null;
+
+  const siteAddress =
+    delivery?.overview?.siteAddress ||
+    delivery?.deliveryLocation ||
+    delivery?.stagingArea ||
+    "-";
 
   const modalContent = (
     <div
@@ -171,7 +191,7 @@ export default function DeliveryDetailsModal({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base sm:text-lg font-bold text-gray-900 tracking-tight">
-                  Delivery Details
+                  {delivery?.title || "Delivery Details"}
                 </h2>
                 {delivery?.status && (
                   <span className="bg-blue-50 text-blue-700 border border-blue-200/80 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
@@ -181,9 +201,10 @@ export default function DeliveryDetailsModal({
               </div>
               <p className="text-xs font-semibold text-gray-500 mt-0.5">
                 {delivery?.deliveryNumber || deliveryId || "-"}
-                {delivery?.project?.projectName
-                  ? ` • ${delivery.project.projectName}`
+                {delivery?.project?.projectName || delivery?.overview?.projectName
+                  ? ` • ${delivery?.project?.projectName || delivery?.overview?.projectName}`
                   : ""}
+                {delivery?.project?.jobId ? ` (Job #${delivery.project.jobId})` : ""}
               </p>
             </div>
           </div>
@@ -233,10 +254,10 @@ export default function DeliveryDetailsModal({
                     <p className="text-xs font-semibold text-blue-800">
                       Current Status
                     </p>
-                    {etaText && (
+                    {timeWindowOrEta && (
                       <span className="inline-flex items-center gap-1.5 bg-amber-100/80 text-amber-900 px-2 py-0.5 rounded text-[10px] font-bold">
                         <span className="w-1.5 h-1.5 bg-amber-500 rounded-full" />
-                        {etaText}
+                        {timeWindowOrEta}
                       </span>
                     )}
                   </div>
@@ -244,12 +265,15 @@ export default function DeliveryDetailsModal({
                     {formattedStatusText}
                   </h3>
                 </div>
-                <div className="sm:text-right">
+                <div className="sm:text-right max-w-xs">
                   <p className="text-xs font-medium text-gray-500">
-                    Staging Area
+                    Site Destination
                   </p>
-                  <h4 className="text-base font-bold text-gray-800">
-                    {delivery?.stagingArea || "-"}
+                  <h4
+                    className="text-xs sm:text-sm font-bold text-gray-800 truncate"
+                    title={siteAddress}
+                  >
+                    {siteAddress}
                   </h4>
                 </div>
               </div>
@@ -304,19 +328,27 @@ export default function DeliveryDetailsModal({
                     <div className="flex justify-between">
                       <span className="text-gray-500">Delivery Date</span>
                       <span className="font-semibold text-gray-800">
-                        {formatDateTime(delivery?.schedule?.deliveryDate)}
+                        {formatDateTime(
+                          delivery?.overview?.deliveryDate ||
+                            delivery?.schedule?.deliveryDate
+                        )}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Delivery Time</span>
+                      <span className="text-gray-500">Time Window</span>
                       <span className="font-semibold text-gray-800">
-                        {delivery?.schedule?.deliveryTime || "-"}
+                        {delivery?.overview?.timeWindow ||
+                          delivery?.schedule?.deliveryTime ||
+                          "-"}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">Pickup Date</span>
                       <span className="font-semibold text-gray-800">
-                        {formatDateTime(delivery?.schedule?.pickupDate)}
+                        {formatDateTime(
+                          delivery?.deliveryInformation?.pickupDate ||
+                            delivery?.schedule?.pickupDate
+                        )}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -328,124 +360,182 @@ export default function DeliveryDetailsModal({
                   </div>
                 </div>
 
-                {/* Carrier Card */}
+                {/* Vendor & Carrier Card */}
                 <div className="p-4 rounded-xl border border-gray-200/80 bg-white space-y-3">
                   <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
                     <Truck className="w-4 h-4 text-blue-600" />
                     <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
-                      Carrier Information
+                      Vendor & Logistics
                     </h4>
                   </div>
                   <div className="space-y-2 text-xs">
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Truck Number</span>
+                      <span className="text-gray-500">Vendor Company</span>
                       <span className="font-semibold text-gray-800">
-                        {delivery?.carrier?.truckNumber || "-"}
+                        {delivery?.vendor?.company ||
+                          delivery?.deliveryCompany?.companyName ||
+                          "-"}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Driver Name</span>
+                      <span className="text-gray-500">Contact Person</span>
                       <span className="font-semibold text-gray-800">
-                        {delivery?.carrier?.driverName || "-"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Driver Phone</span>
-                      <span className="font-semibold text-gray-800">
-                        {delivery?.carrier?.driverPhone || "-"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Carrier Phone</span>
-                      <span className="font-semibold text-gray-800">
-                        {delivery?.carrier?.phone || "-"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Destination & Contact Card */}
-                <div className="p-4 rounded-xl border border-gray-200/80 bg-white space-y-3">
-                  <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
-                    <MapPin className="w-4 h-4 text-blue-600" />
-                    <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
-                      Destination & Site Contact
-                    </h4>
-                  </div>
-                  <div className="space-y-2 text-xs">
-                    <div>
-                      <span className="text-gray-500 block">Delivery Location</span>
-                      <span className="font-semibold text-gray-800">
-                        {delivery?.deliveryLocation || "-"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Site Contact</span>
-                      <span className="font-semibold text-gray-800">
-                        {delivery?.siteContact?.contactName || "-"}
+                        {delivery?.vendor?.contactName ||
+                          delivery?.deliveryCompany?.driverName ||
+                          delivery?.carrier?.driverName ||
+                          "-"}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">Contact Phone</span>
                       <span className="font-semibold text-gray-800">
-                        {delivery?.siteContact?.phone || "-"}
+                        {delivery?.vendor?.phone ||
+                          delivery?.deliveryCompany?.driverPhone ||
+                          delivery?.carrier?.driverPhone ||
+                          delivery?.carrier?.phone ||
+                          "-"}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">Contact Email</span>
-                      <span className="font-semibold text-gray-800">
-                        {delivery?.siteContact?.email || "-"}
+                      <span className="font-semibold text-gray-800 truncate max-w-45">
+                        {delivery?.vendor?.email ||
+                          delivery?.deliveryCompany?.email ||
+                          delivery?.carrier?.email ||
+                          "-"}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                {/* Material & Specs Card */}
+                {/* Customer & Destination Card */}
                 <div className="p-4 rounded-xl border border-gray-200/80 bg-white space-y-3">
                   <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
-                    <FileText className="w-4 h-4 text-blue-600" />
+                    <MapPin className="w-4 h-4 text-blue-600" />
                     <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
-                      Material & Load Specs
+                      Customer & Site
                     </h4>
                   </div>
                   <div className="space-y-2 text-xs">
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Material Type</span>
+                      <span className="text-gray-500">Customer Name</span>
                       <span className="font-semibold text-gray-800">
-                        {delivery?.materialType || "-"}
+                        {delivery?.customer?.customerName ||
+                          delivery?.overview?.customerName ||
+                          "-"}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Load Weight</span>
-                      <span className="font-semibold text-gray-800">
-                        {formattedWeight}
+                      <span className="text-gray-500">Customer Email</span>
+                      <span className="font-semibold text-gray-800 truncate max-w-45">
+                        {delivery?.customer?.email || "-"}
                       </span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Package Count</span>
-                      <span className="font-semibold text-gray-800">
-                        {delivery?.packageCount ?? "-"}
-                      </span>
-                    </div>
+                    {customerPhone && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Customer Phone</span>
+                        <span className="font-semibold text-gray-800">
+                          {customerPhone}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex justify-between">
                       <span className="text-gray-500">Receiving POC</span>
                       <span className="font-semibold text-gray-800">
-                        {delivery?.receivingPoc || "-"}
+                        {receivingPocName}
+                        {receivingPocPhone ? ` (${receivingPocPhone})` : ""}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block">Site Address</span>
+                      <span className="font-semibold text-gray-800 block text-[11px] mt-0.5 leading-snug">
+                        {siteAddress}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Material & Site Coordination Card */}
+                <div className="p-4 rounded-xl border border-gray-200/80 bg-white space-y-3">
+                  <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+                    <FileText className="w-4 h-4 text-blue-600" />
+                    <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+                      Material & Coordination
+                    </h4>
+                  </div>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Material Category</span>
+                      <span className="font-semibold text-gray-800 capitalize">
+                        {delivery?.deliveryInformation?.materialCategory ||
+                          delivery?.materialType ||
+                          "-"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Required Equipment</span>
+                      <span className="font-semibold text-gray-800">
+                        {delivery?.siteCoordination?.requiredEquipment ||
+                          (delivery?.loadingEquipment &&
+                            delivery.loadingEquipment.join(", ")) ||
+                          "-"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Equipment Status</span>
+                      <span className="font-semibold text-gray-800">
+                        {delivery?.siteCoordination?.equipmentConfirmationStatus ||
+                          "-"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Description</span>
+                      <span
+                        className="font-semibold text-gray-800 truncate max-w-45"
+                        title={
+                          delivery?.deliveryInformation?.description ||
+                          delivery?.title ||
+                          delivery?.description ||
+                          "-"
+                        }
+                      >
+                        {delivery?.deliveryInformation?.description ||
+                          delivery?.title ||
+                          delivery?.description ||
+                          "-"}
                       </span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Notes */}
-              {delivery?.notes && (
-                <div className="p-4 rounded-xl border border-gray-200/70 bg-gray-50/50">
-                  <p className="text-xs font-bold text-gray-700 mb-1">
-                    Delivery Notes
-                  </p>
-                  <p className="text-xs text-gray-600 leading-relaxed">
-                    {delivery.notes}
-                  </p>
+              {/* Site Instructions & Notes */}
+              {(delivery?.siteCoordination?.siteInstructions ||
+                delivery?.siteCoordination?.specialNotes ||
+                delivery?.notes) && (
+                <div className="p-4 rounded-xl border border-gray-200/70 bg-gray-50/50 space-y-2">
+                  {delivery?.siteCoordination?.siteInstructions && (
+                    <div>
+                      <p className="text-xs font-bold text-gray-700">
+                        Site Instructions
+                      </p>
+                      <p className="text-xs text-gray-600 leading-relaxed mt-0.5">
+                        {delivery.siteCoordination.siteInstructions}
+                      </p>
+                    </div>
+                  )}
+                  {(delivery?.siteCoordination?.specialNotes ||
+                    delivery?.notes) && (
+                    <div>
+                      <p className="text-xs font-bold text-gray-700">
+                        Special Notes
+                      </p>
+                      <p className="text-xs text-gray-600 leading-relaxed mt-0.5">
+                        {delivery.siteCoordination?.specialNotes ||
+                          delivery.notes}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </>

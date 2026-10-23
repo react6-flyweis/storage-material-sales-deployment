@@ -12,6 +12,9 @@ import { useLeadsLookupQuery } from "@/modules/leads/leads.hooks";
 import { formatLifecycleStatus, getStatusBadgeClassName, getLeadProjectName } from "@/modules/leads/leads.utils";
 import { isLeadInLifecycleRange, type LeadLifecycleStatusValue } from "@/modules/leads/lifecycle-statuses";
 
+import type { InstallAddress } from "@/types/address.types";
+import { formatInstallAddress } from "@/lib/address";
+
 export type Client = {
   id: string;
   name: string;
@@ -21,6 +24,7 @@ export type Client = {
   jobId?: string;
   quoteValue?: number;
   location?: string;
+  installAddress?: InstallAddress;
 };
 
 type Props = {
@@ -56,7 +60,8 @@ export default function ClientSelector({
         lifecycleStatus: lead.lifecycleStatus,
         jobId: lead.jobId,
         quoteValue: lead.quoteValue,
-        location: lead.location || "",
+        location: formatInstallAddress(lead.installAddress, lead.location),
+        installAddress: lead.installAddress,
       })) || [];
 
 

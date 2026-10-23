@@ -1,6 +1,7 @@
 import axios from "axios";
 import { apiClient } from "@/modules/auth/auth.api";
 import type { InvoiceLineItem } from "@/modules/invoices/invoices.api";
+import type { InstallAddress } from "@/types/address.types";
 export * from "./customer-documents.types";
 import type {
   CreateCustomerDocumentPayload,
@@ -48,6 +49,10 @@ export type AdminCustomerProject = {
   businessUnit?: string | null;
   businessUnitLabel?: string;
   location?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  installAddress?: InstallAddress;
   source?: string;
   quoteValue?: number;
   lifecycleStatus?: string;
@@ -238,6 +243,10 @@ export type CreateSalesCustomerProjectPayload = {
   buildingType: string;
   businessUnit?: string | null;
   location: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  installAddress?: InstallAddress;
   roofStyle: string;
   quoteValue: number;
   width: number;
