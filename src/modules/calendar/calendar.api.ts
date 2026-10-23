@@ -2,8 +2,6 @@ import { apiClient } from "@/modules/auth/auth.api";
 import type {
   CalendarApiResponse,
   CalendarQueryParams,
-  DeliveriesApiResponse,
-  DeliveriesQueryParams,
   DeliveryDetailsApiResponse,
   CalendarProjectsApiResponse,
 } from "./calendar.types";
@@ -11,30 +9,22 @@ import { getLeadsProvider } from "@/modules/leads/leads.api";
 
 export async function getCalendarApi(params: CalendarQueryParams) {
   const response = await apiClient.get<CalendarApiResponse>(
-    "/construction/projects/calendar",
+    "/api/sales/construction/projects/calendar",
     { params }
   );
   return response.data;
 }
 
-export async function getDeliveriesApi(params?: DeliveriesQueryParams) {
-  const response = await apiClient.get<DeliveriesApiResponse>(
-    "/construction/deliveries",
-    { params }
-  );
-  return response.data;
-}
-
-export async function getDeliveryDetailsApi(deliveryId: string) {
+export async function getDeliveryDetailsApi(leadId: string, deliveryId: string) {
   const response = await apiClient.get<DeliveryDetailsApiResponse>(
-    `/construction/deliveries/${deliveryId}`
+    `/api/sales/construction/projects/${leadId}/deliveries/${deliveryId}`
   );
   return response.data;
 }
 
 export async function downloadDeliveryPackingListApi(deliveryId: string) {
   const response = await apiClient.get(
-    `/construction/deliveries/${deliveryId}/download/packing-list`,
+    `/api/sales/construction/deliveries/${deliveryId}/download/packing-list`,
     { responseType: "blob" }
   );
   return response;
@@ -42,7 +32,7 @@ export async function downloadDeliveryPackingListApi(deliveryId: string) {
 
 export async function downloadDeliveryBillOfLadingApi(deliveryId: string) {
   const response = await apiClient.get(
-    `/construction/deliveries/${deliveryId}/download/bill-of-lading`,
+    `/api/sales/construction/deliveries/${deliveryId}/download/bill-of-lading`,
     { responseType: "blob" }
   );
   return response;
@@ -55,14 +45,14 @@ export async function getCalendarProjectsApi(params?: {
 }): Promise<CalendarProjectsApiResponse> {
   try {
     const response = await apiClient.get<CalendarProjectsApiResponse>(
-      "/construction/projects",
+      "/api/sales/construction/projects",
       { params }
     );
     if (response?.data?.data?.projects?.length > 0) {
       return response.data;
     }
   } catch {
-    // If /construction/projects is forbidden or errors for sales role, fall back to /api/sales/leads
+    // If /api/sales/construction/projects is forbidden or errors for sales role, fall back to /api/sales/leads
   }
 
   try {
