@@ -23,6 +23,7 @@ import {
   getLeadProjectName,
   type LeadStatusType,
 } from "@/modules/leads/leads.utils";
+import type { InstallAddress } from "@/types/address.types";
 import { ArrowUpDown, Search } from "lucide-react";
 import { useNavigate } from "react-router";
 import { getLeadLifecycleBadgeClassName } from "@/modules/leads/lifecycle-statuses";
@@ -58,6 +59,7 @@ function mapProjectToRow(
     numberOfBuildings?: number;
     createdAt?: string;
     location?: string;
+    installAddress?: InstallAddress;
     buildingType?: string;
   },
   customerFirstName?: string
