@@ -1,13 +1,12 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   getCalendarApi,
-  getDeliveriesApi,
   getDeliveryDetailsApi,
   downloadDeliveryPackingListApi,
   downloadDeliveryBillOfLadingApi,
   getCalendarProjectsApi,
 } from "./calendar.api";
-import type { CalendarQueryParams, DeliveriesQueryParams } from "./calendar.types";
+import type { CalendarQueryParams } from "./calendar.types";
 
 export function useCalendarDeliveries(params: CalendarQueryParams) {
   return useQuery({
@@ -22,26 +21,15 @@ export function useCalendarDeliveries(params: CalendarQueryParams) {
   });
 }
 
-export function useCalendarProjectDeliveries(params?: DeliveriesQueryParams) {
-  const isEnabled = Boolean(params?.projectId || params?.leadId);
+export function useDeliveryDetails(
+  leadId?: string | null,
+  deliveryId?: string | null,
+  open = true
+) {
   return useQuery({
-    queryKey: ["calendar-project-deliveries", params?.projectId, params?.leadId],
-    queryFn: () =>
-      getDeliveriesApi({
-        projectId: params?.projectId,
-        leadId: params?.leadId,
-        limit: 100,
-        sortBy: "DeliveryDate",
-      }),
-    enabled: isEnabled,
-  });
-}
-
-export function useDeliveryDetails(deliveryId?: string | null, open = true) {
-  return useQuery({
-    queryKey: ["delivery-details", deliveryId],
-    queryFn: () => getDeliveryDetailsApi(deliveryId!),
-    enabled: Boolean(open && deliveryId),
+    queryKey: ["delivery-details", leadId, deliveryId],
+    queryFn: () => getDeliveryDetailsApi(leadId!, deliveryId!),
+    enabled: Boolean(open && leadId && deliveryId),
   });
 }
 
