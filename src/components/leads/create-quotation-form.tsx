@@ -32,6 +32,7 @@ import { useCreateQuotationMutation } from "@/modules/quotations/quotations.hook
 import { useAuthStore } from "@/modules/auth/auth.store";
 import SuccessDialog from "@/components/success-dialog";
 import type { LeadListItem } from "@/modules/leads/leads.api";
+import { formatInstallAddress } from "@/lib/address";
 
 const requiredText = (message: string) => z.string().trim().min(1, message);
 
@@ -288,7 +289,7 @@ export default function CreateQuotationForm({
         initialValues?.customerName ?? leadData?.customerId?.firstName ?? "",
       email: initialValues?.email ?? leadData?.customerId?.email ?? "",
       phone: initialValues?.phone ?? "",
-      location: initialValues?.location ?? leadData?.location ?? "",
+      location: initialValues?.location ?? (leadData ? formatInstallAddress(leadData.installAddress, leadData.location) : ""),
       company: initialValues?.company ?? "",
       buildingType:
         initialValues?.buildingType ?? mapBuildingType(leadData?.buildingType),
