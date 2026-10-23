@@ -24,6 +24,7 @@ import {
   Briefcase,
 } from "lucide-react";
 import { formatBusinessUnit } from "@/modules/leads/business-unit";
+import { formatInstallAddress } from "@/lib/address";
 import { useMemo, useState } from "react";
 import type { LeadDetailData } from "@/modules/leads/leads.api";
 import {
@@ -132,7 +133,7 @@ export default function BasicDetails({
     latestQuotation?.currency ?? "USD",
   );
   const createdOn = formatLeadDate(leadData?.createdAt);
-  const location = leadData?.location || "—";
+  const location = formatInstallAddress(leadData?.installAddress, leadData?.location);
   const contactName = customer?.firstName?.trim() || "-";
   const contactPhone = formatPhone(
     typeof customer?.phone === "string"
@@ -143,7 +144,7 @@ export default function BasicDetails({
       : null,
   );
   const contactEmail = customer?.email || "—";
-  const contactAddress = leadData?.location || "—";
+  const contactAddress = formatInstallAddress(leadData?.installAddress, leadData?.location);
   // const assignedToName =
   //   getAssignedEmployeeName(lead?.auditLog ?? []) ||
   //   (leadData?.assignedSales ?? "Unassigned");
