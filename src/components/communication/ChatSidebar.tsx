@@ -67,11 +67,18 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
 
   // 3. Customer conversations list
   const customerItems = useMemo(() => {
+    const sorted = [...customerConversations].sort((a, b) => {
+      const timeA = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
+      const timeB = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+      return timeB - timeA;
+    });
+
     const q = searchQuery.toLowerCase().trim();
-    if (!q) return customerConversations;
-    return customerConversations.filter(
+    if (!q) return sorted;
+    return sorted.filter(
       (c) =>
         c.customerName?.toLowerCase().includes(q) ||
+        (c.company && c.company.toLowerCase().includes(q)) ||
         (c.email && c.email.toLowerCase().includes(q)) ||
         (c.phone && c.phone.toLowerCase().includes(q)) ||
         (c.lastMessage && c.lastMessage.toLowerCase().includes(q))
@@ -229,9 +236,11 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
               <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mb-2">
                 <UsersRound size={20} />
               </div>
-              <p className="font-semibold text-slate-700 mb-1">No customer chats yet</p>
+              <p className="font-semibold text-slate-700 mb-1">No customer chats found</p>
               <p className="text-[11px] text-gray-400 text-center max-w-xs">
-                Start a conversation from any customer profile.
+                {currentUser?.role === "sales"
+                  ? "Customers will appear here once an admin assigns their lead to you."
+                  : "Customer conversations will appear once customer activity is recorded."}
               </p>
             </div>
           ) : (
@@ -263,6 +272,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                       phone: conv.phone,
                       category: "Customer",
                       color: "bg-emerald-600",
+                      leadId: conv.leadId,
                     })
                   }
                   className={`flex items-center justify-between p-3 cursor-pointer rounded-xl transition-all group ${
@@ -288,6 +298,11 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                           }`}
                         >
                           {conv.customerName || "Customer"}
+                          {conv.company && (
+                            <span className="font-normal text-[11px] text-slate-400 ml-1">
+                              ({conv.company})
+                            </span>
+                          )}
                         </span>
                         {conv.lastMessageAt && (
                           <span className="text-[10px] text-gray-400 shrink-0">
