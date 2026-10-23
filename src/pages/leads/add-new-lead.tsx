@@ -23,6 +23,8 @@ import { useCreateLeadMutation, useLeadDetailQuery, useUpdateLeadMutation } from
 
 import BusinessUnitSelector from "@/components/business-unit-selector";
 import BuildingTypeSelector from "@/components/building-type-selector";
+import InstallAddressFields from "@/components/common/install-address-fields";
+import { buildLocationString, parseLocationFallback } from "@/lib/address";
 
 const requiredNumber = (message: string) => z.number().min(0, message);
 
@@ -32,7 +34,10 @@ const addNewLeadSchema = z.object({
   customerId: z.string().trim().min(1, "Customer is required"),
   projectName: z.string().trim().min(1, "Project name is required"),
   businessUnit: z.string().optional(),
-  location: z.string().trim().min(1, "Location is required"),
+  addressLine1: z.string().trim().min(1, "Street address is required"),
+  city: z.string().trim().min(1, "City is required"),
+  state: z.string().trim().min(1, "State is required"),
+  postalCode: z.string().trim().min(1, "ZIP / postal code is required"),
   estimatedValue: z.string().trim(),
   priority: z.enum(priorityValues),
   roofStyle: z.enum(["gable", "arch"]),
@@ -52,7 +57,10 @@ const defaultValues: AddNewLeadFormValues = {
   customerId: "",
   projectName: "",
   businessUnit: "",
-  location: "",
+  addressLine1: "",
+  city: "",
+  state: "",
+  postalCode: "",
   estimatedValue: "",
   priority: "Medium",
   roofStyle: "gable",
@@ -83,6 +91,8 @@ export default function AddNewLead() {
     handleSubmit,
     reset,
     setError,
+    setValue,
+    watch,
     formState: { isSubmitting, errors },
   } = useForm<AddNewLeadFormValues>({
     defaultValues,
@@ -92,11 +102,20 @@ export default function AddNewLead() {
   useEffect(() => {
     if (isEditMode && detail) {
       const lead = detail.lead;
+      const fallbackParsed = parseLocationFallback(lead?.location);
+      const line1 = lead?.installAddress?.line1 || fallbackParsed.line1;
+      const city = lead?.installAddress?.city || lead?.city || fallbackParsed.city;
+      const state = lead?.installAddress?.state || lead?.state || fallbackParsed.state;
+      const postalCode = lead?.installAddress?.postalCode || lead?.pincode || fallbackParsed.postalCode;
+
       reset({
         customerId: lead.customerId || "",
         projectName: lead.projectName || "",
         businessUnit: lead.businessUnit || "",
-        location: lead.location || "",
+        addressLine1: line1 || "",
+        city: city || "",
+        state: state || "",
+        postalCode: postalCode || "",
         estimatedValue: lead.quoteValue ? lead.quoteValue.toString() : "",
         priority: lead.priority || "Medium",
         roofStyle: lead.roofStyle === "Arch" ? "arch" : "gable",
@@ -113,11 +132,31 @@ export default function AddNewLead() {
   }, [isEditMode, detail, reset]);
 
   const onSubmit = async (values: AddNewLeadFormValues) => {
+    const compiledLocation = buildLocationString({
+      line1: values.addressLine1,
+      city: values.city,
+      state: values.state,
+      postalCode: values.postalCode,
+    });
+
     const payload = {
       customerId: values.customerId,
       projectName: values.projectName,
       businessUnit: values.businessUnit ? values.businessUnit.trim().toLowerCase() : null,
-      location: values.location,
+      location: compiledLocation,
+      city: values.city.trim(),
+      state: values.state.trim(),
+      pincode: values.postalCode.trim(),
+      installAddress: {
+        companyName: "",
+        line1: values.addressLine1.trim(),
+        line2: "",
+        city: values.city.trim(),
+        state: values.state.trim(),
+        postalCode: values.postalCode.trim(),
+        country: "US",
+        lines: [],
+      },
       buildingType: values.buildingType,
       source: "manual",
       quoteValue: values.estimatedValue
@@ -247,15 +286,30 @@ export default function AddNewLead() {
                 )}
               />
             </Field>
-            <Field>
-              <FieldLabel htmlFor="location">Location</FieldLabel>
-              <Input
-                id="location"
-                type="text"
-                placeholder="Enter location"
-                {...register("location")}
+            <div className="md:col-span-2">
+              <InstallAddressFields
+                values={{
+                  line1: watch("addressLine1") || "",
+                  city: watch("city") || "",
+                  state: watch("state") || "",
+                  postalCode: watch("postalCode") || "",
+                }}
+                onChange={(field, val) => {
+                  if (field === "line1") setValue("addressLine1", val, { shouldValidate: true });
+                  else if (field === "city") setValue("city", val, { shouldValidate: true });
+                  else if (field === "state") setValue("state", val, { shouldValidate: true });
+                  else if (field === "postalCode") setValue("postalCode", val, { shouldValidate: true });
+                }}
+                errors={{
+                  line1: errors.addressLine1?.message,
+                  city: errors.city?.message,
+                  state: errors.state?.message,
+                  postalCode: errors.postalCode?.message,
+                }}
+                disabled={submitting}
+                idPrefix="add-lead-addr"
               />
-            </Field>
+            </div>
             <Field>
               <FieldLabel htmlFor="estimatedValue">Estimated Value</FieldLabel>
               <Input
