@@ -7,6 +7,7 @@ import type {
   LeadDetailLead,
   LeadDetailCustomer,
 } from "@/modules/leads/leads.api";
+import { formatInstallAddress } from "@/lib/address";
 
 interface QuotationData {
   projectName: string;
@@ -99,7 +100,7 @@ export default function QuotationPreviewPage() {
     currency: quotationData.currency || "USD",
     roofStyle: quotationData.roofStyle || "—",
     validTill: quotationData.validUntil || undefined,
-    location: quotationData.location || leadData.location || "—",
+    location: quotationData.location || formatInstallAddress(leadData.installAddress, leadData.location),
     paymentTerms: quotationData.paymentTerms || "—",
     specialNote: quotationData.specialNotes || "—",
     internalNotes: quotationData.internalNotes || "—",
@@ -242,7 +243,8 @@ export default function QuotationPreviewPage() {
     _id: leadData._id || "preview-lead-id",
     customerId: leadData.customerId || "preview-customer-id",
     buildingType: quotationData.buildingType || leadData.buildingType || "—",
-    location: leadData.location || quotationData.location || "—",
+    location: formatInstallAddress(leadData.installAddress, leadData.location) || quotationData.location || "—",
+    installAddress: leadData.installAddress,
     source: leadData.source || "—",
     quoteValue: Number(quotationData.totalPrice) || leadData.quoteValue || 0,
     lifecycleStatus: leadData.lifecycleStatus || "—",
