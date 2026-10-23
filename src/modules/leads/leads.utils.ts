@@ -1,3 +1,6 @@
+import type { InstallAddress } from "@/types/address.types";
+import { formatInstallAddress } from "@/lib/address";
+
 export const formatLeadCurrency = (value = 0, currency = "USD") =>
   new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -203,6 +206,7 @@ export function getLeadProjectName(
     customerId?: { firstName?: string | null; name?: string | null } | null;
     buildingType?: string | null;
     location?: string | null;
+    installAddress?: InstallAddress | null;
   } | null,
   customer?: { firstName?: string | null; name?: string | null } | null
 ) {
@@ -215,8 +219,9 @@ export function getLeadProjectName(
   if (lead?.buildingType && lead.buildingType !== "N/A" && lead.buildingType !== "—" && lead.buildingType !== "-") {
     parts.push(lead.buildingType);
   }
-  if (lead?.location && lead.location !== "N/A" && lead.location !== "—" && lead.location !== "-") {
-    parts.push(lead.location);
+  const displayLocation = formatInstallAddress(lead?.installAddress, lead?.location);
+  if (displayLocation && displayLocation !== "N/A" && displayLocation !== "—" && displayLocation !== "-") {
+    parts.push(displayLocation);
   }
   return parts.join("-");
 }
