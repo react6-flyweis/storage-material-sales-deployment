@@ -1,6 +1,7 @@
 import { apiClient } from "@/modules/auth/auth.api";
 import type { AuthUser } from "../auth/auth.types";
 import type { LeadStatusType } from "./leads.utils";
+import type { InstallAddress } from "@/types/address.types";
 
 export type ImportLeadsPayload = {
   csv: string;
@@ -34,6 +35,10 @@ export type LeadListItem = {
   businessUnit?: string | null;
   businessUnitLabel?: string;
   location: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  installAddress?: InstallAddress;
   nextFollowUp: LeadFollowUpSummary | null;
   isRaisedToPO?: boolean;
   isOnline?: boolean;
@@ -69,6 +74,10 @@ export type ScoredLeadItem = {
   businessUnit?: string | null;
   businessUnitLabel?: string;
   location: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  installAddress?: InstallAddress;
   lifecycleStatus: string;
   lifecycleHistory?: Array<{
     stage: string;
@@ -204,6 +213,10 @@ export type CreateLeadPayload = {
   buildingType: string;
   businessUnit?: string | null;
   location: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  installAddress?: InstallAddress;
   source: string;
   quoteValue: number;
   roofStyle: string;
@@ -268,6 +281,10 @@ export type LeadLookupItem = {
   businessUnit?: string | null;
   businessUnitLabel?: string;
   location: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  installAddress?: InstallAddress;
   buildingType: string;
   lifecycleStatus: string;
   quoteValue: number;
@@ -335,6 +352,10 @@ export type LeadDetailLead = {
   businessUnit?: string | null;
   businessUnitLabel?: string;
   location: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  installAddress?: InstallAddress;
   source: string;
   assignedSales?: {
     _id: string;
