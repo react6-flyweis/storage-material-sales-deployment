@@ -1484,7 +1484,20 @@ export default function InvoiceForm({
                         : lead.name;
                     setValue("recipientAddress.companyName", customerName);
 
-                    if (lead.location) {
+                    if (lead.installAddress) {
+                      if (lead.installAddress.line1) {
+                        setValue("recipientAddress.line1", lead.installAddress.line1);
+                      }
+                      if (lead.installAddress.city) {
+                        setValue("recipientAddress.city", lead.installAddress.city);
+                      }
+                      if (lead.installAddress.state) {
+                        setValue("recipientAddress.state", lead.installAddress.state);
+                      }
+                      if (lead.installAddress.postalCode) {
+                        setValue("recipientAddress.postalCode", lead.installAddress.postalCode);
+                      }
+                    } else if (lead.location) {
                       const parsed = parseLocationToAddress(lead.location);
                       if (parsed.line1) {
                         setValue("recipientAddress.line1", parsed.line1);
