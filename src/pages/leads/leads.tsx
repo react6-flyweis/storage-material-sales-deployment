@@ -134,6 +134,7 @@ export default function LeadsPage() {
   const leads = useMemo(() => leadsData ?? [], [leadsData]);
   const totalItems = leadsResponse?.data.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalItems / rowsPerPage));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
 
   useEffect(() => {
     setSelectedLeads([]);
@@ -147,12 +148,6 @@ export default function LeadsPage() {
     startDate,
     endDate,
   ]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -536,7 +531,7 @@ export default function LeadsPage() {
             </Table>
             <Pagination
               totalItems={totalItems}
-              currentPage={currentPage}
+              currentPage={safeCurrentPage}
               rowsPerPage={rowsPerPage}
               onPageChange={setCurrentPage}
               onRowsPerPageChange={(rows) => {

@@ -17,23 +17,29 @@ const Pagination: React.FC<PaginationProps> = ({
   onPageChange,
   onRowsPerPageChange,
 }) => {
-  const totalPages = Math.ceil(totalItems / rowsPerPage);
+  const totalPages = Math.max(1, Math.ceil(totalItems / rowsPerPage));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
 
   const getPages = () => {
-    const pages: (number | "...")[] = [];
+    const pages: (number | string)[] = [];
 
     if (totalPages <= 7) {
       for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else if (safeCurrentPage <= 4) {
+      for (let i = 1; i <= 5; i++) pages.push(i);
+      pages.push("ellipsis-end");
+      pages.push(totalPages);
+    } else if (safeCurrentPage >= totalPages - 3) {
+      pages.push(1);
+      pages.push("ellipsis-start");
+      for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i);
     } else {
       pages.push(1);
-      if (currentPage > 3) pages.push("...");
-
-      const start = Math.max(2, currentPage - 1);
-      const end = Math.min(totalPages - 1, currentPage + 1);
-
-      for (let i = start; i <= end; i++) pages.push(i);
-
-      if (currentPage < totalPages - 2) pages.push("...");
+      pages.push("ellipsis-start");
+      for (let i = safeCurrentPage - 1; i <= safeCurrentPage + 1; i++) {
+        pages.push(i);
+      }
+      pages.push("ellipsis-end");
       pages.push(totalPages);
     }
 
@@ -65,39 +71,42 @@ const Pagination: React.FC<PaginationProps> = ({
       <div className="flex items-center gap-1">
         {/* Prev */}
         <button
-          disabled={currentPage === 1}
-          onClick={() => onPageChange(currentPage - 1)}
-          className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 text-gray-400 disabled:opacity-40"
+          type="button"
+          disabled={safeCurrentPage <= 1}
+          onClick={() => onPageChange(safeCurrentPage - 1)}
+          className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 text-gray-400 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           ‹
         </button>
 
-        {getPages().map((page, idx) =>
-          page === "..." ? (
-            <span key={idx} className="px-2 text-gray-400">
+        {getPages().map((item) =>
+          typeof item === "string" ? (
+            <span key={item} className="px-2 text-gray-400 select-none">
               ...
             </span>
           ) : (
             <button
-              key={page}
-              onClick={() => onPageChange(page)}
+              key={`page-${item}`}
+              type="button"
+              onClick={() => onPageChange(item)}
               className={`w-8 h-8 flex items-center justify-center rounded-full font-medium
                 ${
-                  page === currentPage
+                  item === safeCurrentPage
                     ? "bg-[#FF885B] text-white shadow-sm border border-[#FF885B]"
                     : "hover:bg-gray-100 text-gray-600"
                 }`}
             >
-              {page}
+              {item}
             </button>
           )
         )}
 
         {/* Next */}
         <button
-          disabled={currentPage === totalPages}
-          onClick={() => onPageChange(currentPage + 1)}
-          className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 text-gray-600 disabled:opacity-40"
+          type="button"
+          disabled={safeCurrentPage >= totalPages || totalItems === 0}
+          onClick={() => onPageChange(safeCurrentPage + 1)}
+          className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           ›
         </button>

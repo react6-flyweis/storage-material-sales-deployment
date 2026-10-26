@@ -1,4 +1,6 @@
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
@@ -13,6 +15,8 @@ import {
   type GetLeadScoringFilters,
   getLeadsProvider,
   importLeadsProvider,
+  importLeadsFileProvider,
+  getLeadImportJobStatusProvider,
   createLeadProvider,
   moveLeadToOrdersProvider,
   updateLeadTemperatureProvider,
@@ -22,6 +26,9 @@ import {
   updateLeadBuildingsProvider,
   updateLeadProvider,
   type ImportLeadsPayload,
+  type ImportLeadsFileOptions,
+  type LeadImportJobData,
+  type ImportLeadsSyncData,
   type GetLeadsParams,
   type UpdateLeadBuildingsPayload,
   type UpdateLeadPayload,
@@ -80,6 +87,7 @@ export function useLeadsQuery(params: GetLeadsParams) {
   return useQuery({
     queryKey: ["sales", "leads", params],
     queryFn: () => getLeadsProvider(params),
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -118,6 +126,196 @@ export function useImportLeadsMutation() {
       void queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
     },
   });
+}
+
+const IMPORT_JOB_STORAGE_KEY = "sales_lead_import_job_id";
+
+export type UseLeadImportState = {
+  isUploading: boolean;
+  isPolling: boolean;
+  jobId: string | null;
+  jobData: LeadImportJobData | null;
+  syncData: ImportLeadsSyncData | null;
+  status: "idle" | "uploading" | "polling" | "completed" | "failed";
+  error: string | null;
+};
+
+export function useLeadImport() {
+  const queryClient = useQueryClient();
+  const [jobId, setJobId] = useState<string | null>(() => {
+    try {
+      return sessionStorage.getItem(IMPORT_JOB_STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  });
+
+  const [jobData, setJobData] = useState<LeadImportJobData | null>(null);
+  const [syncData, setSyncData] = useState<ImportLeadsSyncData | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const activePollingRef = useRef<boolean>(false);
+
+  const clearSessionJob = useCallback(() => {
+    try {
+      sessionStorage.removeItem(IMPORT_JOB_STORAGE_KEY);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const saveSessionJob = useCallback((id: string) => {
+    try {
+      sessionStorage.setItem(IMPORT_JOB_STORAGE_KEY, id);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const refreshLeadsData = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
+    void queryClient.invalidateQueries({ queryKey: ["sales", "leads", "stats"] });
+    void queryClient.invalidateQueries({ queryKey: ["leads-stats"] });
+  }, [queryClient]);
+
+  const pollJob = useCallback(
+    async (targetJobId: string) => {
+      activePollingRef.current = true;
+      while (activePollingRef.current) {
+        try {
+          const res = await getLeadImportJobStatusProvider(targetJobId);
+          if (res.success && res.data) {
+            const data = res.data;
+            setJobData(data);
+
+            if (data.status === "completed") {
+              clearSessionJob();
+              activePollingRef.current = false;
+              refreshLeadsData();
+              return data;
+            }
+
+            if (data.status === "failed") {
+              clearSessionJob();
+              activePollingRef.current = false;
+              setError(data.errorMessage || "Lead import job failed.");
+              return data;
+            }
+          }
+        } catch (err: unknown) {
+          // If 404 or auth error, clear saved jobId
+          const axiosErr = err as { response?: { status?: number; data?: { message?: string } } };
+          if (axiosErr.response?.status === 404) {
+            clearSessionJob();
+            setJobId(null);
+            activePollingRef.current = false;
+            setError("Previous import job not found or has expired.");
+            return null;
+          }
+        }
+
+        if (!activePollingRef.current) break;
+        await new Promise((r) => setTimeout(r, 2500));
+      }
+      return null;
+    },
+    [clearSessionJob, refreshLeadsData]
+  );
+
+  // Resume polling on mount if a jobId was stored in sessionStorage
+  useEffect(() => {
+    if (jobId && !activePollingRef.current) {
+      void pollJob(jobId);
+    }
+
+    return () => {
+      activePollingRef.current = false;
+    };
+  }, [jobId, pollJob]);
+
+  const startImport = useCallback(
+    async (file: File, options?: ImportLeadsFileOptions) => {
+      setError(null);
+      setSyncData(null);
+      setJobData(null);
+      setIsUploading(true);
+
+      try {
+        const response = await importLeadsFileProvider(file, options);
+        setIsUploading(false);
+
+        if (!response.success) {
+          throw new Error(response.message || "Failed to start import");
+        }
+
+        const data = response.data;
+
+        // Async job (202 or inProgress 200)
+        if (data.async && data.jobId) {
+          setJobId(data.jobId);
+          saveSessionJob(data.jobId);
+          setJobData(data);
+
+          if (data.status === "completed") {
+            clearSessionJob();
+            refreshLeadsData();
+            return { mode: "async" as const, data };
+          }
+
+          void pollJob(data.jobId);
+          return { mode: "async" as const, data };
+        }
+
+        // Sync finished (200, row count <= 50)
+        setSyncData(data);
+        refreshLeadsData();
+        return { mode: "sync" as const, data };
+      } catch (err: unknown) {
+        setIsUploading(false);
+        const axiosErr = err as { response?: { data?: { message?: string } }; message?: string };
+        const msg = axiosErr.response?.data?.message || axiosErr.message || "Failed to import leads.";
+        setError(msg);
+        throw err;
+      }
+    },
+    [clearSessionJob, pollJob, refreshLeadsData, saveSessionJob]
+  );
+
+  const resetImport = useCallback(() => {
+    activePollingRef.current = false;
+    clearSessionJob();
+    setJobId(null);
+    setJobData(null);
+    setSyncData(null);
+    setError(null);
+    setIsUploading(false);
+  }, [clearSessionJob]);
+
+  let status: "idle" | "uploading" | "polling" | "completed" | "failed" = "idle";
+  if (isUploading) {
+    status = "uploading";
+  } else if (jobData) {
+    if (jobData.status === "completed") status = "completed";
+    else if (jobData.status === "failed") status = "failed";
+    else status = "polling";
+  } else if (syncData) {
+    status = "completed";
+  } else if (error) {
+    status = "failed";
+  }
+
+  return {
+    startImport,
+    resetImport,
+    status,
+    isUploading,
+    isPolling: status === "polling",
+    jobId,
+    jobData,
+    syncData,
+    error,
+  };
 }
 
 type EscalateLeadVariables = {
