@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
@@ -86,6 +87,7 @@ export function useLeadsQuery(params: GetLeadsParams) {
   return useQuery({
     queryKey: ["sales", "leads", params],
     queryFn: () => getLeadsProvider(params),
+    placeholderData: keepPreviousData,
   });
 }
 
