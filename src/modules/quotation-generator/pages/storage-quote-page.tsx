@@ -62,6 +62,7 @@ import {
 } from "../components/storage-preview-document";
 import { QuoteConcreteTab } from "../components/quote-concrete-tab";
 import { QuoteInsulationTab } from "../components/quote-insulation-tab";
+import { usePricingRulesQuery } from "../pricing-rules.hooks";
 
 const tabs = [
   { id: "breakdown", label: "Breakdown" },
@@ -206,17 +207,21 @@ export default function StorageQuotePage() {
     storageData?.project?.jobNumber ||
     "";
 
+  const { data: pricingRules } = usePricingRulesQuery();
+
   const isInitializedRef = useRef(false);
   useEffect(() => {
     if (!isInitializedRef.current) {
       isInitializedRef.current = true;
       setJobType("Storage");
       setScope("Both");
+      const defaultCost = pricingRules?.install?.storageBasic?.cost || 2.5;
+      const defaultSell = pricingRules?.install?.storageBasic?.sell || 3.25;
       if (installCost === 5.5 || installCost === 5.85) {
-        setInstallCost(2.5);
+        setInstallCost(defaultCost);
       }
       if (installSell === 8.5 || installSell === 9.0) {
-        setInstallSell(3.25);
+        setInstallSell(defaultSell);
       }
     }
   }, [
@@ -226,6 +231,7 @@ export default function StorageQuotePage() {
     installSell,
     setInstallCost,
     setInstallSell,
+    pricingRules,
   ]);
 
   useEffect(() => {
