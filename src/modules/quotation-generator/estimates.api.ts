@@ -84,8 +84,8 @@ export const DEFAULT_SCOPE: Scope = "Both";
 export interface ExtractShipperRequest {
   fileBase64: string;
   fileName: string;
-  jobType?: JobType;
-  scope?: Scope;
+  jobType?: JobType | string;
+  scope?: Scope | string;
   roof?: "screw-down" | "standing-seam" | string;
   install?: string;
   squareFootage?: number;
@@ -94,6 +94,11 @@ export interface ExtractShipperRequest {
   blendPct?: number;
   installCostPerSf?: number;
   sellPerSf?: number;
+  steelFinish?: "red-iron" | "galvanized" | string;
+  freightOverride?: number;
+  matMuOverride?: number;
+  matMuPct?: number;
+  deletedRowKeys?: string[];
 }
 
 export interface FullQuoteConcrete {
@@ -292,15 +297,16 @@ export async function extractShipperProvider(
     "/api/sales/estimates/extract-shipper",
     {
       jobType: DEFAULT_JOB_TYPE,
-      scope: DEFAULT_SCOPE,
+      scope: "both",
       roof: "screw-down",
-      install: "easy",
+      install: "medium",
       squareFootage: 0,
       sf: 0,
       useManualSquareFootage: false,
       blendPct: 50,
       installCostPerSf: 5.5,
       sellPerSf: 8.5,
+      deletedRowKeys: [],
       ...payload,
     }
   );
@@ -373,8 +379,8 @@ export interface ComputeMarginOverrideConfig {
 
 export interface ComputeEstimateRequest {
   parsedCategories?: Record<string, unknown>;
-  jobType?: JobType;
-  scope?: Scope;
+  jobType?: JobType | string;
+  scope?: Scope | string;
   squareFootage?: number;
   sf?: number;
   useManualSquareFootage?: boolean;
@@ -383,6 +389,13 @@ export interface ComputeEstimateRequest {
   install?: string;
   installCostPerSf?: number;
   sellPerSf?: number;
+  steelFinish?: "red-iron" | "galvanized" | string;
+  freightOverride?: number;
+  matMuOverride?: number;
+  matMuPct?: number;
+  materialSellOverride?: number;
+  matSellOverride?: number;
+  deletedRowKeys?: string[];
   concrete?: ComputeConcreteConfig;
   insulation?: ComputeInsulationConfig;
   salesTax?: ComputeSalesTaxConfig;
