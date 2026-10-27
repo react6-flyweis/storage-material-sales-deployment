@@ -70,7 +70,12 @@ export function QuoteBreakdownTab({
   isManualSqFt,
   estimateId,
 }: QuoteBreakdownTabProps) {
-  const { scope, pembEstimateId } = useQuotationStore();
+  const {
+    scope,
+    pembEstimateId,
+    materialSellOverride,
+    setMaterialSellOverride,
+  } = useQuotationStore();
   const isEditing = Boolean(estimateId || pembEstimateId);
   const [isSfBannerDismissed, setIsSfBannerDismissed] = useState(false);
 
@@ -355,6 +360,43 @@ export function QuoteBreakdownTab({
                         : `+ ${formatCurrency2(pricing.vendorBlendAdjustment)}`
                     }`
                   : ""}
+              </td>
+            </tr>
+
+            {/* Material Sell Override Row (Matching SM-QuotingTool-v5) */}
+            <tr className="bg-[#F0F7FF] border-t border-b border-[#BCD7F5]">
+              <td className="p-3" colSpan={3}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm select-none">📝</span>
+                  <span className="font-bold text-[#1E3A8A] text-xs sm:text-sm">
+                    Material Sell Override
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-normal">
+                    Enter to override shipper price
+                  </span>
+                </div>
+              </td>
+              <td className="p-3" colSpan={2}>
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-600 font-bold text-xs">$</span>
+                  <input
+                    type="number"
+                    step="1"
+                    placeholder="Auto"
+                    value={materialSellOverride}
+                    onChange={(e) => setMaterialSellOverride(e.target.value)}
+                    className="w-32 px-2.5 py-1 text-xs font-semibold text-slate-900 bg-white border border-[#2B6CB0] rounded-md shadow-2xs focus:outline-none focus:ring-1 focus:ring-[#2B6CB0]"
+                  />
+                  {materialSellOverride && (
+                    <button
+                      type="button"
+                      onClick={() => setMaterialSellOverride("")}
+                      className="px-2.5 py-1 bg-slate-400 hover:bg-slate-500 text-white rounded text-[11px] font-medium transition-colors cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
               </td>
             </tr>
 
