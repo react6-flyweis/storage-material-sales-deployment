@@ -1,15 +1,17 @@
-import { useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router";
-// import { Printer, Loader2 } from "lucide-react";
+import { Printer, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 import {
-  // downloadPdfProvider,
+  downloadPdfProvider,
   type ExtractShipperResponseData,
   type ExtractDrawingResponseData,
   type PreviewDocumentRequest,
 } from "../estimates.api";
+import { downloadPdfFromBase64 } from "../utils/pdf-download";
 import { useQuotationPricing } from "../hooks/use-quotation-pricing";
 import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
 import { ServerDocumentPreview } from "./server-document-preview";
@@ -45,8 +47,8 @@ export function QuoteDetailTab({
   pdfFileName,
   estimateId,
   onQuotePreview,
-  // onSaveDraft,
-  // isSavingDraft,
+  onSaveDraft,
+  isSavingDraft,
   onBackToBreakdown,
 }: QuoteDetailTabProps) {
   const navigate = useNavigate();
@@ -63,7 +65,7 @@ export function QuoteDetailTab({
     setInstallSell,
   } = useQuotationStore();
 
-  // const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
   const {
     customerLeadName,
@@ -127,48 +129,50 @@ export function QuoteDetailTab({
     payload: previewPayload,
   });
 
-  // const handlePrint = () => {
-  //   const originalTitle = document.title;
-  //   const safeCustomer = (customerLeadName || "Quote").replace(/[^a-zA-Z0-9_-]/g, "_");
-  //   document.title = `Quote_Package_${safeCustomer}`;
-  //   window.print();
-  //   document.title = originalTitle;
-  // };
+  const handlePrint = () => {
+    const originalTitle = document.title;
+    const safeCustomer = (customerLeadName || "Quote").replace(/[^a-zA-Z0-9_-]/g, "_");
+    document.title = `Quote_Package_${safeCustomer}`;
+    window.print();
+    document.title = originalTitle;
+  };
 
-  // const handleDownloadPdf = async () => {
-  //   setIsDownloadingPdf(true);
-  //   try {
-  //     const payload: PreviewDocumentRequest = {
-  //       leadCompanyName: customerLeadName,
-  //       customerEmail,
-  //       streetAddress: customerAddress,
-  //       cityStateZip: customerAddress,
-  //       buildingSize: displayBuildingSize,
-  //       squareFootage: effectiveSqFt,
-  //       jobNumber: quotationForm?.jobNumber || extractedDrawing?.extracted?.jobnumber || "",
-  //       pricingResult: extractedShipper?.pricing,
-  //       fullQuote: extractedShipper?.fullQuote || (extractedShipper?.pricing as Record<string, unknown> | undefined),
-  //       extractedDrawingFields: extractedDrawing?.extracted,
-  //       drawingAttachments: pdfFileName ? [{ name: pdfFileName, includeInQuote: true }] : [],
-  //       sections: pdfFileName ? ["quote", "sow", "contract", "drawings"] : ["quote", "sow", "contract"],
-  //     };
-  //     const res = await downloadPdfProvider(payload, estimateId || undefined);
-  //     const pdfData = res.data || res;
-  //     if (pdfData?.fileBase64) {
-  //       const a = document.createElement("a");
-  //       a.href = `data:${pdfData.mimeType || "application/pdf"};base64,${pdfData.fileBase64}`;
-  //       a.download = pdfData.fileName || `Quote_${(customerLeadName || "Package").replace(/\s+/g, "_")}.pdf`;
-  //       a.click();
-  //     } else {
-  //       handlePrint();
-  //     }
-  //   } catch (err) {
-  //     console.error("Failed to download PDF via API, opening print dialog:", err);
-  //     handlePrint();
-  //   } finally {
-  //     setIsDownloadingPdf(false);
-  //   }
-  // };
+  const handleDownloadPdf = async () => {
+    setIsDownloadingPdf(true);
+    try {
+      const payload: PreviewDocumentRequest = {
+        leadCompanyName: customerLeadName,
+        customerEmail,
+        streetAddress: customerAddress,
+        cityStateZip: customerAddress,
+        buildingSize: displayBuildingSize,
+        squareFootage: effectiveSqFt,
+        jobNumber: quotationForm?.jobNumber || extractedDrawing?.extracted?.jobnumber || "",
+        pricingResult: extractedShipper?.pricing,
+        fullQuote: extractedShipper?.fullQuote || (extractedShipper?.pricing as Record<string, unknown> | undefined),
+        extractedDrawingFields: extractedDrawing?.extracted,
+        drawingAttachments: pdfFileName ? [{ name: pdfFileName, includeInQuote: true }] : [],
+        sections: pdfFileName ? ["quote", "sow", "contract", "drawings"] : ["quote", "sow", "contract"],
+      };
+      const res = await downloadPdfProvider(payload, estimateId || undefined);
+      const pdfData = res?.data || res;
+      if (pdfData?.fileBase64) {
+        downloadPdfFromBase64(
+          pdfData.fileBase64,
+          pdfData.fileName || `Quote_${(customerLeadName || "Package").replace(/\s+/g, "_")}.pdf`,
+          pdfData.mimeType || "application/pdf"
+        );
+        toast.success("PDF downloaded successfully");
+      } else {
+        handlePrint();
+      }
+    } catch (err) {
+      console.error("Failed to download PDF via API, opening print dialog:", err);
+      handlePrint();
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -391,21 +395,23 @@ export function QuoteDetailTab({
         >
           Quote Preview
         </Button>
-        {/* <Button
-          type="button"
-          onClick={onSaveDraft}
-          disabled={isSavingDraft}
-          className="bg-[#16A34A] hover:bg-[#15803D] text-white px-6 py-2.5 rounded-lg text-xs font-semibold cursor-pointer shadow-xs flex items-center gap-2"
-        >
-          {isSavingDraft && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-          {isSavingDraft
-            ? estimateId
-              ? "Updating Changes..."
-              : "Saving..."
-            : estimateId
-              ? "Update Changes"
-              : "Save to History"}
-        </Button>
+        {onSaveDraft && (
+          <Button
+            type="button"
+            onClick={onSaveDraft}
+            disabled={isSavingDraft}
+            className="bg-[#16A34A] hover:bg-[#15803D] text-white px-6 py-2.5 rounded-lg text-xs font-semibold cursor-pointer shadow-xs flex items-center gap-2"
+          >
+            {isSavingDraft && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {isSavingDraft
+              ? estimateId
+                ? "Updating Changes..."
+                : "Saving..."
+              : estimateId
+                ? "Update Changes"
+                : "Save to History"}
+          </Button>
+        )}
         <Button
           type="button"
           variant="outline"
@@ -419,7 +425,7 @@ export function QuoteDetailTab({
             <Printer className="h-3.5 w-3.5" />
           )}
           {isDownloadingPdf ? "Downloading PDF..." : "Print / Save PDF"}
-        </Button> */}
+        </Button>
       </div>
     </div>
   );

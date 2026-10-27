@@ -13,6 +13,7 @@ import { mapExtractedDrawingToFormData } from "../utils/extracted-drawing-mapper
 import { QuoteBreakdownPricingSection } from "../components/quote-breakdown-pricing-section";
 import { QuotationStickerTool } from "../components/quotation-sticker-tool";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
+import { usePricingRulesQuery } from "../pricing-rules.hooks";
 import type {
   ExtractDrawingResponseData,
   ExtractShipperResponseData,
@@ -22,6 +23,21 @@ export default function PembQuotePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [isCustomerInfoOpen, setIsCustomerInfoOpen] = useState(false);
+
+  // Load pricing rules on quoting mount
+  const { data: pricingRules } = usePricingRulesQuery();
+
+  useEffect(() => {
+    if (pricingRules?.install?.pembMedium) {
+      const store = useQuotationStore.getState();
+      if (store.installCost === 5.5 && pricingRules.install.pembMedium.cost) {
+        store.setInstallCost(pricingRules.install.pembMedium.cost);
+      }
+      if (store.installSell === 8.5 && pricingRules.install.pembMedium.sell) {
+        store.setInstallSell(pricingRules.install.pembMedium.sell);
+      }
+    }
+  }, [pricingRules]);
 
   const {
     pembLeadId,

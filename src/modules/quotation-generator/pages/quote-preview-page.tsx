@@ -1,18 +1,19 @@
 import { useState, useRef, useMemo, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router";
-import { ArrowLeft, FolderUp, Loader2, FileSearch } from "lucide-react";
+import { ArrowLeft, FolderUp, Loader2, FileSearch, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 import {
-  // downloadPdfProvider,
+  downloadPdfProvider,
   saveEstimateProvider,
   type ExtractDrawingResponseData,
   type ExtractShipperResponseData,
   type PreviewDocumentRequest,
 } from "../estimates.api";
+import { downloadPdfFromBase64 } from "../utils/pdf-download";
 import { useQuotationPricing } from "../hooks/use-quotation-pricing";
 import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
 import { ServerDocumentPreview } from "../components/server-document-preview";
@@ -22,7 +23,7 @@ export function QuotePreviewPage() {
   const location = useLocation();
   const previewSectionRef = useRef<HTMLDivElement>(null);
 
-  // const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [isSavingEstimate, setIsSavingEstimate] = useState(false);
 
   const navState = (location.state || {}) as {
@@ -202,83 +203,83 @@ export function QuotePreviewPage() {
     });
   };
 
-  // const handlePrint = () => {
-  //   const originalTitle = document.title;
-  //   const safeCustomer = (customerLeadName || "Quote").replace(
-  //     /[^a-zA-Z0-9_-]/g,
-  //     "_"
-  //   );
-  //   document.title = `Quote_Package_${safeCustomer}`;
-  //   window.print();
-  //   document.title = originalTitle;
-  // };
+  const handlePrint = () => {
+    const originalTitle = document.title;
+    const safeCustomer = (customerLeadName || "Quote").replace(
+      /[^a-zA-Z0-9_-]/g,
+      "_"
+    );
+    document.title = `Quote_Package_${safeCustomer}`;
+    window.print();
+    document.title = originalTitle;
+  };
 
-  // const handleDownloadPdf = async () => {
-  //   setIsDownloadingPdf(true);
-  //   try {
-  //     const activeEstId =
-  //       estimateId || pembEstimateId || navState.estimateId || undefined;
-  //     const payload: PreviewDocumentRequest = {
-  //       estimateId: activeEstId,
-  //       jobType: "PEMB",
-  //       leadCompanyName: customerLeadName,
-  //       customerEmail,
-  //       streetAddress: customerAddress,
-  //       cityStateZip: customerAddress,
-  //       buildingSize: displayBuildingSize,
-  //       squareFootage: effectiveSqFt,
-  //       jobNumber:
-  //         navState.quotationForm?.jobNumber ||
-  //         navState.extractedDrawing?.extracted?.jobnumber ||
-  //         "",
-  //       pricingResult: navState.extractedShipper?.pricing,
-  //       fullQuote:
-  //         navState.extractedShipper?.fullQuote ||
-  //         (navState.extractedShipper?.pricing as
-  //           | Record<string, unknown>
-  //           | undefined),
-  //       contract: {
-  //         customer: customerLeadName,
-  //         address: customerAddress,
-  //         city: customerAddress,
-  //         email: customerEmail,
-  //         date: quoteDate,
-  //         deposit: "forty-percent (40%)",
-  //         type:
-  //           scope?.toLowerCase() === "both"
-  //             ? "both"
-  //             : scope?.toLowerCase() === "install"
-  //             ? "install"
-  //             : "supply",
-  //         value: totalSellFormatted,
-  //       },
-  //       extractedDrawingFields: navState.extractedDrawing?.extracted,
-  //       drawingAttachments: selectedPdf
-  //         ? [{ name: selectedPdf.name, includeInQuote: true }]
-  //         : [],
-  //       sections: selectedPdf
-  //         ? ["quote", "sow", "contract", "drawings"]
-  //         : ["quote", "sow", "contract"],
-  //     };
-  //     const res = await downloadPdfProvider(payload, activeEstId);
-  //     const pdfData = res.data || res;
-  //     if (pdfData?.fileBase64) {
-  //       const a = document.createElement("a");
-  //       a.href = `data:${pdfData.mimeType || "application/pdf"};base64,${pdfData.fileBase64}`;
-  //       a.download =
-  //         pdfData.fileName ||
-  //         `Quote_${(customerLeadName || "Package").replace(/\s+/g, "_")}.pdf`;
-  //       a.click();
-  //     } else {
-  //       handlePrint();
-  //     }
-  //   } catch (err) {
-  //     console.error("Failed to download PDF via API, opening print dialog:", err);
-  //     handlePrint();
-  //   } finally {
-  //     setIsDownloadingPdf(false);
-  //   }
-  // };
+  const handleDownloadPdf = async () => {
+    setIsDownloadingPdf(true);
+    try {
+      const activeEstId =
+        estimateId || pembEstimateId || navState.estimateId || undefined;
+      const payload: PreviewDocumentRequest = {
+        estimateId: activeEstId,
+        jobType: "PEMB",
+        leadCompanyName: customerLeadName,
+        customerEmail,
+        streetAddress: customerAddress,
+        cityStateZip: customerAddress,
+        buildingSize: displayBuildingSize,
+        squareFootage: effectiveSqFt,
+        jobNumber:
+          navState.quotationForm?.jobNumber ||
+          navState.extractedDrawing?.extracted?.jobnumber ||
+          "",
+        pricingResult: navState.extractedShipper?.pricing,
+        fullQuote:
+          navState.extractedShipper?.fullQuote ||
+          (navState.extractedShipper?.pricing as
+            | Record<string, unknown>
+            | undefined),
+        contract: {
+          customer: customerLeadName,
+          address: customerAddress,
+          city: customerAddress,
+          email: customerEmail,
+          date: quoteDate,
+          deposit: "forty-percent (40%)",
+          type:
+            scope?.toLowerCase() === "both"
+              ? "both"
+              : scope?.toLowerCase() === "install"
+              ? "install"
+              : "supply",
+          value: totalSellFormatted,
+        },
+        extractedDrawingFields: navState.extractedDrawing?.extracted,
+        drawingAttachments: selectedPdf
+          ? [{ name: selectedPdf.name, includeInQuote: true }]
+          : [],
+        sections: selectedPdf
+          ? ["quote", "sow", "contract", "drawings"]
+          : ["quote", "sow", "contract"],
+      };
+      const res = await downloadPdfProvider(payload, activeEstId);
+      const pdfData = res?.data || res;
+      if (pdfData?.fileBase64) {
+        downloadPdfFromBase64(
+          pdfData.fileBase64,
+          pdfData.fileName || `Quote_${(customerLeadName || "Package").replace(/\s+/g, "_")}.pdf`,
+          pdfData.mimeType || "application/pdf"
+        );
+        toast.success("PDF downloaded successfully");
+      } else {
+        handlePrint();
+      }
+    } catch (err) {
+      console.error("Failed to download PDF via API, opening print dialog:", err);
+      handlePrint();
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
 
   const handleSaveToHistory = async () => {
     setIsSavingEstimate(true);
@@ -475,7 +476,7 @@ export function QuotePreviewPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* <Button
+          <Button
             type="button"
             onClick={handleDownloadPdf}
             disabled={isDownloadingPdf}
@@ -487,7 +488,7 @@ export function QuotePreviewPage() {
               <Printer className="h-4 w-4" />
             )}
             {isDownloadingPdf ? "Generating PDF..." : "Generate & Print PDF"}
-          </Button> */}
+          </Button>
           <Button
             type="button"
             onClick={handleSaveToHistory}

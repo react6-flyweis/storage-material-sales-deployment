@@ -4,17 +4,18 @@ import {
   ArrowLeft,
   FolderUp,
   Loader2,
-  //  RefreshCw, Printer
+  Printer,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getApiErrorMessage } from "@/lib/api-error";
 import {
-  // downloadPdfProvider,
+  downloadPdfProvider,
   saveEstimateProvider,
   type PreviewDocumentRequest,
 } from "../estimates.api";
+import { downloadPdfFromBase64 } from "../utils/pdf-download";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
 import { ServerDocumentPreview } from "../components/server-document-preview";
@@ -116,8 +117,7 @@ export function StoragePreviewPage() {
     }
   }, [navState.estimateId, storeStorageEstimateId, setStorageEstimateId]);
 
-  // const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
-  // const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [isSavingEstimate, setIsSavingEstimate] = useState(false);
 
   const isEditing = Boolean(
@@ -169,139 +169,105 @@ export function StoragePreviewPage() {
     });
   };
 
-  // const handlePrint = () => {
-  //   const originalTitle = document.title;
-  //   const safeCustomer = (customerLeadName || "Storage_Quote").replace(/[^a-zA-Z0-9_-]/g, "_");
-  //   document.title = `Storage_Quote_${safeCustomer}`;
-  //   window.print();
-  //   document.title = originalTitle;
-  // };
+  const handlePrint = () => {
+    const originalTitle = document.title;
+    const safeCustomer = (customerLeadName || "Storage_Quote").replace(/[^a-zA-Z0-9_-]/g, "_");
+    document.title = `Storage_Quote_${safeCustomer}`;
+    window.print();
+    document.title = originalTitle;
+  };
 
-  // const handleDownloadPdf = async () => {
-  //   setIsDownloadingPdf(true);
-  //   try {
-  //     const activeDrawings = storageDrawings.filter((d) => d.includeInPackage !== false);
-  //     const drawingAttachments = activeDrawings.map((d) => ({
-  //       name: d.name,
-  //       fileBase64: d.data?.includes(",") ? d.data.split(",")[1] : d.data,
-  //       includeInQuote: true,
-  //     }));
+  const handleDownloadPdf = async () => {
+    setIsDownloadingPdf(true);
+    try {
+      const activeDrawings = storageDrawings.filter((d) => d.includeInPackage !== false);
+      const drawingAttachments = activeDrawings.map((d) => ({
+        name: d.name,
+        fileBase64: d.data?.includes(",") ? d.data.split(",")[1] : d.data,
+        includeInQuote: true,
+      }));
 
-  //     const payload = {
-  //       jobType: "Storage",
-  //       estimateId: estimateId || undefined,
-  //       scope:
-  //         (scope || "Both").toLowerCase() === "supply"
-  //           ? "Supply"
-  //           : (scope || "Both").toLowerCase() === "install"
-  //           ? "Install"
-  //           : "Both",
-  //       leadCompanyName: customerLeadName || "Customer",
-  //       customerEmail,
-  //       streetAddress: customerAddress,
-  //       cityStateZip: customerAddress,
-  //       jobNumber: jobNumber || "8098",
-  //       buildingSize:
-  //         storageData?.buildings?.map((b) => `${b.width}x${b.length}`).join(", ") ||
-  //         "Storage Complex",
-  //       squareFootage:
-  //         Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) ||
-  //         storageData?.buildings?.reduce(
-  //           (acc, b) =>
-  //             acc +
-  //             (Number(b.sqft || b.squareFootage) ||
-  //               Number(b.width || 0) * Number(b.length || 0)),
-  //           0
-  //         ) ||
-  //         0,
-  //       sf:
-  //         Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) ||
-  //         storageData?.buildings?.reduce(
-  //           (acc, b) =>
-  //             acc +
-  //             (Number(b.sqft || b.squareFootage) ||
-  //               Number(b.width || 0) * Number(b.length || 0)),
-  //           0
-  //         ) ||
-  //         0,
-  //       pricingResult: storagePricing as Record<string, unknown>,
-  //       storagePricingResult: storagePricing as Record<string, unknown>,
-  //       storagePricing: storagePricing as Record<string, unknown>,
-  //       storageData: storageData as Record<string, unknown>,
-  //       concreteAddon: {
-  //         include: navState.concreteInclude,
-  //       },
-  //       insulationAddon: {
-  //         include: navState.insulationInclude,
-  //       },
-  //       salesTax: {
-  //         include: navState.includeTax,
-  //         rate: navState.taxRate,
-  //       },
-  //       drawingAttachments,
-  //       sections: drawingAttachments.length > 0
-  //         ? ["quote", "sow", "contract", "drawings"]
-  //         : ["quote", "sow", "contract"],
-  //       format: "pdf",
-  //     };
+      const activeEstId =
+        estimateId || storeStorageEstimateId || navState.estimateId || undefined;
 
-  //     const activeEstId =
-  //       estimateId || storeStorageEstimateId || navState.estimateId || undefined;
-  //     const res = await downloadPdfProvider(payload, activeEstId);
-  //     const pdfData = res.data || res;
+      const payload: PreviewDocumentRequest = {
+        jobType: "Storage",
+        estimateId: activeEstId,
+        scope:
+          (scope || "Both").toLowerCase() === "supply"
+            ? "Supply"
+            : (scope || "Both").toLowerCase() === "install"
+            ? "Install"
+            : "Both",
+        leadCompanyName: customerLeadName || "Customer",
+        customerEmail,
+        streetAddress: customerAddress,
+        cityStateZip: customerAddress,
+        jobNumber: jobNumber || "8098",
+        buildingSize:
+          storageData?.buildings?.map((b) => `${b.width}x${b.length}`).join(", ") ||
+          "Storage Complex",
+        squareFootage:
+          Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) ||
+          storageData?.buildings?.reduce(
+            (acc, b) =>
+              acc +
+              (Number(b.sqft || b.squareFootage) ||
+                Number(b.width || 0) * Number(b.length || 0)),
+            0
+          ) ||
+          0,
+        sf:
+          Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) ||
+          storageData?.buildings?.reduce(
+            (acc, b) =>
+              acc +
+              (Number(b.sqft || b.squareFootage) ||
+                Number(b.width || 0) * Number(b.length || 0)),
+            0
+          ) ||
+          0,
+        pricingResult: storagePricing as Record<string, unknown>,
+        storagePricingResult: storagePricing as Record<string, unknown>,
+        storagePricing: storagePricing as Record<string, unknown>,
+        storageData: storageData as Record<string, unknown>,
+        concreteAddon: {
+          include: navState.concreteInclude,
+        },
+        insulationAddon: {
+          include: navState.insulationInclude,
+        },
+        salesTax: {
+          include: navState.includeTax,
+          rate: navState.taxRate,
+        },
+        drawingAttachments,
+        sections: drawingAttachments.length > 0
+          ? ["quote", "sow", "contract", "drawings"]
+          : ["quote", "sow", "contract"],
+        format: "pdf",
+      };
 
-  //     const fileName =
-  //       pdfData?.fileName ||
-  //       `Storage_Quote_${(customerLeadName || "Customer").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
+      const res = await downloadPdfProvider(payload, activeEstId);
+      const pdfData = res?.data || res;
 
-  //     // 1. Check for base64 string
-  //     const base64 =
-  //       typeof pdfData === "string"
-  //         ? pdfData
-  //         : pdfData?.fileBase64 ||
-  //           (pdfData as { base64?: string })?.base64 ||
-  //           (pdfData as { pdfBase64?: string })?.pdfBase64;
-
-  //     if (base64) {
-  //       const cleanBase64 = base64.includes(",") ? base64.split(",")[1] : base64;
-  //       const byteCharacters = atob(cleanBase64);
-  //       const byteNumbers = new Array(byteCharacters.length);
-  //       for (let i = 0; i < byteCharacters.length; i++) {
-  //         byteNumbers[i] = byteCharacters.charCodeAt(i);
-  //       }
-  //       const byteArray = new Uint8Array(byteNumbers);
-  //       const blob = new Blob([byteArray], { type: pdfData?.mimeType || "application/pdf" });
-  //       const blobUrl = URL.createObjectURL(blob);
-
-  //       const a = document.createElement("a");
-  //       a.href = blobUrl;
-  //       a.download = fileName;
-  //       document.body.appendChild(a);
-  //       a.click();
-  //       document.body.removeChild(a);
-  //       URL.revokeObjectURL(blobUrl);
-  //       return;
-  //     }
-
-  //     // 2. Check for URL redirect
-  //     const downloadUrl =
-  //       (pdfData as { url?: string; downloadUrl?: string })?.url ||
-  //       (pdfData as { url?: string; downloadUrl?: string })?.downloadUrl;
-  //     if (downloadUrl) {
-  //       window.open(downloadUrl, "_blank");
-  //       return;
-  //     }
-
-  //     // 3. Fallback to print dialog if stream was empty
-  //     console.warn("Backend did not return base64 PDF stream, falling back to print dialog.");
-  //     handlePrint();
-  //   } catch (err) {
-  //     console.error("Failed to generate PDF via server API:", err);
-  //     handlePrint();
-  //   } finally {
-  //     setIsDownloadingPdf(false);
-  //   }
-  // };
+      if (pdfData?.fileBase64) {
+        downloadPdfFromBase64(
+          pdfData.fileBase64,
+          pdfData.fileName || `Storage_Quote_${(customerLeadName || "Customer").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`,
+          pdfData.mimeType || "application/pdf"
+        );
+        toast.success("PDF downloaded successfully");
+      } else {
+        handlePrint();
+      }
+    } catch (err) {
+      console.error("Failed to generate PDF via server API:", err);
+      handlePrint();
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
 
   const handleSaveToHistory = async () => {
     setIsSavingEstimate(true);
@@ -561,16 +527,6 @@ export function StoragePreviewPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* <Button
-            type="button"
-            variant="outline"
-            onClick={handleRefreshPreview}
-            disabled={isRefreshing || isPreviewLoading}
-            className="border-slate-300 text-slate-700 hover:bg-slate-50 px-3.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer bg-white"
-          >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing || isPreviewLoading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
           <Button
             type="button"
             onClick={handleDownloadPdf}
@@ -583,7 +539,7 @@ export function StoragePreviewPage() {
               <Printer className="h-4 w-4" />
             )}
             {isDownloadingPdf ? "Generating PDF..." : "Generate & Print PDF"}
-          </Button> */}
+          </Button>
           <Button
             type="button"
             onClick={handleSaveToHistory}

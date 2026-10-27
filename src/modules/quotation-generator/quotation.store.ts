@@ -18,6 +18,8 @@ export interface QuotationState {
   blendPercentage: number;
   installDifficulty: string;
   squareFootage: number;
+  materialSellOverride: string;
+  deletedRowKeys: string[];
 
   // PEMB Specific State
   pembLeadId: string;
@@ -102,6 +104,11 @@ export interface QuotationState {
   buildingSize: string;
   setBuildingSize: (buildingSize: string) => void;
   setSquareFootage: (squareFootage: number) => void;
+  setMaterialSellOverride: (override: string) => void;
+  setDeletedRowKeys: (keys: string[]) => void;
+  addDeletedRowKey: (key: string) => void;
+  removeDeletedRowKey: (key: string) => void;
+  clearDeletedRowKeys: () => void;
 
   // PEMB Actions
   setPembLeadData: (data: {
@@ -196,9 +203,11 @@ export const useQuotationStore = create<QuotationState>((set) => ({
   installCost: 5.5,
   installSell: 8.5,
   blendPercentage: 50,
-  installDifficulty: "easy",
+  installDifficulty: "medium",
   buildingSize: "",
   squareFootage: 0,
+  materialSellOverride: "",
+  deletedRowKeys: [],
 
   // Concrete initial state
   concreteInclude: false,
@@ -313,6 +322,19 @@ export const useQuotationStore = create<QuotationState>((set) => ({
   setInstallDifficulty: (installDifficulty) => set({ installDifficulty }),
   setBuildingSize: (buildingSize) => set({ buildingSize }),
   setSquareFootage: (squareFootage) => set({ squareFootage }),
+  setMaterialSellOverride: (materialSellOverride) => set({ materialSellOverride }),
+  setDeletedRowKeys: (deletedRowKeys) => set({ deletedRowKeys }),
+  addDeletedRowKey: (key) =>
+    set((state) => ({
+      deletedRowKeys: state.deletedRowKeys.includes(key)
+        ? state.deletedRowKeys
+        : [...state.deletedRowKeys, key],
+    })),
+  removeDeletedRowKey: (key) =>
+    set((state) => ({
+      deletedRowKeys: state.deletedRowKeys.filter((k) => k !== key),
+    })),
+  clearDeletedRowKeys: () => set({ deletedRowKeys: [] }),
 
   // PEMB Actions
   setPembLeadData: (data) =>
@@ -350,6 +372,8 @@ export const useQuotationStore = create<QuotationState>((set) => ({
       pembExtractedShipper: null,
       pembPdfFileName: "",
       pembEstimateId: null,
+      materialSellOverride: "",
+      deletedRowKeys: [],
     }),
   resetPembFiles: () =>
     set((state) => ({
@@ -357,6 +381,8 @@ export const useQuotationStore = create<QuotationState>((set) => ({
       pembExtractedShipper: null,
       pembPdfFileName: "",
       pembEstimateId: null,
+      materialSellOverride: "",
+      deletedRowKeys: [],
       buildingSize: state.pembBuildingSize || "",
       squareFootage: state.pembSquareFootage
         ? parseFloat(state.pembSquareFootage) || 0

@@ -1,12 +1,14 @@
 import { useState, useMemo } from "react";
-import { Sparkles, Check, RotateCcw, Edit3, Save } from "lucide-react";
+import { Sparkles, Check, RotateCcw, Edit3, Save, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
-  // downloadPdfProvider,
+  downloadPdfProvider,
   type ExtractShipperResponseData,
   type ExtractDrawingResponseData,
   type PreviewDocumentRequest,
 } from "../estimates.api";
+import { downloadPdfFromBase64 } from "../utils/pdf-download";
 import { useSowDocument } from "../hooks/use-sow-document";
 import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
 import { ServerDocumentPreview } from "./server-document-preview";
@@ -36,7 +38,7 @@ export function QuoteSowTab({
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  // const [isDownloadingSow, setIsDownloadingSow] = useState(false);
+  const [isDownloadingSow, setIsDownloadingSow] = useState(false);
 
   const sow = useSowDocument({
     extractedShipper,
@@ -101,44 +103,45 @@ export function QuoteSowTab({
     setTimeout(() => setAiFeedback(null), 4000);
   };
 
-  // const handleDownloadSowPdf = async () => {
-  //   setIsDownloadingSow(true);
-  //   const customerName = sow.pricingData.customerLeadName || "Customer";
-  //   try {
-  //     const payload: PreviewDocumentRequest = {
-  //       leadCompanyName: customerName,
-  //       customerEmail: quotationForm?.email || sow.pricingData.customerEmail,
-  //       streetAddress: sow.pricingData.customerAddress,
-  //       cityStateZip: sow.pricingData.customerAddress,
-  //       buildingSize: sow.pricingData.displayBuildingSize,
-  //       squareFootage: sow.pricingData.effectiveSqFt,
-  //       jobNumber: quotationForm?.jobNumber || extractedDrawing?.extracted?.jobnumber || "",
-  //       pricingResult: extractedShipper?.pricing,
-  //       fullQuote:
-  //         extractedShipper?.fullQuote ||
-  //         (extractedShipper?.pricing as Record<string, unknown> | undefined),
-  //       extractedDrawingFields: extractedDrawing?.extracted,
-  //       drawingAttachments: [],
-  //       sections: ["sow"],
-  //     };
+  const handleDownloadSowPdf = async () => {
+    setIsDownloadingSow(true);
+    const customerName = sow.pricingData.customerLeadName || "Customer";
+    try {
+      const payload: PreviewDocumentRequest = {
+        leadCompanyName: customerName,
+        customerEmail: quotationForm?.email || sow.pricingData.customerEmail,
+        streetAddress: sow.pricingData.customerAddress,
+        cityStateZip: sow.pricingData.customerAddress,
+        buildingSize: sow.pricingData.displayBuildingSize,
+        squareFootage: sow.pricingData.effectiveSqFt,
+        jobNumber: quotationForm?.jobNumber || extractedDrawing?.extracted?.jobnumber || "",
+        pricingResult: extractedShipper?.pricing,
+        fullQuote:
+          extractedShipper?.fullQuote ||
+          (extractedShipper?.pricing as Record<string, unknown> | undefined),
+        extractedDrawingFields: extractedDrawing?.extracted,
+        drawingAttachments: [],
+        sections: ["sow"],
+      };
 
-  //     const res = await downloadPdfProvider(payload, estimateId || undefined);
-  //     const pdfData = res.data || res;
+      const res = await downloadPdfProvider(payload, estimateId || undefined);
+      const pdfData = res?.data || res;
 
-  //     if (pdfData?.fileBase64) {
-  //       const a = document.createElement("a");
-  //       a.href = `data:${pdfData.mimeType || "application/pdf"};base64,${pdfData.fileBase64}`;
-  //       a.download =
-  //         pdfData.fileName ||
-  //         `SOW_${customerName.replace(/\s+/g, "_")}.pdf`;
-  //       a.click();
-  //     }
-  //   } catch (err) {
-  //     console.error("Failed to download SOW PDF, opening print dialog:", err);
-  //   } finally {
-  //     setIsDownloadingSow(false);
-  //   }
-  // };
+      if (pdfData?.fileBase64) {
+        downloadPdfFromBase64(
+          pdfData.fileBase64,
+          pdfData.fileName || `SOW_${customerName.replace(/\s+/g, "_")}.pdf`,
+          pdfData.mimeType || "application/pdf"
+        );
+        toast.success("SOW PDF downloaded");
+      }
+    } catch (err) {
+      console.error("Failed to download SOW PDF:", err);
+      toast.error("Failed to download SOW PDF");
+    } finally {
+      setIsDownloadingSow(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -274,7 +277,7 @@ export function QuoteSowTab({
         >
           Quote Preview →
         </Button>
-        {/* <Button
+        <Button
           type="button"
           variant="outline"
           onClick={handleDownloadSowPdf}
@@ -289,7 +292,7 @@ export function QuoteSowTab({
           ) : (
             <span>SOW Only (PDF)</span>
           )}
-        </Button> */}
+        </Button>
       </div>
     </div>
   );

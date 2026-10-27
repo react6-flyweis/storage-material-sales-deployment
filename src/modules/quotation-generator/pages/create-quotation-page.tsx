@@ -17,6 +17,70 @@ import {
 import { useLeadsLookupQuery, useLeadDetailQuery } from "@/modules/leads/leads.hooks";
 import { getLeadProjectName } from "@/modules/leads/leads.utils";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
+import { parseLocationFallback } from "@/lib/address";
+import type { InstallAddress } from "@/types/address.types";
+
+function getLeadAddressFields(
+  sourceLead?: {
+    installAddress?: InstallAddress | null;
+    city?: string;
+    state?: string;
+    pincode?: string;
+    location?: string;
+  } | null,
+  fallbackLead?: {
+    installAddress?: InstallAddress | null;
+    city?: string;
+    state?: string;
+    pincode?: string;
+    location?: string;
+  } | null
+) {
+  const installAddr = sourceLead?.installAddress || fallbackLead?.installAddress;
+  const rawLocation = sourceLead?.location || fallbackLead?.location || "";
+  const fallbackParsed = parseLocationFallback(rawLocation);
+
+  const line1 =
+    installAddr?.line1?.trim() ||
+    fallbackParsed.line1 ||
+    "";
+  const line2 =
+    installAddr?.line2?.trim() ||
+    fallbackParsed.line2 ||
+    "";
+
+  let street = [line1, line2].filter(Boolean).join(", ");
+
+  const city =
+    installAddr?.city?.trim() ||
+    sourceLead?.city?.trim() ||
+    fallbackLead?.city?.trim() ||
+    fallbackParsed.city ||
+    "";
+
+  const state =
+    installAddr?.state?.trim() ||
+    sourceLead?.state?.trim() ||
+    fallbackLead?.state?.trim() ||
+    fallbackParsed.state ||
+    "";
+
+  const postalCode =
+    installAddr?.postalCode?.trim() ||
+    sourceLead?.pincode?.trim() ||
+    fallbackLead?.pincode?.trim() ||
+    fallbackParsed.postalCode ||
+    "";
+
+  const stateZip = [state, postalCode].filter(Boolean).join(" ");
+  const cityStateZip = [city, stateZip].filter(Boolean).join(", ");
+
+  if (!street && rawLocation && !cityStateZip) {
+    street = rawLocation;
+  }
+
+  return { street, cityStateZip };
+}
 
 const createQuotationSchema = z.object({
   leadId: z.string().min(1, "Lead selection is required"),
@@ -123,7 +187,7 @@ export default function CreateQuotationPage() {
         "";
 
       const email = customer?.email || lookupItem?.customerId?.email || "";
-      const street = lead?.location || lookupItem?.location || "";
+      const { street, cityStateZip } = getLeadAddressFields(lead, lookupItem);
 
       let bSize = "";
       if (lead?.width && lead?.length && lead?.height) {
@@ -144,6 +208,7 @@ export default function CreateQuotationPage() {
       setValue("leadName", name);
       setValue("email", email);
       setValue("street", street);
+      setValue("cityStateZip", cityStateZip);
       setValue("buildingSize", bSize);
       setValue("squareFootage", sqftStr);
       setValue("jobNumber", jobId);
@@ -153,12 +218,14 @@ export default function CreateQuotationPage() {
         `${lookupItem.customerId?.firstName || ""} ${lookupItem.customerId?.lastName || ""}`.trim() ||
         lookupItem.projectName;
 
+      const { street, cityStateZip } = getLeadAddressFields(lookupItem);
       const bSize = "";
       const sqftStr = "";
 
       setValue("leadName", name);
       setValue("email", lookupItem.customerId?.email || "");
-      setValue("street", lookupItem.location || "");
+      setValue("street", street);
+      setValue("cityStateZip", cityStateZip);
       setValue("buildingSize", bSize);
       setValue("squareFootage", sqftStr);
       setValue("jobNumber", lookupItem.jobId || "");
