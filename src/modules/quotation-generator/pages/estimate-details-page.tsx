@@ -19,6 +19,7 @@ import {
   type SaveEstimatePayload,
   type PreviewDocumentRequest,
 } from "../estimates.api";
+import { downloadPdfFromBase64 } from "../utils/pdf-download";
 import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
 import { ServerDocumentPreview } from "../components/server-document-preview";
 import { useLoadEstimateToEditor } from "../hooks/use-load-estimate-to-editor";
@@ -132,19 +133,35 @@ export function EstimateDetailPage() {
     if (!id) return;
     setIsDownloadingPdf(true);
     try {
-      await downloadPdfProvider({
-        estimateId: id,
-        jobType: isStorage ? "Storage" : "PEMB",
-        format: "pdf",
-        customerLeadName,
-        customerEmail,
-        customerAddress,
-        jobNumber,
-        pricingResult: estimate?.pricingResult,
-        storageData: estimate?.storageData || undefined,
-        storagePricingResult: estimate?.storagePricingResult || undefined,
-        fullQuote: estimate?.fullQuoteResult,
-      });
+      const res = await downloadPdfProvider(
+        {
+          estimateId: id,
+          jobType: isStorage ? "Storage" : "PEMB",
+          format: "pdf",
+          customerLeadName,
+          customerEmail,
+          customerAddress,
+          jobNumber,
+          pricingResult: estimate?.pricingResult,
+          storageData: estimate?.storageData || undefined,
+          storagePricingResult: estimate?.storagePricingResult || undefined,
+          fullQuote: estimate?.fullQuoteResult,
+          sections: ["quote", "sow", "contract"],
+        },
+        id
+      );
+
+      const pdfData = res?.data || res;
+      if (pdfData?.fileBase64) {
+        downloadPdfFromBase64(
+          pdfData.fileBase64,
+          pdfData.fileName || `${customerLeadName || "Estimate"}_Quote.pdf`,
+          pdfData.mimeType || "application/pdf"
+        );
+        toast.success("PDF downloaded successfully");
+      } else {
+        toast.error("No PDF content returned by server");
+      }
     } catch (err) {
       console.error("Failed to generate PDF:", err);
       const msg = getApiErrorMessage(
