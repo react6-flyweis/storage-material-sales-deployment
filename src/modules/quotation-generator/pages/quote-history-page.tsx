@@ -4,10 +4,12 @@ import {
   ArrowLeft,
   Search,
   Trash2,
-  ExternalLink,
   Loader2,
   RefreshCw,
   Eye,
+  FolderOpen,
+  Banknote,
+  Milestone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -26,6 +28,11 @@ import {
   type SaveEstimatePayload,
 } from "../estimates.api";
 import { resolveQuotationLifecycle } from "@/modules/quotations/quotations.api";
+import {
+  ChangeOrderModal,
+  RequestDepositModal,
+  MilestonePaymentsModal,
+} from "../components";
 import { useLoadEstimateToEditor } from "../hooks/use-load-estimate-to-editor";
 import {
   formatCurrency2,
@@ -125,10 +132,10 @@ export function QuoteHistoryPage() {
     }
   }, [currentPage, totalPages]);
 
-  const handleClearAll = () => {
-    setEstimatesList([]);
-    setTotalItems(0);
-  };
+  // const handleClearAll = () => {
+  //   setEstimatesList([]);
+  //   setTotalItems(0);
+  // };
 
   const handleDeleteQuote = async (id?: string) => {
     if (!id) return;
@@ -149,8 +156,7 @@ export function QuoteHistoryPage() {
     }
   };
 
-  const { loadAndEdit, loadingId: hookLoadingId } =
-    useLoadEstimateToEditor();
+  const { loadAndEdit, loadingId: hookLoadingId } = useLoadEstimateToEditor();
 
   const handleLoadAndEdit = async (item: SaveEstimatePayload) => {
     try {
@@ -170,6 +176,13 @@ export function QuoteHistoryPage() {
       navigate(`/quotation/history/${item._id}`);
     }
   };
+
+  const [activeChangeOrderQuote, setActiveChangeOrderQuote] =
+    useState<SaveEstimatePayload | null>(null);
+  const [activeDepositQuote, setActiveDepositQuote] =
+    useState<SaveEstimatePayload | null>(null);
+  const [activeMilestoneQuote, setActiveMilestoneQuote] =
+    useState<SaveEstimatePayload | null>(null);
 
   const totalQuotesCount = summaryData?.totalQuotes ?? 0;
   const totalPipelineVal = summaryData?.totalValue ?? 0;
@@ -231,7 +244,7 @@ export function QuoteHistoryPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </InputGroup>
-          <Button
+          {/* <Button
             type="button"
             variant="outline"
             onClick={() => {
@@ -253,7 +266,7 @@ export function QuoteHistoryPage() {
             className="border border-slate-400 cursor-pointer"
           >
             Clear All
-          </Button>
+          </Button> */}
         </div>
       </div>
 
@@ -559,17 +572,49 @@ export function QuoteHistoryPage() {
               const quoteNumber =
                 quote.conversion?.quoteNumber || quote.quoteNumber;
 
+              const bldgVal =
+                Number(
+                  quote.buildingSubtotal ??
+                    quote.materialCost ??
+                    pricingRes?.matSell ??
+                    pricingRes?.matCost,
+                ) || 0;
+
+              const installVal =
+                Number(
+                  quote.installCost ??
+                    pricingRes?.instSell ??
+                    pricingRes?.instCost,
+                ) || 0;
+
+              const formatK = (val: number) => {
+                if (!val) return "$0";
+                if (val >= 1000) {
+                  return `$${Math.round(val / 1000)}k`;
+                }
+                return `$${Math.round(val).toLocaleString()}`;
+              };
+
+              // const blendPctVal =
+              //   quote.blendPct ??
+              //   (pricingRes?.blendPct as number | undefined) ??
+              //   50;
+
               return (
                 <div
                   key={quote._id || String(quote.jobNumber || Math.random())}
-                  className="bg-[#f2fcf6] border-l-4 border-l-[#22c55e] border border-emerald-200/60 rounded-xl p-4 md:p-5 shadow-xs flex flex-col md:flex-row md:items-stretch justify-between gap-4 transition-all hover:shadow-sm"
+                  className="bg-[#f2fcf6] border border-emerald-300/80 rounded-2xl p-4 md:p-5 shadow-xs flex flex-col gap-4 transition-all hover:shadow-sm"
                 >
-                  {/* Left Side Quote Details */}
-                  <div className="flex flex-col justify-between space-y-1.5 min-w-0">
-                    <div>
+                  {/* Top Section */}
+                  <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                    {/* Left Details */}
+                    <div className="space-y-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-sm font-bold text-slate-900 leading-snug">
-                          {quote.leadCompanyName || "Customer Quote"}
+                        <h3 className="text-sm md:text-base font-bold text-slate-900 leading-snug">
+                          {quote.cityStateZip ||
+                            quote.streetAddress ||
+                            quote.leadCompanyName ||
+                            "Location"}
                         </h3>
                         {quoteNumber && (
                           <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-bold text-[10px] border border-blue-200">
@@ -577,156 +622,183 @@ export function QuoteHistoryPage() {
                           </span>
                         )}
                       </div>
-                      <div className="text-xs text-slate-500 font-normal mt-1 flex flex-wrap items-center gap-1.5">
-                        <span>{quote.scope?.toUpperCase() || "SUPPLY"}</span>
+                      <div className="text-xs text-slate-500 font-medium flex flex-wrap items-center gap-1.5">
+                        <span>{quote.leadCompanyName || "TBD"}</span>
+                        <span>·</span>
+                        <span>{quote.scope?.toUpperCase() || "Supply"}</span>
                         <span>·</span>
                         <span>{formatNumber2(effectiveSqFt)} SF</span>
                         <span>·</span>
                         <span>{displayBuilding}</span>
-                        <span>·</span>
-                        <span>
-                          {quote.cityStateZip ||
-                            quote.streetAddress ||
-                            "Location"}
-                        </span>
+                        {formattedDate && (
+                          <>
+                            <span>·</span>
+                            <span>{formattedDate}</span>
+                          </>
+                        )}
                       </div>
+                      {(bldgVal > 0 || installVal > 0) && (
+                        <div className="flex items-center gap-3 pt-1">
+                          {bldgVal > 0 && (
+                            <span className="text-xs font-bold text-[#2563eb]">
+                              Bldgs {formatK(bldgVal)}
+                            </span>
+                          )}
+                          {installVal > 0 && (
+                            <span className="text-xs font-bold text-[#16a34a]">
+                              Install {formatK(installVal)}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <div className="text-xs font-semibold text-[#2563eb] pt-1">
-                      Job #{quote.jobNumber || "Draft"} ·{" "}
-                      {quote.sourceFileName ||
-                        (isStorage ? "Storage_COG.xlsx" : "Drawing.pdf")}
-                      {formattedDate ? ` · ${formattedDate}` : ""}
-                    </div>
-                  </div>
 
-                  {/* Right Side Quote Metrics & Action Buttons */}
-                  <div className="flex flex-col items-end justify-between gap-4 shrink-0">
-                    {/* Top Right Price Metrics Stack */}
-                    <div className="text-right leading-tight space-y-0.5">
-                      <div className="flex items-center justify-end gap-2">
+                    {/* Right Details: Badges & Financial Metrics */}
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      {/* Top Badges Row */}
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold text-xs uppercase">
+                          {isStorage
+                            ? "STORAGE"
+                            : quote.jobType?.toUpperCase() || "PEMB"}
+                        </span>
                         {(() => {
                           const lifecycle = resolveQuotationLifecycle(quote);
                           switch (lifecycle.lifecycleStatus) {
-                            case "customer_rejected":
-                              return (
-                                <span className="px-3 py-1 rounded-md bg-rose-100 text-rose-800 font-bold text-sm border border-rose-300 shadow-2xs">
-                                  Declined by Customer
-                                </span>
-                              );
-                            case "admin_rejected":
-                              return (
-                                <span
-                                  className="px-3 py-1 rounded-md bg-red-100 text-red-800 font-bold text-sm border border-red-300 shadow-2xs"
-                                  title={
-                                    quote.approval?.rejectionReason ||
-                                    "Approval Rejected"
-                                  }
-                                >
-                                  Admin Rejected
-                                </span>
-                              );
-                            case "customer_accepted":
-                              return (
-                                <span className="px-3 py-1 rounded-md bg-emerald-100 text-emerald-800 font-bold text-sm border border-emerald-300 shadow-2xs">
-                                  Accepted by Customer
-                                </span>
-                              );
-                            case "pending_approval":
-                              return (
-                                <span className="px-3 py-1 rounded-md bg-amber-100 text-amber-800 font-bold text-sm border border-amber-300 shadow-2xs">
-                                  Pending Approval
-                                </span>
-                              );
                             case "approved":
                               return (
-                                <span className="px-3 py-1 rounded-md bg-emerald-100 text-emerald-800 font-bold text-sm border border-emerald-300 shadow-2xs">
-                                  Approved
+                                <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs flex items-center gap-1">
+                                  <span>✅</span>
+                                  <span>Approved</span>
                                 </span>
                               );
                             case "sent":
                               return (
-                                <span className="px-3 py-1 rounded-md bg-blue-100 text-blue-800 font-bold text-sm border border-blue-300 shadow-2xs">
-                                  Sent
+                                <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-300 font-bold text-xs flex items-center gap-1">
+                                  <span>📬</span>
+                                  <span>Sent</span>
+                                </span>
+                              );
+                            case "pending_approval":
+                              return (
+                                <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 font-bold text-xs flex items-center gap-1">
+                                  <span>⏳</span>
+                                  <span>Pending Approval</span>
+                                </span>
+                              );
+                            case "customer_accepted":
+                              return (
+                                <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs flex items-center gap-1">
+                                  <span>🤝</span>
+                                  <span>Accepted</span>
+                                </span>
+                              );
+                            case "customer_rejected":
+                            case "admin_rejected":
+                              return (
+                                <span className="px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-300 font-bold text-xs flex items-center gap-1">
+                                  <span>❌</span>
+                                  <span>Rejected</span>
                                 </span>
                               );
                             default:
                               return (
-                                <span className="px-3 py-1 rounded-md bg-slate-100 text-slate-700 font-semibold text-sm border border-slate-300">
+                                <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-300 font-medium text-xs">
                                   Draft
                                 </span>
                               );
                           }
                         })()}
-                        <div className="text-sm font-bold text-[#2563eb]">
+                        {/* <span className="text-xs font-semibold text-slate-500">
+                          {blendPctVal}% Quicken blend
+                        </span> */}
+                      </div>
+
+                      {/* Financial Numbers Stack */}
+                      <div className="text-right leading-tight space-y-0.5 pt-1">
+                        <div className="text-base md:text-lg font-black text-[#2563eb]">
                           {formatCurrency2(totSell)}
                         </div>
-                      </div>
-                      <div className="text-[11px] font-normal text-slate-500">
-                        {formatSfPrice2(sfPrice)}/SF
-                      </div>
-                      <div className="flex items-center justify-end gap-1 text-xs font-semibold text-[#16a34a]">
-                        <span>💰</span>
-                        <span>{formatCurrency2(prof)}</span>
-                      </div>
-                      <div className="text-xs font-semibold text-[#16a34a]">
-                        {formatPercent2(marginPct)}
+                        <div className="text-[11px] font-normal text-slate-500">
+                          {formatSfPrice2(sfPrice)}/SF
+                        </div>
+                        <div className="flex items-center justify-end gap-1 text-xs font-semibold text-[#16a34a]">
+                          <span>💰</span>
+                          <span>{formatCurrency2(prof)}</span>
+                        </div>
+                        <div className="text-xs font-semibold text-[#16a34a]">
+                          {formatPercent2(marginPct)}
+                        </div>
                       </div>
                     </div>
+                  </div>
 
-                    {/* Bottom Right Badge & Action Buttons */}
-                    <div className="flex flex-wrap items-center gap-2.5">
-                      <div className="flex items-center gap-1.5 mr-1">
-                        <span
-                          className={`px-1.5 py-0.5 rounded-xs text-[10px] font-bold tracking-wide uppercase ${
-                            isStorage
-                              ? "bg-amber-100 text-amber-900"
-                              : "bg-[#dbeafe] text-[#2563eb]"
-                          }`}
-                        >
-                          {isStorage
-                            ? "STORAGE COG"
-                            : quote.jobType?.toUpperCase() || "PEMB"}
-                        </span>
-                      </div>
+                  {/* Bottom Row Action Buttons */}
+                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-emerald-200/60">
+                    <Button
+                      type="button"
+                      onClick={() => handleLoadAndEdit(quote)}
+                      disabled={hookLoadingId === quote._id}
+                      className="bg-[#1e3a8a] hover:bg-[#172554] text-white h-8 px-3 text-xs font-medium rounded-md cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                    >
+                      {hookLoadingId === quote._id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <FolderOpen className="h-3.5 w-3.5" />
+                      )}
+                      <span>Load & Edit</span>
+                    </Button>
 
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => handleDeleteQuote(quote._id)}
-                        className="border border-[#f97316] text-[#f97316] hover:bg-orange-50 h-8 px-2.5 text-xs font-medium rounded-md bg-white cursor-pointer flex items-center gap-1.5"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Delete
-                      </Button>
+                    <Button
+                      type="button"
+                      onClick={() => setActiveChangeOrderQuote(quote)}
+                      className="bg-[#1e3a8a] hover:bg-[#172554] text-white h-8 px-3 text-xs font-medium rounded-md cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      <span>Change Order</span>
+                    </Button>
 
-                      <Button
-                        type="button"
-                        onClick={() => handleLoadAndEdit(quote)}
-                        disabled={hookLoadingId === quote._id}
-                        className="bg-[#1e3e66] hover:bg-[#152e4d] text-white h-8 px-3 text-xs font-medium rounded-md cursor-pointer flex items-center gap-1.5 shadow-xs"
-                      >
-                        {hookLoadingId === quote._id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        )}
-                        Load & Edit
-                      </Button>
+                    <Button
+                      type="button"
+                      onClick={() => setActiveDepositQuote(quote)}
+                      className="bg-[#15803d] hover:bg-[#166534] text-white h-8 px-3 text-xs font-medium rounded-md cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <Banknote className="h-3.5 w-3.5" />
+                      <span>Request Deposit</span>
+                    </Button>
 
-                      <Button
-                        type="button"
-                        onClick={() => handlePreviewQuote(quote)}
-                        disabled={hookLoadingId === quote._id}
-                        className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white h-8 px-3.5 text-xs font-semibold rounded-md cursor-pointer flex items-center gap-1.5 shadow-xs"
-                      >
-                        {hookLoadingId === quote._id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Eye className="h-3.5 w-3.5" />
-                        )}
-                        Preview
-                      </Button>
-                    </div>
+                    <Button
+                      type="button"
+                      onClick={() => setActiveMilestoneQuote(quote)}
+                      className="bg-[#7c3aed] hover:bg-[#6d28d9] text-white h-8 px-3 text-xs font-medium rounded-md cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <Milestone className="h-3.5 w-3.5" />
+                      <span>Milestones</span>
+                    </Button>
+
+                    <Button
+                      type="button"
+                      onClick={() => handlePreviewQuote(quote)}
+                      disabled={hookLoadingId === quote._id}
+                      className="bg-[#f1f5f9] hover:bg-slate-200 text-slate-800 border border-slate-300 h-8 px-3 text-xs font-medium rounded-md cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                    >
+                      {hookLoadingId === quote._id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Eye className="h-3.5 w-3.5" />
+                      )}
+                      <span>Preview</span>
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => handleDeleteQuote(quote._id)}
+                      className="border border-[#f97316] text-[#f97316] hover:bg-orange-50 bg-white h-8 px-2.5 text-xs font-medium rounded-md cursor-pointer flex items-center gap-1.5 ml-auto sm:ml-0"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span>Delete</span>
+                    </Button>
                   </div>
                 </div>
               );
@@ -750,6 +822,28 @@ export function QuoteHistoryPage() {
           </div>
         )}
       </div>
+
+      {/* Action Modals */}
+      <ChangeOrderModal
+        open={Boolean(activeChangeOrderQuote)}
+        onOpenChange={(open) => !open && setActiveChangeOrderQuote(null)}
+        quote={activeChangeOrderQuote}
+        onSuccess={() => fetchHistory()}
+      />
+
+      <RequestDepositModal
+        open={Boolean(activeDepositQuote)}
+        onOpenChange={(open) => !open && setActiveDepositQuote(null)}
+        quote={activeDepositQuote}
+        onSuccess={() => fetchHistory()}
+      />
+
+      <MilestonePaymentsModal
+        open={Boolean(activeMilestoneQuote)}
+        onOpenChange={(open) => !open && setActiveMilestoneQuote(null)}
+        quote={activeMilestoneQuote}
+        onSuccess={() => fetchHistory()}
+      />
     </div>
   );
 }
