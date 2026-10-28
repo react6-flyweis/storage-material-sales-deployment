@@ -16,6 +16,7 @@ import { QuoteMarginTab } from "./quote-margin-tab";
 import { QuoteCogsTab } from "./quote-cogs-tab";
 import { QuoteConcreteTab } from "./quote-concrete-tab";
 import { QuoteInsulationTab } from "./quote-insulation-tab";
+import { QuoteAddOnsTab } from "./quote-addons-tab";
 import { QuoteContractTab } from "./quote-contract-tab";
 import {
   extractShipperProvider,
@@ -57,11 +58,12 @@ const tabs = [
   { id: "breakdown", label: "Breakdown" },
   { id: "quote", label: "Quote" },
   { id: "sow", label: "Statement of Work" },
-  { id: "margin", label: "Margin" },
-  { id: "cogs", label: "COGS" },
-  { id: "concrete", label: "Concrete" },
-  { id: "insulation", label: "Insulation" },
-  { id: "contract", label: "Contract" },
+  { id: "margin", label: "📊 Margin" },
+  { id: "cogs", label: "🧮 COGS" },
+  { id: "concrete", label: "🪨 Concrete" },
+  { id: "insulation", label: "🧱 Insulation" },
+  { id: "addons", label: "➕ Add-Ons" },
+  { id: "contract", label: "📄 Contract" },
 ];
 
 interface QuoteBreakdownPricingSectionProps {
@@ -136,6 +138,10 @@ export function QuoteBreakdownPricingSection({
     freightOverride,
     materialSellOverride,
     deletedRowKeys,
+    isMultiStory,
+    staircaseCount,
+    staircaseUnitPrice,
+    pembAddOns,
     pembExtractedShipper,
     setPembExtractedShipper,
     pembLeadId,
@@ -236,6 +242,7 @@ export function QuoteBreakdownPricingSection({
   const handleSaveDraft = useCallback(async () => {
     if (!shipperData) return;
     setIsSavingDraft(true);
+    const storeState = useQuotationStore.getState();
     const activeEstimateId =
       estimateId || propEstimateId || pembEstimateId || undefined;
     try {
@@ -319,6 +326,31 @@ export function QuoteBreakdownPricingSection({
             include: includeTax,
             zip: taxZip,
           },
+          pembAddOns: (storeState.pembAddOns || []).map((addon) => ({
+            item: addon.item,
+            cost: Number(addon.cost) || 0,
+            markupPct: Number(addon.markupPct) || 0,
+            inQuote: Boolean(addon.inQuote),
+            inSow: Boolean(addon.inSow),
+          })),
+          staircase:
+            storeState.staircaseCount > 0
+              ? {
+                  count: storeState.staircaseCount,
+                  unitCost: storeState.staircaseUnitPrice || 35000,
+                  stories: 2,
+                }
+              : undefined,
+          multiStory:
+            storeState.isMultiStory || storeState.staircaseCount > 0
+              ? {
+                  stories: 2,
+                  staircaseCount: storeState.staircaseCount,
+                  staircaseUnitCost: storeState.staircaseUnitPrice || 35000,
+                }
+              : undefined,
+          pembDrawings: 0,
+          pembIncludeErection: scope === "Both" || scope === "Install",
           cogsOverride: cogsOverrideApplied
             ? {
                 applied: true,
@@ -480,6 +512,11 @@ export function QuoteBreakdownPricingSection({
       marginLaborOverride,
       marginTargetMargin,
       marginFixedSellOverride,
+      isMultiStory,
+      staircaseCount,
+      staircaseUnitPrice,
+      pembAddOnsLength: pembAddOns?.length || 0,
+      pembAddOnsSummary: (pembAddOns || []).map((a) => `${a.item}:${a.cost}:${a.markupPct}:${a.inQuote}`).join(";"),
     });
   }, [
     sqFt,
@@ -518,6 +555,10 @@ export function QuoteBreakdownPricingSection({
     marginLaborOverride,
     marginTargetMargin,
     marginFixedSellOverride,
+    isMultiStory,
+    staircaseCount,
+    staircaseUnitPrice,
+    pembAddOns,
   ]);
 
   // Compute estimate function
@@ -591,6 +632,31 @@ export function QuoteBreakdownPricingSection({
             include: includeTax,
             zip: taxZip,
           },
+          pembAddOns: (storeState.pembAddOns || []).map((addon) => ({
+            item: addon.item,
+            cost: Number(addon.cost) || 0,
+            markupPct: Number(addon.markupPct) || 0,
+            inQuote: Boolean(addon.inQuote),
+            inSow: Boolean(addon.inSow),
+          })),
+          staircase:
+            storeState.staircaseCount > 0
+              ? {
+                  count: storeState.staircaseCount,
+                  unitCost: storeState.staircaseUnitPrice || 35000,
+                  stories: 2,
+                }
+              : undefined,
+          multiStory:
+            storeState.isMultiStory || storeState.staircaseCount > 0
+              ? {
+                  stories: 2,
+                  staircaseCount: storeState.staircaseCount,
+                  staircaseUnitCost: storeState.staircaseUnitPrice || 35000,
+                }
+              : undefined,
+          pembDrawings: 0,
+          pembIncludeErection: scope === "Both" || scope === "Install",
           cogsOverride: cogsOverrideApplied
             ? {
                 applied: true,
@@ -971,6 +1037,7 @@ export function QuoteBreakdownPricingSection({
               estimateId={estimateId || undefined}
               onBackToBreakdown={() => setActiveTab("breakdown")}
               onQuotePreview={handleNavigateToPreview}
+              onTriggerCompute={executeCompute}
             />
           </TabsContent>
 
@@ -1006,6 +1073,11 @@ export function QuoteBreakdownPricingSection({
               sqFt={sqFt}
               onTriggerCompute={executeCompute}
             />
+          </TabsContent>
+
+          {/* Add-Ons Tab */}
+          <TabsContent value="addons" className="m-0 outline-none">
+            <QuoteAddOnsTab onTriggerCompute={executeCompute} />
           </TabsContent>
 
           {/* Contract Tab */}

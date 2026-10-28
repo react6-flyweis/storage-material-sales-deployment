@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
+import { Loader2, Download } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -9,6 +10,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
+import {
+  createCustomQuoteProvider,
+  previewCustomQuoteProvider,
+  downloadCustomQuotePdfProvider,
+} from "../custom-quotes.api";
+import { downloadPdfFromBase64 } from "../utils/pdf-download";
 
 interface CalculationResult {
   totalCost: number;
@@ -46,6 +53,8 @@ export default function CustomQuote() {
 
   // Calculation Results
   const [calcResult, setCalcResult] = useState<CalculationResult | null>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const calculateNumbers = (): CalculationResult => {
     const mat = parseFloat(materialCost) || 0;
@@ -84,22 +93,94 @@ export default function CustomQuote() {
     };
   };
 
-  const handleCalculate = () => {
-    const result = calculateNumbers();
-    setCalcResult(result);
-    toast.success(
-      `Calculated: Total Sell $${Math.round(result.totalSell).toLocaleString()} (${result.marginPercent.toFixed(1)}% margin)`
-    );
+  const handleCalculate = async () => {
+    const mat = parseFloat(materialCost) || 0;
+    const freight = parseFloat(freightCost) || 0;
+    const labor = parseFloat(laborCost) || 0;
+    const marginPct = parseFloat(targetMargin) || 0;
+    const fixedSell = parseFloat(fixedSellPrice) || null;
+
+    setIsCalculating(true);
+    try {
+      const preview = await previewCustomQuoteProvider({
+        matCost: mat,
+        freight,
+        laborCost: labor,
+        marginPct,
+        sellOverride: fixedSell,
+      });
+
+      const res: CalculationResult = {
+        totalCost: preview.totalCost,
+        totalSell: preview.sell,
+        profit: preview.profit,
+        marginPercent: preview.profPct,
+      };
+      setCalcResult(res);
+      toast.success(
+        `Calculated: Total Sell $${Math.round(res.totalSell).toLocaleString()} (${res.marginPercent.toFixed(1)}% margin)`
+      );
+    } catch {
+      const localResult = calculateNumbers();
+      setCalcResult(localResult);
+      toast.success(
+        `Calculated: Total Sell $${Math.round(localResult.totalSell).toLocaleString()} (${localResult.marginPercent.toFixed(1)}% margin)`
+      );
+    } finally {
+      setIsCalculating(false);
+    }
   };
 
-  const handleGenerateQuote = () => {
+  const handleGenerateQuote = async () => {
     if (!customerCompany.trim()) {
       toast.error("Please enter a Customer / Company name");
       return;
     }
 
-    const result = calculateNumbers();
-    setCalcResult(result);
+    const mat = parseFloat(materialCost) || 0;
+    const freight = parseFloat(freightCost) || 0;
+    const labor = parseFloat(laborCost) || 0;
+    const marginPct = parseFloat(targetMargin) || 0;
+    const fixedSell = parseFloat(fixedSellPrice) || null;
+    const validDays = parseInt(quoteValidDays) || 15;
+
+    setIsSaving(true);
+    let savedQuoteId = "";
+    try {
+      const savedDoc = await createCustomQuoteProvider({
+        customer: customerCompany.trim(),
+        location: location.trim(),
+        size: buildingSize.trim(),
+        scope,
+        expDays: validDays,
+        matCost: mat,
+        freight,
+        laborCost: labor,
+        marginPct,
+        sellOverride: fixedSell,
+        inclusions: includedScope.split("\n").filter(Boolean),
+        exclusions: excludedScope.split("\n").filter(Boolean),
+        sow: {
+          overview: `${scope} for ${buildingSize.trim()}`,
+          terms: `Valid for ${validDays} days`,
+        },
+      });
+      if (savedDoc?._id) {
+        savedQuoteId = savedDoc._id;
+        setCalcResult({
+          totalCost: savedDoc.totalCost,
+          totalSell: savedDoc.sell,
+          profit: savedDoc.profit,
+          marginPercent: savedDoc.profPct,
+        });
+      }
+    } catch (err) {
+      console.warn("Server custom-quote creation failed, proceeding with local preview state:", err);
+    } finally {
+      setIsSaving(false);
+    }
+
+    const result = calcResult || calculateNumbers();
 
     // Save lead details to store
     setPembLeadData({
@@ -123,14 +204,15 @@ export default function CustomQuote() {
             year: "numeric",
           }),
           quoteValidDays: quoteValidDays || "15",
+          ...(savedQuoteId ? { customQuoteId: savedQuoteId } : {}),
         },
         buildingSize: buildingSize.trim(),
         customPricing: {
-          materialCost: parseFloat(materialCost) || 0,
-          freightCost: parseFloat(freightCost) || 0,
-          laborCost: parseFloat(laborCost) || 0,
-          targetMargin: parseFloat(targetMargin) || 20,
-          fixedSellPrice: parseFloat(fixedSellPrice) || 0,
+          materialCost: mat,
+          freightCost: freight,
+          laborCost: labor,
+          targetMargin: marginPct,
+          fixedSellPrice: fixedSell || 0,
           totalCost: result.totalCost,
           totalSell: result.totalSell,
           profit: result.profit,
@@ -140,6 +222,51 @@ export default function CustomQuote() {
         },
       },
     });
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!customerCompany.trim()) {
+      toast.error("Please enter a Customer / Company name first");
+      return;
+    }
+    const mat = parseFloat(materialCost) || 0;
+    const freight = parseFloat(freightCost) || 0;
+    const labor = parseFloat(laborCost) || 0;
+    const marginPct = parseFloat(targetMargin) || 0;
+    const fixedSell = parseFloat(fixedSellPrice) || null;
+    const validDays = parseInt(quoteValidDays) || 15;
+
+    setIsSaving(true);
+    try {
+      const savedDoc = await createCustomQuoteProvider({
+        customer: customerCompany.trim(),
+        location: location.trim(),
+        size: buildingSize.trim(),
+        scope,
+        expDays: validDays,
+        matCost: mat,
+        freight,
+        laborCost: labor,
+        marginPct,
+        sellOverride: fixedSell,
+        inclusions: includedScope.split("\n").filter(Boolean),
+        exclusions: excludedScope.split("\n").filter(Boolean),
+      });
+
+      const pdfRes = await downloadCustomQuotePdfProvider(savedDoc._id);
+      const b64 = pdfRes.data?.fileBase64 || pdfRes.fileBase64;
+      if (b64) {
+        downloadPdfFromBase64(
+          b64,
+          pdfRes.data?.fileName || pdfRes.fileName || `Custom-Quote-${customerCompany.trim()}.pdf`
+        );
+        toast.success("Custom Quote PDF downloaded!");
+      }
+    } catch {
+      toast.error("Failed to generate PDF from server");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -309,20 +436,33 @@ export default function CustomQuote() {
           </div>
 
           {/* Buttons Row */}
-          <div className="flex items-center gap-3 pt-2">
+          <div className="flex flex-wrap items-center gap-3 pt-2">
             <button
               type="button"
+              disabled={isCalculating}
               onClick={handleCalculate}
-              className="px-6 py-2.5 bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-sm font-semibold rounded-lg shadow-xs transition-colors cursor-pointer"
+              className="px-6 py-2.5 bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-sm font-semibold rounded-lg shadow-xs transition-colors cursor-pointer flex items-center gap-2"
             >
-              Calculate
+              {isCalculating && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isCalculating ? "Calculating..." : "Calculate"}
             </button>
             <button
               type="button"
+              disabled={isSaving}
               onClick={handleGenerateQuote}
-              className="px-6 py-2.5 bg-[#0e3a8c] hover:bg-[#0b2f73] text-white text-sm font-semibold rounded-lg shadow-xs transition-colors cursor-pointer"
+              className="px-6 py-2.5 bg-[#0e3a8c] hover:bg-[#0b2f73] text-white text-sm font-semibold rounded-lg shadow-xs transition-colors cursor-pointer flex items-center gap-2"
             >
+              {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
               Generate Quote
+            </button>
+            <button
+              type="button"
+              disabled={isSaving}
+              onClick={handleDownloadPdf}
+              className="px-5 py-2.5 bg-slate-700 hover:bg-slate-800 text-white text-sm font-semibold rounded-lg shadow-xs transition-colors cursor-pointer flex items-center gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Download PDF
             </button>
           </div>
 

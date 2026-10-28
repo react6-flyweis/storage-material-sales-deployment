@@ -186,6 +186,9 @@ export interface FullQuoteData {
   concrete?: FullQuoteConcrete;
   insulation?: FullQuoteInsulation;
   salesTax?: FullQuoteSalesTax;
+  pembAddOns?: unknown[];
+  pembAddOnTotals?: { sell: number; profit: number };
+  staircase?: { count: number; unitCost: number; staircaseSell: number; include: boolean };
   buildingSubtotal?: number;
   grandTotal?: number;
   pricePerSf?: string | number;
@@ -391,10 +394,26 @@ export interface ComputeEstimateRequest {
   sellPerSf?: number;
   steelFinish?: "red-iron" | "galvanized" | string;
   freightOverride?: number;
-  matMuOverride?: number;
+  matMuOverride?: number | null;
   matMuPct?: number;
   materialSellOverride?: number;
   matSellOverride?: number;
+  pembDrawings?: number;
+  pembIncludeErection?: boolean;
+  pembAddOns?: Array<{
+    item: string;
+    cost: number;
+    markupPct: number;
+    inQuote: boolean;
+    inSow: boolean;
+    [key: string]: unknown;
+  }>;
+  staircase?: {
+    count: number;
+    unitCost: number;
+    stories: number;
+    [key: string]: unknown;
+  };
   deletedRowKeys?: string[];
   concrete?: ComputeConcreteConfig;
   insulation?: ComputeInsulationConfig;
@@ -757,6 +776,10 @@ export async function extractStorageCogProvider(
 
 export interface ComputeStorageRequest {
   storageData?: Record<string, unknown>;
+  shipping?: number;
+  drawings?: number;
+  installSellPerSf?: number;
+  installCostPerSf?: number;
   concrete?: ComputeConcreteConfig;
   insulation?: ComputeInsulationConfig;
   salesTax?: ComputeSalesTaxConfig;
@@ -956,6 +979,26 @@ export interface PreviewDocumentRequest {
   concreteAddon?: { include?: boolean; [key: string]: unknown };
   insulationAddon?: { include?: boolean; [key: string]: unknown };
   salesTax?: { include?: boolean; rate?: number; [key: string]: unknown };
+  staircase?: {
+    count: number;
+    unitCost: number;
+    stories?: number;
+    [key: string]: unknown;
+  };
+  multiStory?: {
+    stories?: number;
+    staircaseCount?: number;
+    staircaseUnitCost?: number;
+    [key: string]: unknown;
+  };
+  pembAddOns?: Array<{
+    item: string;
+    cost: number;
+    markupPct: number;
+    inQuote: boolean;
+    inSow: boolean;
+    [key: string]: unknown;
+  }>;
   [key: string]: unknown;
 }
 
@@ -1074,6 +1117,186 @@ export async function previewMarginProvider(
 ): Promise<PreviewMarginResponse> {
   const response = await apiClient.post<PreviewMarginResponse>(
     "/api/sales/estimates/margin/preview",
+    payload
+  );
+  return response.data;
+}
+
+// ----------------------------------------------------------------------------
+// DEPOSITS, MILESTONES & MULTI-STORY (v7)
+// ----------------------------------------------------------------------------
+export interface DepositPreviewRequest {
+  grand: number;
+  pct?: number;
+  flat?: number;
+}
+
+export interface DepositPreviewData {
+  grand: number;
+  pct: number;
+  deposit: number;
+  balance: number;
+}
+
+export interface DepositPreviewResponse {
+  success?: boolean;
+  message?: string;
+  data?: DepositPreviewData;
+}
+
+export async function previewDepositProvider(
+  payload: DepositPreviewRequest
+): Promise<DepositPreviewData> {
+  const response = await apiClient.post<DepositPreviewResponse>(
+    "/api/sales/estimates/deposit/preview",
+    payload
+  );
+  return response.data?.data as DepositPreviewData;
+}
+
+export interface MilestoneRowPayload {
+  label: string;
+  amount: number;
+  type?: string;
+  pct?: number;
+}
+
+export interface MilestonesPreviewRequest {
+  grand: number;
+  rows: MilestoneRowPayload[];
+}
+
+export interface MilestonesPreviewData {
+  grand: number;
+  rows: Array<MilestoneRowPayload & { type: string }>;
+  scheduled: number;
+  remaining: number;
+  pct: number;
+  fullyScheduled: boolean;
+}
+
+export interface MilestonesPreviewResponse {
+  success?: boolean;
+  message?: string;
+  data?: MilestonesPreviewData;
+}
+
+export async function previewMilestonesProvider(
+  payload: MilestonesPreviewRequest
+): Promise<MilestonesPreviewData> {
+  const response = await apiClient.post<MilestonesPreviewResponse>(
+    "/api/sales/estimates/milestones/preview",
+    payload
+  );
+  return response.data?.data as MilestonesPreviewData;
+}
+
+export interface StaircasePreviewRequest {
+  count: number;
+  unitCost: number;
+  stories: number;
+}
+
+export interface StaircasePreviewData {
+  count: number;
+  unitCost: number;
+  staircaseSell: number;
+  stories: number;
+  include: boolean;
+}
+
+export interface StaircasePreviewResponse {
+  success?: boolean;
+  message?: string;
+  data?: StaircasePreviewData;
+}
+
+export async function previewStaircaseProvider(
+  payload: StaircasePreviewRequest
+): Promise<StaircasePreviewData> {
+  const response = await apiClient.post<StaircasePreviewResponse>(
+    "/api/sales/estimates/staircase/preview",
+    payload
+  );
+  return response.data?.data as StaircasePreviewData;
+}
+
+export async function saveEstimateDepositProvider(
+  estimateId: string,
+  payload: { pct?: number; flat?: number; note?: string; grand?: number }
+) {
+  const response = await apiClient.put(
+    `/api/sales/estimates/${encodeURIComponent(estimateId)}/deposit`,
+    payload
+  );
+  return response.data?.data;
+}
+
+export async function saveEstimateMilestonesProvider(
+  estimateId: string,
+  payload: { rows: MilestoneRowPayload[]; note?: string; grand?: number }
+) {
+  const response = await apiClient.put(
+    `/api/sales/estimates/${encodeURIComponent(estimateId)}/milestones`,
+    payload
+  );
+  return response.data?.data;
+}
+
+export async function saveEstimateMultiStoryProvider(
+  estimateId: string,
+  payload: { count: number; unitCost?: number; stories?: number }
+) {
+  const response = await apiClient.put(
+    `/api/sales/estimates/${encodeURIComponent(estimateId)}/multi-story`,
+    payload
+  );
+  return response.data?.data;
+}
+
+export interface EstimateDocumentReceiptResponse {
+  success?: boolean;
+  message?: string;
+  data?: {
+    fileName?: string;
+    mimeType?: string;
+    fileBase64?: string;
+    sizeBytes?: number;
+    html?: string;
+  };
+  fileName?: string;
+  mimeType?: string;
+  fileBase64?: string;
+  sizeBytes?: number;
+  html?: string;
+}
+
+export async function downloadDepositReceiptPdfProvider(payload: {
+  estimateId?: string;
+  quote?: unknown;
+  grand?: number;
+  pct?: number;
+  flat?: number;
+  note?: string;
+  format?: "html" | "pdf";
+}): Promise<EstimateDocumentReceiptResponse> {
+  const response = await apiClient.post<EstimateDocumentReceiptResponse>(
+    "/api/sales/estimates/documents/deposit-receipt/pdf",
+    payload
+  );
+  return response.data;
+}
+
+export async function downloadMilestonesPdfProvider(payload: {
+  estimateId?: string;
+  quote?: unknown;
+  grand?: number;
+  rows?: MilestoneRowPayload[];
+  note?: string;
+  format?: "html" | "pdf";
+}): Promise<EstimateDocumentReceiptResponse> {
+  const response = await apiClient.post<EstimateDocumentReceiptResponse>(
+    "/api/sales/estimates/documents/milestones/pdf",
     payload
   );
   return response.data;

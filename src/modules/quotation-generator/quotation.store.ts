@@ -7,6 +7,16 @@ import type {
 } from "./estimates.api";
 import { DEFAULT_JOB_TYPE, DEFAULT_SCOPE } from "./estimates.api";
 
+export interface PembAddOnItem {
+  id: string;
+  item: string;
+  cost: number;
+  markupPct: number;
+  note?: string;
+  inQuote: boolean;
+  inSow: boolean;
+}
+
 export interface QuotationState {
   // Shared fields between Sidebar, Sticky Header, and Quotation Views
   jobType: JobType;
@@ -20,6 +30,15 @@ export interface QuotationState {
   squareFootage: number;
   materialSellOverride: string;
   deletedRowKeys: string[];
+
+  // Multi-Story, Red Oxide & Staircase settings
+  isMultiStory: boolean;
+  isRedOxideConfirmed: boolean;
+  staircaseCount: number;
+  staircaseUnitPrice: number;
+
+  // Add-Ons settings
+  pembAddOns: PembAddOnItem[];
 
   // PEMB Specific State
   pembLeadId: string;
@@ -109,6 +128,14 @@ export interface QuotationState {
   addDeletedRowKey: (key: string) => void;
   removeDeletedRowKey: (key: string) => void;
   clearDeletedRowKeys: () => void;
+  setIsMultiStory: (isMultiStory: boolean) => void;
+  setIsRedOxideConfirmed: (isRedOxideConfirmed: boolean) => void;
+  setStaircaseCount: (staircaseCount: number) => void;
+  setStaircaseUnitPrice: (staircaseUnitPrice: number) => void;
+  setPembAddOns: (items: PembAddOnItem[]) => void;
+  addPembAddOn: (item?: Partial<PembAddOnItem>) => void;
+  updatePembAddOn: (id: string, updates: Partial<PembAddOnItem>) => void;
+  removePembAddOn: (id: string) => void;
 
   // PEMB Actions
   setPembLeadData: (data: {
@@ -208,6 +235,15 @@ export const useQuotationStore = create<QuotationState>((set) => ({
   squareFootage: 0,
   materialSellOverride: "",
   deletedRowKeys: [],
+
+  // Multi-Story, Red Oxide & Staircase initial state
+  isMultiStory: true,
+  isRedOxideConfirmed: false,
+  staircaseCount: 0,
+  staircaseUnitPrice: 35000,
+
+  // Add-Ons initial state
+  pembAddOns: [],
 
   // Concrete initial state
   concreteInclude: false,
@@ -556,4 +592,38 @@ export const useQuotationStore = create<QuotationState>((set) => ({
       marginTargetMargin: "",
       marginFixedSellOverride: "",
     }),
+
+  // Multi-Story, Red Oxide & Staircase Actions
+  setIsMultiStory: (isMultiStory) => set({ isMultiStory }),
+  setIsRedOxideConfirmed: (isRedOxideConfirmed) => set({ isRedOxideConfirmed }),
+  setStaircaseCount: (staircaseCount) => set({ staircaseCount }),
+  setStaircaseUnitPrice: (staircaseUnitPrice) => set({ staircaseUnitPrice }),
+
+  // Add-Ons Actions
+  setPembAddOns: (pembAddOns) => set({ pembAddOns }),
+  addPembAddOn: (item) =>
+    set((state) => ({
+      pembAddOns: [
+        ...state.pembAddOns,
+        {
+          id: Math.random().toString(36).substring(2, 9),
+          item: item?.item || "",
+          cost: item?.cost ?? 50,
+          markupPct: item?.markupPct ?? 25,
+          note: item?.note || "",
+          inQuote: item?.inQuote ?? true,
+          inSow: item?.inSow ?? true,
+        },
+      ],
+    })),
+  updatePembAddOn: (id, updates) =>
+    set((state) => ({
+      pembAddOns: state.pembAddOns.map((addon) =>
+        addon.id === id ? { ...addon, ...updates } : addon
+      ),
+    })),
+  removePembAddOn: (id) =>
+    set((state) => ({
+      pembAddOns: state.pembAddOns.filter((addon) => addon.id !== id),
+    })),
 }));

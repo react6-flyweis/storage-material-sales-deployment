@@ -12,6 +12,7 @@ import {
   Milestone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import ConfirmModal from "@/components/common/confirm-modal";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/lib/api-error";
 import {
@@ -137,24 +138,6 @@ export function QuoteHistoryPage() {
   //   setTotalItems(0);
   // };
 
-  const handleDeleteQuote = async (id?: string) => {
-    if (!id) return;
-    try {
-      await deleteEstimateProvider(id);
-      setEstimatesList((prev) => prev.filter((q) => q._id !== id));
-      setTotalItems((prev) => Math.max(0, prev - 1));
-      toast.success("Estimate deleted successfully");
-      fetchHistory();
-    } catch (err) {
-      console.error("Failed to delete estimate:", err);
-      const msg = getApiErrorMessage(
-        err,
-        "Failed to delete estimate. Please try again.",
-      );
-      toast.error(msg);
-      fetchHistory();
-    }
-  };
 
   const { loadAndEdit, loadingId: hookLoadingId } = useLoadEstimateToEditor();
 
@@ -183,6 +166,32 @@ export function QuoteHistoryPage() {
     useState<SaveEstimatePayload | null>(null);
   const [activeMilestoneQuote, setActiveMilestoneQuote] =
     useState<SaveEstimatePayload | null>(null);
+  const [quoteToDelete, setQuoteToDelete] =
+    useState<SaveEstimatePayload | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteConfirm = async () => {
+    if (!quoteToDelete?._id) return;
+    try {
+      setIsDeleting(true);
+      await deleteEstimateProvider(quoteToDelete._id);
+      setEstimatesList((prev) => prev.filter((q) => q._id !== quoteToDelete._id));
+      setTotalItems((prev) => Math.max(0, prev - 1));
+      toast.success("Estimate deleted successfully");
+      setQuoteToDelete(null);
+      fetchHistory();
+    } catch (err) {
+      console.error("Failed to delete estimate:", err);
+      const msg = getApiErrorMessage(
+        err,
+        "Failed to delete estimate. Please try again.",
+      );
+      toast.error(msg);
+      fetchHistory();
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const totalQuotesCount = summaryData?.totalQuotes ?? 0;
   const totalPipelineVal = summaryData?.totalValue ?? 0;
@@ -793,7 +802,7 @@ export function QuoteHistoryPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => handleDeleteQuote(quote._id)}
+                      onClick={() => setQuoteToDelete(quote)}
                       className="border border-[#f97316] text-[#f97316] hover:bg-orange-50 bg-white h-8 px-2.5 text-xs font-medium rounded-md cursor-pointer flex items-center gap-1.5 ml-auto sm:ml-0"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -844,6 +853,51 @@ export function QuoteHistoryPage() {
         quote={activeMilestoneQuote}
         onSuccess={() => fetchHistory()}
       />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        open={Boolean(quoteToDelete)}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) {
+            setQuoteToDelete(null);
+          }
+        }}
+        title="Delete Quote?"
+        description="This estimate will be permanently removed from your library."
+        confirmText="Delete"
+        variant="danger"
+        isLoading={isDeleting}
+        loadingText="Deleting..."
+        onConfirm={handleDeleteConfirm}
+      >
+        {quoteToDelete && (
+          <div className="rounded-lg border border-slate-200/80 bg-slate-50 px-3 py-2 text-xs text-slate-700 space-y-0.5">
+            <div className="font-semibold text-slate-900 truncate">
+              {quoteToDelete.cityStateZip ||
+                quoteToDelete.streetAddress ||
+                quoteToDelete.leadCompanyName ||
+                "Quotation"}
+            </div>
+            <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-1.5">
+              {quoteToDelete.leadCompanyName && (
+                <>
+                  <span className="truncate max-w-[120px]">{quoteToDelete.leadCompanyName}</span>
+                  <span>·</span>
+                </>
+              )}
+              {quoteToDelete.quoteNumber && (
+                <>
+                  <span className="font-medium text-slate-700">Quote #{quoteToDelete.quoteNumber}</span>
+                  <span>·</span>
+                </>
+              )}
+              <span className="uppercase text-[10px] font-semibold text-slate-500">
+                {quoteToDelete.scope || "Supply"}
+              </span>
+            </div>
+          </div>
+        )}
+      </ConfirmModal>
     </div>
   );
 }

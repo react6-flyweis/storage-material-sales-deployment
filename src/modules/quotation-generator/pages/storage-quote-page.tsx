@@ -62,17 +62,19 @@ import {
 } from "../components/storage-preview-document";
 import { QuoteConcreteTab } from "../components/quote-concrete-tab";
 import { QuoteInsulationTab } from "../components/quote-insulation-tab";
+import { QuoteAddOnsTab } from "../components/quote-addons-tab";
 import { usePricingRulesQuery } from "../pricing-rules.hooks";
 
 const tabs = [
   { id: "breakdown", label: "Breakdown" },
   { id: "quote", label: "Quote" },
   { id: "sow", label: "Statement of Work" },
-  { id: "margin", label: "Margin" },
-  { id: "concrete", label: "Concrete" },
-  { id: "insulation", label: "Insulation" },
+  { id: "margin", label: "📊 Margin" },
+  { id: "concrete", label: "🪨 Concrete" },
+  { id: "insulation", label: "🧱 Insulation" },
+  { id: "addons", label: "➕ Add-Ons" },
   { id: "drawings", label: "Drawings" },
-  { id: "contract", label: "Contract" },
+  { id: "contract", label: "📄 Contract" },
 ];
 
 function fileToBase64(file: File): Promise<string> {
@@ -399,6 +401,7 @@ export default function StorageQuotePage() {
     | "margin"
     | "concrete"
     | "insulation"
+    | "addons"
     | "drawings"
     | "contract"
   >("breakdown");
@@ -420,6 +423,11 @@ export default function StorageQuotePage() {
       if (!currentStorageData) return;
       setIsComputing(true);
       try {
+        const effectiveInstallSell =
+          scope.toLowerCase() === "supply" ? 0 : installSell;
+        const effectiveInstallCost =
+          scope.toLowerCase() === "supply" ? 0 : installCost;
+
         const payload = {
           storageData: {
             buildings: currentStorageData.buildings || [],
@@ -427,11 +435,13 @@ export default function StorageQuotePage() {
             extras: currentStorageData.extras || [],
             shipping: shippingVal,
             drawings: drawingsVal,
-            installSellPerSf:
-              scope.toLowerCase() === "supply" ? 0 : installSell,
-            installCostPerSf:
-              scope.toLowerCase() === "supply" ? 0 : installCost,
+            installSellPerSf: effectiveInstallSell,
+            installCostPerSf: effectiveInstallCost,
           },
+          shipping: shippingVal,
+          drawings: drawingsVal,
+          installSellPerSf: effectiveInstallSell,
+          installCostPerSf: effectiveInstallCost,
           concrete: {
             include: concreteInclude,
             costSF: concreteCostSf,
@@ -1653,6 +1663,7 @@ export default function StorageQuotePage() {
                   | "margin"
                   | "concrete"
                   | "insulation"
+                  | "addons"
                   | "drawings"
                   | "contract",
               )
@@ -2614,6 +2625,13 @@ export default function StorageQuotePage() {
                       0,
                     ),
                 )}
+                onTriggerCompute={() => triggerApiCompute(storageData)}
+              />
+            </TabsContent>
+
+            {/* TAB: ADD-ONS */}
+            <TabsContent value="addons" className="m-0 outline-none">
+              <QuoteAddOnsTab
                 onTriggerCompute={() => triggerApiCompute(storageData)}
               />
             </TabsContent>
