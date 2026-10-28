@@ -8,6 +8,8 @@ import {
   FileEdit,
   FileText,
   AlertCircle,
+  Milestone,
+  Banknote,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -24,6 +26,8 @@ import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
 import { ServerDocumentPreview } from "../components/server-document-preview";
 import { useLoadEstimateToEditor } from "../hooks/use-load-estimate-to-editor";
 import { useConvertEstimateToQuotationMutation } from "@/modules/quotations/quotations.hooks";
+import { MilestonePaymentsModal } from "../components/milestone-payments-modal";
+import { RequestDepositModal } from "../components/request-deposit-modal";
 
 export function EstimateDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -36,6 +40,8 @@ export function EstimateDetailPage() {
 
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
+  const [isMilestoneModalOpen, setIsMilestoneModalOpen] = useState(false);
+  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
 
   const { loadAndEdit, isLoading: isEditing } = useLoadEstimateToEditor();
   const convertMutation = useConvertEstimateToQuotationMutation();
@@ -92,21 +98,22 @@ export function EstimateDetailPage() {
     estimate?.status ||
     "draft";
 
-  // Server document preview request payload
+  // Server document preview request payload (History requires only estimateId and sections)
   const previewPayload: PreviewDocumentRequest | null = useMemo(() => {
-    if (!id || !estimate) return null;
+    if (!id) return null;
     return {
       estimateId: id,
+      sections: ["quote", "sow", "contract"],
       jobType: isStorage ? "Storage" : "PEMB",
-      sourceFileName: estimate.sourceFileName,
+      sourceFileName: estimate?.sourceFileName,
       customerLeadName,
       customerAddress,
       customerEmail,
       jobNumber,
-      pricingResult: estimate.pricingResult,
-      storageData: estimate.storageData || undefined,
-      storagePricingResult: estimate.storagePricingResult || undefined,
-      fullQuote: estimate.fullQuoteResult,
+      pricingResult: estimate?.pricingResult,
+      storageData: estimate?.storageData || undefined,
+      storagePricingResult: estimate?.storagePricingResult || undefined,
+      fullQuote: estimate?.fullQuoteResult,
     };
   }, [
     id,
@@ -125,7 +132,7 @@ export function EstimateDetailPage() {
     refetch: refetchPreview,
   } = useServerDocumentPreview({
     payload: previewPayload,
-    enabled: Boolean(id && estimate),
+    enabled: Boolean(id),
     debounceMs: 100,
   });
 
@@ -383,6 +390,28 @@ export function EstimateDetailPage() {
             </Button>
           )}
 
+          {/* Request Deposit Terms */}
+          <Button
+            type="button"
+            onClick={() => setIsDepositModalOpen(true)}
+            className="bg-[#15803d] hover:bg-[#166534] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
+            title="Request deposit and generate deposit receipt"
+          >
+            <Banknote className="h-4 w-4" />
+            Deposit
+          </Button>
+
+          {/* Milestone Payments Schedule */}
+          <Button
+            type="button"
+            onClick={() => setIsMilestoneModalOpen(true)}
+            className="bg-[#7c3aed] hover:bg-[#6d28d9] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
+            title="Configure milestone payment schedule for this estimate"
+          >
+            <Milestone className="h-4 w-4" />
+            Milestones
+          </Button>
+
           {/* Edit Estimate Button */}
           <Button
             type="button"
@@ -432,6 +461,27 @@ export function EstimateDetailPage() {
           minHeight={800}
         />
       </div>
+
+      {/* Milestone Payments Modal */}
+      <MilestonePaymentsModal
+        open={isMilestoneModalOpen}
+        onOpenChange={setIsMilestoneModalOpen}
+        quote={estimate ? { ...estimate, _id: id } : ({ _id: id } as SaveEstimatePayload)}
+        onSuccess={() => {
+          fetchEstimateDetail();
+          refetchPreview();
+        }}
+      />
+
+      {/* Request Deposit Modal */}
+      <RequestDepositModal
+        open={isDepositModalOpen}
+        onOpenChange={setIsDepositModalOpen}
+        quote={estimate ? { ...estimate, _id: id } : ({ _id: id } as SaveEstimatePayload)}
+        onSuccess={() => {
+          fetchEstimateDetail();
+        }}
+      />
     </div>
   );
 }
