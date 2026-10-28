@@ -70,6 +70,10 @@ export function QuotePreviewPage() {
     marginLaborOverride,
     marginTargetMargin,
     marginFixedSellOverride,
+    isMultiStory,
+    staircaseCount,
+    staircaseUnitPrice,
+    pembAddOns,
     pembEstimateId,
     setPembEstimateId,
     pembExtractedShipper,
@@ -168,6 +172,23 @@ export function QuotePreviewPage() {
       sections: selectedPdf
         ? ["quote", "sow", "contract", "drawings"]
         : ["quote", "sow", "contract"],
+      staircase: {
+        count: isMultiStory ? staircaseCount : 0,
+        unitCost: staircaseUnitPrice || 35000,
+        stories: 2,
+      },
+      multiStory: {
+        stories: 2,
+        staircaseCount: isMultiStory ? staircaseCount : 0,
+        staircaseUnitCost: staircaseUnitPrice || 35000,
+      },
+      pembAddOns: (pembAddOns || []).map((addon) => ({
+        item: addon.item,
+        cost: Number(addon.cost) || 0,
+        markupPct: Number(addon.markupPct) || 0,
+        inQuote: Boolean(addon.inQuote),
+        inSow: Boolean(addon.inSow),
+      })),
     }),
     [
       activeEstimateId,
@@ -184,6 +205,10 @@ export function QuotePreviewPage() {
       scope,
       totalSellFormatted,
       selectedPdf,
+      isMultiStory,
+      staircaseCount,
+      staircaseUnitPrice,
+      pembAddOns,
     ],
   );
 
@@ -260,6 +285,23 @@ export function QuotePreviewPage() {
         sections: selectedPdf
           ? ["quote", "sow", "contract", "drawings"]
           : ["quote", "sow", "contract"],
+        staircase: {
+          count: isMultiStory ? staircaseCount : 0,
+          unitCost: staircaseUnitPrice || 35000,
+          stories: 2,
+        },
+        multiStory: {
+          stories: 2,
+          staircaseCount: isMultiStory ? staircaseCount : 0,
+          staircaseUnitCost: staircaseUnitPrice || 35000,
+        },
+        pembAddOns: (pembAddOns || []).map((addon) => ({
+          item: addon.item,
+          cost: Number(addon.cost) || 0,
+          markupPct: Number(addon.markupPct) || 0,
+          inQuote: Boolean(addon.inQuote),
+          inSow: Boolean(addon.inSow),
+        })),
       };
       const res = await downloadPdfProvider(payload, activeEstId);
       const pdfData = res?.data || res;

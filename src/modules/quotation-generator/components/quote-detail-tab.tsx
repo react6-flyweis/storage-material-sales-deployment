@@ -63,6 +63,10 @@ export function QuoteDetailTab({
     setInstallCost,
     installSell,
     setInstallSell,
+    isMultiStory,
+    staircaseCount,
+    staircaseUnitPrice,
+    pembAddOns,
   } = useQuotationStore();
 
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
@@ -104,6 +108,23 @@ export function QuoteDetailTab({
         ? [{ name: pdfFileName, includeInQuote: true }]
         : [],
       sections: ["quote"],
+      staircase: {
+        count: isMultiStory ? staircaseCount : 0,
+        unitCost: staircaseUnitPrice || 35000,
+        stories: 2,
+      },
+      multiStory: {
+        stories: 2,
+        staircaseCount: isMultiStory ? staircaseCount : 0,
+        staircaseUnitCost: staircaseUnitPrice || 35000,
+      },
+      pembAddOns: (pembAddOns || []).map((addon) => ({
+        item: addon.item,
+        cost: Number(addon.cost) || 0,
+        markupPct: Number(addon.markupPct) || 0,
+        inQuote: Boolean(addon.inQuote),
+        inSow: Boolean(addon.inSow),
+      })),
     }),
     [
       estimateId,
@@ -117,6 +138,10 @@ export function QuoteDetailTab({
       extractedShipper?.pricing,
       extractedShipper?.fullQuote,
       pdfFileName,
+      isMultiStory,
+      staircaseCount,
+      staircaseUnitPrice,
+      pembAddOns,
     ],
   );
 
@@ -153,6 +178,23 @@ export function QuoteDetailTab({
         extractedDrawingFields: extractedDrawing?.extracted,
         drawingAttachments: pdfFileName ? [{ name: pdfFileName, includeInQuote: true }] : [],
         sections: pdfFileName ? ["quote", "sow", "contract", "drawings"] : ["quote", "sow", "contract"],
+        staircase: {
+          count: isMultiStory ? staircaseCount : 0,
+          unitCost: staircaseUnitPrice || 35000,
+          stories: 2,
+        },
+        multiStory: {
+          stories: 2,
+          staircaseCount: isMultiStory ? staircaseCount : 0,
+          staircaseUnitCost: staircaseUnitPrice || 35000,
+        },
+        pembAddOns: (pembAddOns || []).map((addon) => ({
+          item: addon.item,
+          cost: Number(addon.cost) || 0,
+          markupPct: Number(addon.markupPct) || 0,
+          inQuote: Boolean(addon.inQuote),
+          inSow: Boolean(addon.inSow),
+        })),
       };
       const res = await downloadPdfProvider(payload, estimateId || undefined);
       const pdfData = res?.data || res;

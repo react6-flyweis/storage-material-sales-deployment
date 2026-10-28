@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { RefreshCw, Printer, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { RefreshCw, Printer, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { SaveEstimatePayload } from "../estimates.api";
+import {
+  createChangeOrderProvider,
+  downloadChangeOrderPdfProvider,
+  getChangeOrdersListProvider,
+  type ChangeOrderRecord,
+} from "../change-orders.api";
+import { downloadPdfFromBase64 } from "../utils/pdf-download";
 
 interface ChangeOrderModalProps {
   open: boolean;
@@ -69,6 +76,18 @@ function ChangeOrderContent({
   const [sellAmount, setSellAmount] = useState<string>("");
   const [costAmount, setCostAmount] = useState<string>("");
   const [markupPct, setMarkupPct] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [existingCOs, setExistingCOs] = useState<ChangeOrderRecord[]>([]);
+
+  useEffect(() => {
+    if (quote?._id) {
+      getChangeOrdersListProvider({ estimateId: quote._id })
+        .then((items) => setExistingCOs(items))
+        .catch(() => {});
+    }
+  }, [quote?._id]);
+
+  const nextCoNum = existingCOs.length + 1;
 
   // Derived Calculations
   const parsedSell = parseFloat(sellAmount) || 0;
@@ -105,7 +124,7 @@ function ChangeOrderContent({
     }
   };
 
-  const handlePrintPdf = () => {
+  const openClientPrintPopup = () => {
     const printWindow = window.open("", "_blank", "width=850,height=900");
     if (!printWindow) {
       toast.error("Please allow popups to print Change Order");
@@ -116,7 +135,7 @@ function ChangeOrderContent({
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Change Order #1 - ${customer}</title>
+          <title>Change Order #${nextCoNum} - ${customer}</title>
           <style>
             body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 40px; color: #1e293b; }
             .header { border-bottom: 2px solid #1e3a8a; padding-bottom: 16px; margin-bottom: 24px; }
@@ -137,7 +156,7 @@ function ChangeOrderContent({
         </head>
         <body>
           <div class="header">
-            <h1 class="title">CHANGE ORDER #1</h1>
+            <h1 class="title">CHANGE ORDER #${nextCoNum}</h1>
             <div class="subtitle">${customer} · Original Contract: $${origContractValue.toLocaleString()}</div>
           </div>
           <div class="grid">
@@ -212,9 +231,55 @@ function ChangeOrderContent({
 
     printWindow.document.write(printHtml);
     printWindow.document.close();
-    toast.success("Change Order generated successfully");
-    onSuccess?.();
-    onOpenChange(false);
+  };
+
+  const handlePrintPdf = async () => {
+    if (!description.trim()) {
+      toast.error("Please enter a description for the change order");
+      return;
+    }
+    if (!parsedSell) {
+      toast.error("Please enter a valid sell amount");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const coRecord = await createChangeOrderProvider({
+        estimateId: quote?._id,
+        parentQuoteRef: quote?._id ? undefined : String(quote?.id || ""),
+        customer,
+        origDate: origContractDate,
+        origVal: origContractValue,
+        amount: parsedSell,
+        cost: parsedCost,
+        description,
+        company: "SM",
+      });
+
+      const pdfRes = await downloadChangeOrderPdfProvider(coRecord._id).catch(() => null);
+      const b64 = pdfRes?.data?.fileBase64 || pdfRes?.fileBase64;
+      if (b64) {
+        downloadPdfFromBase64(
+          b64,
+          pdfRes?.data?.fileName || pdfRes?.fileName || `Change-Order-${coRecord.coNum || nextCoNum}.pdf`
+        );
+        toast.success(`Change Order #${coRecord.coNum || nextCoNum} created and PDF downloaded!`);
+      } else {
+        openClientPrintPopup();
+        toast.success(`Change Order #${coRecord.coNum || nextCoNum} saved successfully!`);
+      }
+      onSuccess?.();
+      onOpenChange(false);
+    } catch (err) {
+      console.error("Failed to save change order to server, using client print:", err);
+      openClientPrintPopup();
+      toast.success("Change Order printed");
+      onSuccess?.();
+      onOpenChange(false);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -227,7 +292,7 @@ function ChangeOrderContent({
           </div>
           <div>
             <DialogTitle className="text-base font-bold text-white tracking-wide">
-              Change Order #1
+              Change Order #{nextCoNum}
             </DialogTitle>
             <div className="text-xs text-blue-100 font-normal">
               {customer} · Original contract: ${origContractValue.toLocaleString()}
@@ -407,11 +472,16 @@ function ChangeOrderContent({
         </Button>
         <Button
           type="button"
+          disabled={isSubmitting}
           onClick={handlePrintPdf}
           className="bg-[#1e3a8a] hover:bg-[#172554] text-white cursor-pointer font-semibold flex items-center gap-2"
         >
-          <Printer className="h-4 w-4" />
-          Save & Create PDF
+          {isSubmitting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Printer className="h-4 w-4" />
+          )}
+          {isSubmitting ? "Generating..." : "Save & Create PDF"}
         </Button>
       </div>
     </>

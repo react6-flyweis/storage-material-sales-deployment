@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Printer, X, Plus } from "lucide-react";
+import { Printer, X, Plus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,13 @@ import {
   DialogContent,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { SaveEstimatePayload } from "../estimates.api";
+import {
+  type SaveEstimatePayload,
+  type MilestoneRowPayload,
+  saveEstimateMilestonesProvider,
+  downloadMilestonesPdfProvider,
+} from "../estimates.api";
+import { downloadPdfFromBase64 } from "../utils/pdf-download";
 
 interface MilestoneItem {
   id: string;
@@ -64,6 +70,7 @@ function MilestonePaymentsContent({
     { id: "1", name: "Deposit", type: "%", value: 30 },
   ]);
   const [notes, setNotes] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Calculate items
   const calculatedItems = milestones.map((m) => {
@@ -149,7 +156,7 @@ function MilestonePaymentsContent({
     );
   };
 
-  const handlePrintSchedule = () => {
+  const openClientPrintPopup = () => {
     const printWindow = window.open("", "_blank", "width=850,height=900");
     if (!printWindow) {
       toast.error("Please allow popups to print Payment Schedule");
@@ -260,9 +267,55 @@ function MilestonePaymentsContent({
 
     printWindow.document.write(printHtml);
     printWindow.document.close();
-    toast.success("Milestone schedule generated successfully");
-    onSuccess?.();
-    onOpenChange(false);
+  };
+
+  const handlePrintSchedule = async () => {
+    setIsSubmitting(true);
+    const rowsPayload: MilestoneRowPayload[] = calculatedItems.map((m) => ({
+      label: m.name,
+      amount: m.amount,
+      type: m.type === "%" ? "percent" : "fixed",
+      pct: m.type === "%" ? m.value : undefined,
+    }));
+
+    try {
+      if (quote?._id) {
+        await saveEstimateMilestonesProvider(quote._id, {
+          rows: rowsPayload,
+          note: notes,
+          grand: totalContractValue,
+        }).catch((err) => console.warn("Could not save milestones to estimate:", err));
+      }
+
+      const pdfRes = await downloadMilestonesPdfProvider({
+        estimateId: quote?._id,
+        quote,
+        grand: totalContractValue,
+        rows: rowsPayload,
+        note: notes,
+      }).catch(() => null);
+
+      const b64 = pdfRes?.data?.fileBase64 || pdfRes?.fileBase64;
+      if (b64) {
+        downloadPdfFromBase64(
+          b64,
+          pdfRes?.data?.fileName || pdfRes?.fileName || `Milestone-Schedule-${customer}.pdf`
+        );
+        toast.success("Payment Schedule PDF downloaded successfully");
+      } else {
+        openClientPrintPopup();
+        toast.success("Milestone schedule generated successfully");
+      }
+      onSuccess?.();
+      onOpenChange(false);
+    } catch (err) {
+      console.error("Error processing milestones schedule:", err);
+      openClientPrintPopup();
+      onSuccess?.();
+      onOpenChange(false);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -423,11 +476,16 @@ function MilestonePaymentsContent({
       <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
         <Button
           type="button"
+          disabled={isSubmitting}
           onClick={handlePrintSchedule}
           className="bg-[#7c3aed] hover:bg-[#6d28d9] text-white cursor-pointer font-semibold flex items-center gap-2"
         >
-          <Printer className="h-4 w-4" />
-          Print Schedule
+          {isSubmitting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Printer className="h-4 w-4" />
+          )}
+          {isSubmitting ? "Generating..." : "Save & Create Schedule"}
         </Button>
         <Button
           type="button"

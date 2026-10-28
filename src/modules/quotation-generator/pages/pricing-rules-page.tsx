@@ -24,10 +24,11 @@ import {
   usePricingRulesQuery,
   useUpdatePricingRulesMutation,
 } from "../pricing-rules.hooks";
-import type {
-  CustomRuleMatchType,
-  CustomRuleMethod,
-  PricingRulesData,
+import {
+  type CustomRuleMatchType,
+  type CustomRuleMethod,
+  type PricingRulesData,
+  normalizePricingRules,
 } from "../pricing-rules.api";
 import { getApiErrorMessage } from "@/lib/api-error";
 
@@ -75,19 +76,7 @@ export interface PricingRulesFormValues {
 }
 
 function extractPricingRules(raw: unknown): PricingRulesData {
-  if (!raw || typeof raw !== "object") return {};
-  const record = raw as Record<string, unknown>;
-  if (record.pricingRules && typeof record.pricingRules === "object") {
-    return record.pricingRules as PricingRulesData;
-  }
-  if (record.data && typeof record.data === "object") {
-    const dataRecord = record.data as Record<string, unknown>;
-    if (dataRecord.pricingRules && typeof dataRecord.pricingRules === "object") {
-      return dataRecord.pricingRules as PricingRulesData;
-    }
-    return record.data as PricingRulesData;
-  }
-  return raw as PricingRulesData;
+  return normalizePricingRules(raw);
 }
 
 function formatFormValues(rulesData: PricingRulesData): PricingRulesFormValues {

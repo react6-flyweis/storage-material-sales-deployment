@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Printer, X } from "lucide-react";
+import { Printer, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,12 @@ import {
   DialogContent,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { SaveEstimatePayload } from "../estimates.api";
+import {
+  type SaveEstimatePayload,
+  saveEstimateDepositProvider,
+  downloadDepositReceiptPdfProvider,
+} from "../estimates.api";
+import { downloadPdfFromBase64 } from "../utils/pdf-download";
 
 interface RequestDepositModalProps {
   open: boolean;
@@ -71,6 +76,7 @@ function RequestDepositContent({
   const [depositPct, setDepositPct] = useState<string>("30");
   const [flatAmount, setFlatAmount] = useState<string>("");
   const [notes, setNotes] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Derived Calculations
   let depositDue = 0;
@@ -96,7 +102,7 @@ function RequestDepositContent({
     }
   };
 
-  const handlePrintInvoice = () => {
+  const openClientPrintPopup = () => {
     const printWindow = window.open("", "_blank", "width=850,height=900");
     if (!printWindow) {
       toast.error("Please allow popups to print Deposit Invoice");
@@ -185,9 +191,53 @@ function RequestDepositContent({
 
     printWindow.document.write(printHtml);
     printWindow.document.close();
-    toast.success("Deposit Invoice generated successfully");
-    onSuccess?.();
-    onOpenChange(false);
+  };
+
+  const handlePrintInvoice = async () => {
+    setIsSubmitting(true);
+    const parsedPct = parseFloat(depositPct) || undefined;
+    const parsedFlat = parseFloat(flatAmount) || undefined;
+
+    try {
+      if (quote?._id) {
+        await saveEstimateDepositProvider(quote._id, {
+          pct: parsedPct,
+          flat: parsedFlat,
+          note: notes,
+          grand: totalContractValue,
+        }).catch((err) => console.warn("Could not save deposit to estimate:", err));
+      }
+
+      const receiptRes = await downloadDepositReceiptPdfProvider({
+        estimateId: quote?._id,
+        quote,
+        grand: totalContractValue,
+        pct: parsedPct,
+        flat: parsedFlat,
+        note: notes,
+      }).catch(() => null);
+
+      const b64 = receiptRes?.data?.fileBase64 || receiptRes?.fileBase64;
+      if (b64) {
+        downloadPdfFromBase64(
+          b64,
+          receiptRes?.data?.fileName || receiptRes?.fileName || `Deposit-Receipt-${customer}.pdf`
+        );
+        toast.success("Deposit Receipt PDF downloaded successfully");
+      } else {
+        openClientPrintPopup();
+        toast.success("Deposit Invoice printed");
+      }
+      onSuccess?.();
+      onOpenChange(false);
+    } catch (err) {
+      console.error("Error processing deposit receipt:", err);
+      openClientPrintPopup();
+      onSuccess?.();
+      onOpenChange(false);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -320,11 +370,16 @@ function RequestDepositContent({
       <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
         <Button
           type="button"
+          disabled={isSubmitting}
           onClick={handlePrintInvoice}
           className="bg-[#1e3a8a] hover:bg-[#172554] text-white cursor-pointer font-semibold flex items-center gap-2"
         >
-          <Printer className="h-4 w-4" />
-          Print Invoice
+          {isSubmitting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Printer className="h-4 w-4" />
+          )}
+          {isSubmitting ? "Generating..." : "Save & Create Receipt"}
         </Button>
         <Button
           type="button"
