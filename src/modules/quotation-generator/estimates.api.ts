@@ -256,6 +256,8 @@ export interface ShipperPricing {
   vendorBlendAdjustment?: number;
   cogsOverrideApplied?: boolean;
   marginOverrideApplied?: boolean;
+  materialSellOverrideApplied?: boolean;
+  materialSellExFreight?: number;
   [key: string]: unknown;
 }
 
@@ -369,6 +371,8 @@ export interface ComputeCogsOverrideConfig {
   marginPct?: number | null;
   sellDollar?: number | null;
   costPctAdj?: number | null;
+  materialSellOverride?: number | null;
+  sellIncludesFreight?: boolean;
   [key: string]: unknown;
 }
 
@@ -396,8 +400,8 @@ export interface ComputeEstimateRequest {
   freightOverride?: number;
   matMuOverride?: number | null;
   matMuPct?: number;
-  materialSellOverride?: number;
-  matSellOverride?: number;
+  materialSellOverride?: number | null;
+  matSellOverride?: number | null;
   pembDrawings?: number;
   pembIncludeErection?: boolean;
   pembAddOns?: Array<{
@@ -519,6 +523,11 @@ export interface SaveEstimatePayload extends Record<string, unknown> {
   blendPct?: number;
   installLevel?: string;
   installDifficulty?: string;
+  steelFinish?: "red-iron" | "galvanized" | string;
+  freightOverride?: number | null;
+  materialSellOverride?: number | null;
+  matSellOverride?: number | null;
+  pembDrawings?: number;
   parsedCategories?: Record<string, unknown>;
   tabSummary?: ShipperTabSummary[];
   breakdownRows?: ShipperPricingRow[];
@@ -567,6 +576,10 @@ export interface SaveEstimatePayload extends Record<string, unknown> {
       at?: string | null;
     }>;
   };
+  milestoneSchedule?: MilestoneRowPayload[];
+  milestones?: MilestoneRowPayload[];
+  milestoneNote?: string;
+  depositTerms?: unknown;
   createdAt?: string;
   updatedAt?: string;
   grandTotal?: number;
@@ -957,6 +970,7 @@ export interface PreviewContractPayload {
 
 export interface PreviewDocumentRequest {
   estimateId?: string;
+  grandTotal?: number;
   leadCompanyName?: string;
   customerEmail?: string;
   streetAddress?: string;
@@ -967,12 +981,26 @@ export interface PreviewDocumentRequest {
   jobNumber?: string;
   jobType?: JobType;
   scope?: Scope;
+  steelFinish?: "red-iron" | "galvanized" | string;
+  freightOverride?: number | null;
+  materialSellOverride?: number | null;
+  matSellOverride?: number | null;
+  pembDrawings?: number;
+  engineeringDrawings?: number;
+  parsedCategories?: Record<string, unknown>;
+  recompute?: boolean;
+  cogsOverride?: ComputeCogsOverrideConfig | null;
+  marginOverride?: ComputeMarginOverrideConfig | null;
   pricingResult?: ShipperPricing | Record<string, unknown>;
   fullQuote?: FullQuoteData | Record<string, unknown>;
   contract?: PreviewContractPayload | Record<string, unknown>;
   extractedDrawingFields?: ExtractedDrawingData;
   drawingAttachments?: Array<{ name?: string; fileBase64?: string; data?: string; includeInQuote?: boolean; [key: string]: unknown }>;
   sections?: string[];
+  milestoneSchedule?: MilestoneRowPayload[];
+  milestones?: MilestoneRowPayload[];
+  milestoneNote?: string;
+  depositTerms?: unknown;
   storageData?: Record<string, unknown>;
   storagePricingResult?: Record<string, unknown>;
   storagePricing?: Record<string, unknown>;
@@ -1007,6 +1035,13 @@ export interface PreviewDocumentResponseData {
   sowHtml?: string | null;
   contractHtml?: string | null;
   assembledHtml?: string | null;
+  grandTotal?: number;
+  milestoneSchedule?: MilestoneRowPayload[];
+  milestones?: MilestoneRowPayload[];
+  milestoneNote?: string;
+  depositTerms?: unknown;
+  pricing?: unknown;
+  fullQuote?: unknown;
   [key: string]: unknown;
 }
 
@@ -1126,9 +1161,11 @@ export async function previewMarginProvider(
 // DEPOSITS, MILESTONES & MULTI-STORY (v7)
 // ----------------------------------------------------------------------------
 export interface DepositPreviewRequest {
-  grand: number;
+  estimateId?: string;
+  grand?: number;
   pct?: number;
   flat?: number;
+  [key: string]: unknown;
 }
 
 export interface DepositPreviewData {
@@ -1136,6 +1173,17 @@ export interface DepositPreviewData {
   pct: number;
   deposit: number;
   balance: number;
+  flat?: number;
+  note?: string;
+  depositTerms?: {
+    pct?: number;
+    flat?: number;
+    amount?: number;
+    deposit?: number;
+    note?: string;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
 }
 
 export interface DepositPreviewResponse {
@@ -1147,23 +1195,30 @@ export interface DepositPreviewResponse {
 export async function previewDepositProvider(
   payload: DepositPreviewRequest
 ): Promise<DepositPreviewData> {
+  const url = payload.estimateId
+    ? `/api/sales/estimates/${encodeURIComponent(payload.estimateId)}/deposit/preview`
+    : "/api/sales/estimates/deposit/preview";
   const response = await apiClient.post<DepositPreviewResponse>(
-    "/api/sales/estimates/deposit/preview",
+    url,
     payload
   );
-  return response.data?.data as DepositPreviewData;
+  return (response.data?.data || response.data) as DepositPreviewData;
 }
 
 export interface MilestoneRowPayload {
   label: string;
-  amount: number;
-  type?: string;
+  amount?: number;
+  type?: "pct" | "percent" | "fixed" | "dollar" | string;
   pct?: number;
+  [key: string]: unknown;
 }
 
 export interface MilestonesPreviewRequest {
-  grand: number;
-  rows: MilestoneRowPayload[];
+  estimateId?: string;
+  grand?: number;
+  rows?: MilestoneRowPayload[];
+  milestones?: MilestoneRowPayload[];
+  [key: string]: unknown;
 }
 
 export interface MilestonesPreviewData {
@@ -1173,6 +1228,10 @@ export interface MilestonesPreviewData {
   remaining: number;
   pct: number;
   fullyScheduled: boolean;
+  milestoneNote?: string;
+  milestones?: Array<MilestoneRowPayload & { type: string }>;
+  depositTerms?: unknown;
+  [key: string]: unknown;
 }
 
 export interface MilestonesPreviewResponse {
@@ -1184,11 +1243,14 @@ export interface MilestonesPreviewResponse {
 export async function previewMilestonesProvider(
   payload: MilestonesPreviewRequest
 ): Promise<MilestonesPreviewData> {
+  const url = payload.estimateId
+    ? `/api/sales/estimates/${encodeURIComponent(payload.estimateId)}/milestones/preview`
+    : "/api/sales/estimates/milestones/preview";
   const response = await apiClient.post<MilestonesPreviewResponse>(
-    "/api/sales/estimates/milestones/preview",
+    url,
     payload
   );
-  return response.data?.data as MilestonesPreviewData;
+  return (response.data?.data || response.data) as MilestonesPreviewData;
 }
 
 export interface StaircasePreviewRequest {
@@ -1234,7 +1296,13 @@ export async function saveEstimateDepositProvider(
 
 export async function saveEstimateMilestonesProvider(
   estimateId: string,
-  payload: { rows: MilestoneRowPayload[]; note?: string; grand?: number }
+  payload: {
+    rows?: MilestoneRowPayload[];
+    milestones?: MilestoneRowPayload[];
+    note?: string;
+    grand?: number;
+    [key: string]: unknown;
+  }
 ) {
   const response = await apiClient.put(
     `/api/sales/estimates/${encodeURIComponent(estimateId)}/milestones`,
