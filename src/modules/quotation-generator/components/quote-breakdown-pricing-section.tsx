@@ -137,6 +137,7 @@ export function QuoteBreakdownPricingSection({
     steelFinish,
     freightOverride,
     materialSellOverride,
+    engineeringDrawings,
     deletedRowKeys,
     isMultiStory,
     staircaseCount,
@@ -257,6 +258,9 @@ export function QuoteBreakdownPricingSection({
       const marginTargetVal = parseFloat(marginTargetMargin) || undefined;
       const marginSellVal = parseFloat(marginFixedSellOverride) || undefined;
 
+      const matSellOverrideVal = materialSellOverride ? parseFloat(materialSellOverride) : null;
+      const pembDrawingsVal = parseFloat(storeState.engineeringDrawings) || 0;
+
       const res = await saveEstimateProvider(
         {
           _id: activeEstimateId,
@@ -286,8 +290,8 @@ export function QuoteBreakdownPricingSection({
           sellPerSf: effectiveSellPerSf,
           steelFinish: steelFinish || "red-iron",
           freightOverride: parseFloat(freightOverride) || undefined,
-          materialSellOverride: parseFloat(materialSellOverride) || undefined,
-          matSellOverride: parseFloat(materialSellOverride) || undefined,
+          materialSellOverride: matSellOverrideVal ?? (materialSellOverride === "" ? null : undefined),
+          matSellOverride: matSellOverrideVal ?? (materialSellOverride === "" ? null : undefined),
           deletedRowKeys: deletedRowKeys || [],
           parsedCategories: shipperData.parsedCategories,
           tabSummary: shipperData.tabSummary,
@@ -349,7 +353,7 @@ export function QuoteBreakdownPricingSection({
                   staircaseUnitCost: storeState.staircaseUnitPrice || 35000,
                 }
               : undefined,
-          pembDrawings: 0,
+          pembDrawings: pembDrawingsVal,
           pembIncludeErection: scope === "Both" || scope === "Install",
           cogsOverride: cogsOverrideApplied
             ? {
@@ -359,9 +363,11 @@ export function QuoteBreakdownPricingSection({
                 sellDollar: cogsSellVal ?? null,
                 costPctAdj: cogsCostAdjustPercent,
               }
-            : {
-                applied: false,
-              },
+            : matSellOverrideVal != null
+              ? undefined
+              : {
+                  applied: false,
+                },
           marginOverride: marginOverrideApplied
             ? {
                 applied: true,
@@ -459,6 +465,7 @@ export function QuoteBreakdownPricingSection({
     steelFinish,
     freightOverride,
     materialSellOverride,
+    engineeringDrawings,
     deletedRowKeys,
     navigate,
     setPembEstimateId,
@@ -488,6 +495,7 @@ export function QuoteBreakdownPricingSection({
       steelFinish: steelFinish || "red-iron",
       freightOverride: freightOverride || "",
       materialSellOverride: materialSellOverride || "",
+      engineeringDrawings: engineeringDrawings || "",
       deletedRowKeys: (deletedRowKeys || []).join(","),
       concreteInclude,
       concreteCostSf,
@@ -531,6 +539,7 @@ export function QuoteBreakdownPricingSection({
     steelFinish,
     freightOverride,
     materialSellOverride,
+    engineeringDrawings,
     deletedRowKeys,
     concreteInclude,
     concreteCostSf,
@@ -576,6 +585,8 @@ export function QuoteBreakdownPricingSection({
       try {
         const storeState = useQuotationStore.getState();
         const parsedSqFt = parseFloat(sqFt) || current.squareFootage || 0;
+        const matSellOverrideVal = materialSellOverride ? parseFloat(materialSellOverride) : null;
+        const pembDrawingsVal = parseFloat(storeState.engineeringDrawings) || 0;
         const cogsCostVal = parseFloat(storeState.cogsCostInput) || undefined;
         const cogsSellVal =
           parseFloat(storeState.cogsFixedSellPrice) || undefined;
@@ -600,8 +611,8 @@ export function QuoteBreakdownPricingSection({
           sellPerSf: installSell,
           steelFinish: steelFinish || "red-iron",
           freightOverride: parseFloat(freightOverride) || undefined,
-          materialSellOverride: parseFloat(materialSellOverride) || undefined,
-          matSellOverride: parseFloat(materialSellOverride) || undefined,
+          materialSellOverride: matSellOverrideVal ?? (materialSellOverride === "" ? null : undefined),
+          matSellOverride: matSellOverrideVal ?? (materialSellOverride === "" ? null : undefined),
           deletedRowKeys: deletedRowKeys || [],
           concrete: {
             include: concreteInclude,
@@ -655,7 +666,7 @@ export function QuoteBreakdownPricingSection({
                   staircaseUnitCost: storeState.staircaseUnitPrice || 35000,
                 }
               : undefined,
-          pembDrawings: 0,
+          pembDrawings: pembDrawingsVal,
           pembIncludeErection: scope === "Both" || scope === "Install",
           cogsOverride: cogsOverrideApplied
             ? {
@@ -665,9 +676,11 @@ export function QuoteBreakdownPricingSection({
                 sellDollar: cogsSellVal ?? null,
                 costPctAdj: storeState.cogsCostAdjustPercent,
               }
-            : {
-                applied: false,
-              },
+            : matSellOverrideVal != null
+              ? undefined
+              : {
+                  applied: false,
+                },
           marginOverride: marginOverrideApplied
             ? {
                 applied: true,
@@ -720,6 +733,7 @@ export function QuoteBreakdownPricingSection({
       steelFinish,
       freightOverride,
       materialSellOverride,
+      engineeringDrawings,
       deletedRowKeys,
       concreteInclude,
       concreteCostSf,

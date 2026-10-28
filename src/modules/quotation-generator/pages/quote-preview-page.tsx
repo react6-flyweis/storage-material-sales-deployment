@@ -74,6 +74,10 @@ export function QuotePreviewPage() {
     staircaseCount,
     staircaseUnitPrice,
     pembAddOns,
+    steelFinish,
+    freightOverride,
+    materialSellOverride,
+    engineeringDrawings,
     pembEstimateId,
     setPembEstimateId,
     pembExtractedShipper,
@@ -133,6 +137,8 @@ export function QuotePreviewPage() {
   const previewPayload: PreviewDocumentRequest = useMemo(
     () => ({
       estimateId: activeEstimateId,
+      grandTotal: (navState.extractedShipper?.fullQuote?.grandTotal ??
+        navState.extractedShipper?.pricing?.totSell) as number | undefined,
       jobType: "PEMB",
       leadCompanyName: customerLeadName,
       customerEmail,
@@ -144,6 +150,15 @@ export function QuotePreviewPage() {
         navState.quotationForm?.jobNumber ||
         navState.extractedDrawing?.extracted?.jobnumber ||
         "",
+      steelFinish: steelFinish || "red-iron",
+      freightOverride: parseFloat(freightOverride) || undefined,
+      materialSellOverride: parseFloat(materialSellOverride) || undefined,
+      matSellOverride: parseFloat(materialSellOverride) || undefined,
+      pembDrawings: parseFloat(engineeringDrawings) || 0,
+      parsedCategories:
+        navState.extractedShipper?.parsedCategories ||
+        pembExtractedShipper?.parsedCategories,
+      recompute: true,
       pricingResult: navState.extractedShipper?.pricing,
       fullQuote:
         navState.extractedShipper?.fullQuote ||
@@ -209,6 +224,12 @@ export function QuotePreviewPage() {
       staircaseCount,
       staircaseUnitPrice,
       pembAddOns,
+      steelFinish,
+      freightOverride,
+      materialSellOverride,
+      engineeringDrawings,
+      pembExtractedShipper?.parsedCategories,
+      navState.extractedShipper?.parsedCategories,
     ],
   );
 
@@ -246,6 +267,8 @@ export function QuotePreviewPage() {
         estimateId || pembEstimateId || navState.estimateId || undefined;
       const payload: PreviewDocumentRequest = {
         estimateId: activeEstId,
+        grandTotal: (navState.extractedShipper?.fullQuote?.grandTotal ??
+          navState.extractedShipper?.pricing?.totSell) as number | undefined,
         jobType: "PEMB",
         leadCompanyName: customerLeadName,
         customerEmail,
@@ -257,6 +280,15 @@ export function QuotePreviewPage() {
           navState.quotationForm?.jobNumber ||
           navState.extractedDrawing?.extracted?.jobnumber ||
           "",
+        steelFinish: steelFinish || "red-iron",
+        freightOverride: parseFloat(freightOverride) || undefined,
+        materialSellOverride: parseFloat(materialSellOverride) || undefined,
+        matSellOverride: parseFloat(materialSellOverride) || undefined,
+        pembDrawings: parseFloat(engineeringDrawings) || 0,
+        parsedCategories:
+          navState.extractedShipper?.parsedCategories ||
+          pembExtractedShipper?.parsedCategories,
+        recompute: true,
         pricingResult: navState.extractedShipper?.pricing,
         fullQuote:
           navState.extractedShipper?.fullQuote ||
@@ -328,6 +360,10 @@ export function QuotePreviewPage() {
     try {
       const activeEstId =
         estimateId || pembEstimateId || navState.estimateId || undefined;
+      const matSellOverrideVal = materialSellOverride
+        ? parseFloat(materialSellOverride)
+        : null;
+      const pembDrawingsVal = parseFloat(engineeringDrawings) || 0;
       const cogsCostVal = parseFloat(cogsCostInput) || undefined;
       const cogsSellVal = parseFloat(cogsFixedSellPrice) || undefined;
       const marginLaborVal = parseFloat(marginLaborOverride) || undefined;
@@ -356,6 +392,13 @@ export function QuotePreviewPage() {
           installLevel: installDifficulty || "easy",
           installCostPerSf: installCost,
           sellPerSf: installSell,
+          steelFinish: steelFinish || "red-iron",
+          freightOverride: parseFloat(freightOverride) || undefined,
+          materialSellOverride:
+            matSellOverrideVal ?? (materialSellOverride === "" ? null : undefined),
+          matSellOverride:
+            matSellOverrideVal ?? (materialSellOverride === "" ? null : undefined),
+          pembDrawings: pembDrawingsVal,
           jobNumber:
             navState.quotationForm?.jobNumber ||
             navState.extractedDrawing?.extracted?.jobnumber ||
@@ -421,9 +464,11 @@ export function QuotePreviewPage() {
                 sellDollar: cogsSellVal ?? null,
                 costPctAdj: cogsCostAdjustPercent,
               }
-            : {
-                applied: false,
-              },
+            : matSellOverrideVal != null
+              ? undefined
+              : {
+                  applied: false,
+                },
           marginOverride: marginOverrideApplied
             ? {
                 applied: true,

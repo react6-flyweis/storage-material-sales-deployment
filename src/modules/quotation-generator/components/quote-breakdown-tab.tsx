@@ -101,6 +101,17 @@ export function QuoteBreakdownTab({
   const blendLabel = pricing?.blendLabel || "50% Quicken blend";
   const fileName = extractedShipper?.fileName || "";
 
+  const defaultExFreightSell =
+    pricing?.materialSellExFreight != null
+      ? pricing.materialSellExFreight
+      : pricing?.matSell != null && pricing?.freight != null
+        ? pricing.matSell - pricing.freight
+        : undefined;
+  const placeholderVal =
+    defaultExFreightSell != null
+      ? String(Math.round(defaultExFreightSell))
+      : "Auto";
+
   // Square Footage metadata from backend
   const sfMeta = extractedShipper?.squareFootageMeta;
   const weightSf = Number(sfMeta?.fromWeight || sfMeta?.selected || 0);
@@ -374,6 +385,11 @@ export function QuoteBreakdownTab({
                   <span className="text-[11px] text-slate-500 font-normal">
                     Enter to override shipper price
                   </span>
+                  {pricing?.materialSellOverrideApplied && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      Applied
+                    </span>
+                  )}
                 </div>
               </td>
               <td className="p-3" colSpan={2}>
@@ -382,9 +398,14 @@ export function QuoteBreakdownTab({
                   <input
                     type="number"
                     step="1"
-                    placeholder="Auto"
+                    placeholder={placeholderVal}
                     value={materialSellOverride}
                     onChange={(e) => setMaterialSellOverride(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.currentTarget.blur();
+                      }
+                    }}
                     className="w-32 px-2.5 py-1 text-xs font-semibold text-slate-900 bg-white border border-[#2B6CB0] rounded-md shadow-2xs focus:outline-none focus:ring-1 focus:ring-[#2B6CB0]"
                   />
                   {materialSellOverride && (

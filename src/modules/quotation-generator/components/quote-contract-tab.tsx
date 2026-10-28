@@ -36,7 +36,13 @@ export function QuoteContractTab({
   onBackToBreakdown,
   onQuotePreview,
 }: QuoteContractTabProps) {
-  const { scope } = useQuotationStore();
+  const {
+    scope,
+    steelFinish,
+    freightOverride,
+    materialSellOverride,
+    engineeringDrawings,
+  } = useQuotationStore();
 
   const pricingData = useQuotationPricing({
     extractedShipper,
@@ -195,6 +201,9 @@ export function QuoteContractTab({
     setIsGeneratingPackage(true);
     try {
       const payload: PreviewDocumentRequest = {
+        estimateId: estimateId || undefined,
+        grandTotal: (extractedShipper?.fullQuote?.grandTotal ??
+          extractedShipper?.pricing?.totSell) as number | undefined,
         leadCompanyName: customerLegalName || pricingData.customerLeadName,
         customerEmail: customerEmail || pricingData.customerEmail,
         streetAddress: customerAddress || pricingData.customerAddress,
@@ -202,6 +211,13 @@ export function QuoteContractTab({
         buildingSize: pricingData.displayBuildingSize,
         squareFootage: pricingData.effectiveSqFt,
         jobNumber: quotationForm?.jobNumber || extractedDrawing?.extracted?.jobnumber || "",
+        steelFinish: steelFinish || "red-iron",
+        freightOverride: parseFloat(freightOverride) || undefined,
+        materialSellOverride: parseFloat(materialSellOverride) || undefined,
+        matSellOverride: parseFloat(materialSellOverride) || undefined,
+        pembDrawings: parseFloat(engineeringDrawings) || 0,
+        parsedCategories: extractedShipper?.parsedCategories,
+        recompute: true,
         pricingResult: extractedShipper?.pricing,
         fullQuote:
           extractedShipper?.fullQuote ||
@@ -249,6 +265,9 @@ export function QuoteContractTab({
     setIsDownloadingContract(true);
     try {
       const payload: PreviewDocumentRequest = {
+        estimateId: estimateId || undefined,
+        grandTotal: (extractedShipper?.fullQuote?.grandTotal ??
+          extractedShipper?.pricing?.totSell) as number | undefined,
         leadCompanyName: customerLegalName || pricingData.customerLeadName,
         customerEmail: customerEmail || pricingData.customerEmail,
         streetAddress: customerAddress || pricingData.customerAddress,
@@ -256,6 +275,13 @@ export function QuoteContractTab({
         buildingSize: pricingData.displayBuildingSize,
         squareFootage: pricingData.effectiveSqFt,
         jobNumber: quotationForm?.jobNumber || extractedDrawing?.extracted?.jobnumber || "",
+        steelFinish: steelFinish || "red-iron",
+        freightOverride: parseFloat(freightOverride) || undefined,
+        materialSellOverride: parseFloat(materialSellOverride) || undefined,
+        matSellOverride: parseFloat(materialSellOverride) || undefined,
+        pembDrawings: parseFloat(engineeringDrawings) || 0,
+        parsedCategories: extractedShipper?.parsedCategories,
+        recompute: true,
         pricingResult: extractedShipper?.pricing,
         fullQuote:
           extractedShipper?.fullQuote ||
