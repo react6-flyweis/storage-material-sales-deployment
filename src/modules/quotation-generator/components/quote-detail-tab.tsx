@@ -67,6 +67,10 @@ export function QuoteDetailTab({
     staircaseCount,
     staircaseUnitPrice,
     pembAddOns,
+    steelFinish,
+    freightOverride,
+    materialSellOverride,
+    engineeringDrawings,
   } = useQuotationStore();
 
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
@@ -166,6 +170,9 @@ export function QuoteDetailTab({
     setIsDownloadingPdf(true);
     try {
       const payload: PreviewDocumentRequest = {
+        estimateId: estimateId || undefined,
+        grandTotal: (extractedShipper?.fullQuote?.grandTotal ??
+          extractedShipper?.pricing?.totSell) as number | undefined,
         leadCompanyName: customerLeadName,
         customerEmail,
         streetAddress: customerAddress,
@@ -173,6 +180,13 @@ export function QuoteDetailTab({
         buildingSize: displayBuildingSize,
         squareFootage: effectiveSqFt,
         jobNumber: quotationForm?.jobNumber || extractedDrawing?.extracted?.jobnumber || "",
+        steelFinish: steelFinish || "red-iron",
+        freightOverride: parseFloat(freightOverride) || undefined,
+        materialSellOverride: parseFloat(materialSellOverride) || undefined,
+        matSellOverride: parseFloat(materialSellOverride) || undefined,
+        pembDrawings: parseFloat(engineeringDrawings) || 0,
+        parsedCategories: extractedShipper?.parsedCategories,
+        recompute: true,
         pricingResult: extractedShipper?.pricing,
         fullQuote: extractedShipper?.fullQuote || (extractedShipper?.pricing as Record<string, unknown> | undefined),
         extractedDrawingFields: extractedDrawing?.extracted,
