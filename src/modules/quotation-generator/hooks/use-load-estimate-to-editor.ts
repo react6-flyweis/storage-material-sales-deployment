@@ -328,6 +328,44 @@ export function useLoadEstimateToEditor() {
           store.setBlendPercentage(Number(estimate.blendPercentage));
         }
 
+        const restoredFinish =
+          estimate.steelFinish ??
+          (estimate as Record<string, unknown> | undefined)?.finishType ??
+          (estimate as Record<string, unknown> | undefined)?.finish;
+        if (restoredFinish === "galvanized" || restoredFinish === "red-iron") {
+          store.setSteelFinish(restoredFinish);
+        }
+
+        const restoredMatOverride =
+          estimate.materialSellOverride ??
+          estimate.matSellOverride ??
+          (estimate.quoteControls as Record<string, unknown> | undefined)?.materialSellOverride ??
+          (estimate.cogsOverride as Record<string, unknown> | undefined)?.materialSellOverride ??
+          (pricingRes?.materialSellExFreight as number | undefined);
+
+        if (restoredMatOverride !== undefined && restoredMatOverride !== null) {
+          store.setMaterialSellOverride(String(restoredMatOverride));
+        } else {
+          store.setMaterialSellOverride("");
+        }
+
+        const restoredDrawings =
+          estimate.pembDrawings ??
+          (estimate.quoteControls as Record<string, unknown> | undefined)?.pembDrawings ??
+          (estimate as Record<string, unknown> | undefined)?.engineeringDrawings;
+
+        if (restoredDrawings !== undefined && restoredDrawings !== null) {
+          store.setEngineeringDrawings(String(restoredDrawings));
+        } else {
+          store.setEngineeringDrawings("");
+        }
+
+        if (estimate.freightOverride !== undefined && estimate.freightOverride !== null) {
+          store.setFreightOverride(String(estimate.freightOverride));
+        } else {
+          store.setFreightOverride("");
+        }
+
         let effectiveInstallCost = Number(estimate.installCostPerSf);
         if (!effectiveInstallCost || isNaN(effectiveInstallCost)) {
           const totalInstCost = Number(
