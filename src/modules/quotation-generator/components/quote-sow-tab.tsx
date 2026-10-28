@@ -53,6 +53,10 @@ export function QuoteSowTab({
     setStaircaseCount,
     staircaseUnitPrice,
     setStaircaseUnitPrice,
+    steelFinish,
+    freightOverride,
+    materialSellOverride,
+    engineeringDrawings,
   } = useQuotationStore();
 
   const sow = useSowDocument({
@@ -77,6 +81,8 @@ export function QuoteSowTab({
   const previewPayload: PreviewDocumentRequest = useMemo(
     () => ({
       estimateId: estimateId || undefined,
+      grandTotal: (extractedShipper?.fullQuote?.grandTotal ??
+        extractedShipper?.pricing?.totSell) as number | undefined,
       jobType: "PEMB",
       leadCompanyName: sow.pricingData.customerLeadName || "Customer",
       customerEmail: quotationForm?.email || sow.pricingData.customerEmail,
@@ -88,6 +94,13 @@ export function QuoteSowTab({
         quotationForm?.jobNumber ||
         extractedDrawing?.extracted?.jobnumber ||
         "",
+      steelFinish: steelFinish || "red-iron",
+      freightOverride: parseFloat(freightOverride) || undefined,
+      materialSellOverride: parseFloat(materialSellOverride) || undefined,
+      matSellOverride: parseFloat(materialSellOverride) || undefined,
+      pembDrawings: parseFloat(engineeringDrawings) || 0,
+      parsedCategories: extractedShipper?.parsedCategories,
+      recompute: true,
       pricingResult: extractedShipper?.pricing,
       fullQuote:
         extractedShipper?.fullQuote ||
@@ -123,6 +136,11 @@ export function QuoteSowTab({
       isRedOxideConfirmed,
       staircaseCount,
       staircaseUnitPrice,
+      steelFinish,
+      freightOverride,
+      materialSellOverride,
+      engineeringDrawings,
+      extractedShipper?.parsedCategories,
     ],
   );
 
@@ -149,6 +167,9 @@ export function QuoteSowTab({
     const customerName = sow.pricingData.customerLeadName || "Customer";
     try {
       const payload: PreviewDocumentRequest = {
+        estimateId: estimateId || undefined,
+        grandTotal: (extractedShipper?.fullQuote?.grandTotal ??
+          extractedShipper?.pricing?.totSell) as number | undefined,
         leadCompanyName: customerName,
         customerEmail: quotationForm?.email || sow.pricingData.customerEmail,
         streetAddress: sow.pricingData.customerAddress,
@@ -156,6 +177,13 @@ export function QuoteSowTab({
         buildingSize: sow.pricingData.displayBuildingSize,
         squareFootage: sow.pricingData.effectiveSqFt,
         jobNumber: quotationForm?.jobNumber || extractedDrawing?.extracted?.jobnumber || "",
+        steelFinish: steelFinish || "red-iron",
+        freightOverride: parseFloat(freightOverride) || undefined,
+        materialSellOverride: parseFloat(materialSellOverride) || undefined,
+        matSellOverride: parseFloat(materialSellOverride) || undefined,
+        pembDrawings: parseFloat(engineeringDrawings) || 0,
+        parsedCategories: extractedShipper?.parsedCategories,
+        recompute: true,
         pricingResult: extractedShipper?.pricing,
         fullQuote:
           extractedShipper?.fullQuote ||
