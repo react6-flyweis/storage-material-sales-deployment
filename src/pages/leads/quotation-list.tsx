@@ -27,6 +27,7 @@ import {
   type AdminStatus,
   type Quotation,
   resolveQuotationLifecycle,
+  QuotationWorkflowBadge,
 } from "@/modules/quotations/quotations.api";
 import {
   useQuotationsQuery,
@@ -77,58 +78,7 @@ function formatDate(value?: string | null) {
 
 function getStatusBadge(quotation: Quotation) {
   const lifecycle = resolveQuotationLifecycle(quotation);
-
-  switch (lifecycle.lifecycleStatus) {
-    case "customer_rejected":
-      return (
-        <span className="px-2.5 py-0.5 whitespace-nowrap rounded-full text-xs font-medium bg-rose-100 text-rose-700">
-          Declined by Customer
-        </span>
-      );
-    case "customer_accepted":
-      return (
-        <span className="px-2.5 py-0.5 whitespace-nowrap rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
-          Accepted by Customer
-        </span>
-      );
-    case "approved":
-      return (
-        <span className="px-2.5 py-0.5 whitespace-nowrap rounded-full text-xs font-medium bg-green-100 text-green-700">
-          Approved
-        </span>
-      );
-    case "pending_approval":
-      return (
-        <span className="px-2.5 py-0.5 whitespace-nowrap rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
-          Pending Approval
-        </span>
-      );
-    case "admin_rejected":
-      return (
-        <span className="px-2.5 py-0.5 whitespace-nowrap rounded-full text-xs font-medium bg-red-100 text-red-700">
-          Admin Rejected
-        </span>
-      );
-    case "sent":
-      if (quotation.sendMethod === "manual") {
-        return (
-          <span className="px-2.5 py-0.5 whitespace-nowrap rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
-            Marked sent
-          </span>
-        );
-      }
-      return (
-        <span className="px-2.5 py-0.5 whitespace-nowrap rounded-full text-xs font-medium bg-purple-100 text-purple-700">
-          Sent via email
-        </span>
-      );
-    default:
-      return (
-        <span className="px-2.5 py-0.5 whitespace-nowrap rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-          Draft
-        </span>
-      );
-  }
+  return <QuotationWorkflowBadge status={lifecycle.lifecycleStatus} />;
 }
 
 function QuotationTableSkeleton() {
@@ -205,21 +155,25 @@ export default function QuotationListPage() {
       label: "Total Quotation",
       value: stats?.total ?? data?.data?.total ?? "-",
       bgColor: "bg-blue-600",
+      statusKey: "all",
     },
     {
       label: "Approved Quotation",
       value: stats?.approved ?? "-",
       bgColor: "bg-green-500",
+      statusKey: "approved",
     },
     {
       label: "Pending Approval",
       value: stats?.pendingApproval ?? stats?.pending_approval ?? "-",
-      bgColor: "bg-yellow-400",
+      bgColor: "bg-yellow-500",
+      statusKey: "pending_approval",
     },
     {
       label: "Rejected Quotation",
       value: stats?.rejected ?? "-",
-      bgColor: "bg-orange-400",
+      bgColor: "bg-orange-500",
+      statusKey: "rejected",
     },
   ];
 
@@ -256,7 +210,9 @@ export default function QuotationListPage() {
         {statBoxes.map((stat) => (
           <div
             key={stat.label}
-            className={`${stat.bgColor} rounded-lg p-6 text-white shadow-md`}
+            onClick={() => handleFilterChange("status", stat.statusKey)}
+            className={`${stat.bgColor} rounded-lg p-6 text-white shadow-md cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.99] select-none`}
+            title={`Filter by ${stat.label}`}
           >
             <p className="text-sm font-medium opacity-90">{stat.label}</p>
             <p className="text-3xl font-bold mt-2">{stat.value}</p>
