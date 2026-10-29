@@ -463,12 +463,12 @@ export default function BasicDetails({
                     key={note._id}
                     className="py-3 first:pt-0 last:pb-0 flex items-start justify-between gap-4 group"
                   >
-                    <div className="space-y-1.5 flex-1">
-                      <p className="whitespace-pre-line text-slate-700 leading-relaxed">
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <p className="whitespace-pre-line text-slate-700 leading-relaxed break-words [overflow-wrap:anywhere]">
                         {note.note}
                       </p>
-                      <p className="text-xs flex items-center text-muted-foreground gap-2">
-                        <span className="font-medium text-slate-600">
+                      <p className="text-xs flex items-center text-muted-foreground gap-2 flex-wrap">
+                        <span className="font-medium text-slate-600 truncate max-w-[200px]">
                           {note.addedBy?.name || "Unknown"}
                         </span>
                         <span>•</span>
@@ -477,7 +477,7 @@ export default function BasicDetails({
                     </div>
 
                     {canManage && (
-                      <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity shrink-0">
                         <Button
                           variant="ghost"
                           size="icon"
@@ -551,7 +551,7 @@ export default function BasicDetails({
           </DialogHeader>
 
           {deletingNote && (
-            <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 italic max-h-24 overflow-y-auto">
+            <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 italic max-h-24 overflow-y-auto break-words [overflow-wrap:anywhere]">
               &quot;{deletingNote.note}&quot;
             </div>
           )}
