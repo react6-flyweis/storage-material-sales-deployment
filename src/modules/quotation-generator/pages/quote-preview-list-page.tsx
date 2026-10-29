@@ -15,7 +15,10 @@ import {
   getEstimateByIdProvider,
   type SaveEstimatePayload,
 } from "../estimates.api";
-import { resolveQuotationLifecycle } from "@/modules/quotations/quotations.api";
+import {
+  resolveQuotationLifecycle,
+  QuotationWorkflowBadge,
+} from "@/modules/quotations/quotations.api";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 
 type FilterCategory = "all" | "pemb" | "storage" | "custom";
@@ -417,59 +420,10 @@ export function QuotePreviewListPage() {
                         {quote.leadCompanyName || "Customer Quote"}
                       </h3>
                       <div className="text-xs text-slate-500 font-normal mt-1 flex flex-wrap items-center gap-1.5">
-                        {(() => {
-                          const lifecycle = resolveQuotationLifecycle(quote);
-                          switch (lifecycle.lifecycleStatus) {
-                            case "customer_rejected":
-                              return (
-                                <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold text-[10px]">
-                                  Declined by Customer
-                                </span>
-                              );
-                            case "admin_rejected":
-                              return (
-                                <span
-                                  className="px-2 py-0.5 rounded-full bg-red-100 text-red-800 font-bold text-[10px]"
-                                  title={
-                                    quote.approval?.rejectionReason ||
-                                    "Approval Rejected"
-                                  }
-                                >
-                                  Admin Rejected
-                                </span>
-                              );
-                            case "customer_accepted":
-                              return (
-                                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">
-                                  Accepted by Customer
-                                </span>
-                              );
-                            case "pending_approval":
-                              return (
-                                <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px]">
-                                  Pending Approval
-                                </span>
-                              );
-                            case "approved":
-                              return (
-                                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">
-                                  Approved
-                                </span>
-                              );
-                            case "sent":
-                              return (
-                                <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold text-[10px]">
-                                  Sent
-                                </span>
-                              );
-                            default:
-                              return (
-                                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold text-[10px]">
-                                  Draft
-                                </span>
-                              );
-                          }
-                        })()}
+                        <QuotationWorkflowBadge
+                          status={resolveQuotationLifecycle(quote).lifecycleStatus}
+                          className="text-[10px]"
+                        />
 
                         {quoteNumber && (
                           <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-bold text-[10px] border border-blue-200">
