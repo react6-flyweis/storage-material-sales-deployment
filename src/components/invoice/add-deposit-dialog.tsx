@@ -63,13 +63,11 @@ export default function AddDepositDialog({
       )
     : Infinity;
 
-  const maxDepositPercent = hasMaxAmount
-    ? getRemainingPercentAfterAdjustment(
-        invoiceTotal,
-        reservedScheduleValue,
-        reservedScheduleType,
-      )
-    : 100;
+  const maxDepositPercent = getRemainingPercentAfterAdjustment(
+    invoiceTotal,
+    reservedScheduleValue,
+    reservedScheduleType,
+  );
 
   const enteredDepositDollars = getAdjustmentAmount(
     value.trim(),
