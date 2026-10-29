@@ -185,6 +185,7 @@ export default function LeadsPage() {
     : (leadsResponse?.data.total ?? 0);
   const totalPages = Math.max(1, Math.ceil(totalItems / rowsPerPage));
   const isTableLoading = isArchived ? archivedLoading : leadsLoading;
+  const safeCurrentPage = Math.min(currentPage, totalPages);
 
   useEffect(() => {
     setSelectedLeads([]);
@@ -200,12 +201,6 @@ export default function LeadsPage() {
     endDate,
     activeTab,
   ]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -705,7 +700,7 @@ export default function LeadsPage() {
             </Table>
             <Pagination
               totalItems={totalItems}
-              currentPage={currentPage}
+              currentPage={safeCurrentPage}
               rowsPerPage={rowsPerPage}
               onPageChange={setCurrentPage}
               onRowsPerPageChange={(rows) => {
