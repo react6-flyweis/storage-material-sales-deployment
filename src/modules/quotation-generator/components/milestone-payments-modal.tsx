@@ -13,6 +13,7 @@ import {
 import {
   type SaveEstimatePayload,
   type MilestoneRowPayload,
+  type SaveEstimateMilestonesResponseData,
   previewMilestonesProvider,
   saveEstimateMilestonesProvider,
   downloadMilestonesPdfProvider,
@@ -30,7 +31,7 @@ interface MilestonePaymentsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   quote: SaveEstimatePayload | null;
-  onSuccess?: () => void;
+  onSuccess?: (res?: SaveEstimateMilestonesResponseData) => void;
 }
 
 function MilestonePaymentsContent({
@@ -40,7 +41,7 @@ function MilestonePaymentsContent({
 }: {
   quote: SaveEstimatePayload | null;
   onOpenChange: (open: boolean) => void;
-  onSuccess?: () => void;
+  onSuccess?: (res?: SaveEstimateMilestonesResponseData) => void;
 }) {
   const initialCustomer =
     quote?.leadCompanyName ||
@@ -65,11 +66,20 @@ function MilestonePaymentsContent({
         pricingRes?.grandTotal,
     ) || 0;
 
+  const initialTerms = quote?.depositTerms as Record<string, unknown> | undefined;
+  const initialDepositType: "%" | "$" = initialTerms?.flat != null && Number(initialTerms.flat) > 0 ? "$" : "%";
+  const initialDepositVal: number =
+    initialTerms?.flat != null && Number(initialTerms.flat) > 0
+      ? Number(initialTerms.flat)
+      : initialTerms?.pct != null && Number(initialTerms.pct) > 0
+        ? Number(initialTerms.pct)
+        : 30;
+
   const [customer] = useState(initialCustomer);
   const [location] = useState(initialLocation);
   const [totalContractValue, setTotalContractValue] = useState<number>(rawTotal);
   const [milestones, setMilestones] = useState<MilestoneItem[]>([
-    { id: "1", name: "Deposit", type: "%", value: 30 },
+    { id: "1", name: "Deposit", type: initialDepositType, value: initialDepositVal },
   ]);
   const [notes, setNotes] = useState(quote?.milestoneNote || "");
   const [isLoadingInitial, setIsLoadingInitial] = useState(false);
@@ -135,6 +145,17 @@ function MilestonePaymentsContent({
             };
           });
           setMilestones(loaded);
+        } else {
+          const terms = (preview.depositTerms || quote?.depositTerms) as Record<string, unknown> | undefined;
+          if (terms) {
+            const pct = terms.pct != null ? Number(terms.pct) : undefined;
+            const flat = terms.flat != null ? Number(terms.flat) : undefined;
+            if (pct != null && pct > 0) {
+              setMilestones([{ id: "1", name: "Deposit", type: "%", value: pct }]);
+            } else if (flat != null && flat > 0) {
+              setMilestones([{ id: "1", name: "Deposit", type: "$", value: flat }]);
+            }
+          }
         }
 
         if (preview.milestoneNote) {
@@ -476,8 +497,9 @@ function MilestonePaymentsContent({
     const rowsPayload = serializePayloadRows();
 
     try {
+      let saveRes: SaveEstimateMilestonesResponseData | undefined;
       if (quote?._id) {
-        await saveEstimateMilestonesProvider(quote._id, {
+        saveRes = await saveEstimateMilestonesProvider(quote._id, {
           rows: rowsPayload,
           note: notes,
           grand: totalContractValue > 0 ? totalContractValue : undefined,
@@ -486,7 +508,7 @@ function MilestonePaymentsContent({
       } else {
         toast.success("Milestones configured");
       }
-      onSuccess?.();
+      onSuccess?.(saveRes);
       onOpenChange(false);
     } catch (err) {
       console.error("Error saving milestones:", err);
