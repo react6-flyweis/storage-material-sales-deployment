@@ -1,9 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
-import {
-  Calendar,
-  AlertTriangle,
-} from "lucide-react";
+import { Calendar, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router";
 import InvoiceLineItem from "./invoice-line-item";
 import AddMarkupDialog from "@/components/invoice/add-markup-dialog";
@@ -249,16 +246,20 @@ function ensureDepositInSchedulePayments(
   depositValue: string,
 ): InvoiceFormValues["paymentSchedulePayments"] {
   const trimmedDeposit = depositValue.trim();
+  const isDepositRow = (payment: InvoiceFormValues["paymentSchedulePayments"][number], index: number) => {
+    return isDepositStageName(payment.name) || (index === 0 && !payment.name?.trim());
+  };
+
   const nonDepositPayments = payments.filter(
-    (payment) => !isDepositStageName(payment.name),
+    (payment, index) => !isDepositRow(payment, index),
   );
 
   if (!trimmedDeposit) {
     return nonDepositPayments;
   }
 
-  const existingDeposit = payments.find((payment) =>
-    isDepositStageName(payment.name),
+  const existingDeposit = payments.find((payment, index) =>
+    isDepositRow(payment, index),
   );
 
   return [
@@ -369,8 +370,7 @@ function invoiceToFormValues(
     state: billingAddr?.state || defaultBillingAddressFormValues.state,
     postalCode:
       billingAddr?.postalCode || defaultBillingAddressFormValues.postalCode,
-    country:
-      billingAddr?.country || defaultBillingAddressFormValues.country,
+    country: billingAddr?.country || defaultBillingAddressFormValues.country,
   };
 
   const customerName = getCustomerName(customer);
@@ -380,9 +380,7 @@ function invoiceToFormValues(
       recipientAddr?.companyName ||
       customerName ||
       defaultRecipientAddressFormValues.companyName,
-    line1:
-      recipientAddr?.line1 ||
-      (recipientAddr?.lines?.[0] ?? ""),
+    line1: recipientAddr?.line1 || (recipientAddr?.lines?.[0] ?? ""),
     line2:
       recipientAddr?.line2 ||
       (recipientAddr?.lines && recipientAddr.lines.length > 2
@@ -487,7 +485,10 @@ function parseLocationToAddress(location?: string): {
   if (!location || location === "N/A" || location === "—" || location === "-") {
     return {};
   }
-  const parts = location.split(",").map((p) => p.trim()).filter(Boolean);
+  const parts = location
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
   if (parts.length === 1) {
     return { line1: parts[0] };
   }
@@ -604,7 +605,8 @@ export default function InvoiceForm({
       if (def.billingAddress) {
         setValue(
           "billingAddress.companyName",
-          def.billingAddress.companyName || defaultBillingAddressFormValues.companyName,
+          def.billingAddress.companyName ||
+            defaultBillingAddressFormValues.companyName,
         );
         setValue(
           "billingAddress.line1",
@@ -621,7 +623,8 @@ export default function InvoiceForm({
         );
         setValue(
           "billingAddress.postalCode",
-          def.billingAddress.postalCode || defaultBillingAddressFormValues.postalCode,
+          def.billingAddress.postalCode ||
+            defaultBillingAddressFormValues.postalCode,
         );
         setValue(
           "billingAddress.country",
@@ -635,21 +638,35 @@ export default function InvoiceForm({
         );
         setValue(
           "bankDetails.accountName",
-          def.bankDetails.accountName || defaultBankDetailsFormValues.accountName,
+          def.bankDetails.accountName ||
+            defaultBankDetailsFormValues.accountName,
         );
-        setValue("bankDetails.accountNumber", def.bankDetails.accountNumber || "");
-        setValue("bankDetails.routingNumber", def.bankDetails.routingNumber || "");
+        setValue(
+          "bankDetails.accountNumber",
+          def.bankDetails.accountNumber || "",
+        );
+        setValue(
+          "bankDetails.routingNumber",
+          def.bankDetails.routingNumber || "",
+        );
         setValue("bankDetails.swiftCode", def.bankDetails.swiftCode || "");
         setValue("bankDetails.iban", def.bankDetails.iban || "");
-        setValue("bankDetails.branchAddress", def.bankDetails.branchAddress || "");
+        setValue(
+          "bankDetails.branchAddress",
+          def.bankDetails.branchAddress || "",
+        );
         setValue(
           "bankDetails.paymentInstructions",
-          def.bankDetails.paymentInstructions || defaultBankDetailsFormValues.paymentInstructions,
+          def.bankDetails.paymentInstructions ||
+            defaultBankDetailsFormValues.paymentInstructions,
         );
       }
       if (def.recipientAddress) {
         if (def.recipientAddress.companyName) {
-          setValue("recipientAddress.companyName", def.recipientAddress.companyName);
+          setValue(
+            "recipientAddress.companyName",
+            def.recipientAddress.companyName,
+          );
         }
         if (def.recipientAddress.line1) {
           setValue("recipientAddress.line1", def.recipientAddress.line1);
@@ -664,7 +681,10 @@ export default function InvoiceForm({
           setValue("recipientAddress.state", def.recipientAddress.state);
         }
         if (def.recipientAddress.postalCode) {
-          setValue("recipientAddress.postalCode", def.recipientAddress.postalCode);
+          setValue(
+            "recipientAddress.postalCode",
+            def.recipientAddress.postalCode,
+          );
         }
         if (def.recipientAddress.country) {
           setValue("recipientAddress.country", def.recipientAddress.country);
@@ -833,7 +853,8 @@ export default function InvoiceForm({
     keyName: "fieldId",
   });
 
-  const watchLineItems = (formValues.lineItems ??
+  const watchedLineItems = useWatch({ control, name: "lineItems" });
+  const watchLineItems = (watchedLineItems ?? formValues.lineItems ??
     defaultFormValues.lineItems) as InvoiceFormValues["lineItems"];
   const invoiceNumber =
     formValues?.invoiceNumber ?? defaultFormValues.invoiceNumber;
@@ -963,7 +984,12 @@ export default function InvoiceForm({
     );
     const tax = calculateTax();
 
-    return Math.max(0, subtotalWithMarkup - discount + tax);
+    const computed = Math.max(0, subtotalWithMarkup - discount + tax);
+    if (computed > 0) return computed;
+    if (typeof invoice?.totalAmount === "number" && invoice.totalAmount > 0) {
+      return invoice.totalAmount;
+    }
+    return 0;
   };
 
   const invoiceTotal = calculateTotal();
@@ -1189,7 +1215,9 @@ export default function InvoiceForm({
       state: data.billingAddress?.state?.trim() || undefined,
       postalCode: data.billingAddress?.postalCode?.trim() || undefined,
       country: data.billingAddress?.country?.trim() || undefined,
-      lines: data.billingAddress ? buildAddressLines(data.billingAddress) : undefined,
+      lines: data.billingAddress
+        ? buildAddressLines(data.billingAddress)
+        : undefined,
     };
 
     const recipientAddressPayload: InvoiceAddress = {
@@ -1200,7 +1228,9 @@ export default function InvoiceForm({
       state: data.recipientAddress?.state?.trim() || undefined,
       postalCode: data.recipientAddress?.postalCode?.trim() || undefined,
       country: data.recipientAddress?.country?.trim() || undefined,
-      lines: data.recipientAddress ? buildAddressLines(data.recipientAddress) : undefined,
+      lines: data.recipientAddress
+        ? buildAddressLines(data.recipientAddress)
+        : undefined,
     };
 
     const bankDetailsPayload: InvoiceBankDetails = {
@@ -1211,7 +1241,8 @@ export default function InvoiceForm({
       swiftCode: data.bankDetails?.swiftCode?.trim() || undefined,
       iban: data.bankDetails?.iban?.trim() || undefined,
       branchAddress: data.bankDetails?.branchAddress?.trim() || undefined,
-      paymentInstructions: data.bankDetails?.paymentInstructions?.trim() || undefined,
+      paymentInstructions:
+        data.bankDetails?.paymentInstructions?.trim() || undefined,
     };
 
     const payload = {
@@ -1360,7 +1391,9 @@ export default function InvoiceForm({
                 <div>1851 Madison Ave Suite 300</div>
               )}
               {billingAddress.line2 && <div>{billingAddress.line2}</div>}
-              {billingAddress.city || billingAddress.state || billingAddress.postalCode ? (
+              {billingAddress.city ||
+              billingAddress.state ||
+              billingAddress.postalCode ? (
                 <div>
                   {[
                     billingAddress.city,
@@ -1457,7 +1490,7 @@ export default function InvoiceForm({
 
               <ClientSelector
                 placeholder="Select Project"
-                minLifecycleStatus="proposal_sent"
+                // minLifecycleStatus="proposal_sent"
                 maxLifecycleStatus="sent_to_admin"
                 value={leadId}
                 onValueChange={(lead) => {
@@ -1486,16 +1519,28 @@ export default function InvoiceForm({
 
                     if (lead.installAddress) {
                       if (lead.installAddress.line1) {
-                        setValue("recipientAddress.line1", lead.installAddress.line1);
+                        setValue(
+                          "recipientAddress.line1",
+                          lead.installAddress.line1,
+                        );
                       }
                       if (lead.installAddress.city) {
-                        setValue("recipientAddress.city", lead.installAddress.city);
+                        setValue(
+                          "recipientAddress.city",
+                          lead.installAddress.city,
+                        );
                       }
                       if (lead.installAddress.state) {
-                        setValue("recipientAddress.state", lead.installAddress.state);
+                        setValue(
+                          "recipientAddress.state",
+                          lead.installAddress.state,
+                        );
                       }
                       if (lead.installAddress.postalCode) {
-                        setValue("recipientAddress.postalCode", lead.installAddress.postalCode);
+                        setValue(
+                          "recipientAddress.postalCode",
+                          lead.installAddress.postalCode,
+                        );
                       }
                     } else if (lead.location) {
                       const parsed = parseLocationToAddress(lead.location);
@@ -1509,7 +1554,10 @@ export default function InvoiceForm({
                         setValue("recipientAddress.state", parsed.state);
                       }
                       if (parsed.postalCode) {
-                        setValue("recipientAddress.postalCode", parsed.postalCode);
+                        setValue(
+                          "recipientAddress.postalCode",
+                          parsed.postalCode,
+                        );
                       }
                     }
                     if (!getValues("recipientAddress.country")) {
@@ -1522,8 +1570,8 @@ export default function InvoiceForm({
               {/* Recipient Address Preview */}
               {Boolean(
                 recipientAddress.companyName ||
-                  recipientAddress.line1 ||
-                  recipientAddress.city,
+                recipientAddress.line1 ||
+                recipientAddress.city,
               ) && (
                 <div className="w-full max-w-xs space-y-1 text-left self-end pt-1">
                   <div className="text-base font-bold text-gray-900 tracking-tight">
@@ -1531,8 +1579,12 @@ export default function InvoiceForm({
                   </div>
 
                   <div className="text-sm text-gray-600 leading-relaxed space-y-0.5">
-                    {recipientAddress.line1 && <div>{recipientAddress.line1}</div>}
-                    {recipientAddress.line2 && <div>{recipientAddress.line2}</div>}
+                    {recipientAddress.line1 && (
+                      <div>{recipientAddress.line1}</div>
+                    )}
+                    {recipientAddress.line2 && (
+                      <div>{recipientAddress.line2}</div>
+                    )}
                     {(recipientAddress.city ||
                       recipientAddress.state ||
                       recipientAddress.postalCode) && (
@@ -1547,7 +1599,9 @@ export default function InvoiceForm({
                           .join(", ")}
                       </div>
                     )}
-                    {recipientAddress.country && <div>{recipientAddress.country}</div>}
+                    {recipientAddress.country && (
+                      <div>{recipientAddress.country}</div>
+                    )}
                   </div>
 
                   {!isSummaryReadOnly && (
@@ -1556,7 +1610,9 @@ export default function InvoiceForm({
                       title="Edit Recipient Address"
                       description="Update the bill-to / customer address details for this invoice."
                       onDone={(newAddr) => {
-                        setValue("recipientAddress", newAddr, { shouldDirty: true });
+                        setValue("recipientAddress", newAddr, {
+                          shouldDirty: true,
+                        });
                       }}
                     >
                       <button
@@ -1626,7 +1682,6 @@ export default function InvoiceForm({
             </div>
           </div>
         </div>
-
 
         {/* Section Headers */}
         <div className="hidden md:grid grid-cols-12 gap-4 bg-gray-50/50 py-3 px-4 rounded-lg mb-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
