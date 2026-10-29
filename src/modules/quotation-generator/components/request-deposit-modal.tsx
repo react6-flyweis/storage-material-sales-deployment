@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   type SaveEstimatePayload,
+  type SaveEstimateMilestonesResponseData,
   previewDepositProvider,
   saveEstimateDepositProvider,
   downloadDepositReceiptPdfProvider,
@@ -22,7 +23,7 @@ interface RequestDepositModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   quote: SaveEstimatePayload | null;
-  onSuccess?: () => void;
+  onSuccess?: (res?: SaveEstimateMilestonesResponseData) => void;
 }
 
 function RequestDepositContent({
@@ -32,7 +33,7 @@ function RequestDepositContent({
 }: {
   quote: SaveEstimatePayload | null;
   onOpenChange: (open: boolean) => void;
-  onSuccess?: () => void;
+  onSuccess?: (res?: SaveEstimateMilestonesResponseData) => void;
 }) {
   const initialCustomer =
     quote?.leadCompanyName ||
@@ -341,8 +342,9 @@ function RequestDepositContent({
     const parsedFlat = parseFloat(flatAmount) || undefined;
 
     try {
+      let saveRes: SaveEstimateMilestonesResponseData | undefined;
       if (quote?._id) {
-        await saveEstimateDepositProvider(quote._id, {
+        saveRes = await saveEstimateDepositProvider(quote._id, {
           pct: parsedPct,
           flat: parsedFlat,
           note: notes,
@@ -352,7 +354,7 @@ function RequestDepositContent({
       } else {
         toast.success("Deposit terms configured");
       }
-      onSuccess?.();
+      onSuccess?.(saveRes);
       onOpenChange(false);
     } catch (err) {
       console.error("Error saving deposit terms:", err);

@@ -76,6 +76,8 @@ export const JOB_TYPE = ["PEMB", "Storage"] as const;
 export type JobType = (typeof JOB_TYPE)[number];
 export const DEFAULT_JOB_TYPE: JobType = "PEMB";
 
+export type CompanyBrand = "SBD" | "SM";
+
 export const SCOPE = ["Supply", "Install", "Both"] as const;
 export type Scope = (typeof SCOPE)[number];
 export type QuotationScope = Scope;
@@ -245,6 +247,11 @@ export interface ShipperPricing {
   quicken?: number;
   jobType?: JobType;
   scope?: Scope;
+  companyBrand?: CompanyBrand | string;
+  company?: CompanyBrand | string;
+  brand?: CompanyBrand | string;
+  logoBrand?: CompanyBrand | string;
+  companyLogoUrl?: string;
   roof?: string;
   install?: string;
   isSS?: boolean;
@@ -267,6 +274,9 @@ export interface SquareFootageMeta {
   selected?: number;
   coverDerivedSqft?: number;
   inputSf?: number;
+  weightLbsUsed?: number;
+  mappedWeightLbs?: number;
+  formula?: string;
   [key: string]: unknown;
 }
 
@@ -274,6 +284,8 @@ export interface ExtractShipperResponseData {
   fileName: string;
   sheetCount: number;
   totalWeightLbs: number;
+  detectedWeightLbs?: number;
+  unmappedWeightLbs?: number;
   squareFootage: number;
   squareFootageMeta?: SquareFootageMeta | null;
   tabSummary: ShipperTabSummary[];
@@ -428,6 +440,11 @@ export interface ComputeEstimateRequest {
 }
 
 export interface ComputeEstimateResponseData {
+  squareFootage?: number;
+  squareFootageMeta?: SquareFootageMeta | null;
+  detectedWeightLbs?: number;
+  totalWeightLbs?: number;
+  unmappedWeightLbs?: number;
   weightByCategory?: ShipperWeightByCategoryItem[];
   pricing?: ShipperPricing;
   fullQuote?: FullQuoteData;
@@ -438,6 +455,11 @@ export interface ComputeEstimateResponse {
   success?: boolean;
   message?: string;
   data?: ComputeEstimateResponseData;
+  squareFootage?: number;
+  squareFootageMeta?: SquareFootageMeta | null;
+  detectedWeightLbs?: number;
+  totalWeightLbs?: number;
+  unmappedWeightLbs?: number;
   weightByCategory?: ShipperWeightByCategoryItem[];
   pricing?: ShipperPricing;
   fullQuote?: FullQuoteData;
@@ -505,6 +527,7 @@ export interface SaveEstimatePayload extends Record<string, unknown> {
   conversion?: EstimateConversion;
   jobType?: JobType;
   scope?: Scope;
+  companyBrand?: CompanyBrand;
   roofType?: string;
   leadCompanyName?: string;
   customerEmail?: string;
@@ -981,6 +1004,7 @@ export interface PreviewDocumentRequest {
   jobNumber?: string;
   jobType?: JobType;
   scope?: Scope;
+  companyBrand?: CompanyBrand;
   steelFinish?: "red-iron" | "galvanized" | string;
   freightOverride?: number | null;
   materialSellOverride?: number | null;
@@ -1283,15 +1307,38 @@ export async function previewStaircaseProvider(
   return response.data?.data as StaircasePreviewData;
 }
 
+export interface EstimateQuotationSync {
+  synced?: boolean;
+  requiresSubmitForApproval?: boolean;
+  approvalStatus?: string;
+  workflowStatus?: string;
+  quotationId?: string;
+  [key: string]: unknown;
+}
+
+export interface SaveEstimateMilestonesResponseData {
+  quotationSync?: EstimateQuotationSync;
+  rawResponse?: unknown;
+  [key: string]: unknown;
+}
+
 export async function saveEstimateDepositProvider(
   estimateId: string,
   payload: { pct?: number; flat?: number; note?: string; grand?: number }
-) {
+): Promise<SaveEstimateMilestonesResponseData> {
   const response = await apiClient.put(
     `/api/sales/estimates/${encodeURIComponent(estimateId)}/deposit`,
     payload
   );
-  return response.data?.data;
+  const data = response.data?.data || {};
+  const quotationSync =
+    response.data?.quotationSync ||
+    (response.data?.data as Record<string, unknown>)?.quotationSync;
+  return {
+    ...(typeof data === "object" ? data : { data }),
+    quotationSync,
+    rawResponse: response.data,
+  };
 }
 
 export async function saveEstimateMilestonesProvider(
@@ -1303,12 +1350,20 @@ export async function saveEstimateMilestonesProvider(
     grand?: number;
     [key: string]: unknown;
   }
-) {
+): Promise<SaveEstimateMilestonesResponseData> {
   const response = await apiClient.put(
     `/api/sales/estimates/${encodeURIComponent(estimateId)}/milestones`,
     payload
   );
-  return response.data?.data;
+  const data = response.data?.data || {};
+  const quotationSync =
+    response.data?.quotationSync ||
+    (response.data?.data as Record<string, unknown>)?.quotationSync;
+  return {
+    ...(typeof data === "object" ? data : { data }),
+    quotationSync,
+    rawResponse: response.data,
+  };
 }
 
 export async function saveEstimateMultiStoryProvider(

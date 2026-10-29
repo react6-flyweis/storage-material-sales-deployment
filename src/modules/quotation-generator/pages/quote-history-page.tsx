@@ -28,7 +28,10 @@ import {
   deleteEstimateProvider,
   type SaveEstimatePayload,
 } from "../estimates.api";
-import { resolveQuotationLifecycle } from "@/modules/quotations/quotations.api";
+import {
+  resolveQuotationLifecycle,
+  QuotationWorkflowBadge,
+} from "@/modules/quotations/quotations.api";
 import {
   ChangeOrderModal,
   RequestDepositModal,
@@ -671,53 +674,10 @@ export function QuoteHistoryPage() {
                             ? "STORAGE"
                             : quote.jobType?.toUpperCase() || "PEMB"}
                         </span>
-                        {(() => {
-                          const lifecycle = resolveQuotationLifecycle(quote);
-                          switch (lifecycle.lifecycleStatus) {
-                            case "approved":
-                              return (
-                                <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs flex items-center gap-1">
-                                  <span>✅</span>
-                                  <span>Approved</span>
-                                </span>
-                              );
-                            case "sent":
-                              return (
-                                <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-300 font-bold text-xs flex items-center gap-1">
-                                  <span>📬</span>
-                                  <span>Sent</span>
-                                </span>
-                              );
-                            case "pending_approval":
-                              return (
-                                <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 font-bold text-xs flex items-center gap-1">
-                                  <span>⏳</span>
-                                  <span>Pending Approval</span>
-                                </span>
-                              );
-                            case "customer_accepted":
-                              return (
-                                <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs flex items-center gap-1">
-                                  <span>🤝</span>
-                                  <span>Accepted</span>
-                                </span>
-                              );
-                            case "customer_rejected":
-                            case "admin_rejected":
-                              return (
-                                <span className="px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-300 font-bold text-xs flex items-center gap-1">
-                                  <span>❌</span>
-                                  <span>Rejected</span>
-                                </span>
-                              );
-                            default:
-                              return (
-                                <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-300 font-medium text-xs">
-                                  Draft
-                                </span>
-                              );
-                          }
-                        })()}
+                        <QuotationWorkflowBadge
+                          status={resolveQuotationLifecycle(quote).lifecycleStatus}
+                          showIcon
+                        />
                         {/* <span className="text-xs font-semibold text-slate-500">
                           {blendPctVal}% Quicken blend
                         </span> */}

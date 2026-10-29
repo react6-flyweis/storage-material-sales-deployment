@@ -55,6 +55,8 @@ export function QuoteDetailTab({
   const {
     jobType,
     setJobType,
+    companyBrand,
+    setCompanyBrand,
     scope,
     setScope,
     roofType,
@@ -92,6 +94,7 @@ export function QuoteDetailTab({
   const previewPayload: PreviewDocumentRequest = useMemo(
     () => ({
       estimateId: estimateId || undefined,
+      companyBrand,
       jobType: "PEMB",
       leadCompanyName: customerLeadName,
       customerEmail,
@@ -132,6 +135,7 @@ export function QuoteDetailTab({
     }),
     [
       estimateId,
+      companyBrand,
       customerLeadName,
       customerEmail,
       customerAddress,
@@ -171,6 +175,7 @@ export function QuoteDetailTab({
     try {
       const payload: PreviewDocumentRequest = {
         estimateId: estimateId || undefined,
+        companyBrand,
         grandTotal: (extractedShipper?.fullQuote?.grandTotal ??
           extractedShipper?.pricing?.totSell) as number | undefined,
         leadCompanyName: customerLeadName,
@@ -238,7 +243,7 @@ export function QuoteDetailTab({
           Live Edit — Changes Update Instantly
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
           {/* JOB TYPE */}
           <div>
             <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
@@ -287,6 +292,36 @@ export function QuoteDetailTab({
                     )}
                   >
                     {item}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* LOGO */}
+          <div>
+            <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+              LOGO
+            </label>
+            <div className="grid grid-cols-2 gap-1">
+              {[
+                { label: "Steel Building", value: "SBD" as const },
+                { label: "Storage Material", value: "SM" as const },
+              ].map((item) => {
+                const isActive = companyBrand === item.value;
+                return (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => setCompanyBrand(item.value)}
+                    className={cn(
+                      "py-2 px-1 rounded-md font-semibold text-xs transition-colors cursor-pointer text-center",
+                      isActive
+                        ? "bg-blue-600 text-white shadow-xs"
+                        : "bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200",
+                    )}
+                  >
+                    {item.label}
                   </button>
                 );
               })}

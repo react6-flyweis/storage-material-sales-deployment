@@ -39,6 +39,7 @@ export function QuotePreviewPage() {
 
   const {
     jobType,
+    companyBrand,
     scope,
     roofType,
     installCost,
@@ -137,6 +138,7 @@ export function QuotePreviewPage() {
   const previewPayload: PreviewDocumentRequest = useMemo(
     () => ({
       estimateId: activeEstimateId,
+      companyBrand,
       grandTotal: (navState.extractedShipper?.fullQuote?.grandTotal ??
         navState.extractedShipper?.pricing?.totSell) as number | undefined,
       jobType: "PEMB",
@@ -207,6 +209,7 @@ export function QuotePreviewPage() {
     }),
     [
       activeEstimateId,
+      companyBrand,
       customerLeadName,
       customerEmail,
       customerAddress,
@@ -267,6 +270,7 @@ export function QuotePreviewPage() {
         estimateId || pembEstimateId || navState.estimateId || undefined;
       const payload: PreviewDocumentRequest = {
         estimateId: activeEstId,
+        companyBrand,
         grandTotal: (navState.extractedShipper?.fullQuote?.grandTotal ??
           navState.extractedShipper?.pricing?.totSell) as number | undefined,
         jobType: "PEMB",
@@ -374,6 +378,7 @@ export function QuotePreviewPage() {
         {
           _id: activeEstId,
           jobType,
+          companyBrand,
           scope:
             (scope || "Both").toLowerCase() === "supply"
               ? "Supply"

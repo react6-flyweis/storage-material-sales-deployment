@@ -4,8 +4,11 @@ import type {
   ExtractShipperResponseData,
   JobType,
   Scope,
+  CompanyBrand,
 } from "./estimates.api";
 import { DEFAULT_JOB_TYPE, DEFAULT_SCOPE } from "./estimates.api";
+
+export type { CompanyBrand };
 
 export interface PembAddOnItem {
   id: string;
@@ -20,6 +23,7 @@ export interface PembAddOnItem {
 export interface QuotationState {
   // Shared fields between Sidebar, Sticky Header, and Quotation Views
   jobType: JobType;
+  companyBrand: CompanyBrand;
   scope: Scope;
   roofType: string;
   steelFinish: "red-iron" | "galvanized";
@@ -113,6 +117,7 @@ export interface QuotationState {
 
   // Actions
   setJobType: (jobType: JobType) => void;
+  setCompanyBrand: (companyBrand: CompanyBrand) => void;
   setScope: (scope: Scope) => void;
   setRoofType: (roofType: string) => void;
   setSteelFinish: (steelFinish: "red-iron" | "galvanized") => void;
@@ -224,6 +229,7 @@ export interface QuotationState {
 
 export const useQuotationStore = create<QuotationState>((set) => ({
   jobType: DEFAULT_JOB_TYPE,
+  companyBrand: "SBD",
   scope: DEFAULT_SCOPE,
   roofType: "screw-down",
   steelFinish: "red-iron",
@@ -349,6 +355,7 @@ export const useQuotationStore = create<QuotationState>((set) => ({
             state.installSell === 3.25 ? 8.5 : state.installSell,
         }),
     })),
+  setCompanyBrand: (companyBrand) => set({ companyBrand }),
   setScope: (scope) => set({ scope }),
   setRoofType: (roofType) => set({ roofType }),
   setSteelFinish: (steelFinish) => set({ steelFinish }),

@@ -4,12 +4,13 @@ import {
   ArrowLeft,
   Loader2,
   Printer,
-  ArrowRightCircle,
   FileEdit,
   FileText,
   AlertCircle,
   Milestone,
   Banknote,
+  FileCheck,
+  Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -26,8 +27,15 @@ import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
 import { ServerDocumentPreview } from "../components/server-document-preview";
 import { useLoadEstimateToEditor } from "../hooks/use-load-estimate-to-editor";
 import { useConvertEstimateToQuotationMutation } from "@/modules/quotations/quotations.hooks";
+import {
+  submitQuotationForApprovalProvider,
+  QuotationWorkflowBadge,
+  normalizeWorkflowStatus,
+} from "@/modules/quotations/quotations.api";
 import { MilestonePaymentsModal } from "../components/milestone-payments-modal";
 import { RequestDepositModal } from "../components/request-deposit-modal";
+import { SubmitApprovalModal } from "../components/submit-approval-modal";
+import { SendQuotationModal } from "../components/send-quotation-modal";
 
 export function EstimateDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -42,6 +50,8 @@ export function EstimateDetailPage() {
   const [isConverting, setIsConverting] = useState(false);
   const [isMilestoneModalOpen, setIsMilestoneModalOpen] = useState(false);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
+  const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
+  const [isSendModalOpen, setIsSendModalOpen] = useState(false);
 
   const { loadAndEdit, isLoading: isEditing } = useLoadEstimateToEditor();
   const convertMutation = useConvertEstimateToQuotationMutation();
@@ -90,19 +100,32 @@ export function EstimateDetailPage() {
   const jobNumber = estimate?.jobNumber || "";
 
   const conversion = estimate?.conversion;
-  const quoteNumber = conversion?.quoteNumber;
-  const effectiveWorkflowStatus =
+  const quoteNumber = conversion?.quoteNumber || estimate?.quoteNumber;
+  const effectiveQuotationId = conversion?.quotationId;
+
+  const rawWorkflowStatus =
     conversion?.workflowStatus ||
     estimate?.workflowStatus ||
-    estimate?.approval?.status ||
-    estimate?.status ||
     "draft";
+
+  const effectiveStatus = useMemo(() => {
+    // If not converted to quotation yet, it is a draft
+    if (!conversion?.isConvertedToQuotation && !effectiveQuotationId) {
+      return "draft";
+    }
+    return normalizeWorkflowStatus(rawWorkflowStatus);
+  }, [
+    conversion?.isConvertedToQuotation,
+    effectiveQuotationId,
+    rawWorkflowStatus,
+  ]);
 
   // Server document preview request payload (History requires only estimateId and sections)
   const previewPayload: PreviewDocumentRequest | null = useMemo(() => {
     if (!id) return null;
     return {
       estimateId: id,
+      companyBrand: estimate?.companyBrand,
       sections: ["quote", "sow", "contract"],
       jobType: isStorage ? "Storage" : "PEMB",
       sourceFileName: estimate?.sourceFileName,
@@ -181,38 +204,44 @@ export function EstimateDetailPage() {
     }
   };
 
-  const handleConvertToQuotation = async () => {
-    if (!id) return;
-    setIsConverting(true);
-    try {
-      const res = await convertMutation.mutateAsync(id);
-      if (res && (res as { success?: boolean }).success === false) {
-        throw new Error(
-          (res as { message?: string }).message ||
-            "Failed to convert estimate to quotation",
-        );
+  const updateEstimateConversion = useCallback(
+    (
+      prev: SaveEstimatePayload,
+      updates: {
+        approvalStatus: "not_submitted" | "pending_approval" | "approved" | "rejected";
+        workflowStatus: "draft" | "pending_approval" | "approved" | "rejected" | "sent";
+        quotationId?: string | null;
+        isConvertedToQuotation?: boolean;
       }
-      const resData = (
-        res as { data?: { quotation?: { _id?: string }; _id?: string } }
-      )?.data;
-      const quotationId = resData?.quotation?._id || resData?._id;
-      if (quotationId) {
-        toast.success("Converted to quotation successfully");
-        navigate(`/leads/quotation-details/${quotationId}`);
-      } else {
-        await fetchEstimateDetail();
-      }
-    } catch (err) {
-      console.error("Failed to convert estimate to quotation:", err);
-      const msg = getApiErrorMessage(
-        err,
-        "Failed to convert estimate to quotation. Please try again.",
-      );
-      toast.error(msg);
-    } finally {
-      setIsConverting(false);
-    }
-  };
+    ): SaveEstimatePayload => {
+      const currentConversion = prev.conversion;
+      const isConverted =
+        updates.isConvertedToQuotation ??
+        Boolean(updates.quotationId || currentConversion?.isConvertedToQuotation);
+
+      return {
+        ...prev,
+        workflowStatus: updates.workflowStatus,
+        approval: {
+          ...prev.approval,
+          status: updates.approvalStatus,
+        },
+        conversion: {
+          isConvertedToQuotation: isConverted,
+          quotationId:
+            updates.quotationId !== undefined
+              ? updates.quotationId
+              : (currentConversion?.quotationId ?? null),
+          quoteNumber: currentConversion?.quoteNumber ?? null,
+          quotationStatus: currentConversion?.quotationStatus ?? null,
+          approvalStatus: updates.approvalStatus,
+          workflowStatus: updates.workflowStatus,
+          convertedAt: currentConversion?.convertedAt ?? null,
+        },
+      };
+    },
+    []
+  );
 
   const handleEditClick = async () => {
     try {
@@ -292,46 +321,7 @@ export function EstimateDetailPage() {
               <h1 className="text-2xl font-bold text-slate-900 leading-tight">
                 {customerLeadName}
               </h1>
-              {(() => {
-                switch (effectiveWorkflowStatus) {
-                  case "pending_approval":
-                    return (
-                      <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-xs border border-amber-300 shadow-2xs">
-                        Pending Approval
-                      </span>
-                    );
-                  case "approved":
-                    return (
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs border border-emerald-300 shadow-2xs">
-                        Approved
-                      </span>
-                    );
-                  case "rejected":
-                    return (
-                      <span
-                        className="px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold text-xs border border-rose-300 shadow-2xs"
-                        title={
-                          estimate?.approval?.rejectionReason ||
-                          "Approval Rejected"
-                        }
-                      >
-                        Rejected
-                      </span>
-                    );
-                  case "sent":
-                    return (
-                      <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold text-xs border border-blue-300 shadow-2xs">
-                        Sent
-                      </span>
-                    );
-                  default:
-                    return (
-                      <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold text-xs border border-slate-300">
-                        Draft
-                      </span>
-                    );
-                }
-              })()}
+              <QuotationWorkflowBadge status={effectiveStatus} />
               {quoteNumber && (
                 <span className="px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 font-bold text-xs border border-blue-200">
                   Quote #{quoteNumber}
@@ -351,42 +341,116 @@ export function EstimateDetailPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {/* View Quotation Button (if converted) */}
-          {(conversion?.isConvertedToQuotation || conversion?.quotationId) && (
+          {/* 1. Draft / not_submitted: Send for Approval CTA */}
+          {effectiveStatus === "draft" && (
+            <Button
+              type="button"
+              onClick={() => setIsSubmitModalOpen(true)}
+              disabled={isConverting}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
+              title="Send this quotation for admin approval"
+            >
+              {isConverting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileCheck className="h-4 w-4" />
+              )}
+              Send for Approval
+            </Button>
+          )}
+
+          {/* 2. Pending Approval: View Quotation (wait for admin) */}
+          {effectiveStatus === "pending_approval" && (
             <Button
               type="button"
               onClick={() => {
-                if (conversion?.quotationId) {
+                if (effectiveQuotationId) {
                   navigate(
-                    `/leads/quotation-details/${conversion.quotationId}`,
+                    `/leads/quotation-details/${effectiveQuotationId}`,
                   );
                 } else {
                   navigate("/leads/quotation-list");
                 }
               }}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
-              title="View the official quotation"
+              className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
+              title="Quotation is awaiting Admin approval. Click to view quotation details."
             >
               <FileText className="h-4 w-4" />
-              View Quotation
+              <span>View Quotation</span>
+              <span className="text-[10px] font-normal opacity-90 hidden sm:inline">
+                (Wait for Admin)
+              </span>
             </Button>
           )}
 
-          {/* Convert to Quote Button (if unconverted) */}
-          {!conversion?.isConvertedToQuotation && !conversion?.quotationId && (
+          {/* 3. Approved: Send to customer CTA */}
+          {effectiveStatus === "approved" && (
+            <>
+              <Button
+                type="button"
+                onClick={() => setIsSendModalOpen(true)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
+                title="Quotation has been approved! Send to customer."
+              >
+                <Send className="h-4 w-4" />
+                Send to customer
+              </Button>
+              {effectiveQuotationId && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    navigate(
+                      `/leads/quotation-details/${effectiveQuotationId}`,
+                    )
+                  }
+                  className="px-3.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs border-slate-300"
+                  title="View official quotation"
+                >
+                  <FileText className="h-4 w-4 text-emerald-600" />
+                  View Quotation
+                </Button>
+              )}
+            </>
+          )}
+
+          {/* 4. Rejected: Edit Estimate CTA */}
+          {(effectiveStatus === "admin_rejected" ||
+            effectiveStatus === "client_rejected") && (
             <Button
               type="button"
-              onClick={handleConvertToQuotation}
-              disabled={isConverting}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
-              title="Convert this estimate into an official quotation"
+              onClick={handleEditClick}
+              disabled={isEditing}
+              className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs ring-2 ring-rose-300"
+              title={
+                estimate?.approval?.rejectionReason
+                  ? `Rejected: ${estimate.approval.rejectionReason}. Click to modify and re-submit.`
+                  : "Quotation was rejected. Click to modify in generator editor and re-submit."
+              }
             >
-              {isConverting ? (
+              {isEditing ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <ArrowRightCircle className="h-4 w-4" />
+                <FileEdit className="h-4 w-4" />
               )}
-              Send For Approval
+              Edit Estimate to Revise
+            </Button>
+          )}
+
+          {/* 5. Sent: View Quotation */}
+          {effectiveStatus === "sent" && effectiveQuotationId && (
+            <Button
+              type="button"
+              onClick={() =>
+                navigate(
+                  `/leads/quotation-details/${effectiveQuotationId}`,
+                )
+              }
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
+              title="View sent quotation"
+            >
+              <FileText className="h-4 w-4" />
+              View Quotation
             </Button>
           )}
 
@@ -412,30 +476,33 @@ export function EstimateDetailPage() {
             Milestones
           </Button>
 
-          {/* Edit Estimate Button */}
-          <Button
-            type="button"
-            onClick={handleEditClick}
-            disabled={isEditing}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
-            title="Load this estimate into generator editor to modify"
-          >
-            {isEditing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <FileEdit className="h-4 w-4" />
-            )}
-            Edit Estimate
-          </Button>
+          {/* Edit Estimate Button (Always available for sales unless rejected CTA shown above) */}
+          {effectiveStatus !== "admin_rejected" &&
+            effectiveStatus !== "client_rejected" && (
+            <Button
+              type="button"
+              onClick={handleEditClick}
+              disabled={isEditing}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
+              title="Load this estimate into generator editor to modify"
+            >
+              {isEditing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileEdit className="h-4 w-4" />
+              )}
+              Edit Estimate
+            </Button>
+          )}
 
           {/* Generate & Print PDF */}
           <Button
             type="button"
             onClick={handleDownloadPdf}
-            disabled={isDownloadingPdf || effectiveWorkflowStatus !== "approved"}
+            disabled={isDownloadingPdf || effectiveStatus !== "approved"}
             className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
             title={
-              effectiveWorkflowStatus !== "approved"
+              effectiveStatus !== "approved"
                 ? "PDF generation is disabled until the estimate is approved."
                 : "Generate and download or print PDF"
             }
@@ -467,7 +534,24 @@ export function EstimateDetailPage() {
         open={isMilestoneModalOpen}
         onOpenChange={setIsMilestoneModalOpen}
         quote={estimate ? { ...estimate, _id: id } : ({ _id: id } as SaveEstimatePayload)}
-        onSuccess={() => {
+        onSuccess={(saveRes) => {
+          if (
+            saveRes?.quotationSync?.requiresSubmitForApproval ||
+            saveRes?.quotationSync?.workflowStatus === "draft" ||
+            saveRes?.quotationSync?.approvalStatus === "not_submitted"
+          ) {
+            setEstimate((prev) => {
+              if (!prev) return prev;
+              return updateEstimateConversion(prev, {
+                approvalStatus: "not_submitted",
+                workflowStatus: "draft",
+                quotationId: saveRes.quotationSync?.quotationId,
+              });
+            });
+            toast.info(
+              "Payment schedule updated. Click 'Send for Approval' to submit for Admin review.",
+            );
+          }
           fetchEstimateDetail();
           refetchPreview();
         }}
@@ -478,10 +562,96 @@ export function EstimateDetailPage() {
         open={isDepositModalOpen}
         onOpenChange={setIsDepositModalOpen}
         quote={estimate ? { ...estimate, _id: id } : ({ _id: id } as SaveEstimatePayload)}
-        onSuccess={() => {
+        onSuccess={(saveRes) => {
+          if (
+            saveRes?.quotationSync?.requiresSubmitForApproval ||
+            saveRes?.quotationSync?.workflowStatus === "draft" ||
+            saveRes?.quotationSync?.approvalStatus === "not_submitted"
+          ) {
+            setEstimate((prev) => {
+              if (!prev) return prev;
+              return updateEstimateConversion(prev, {
+                approvalStatus: "not_submitted",
+                workflowStatus: "draft",
+                quotationId: saveRes.quotationSync?.quotationId,
+              });
+            });
+            toast.info(
+              "Deposit terms updated. Click 'Send for Approval' to submit for Admin review.",
+            );
+          }
           fetchEstimateDetail();
         }}
       />
+
+      {/* Submit for Approval Modal */}
+      <SubmitApprovalModal
+        open={isSubmitModalOpen}
+        onOpenChange={setIsSubmitModalOpen}
+        quotationId={effectiveQuotationId || undefined}
+        estimateId={id}
+        quotationTitle={`Estimate Package — ${customerLeadName}`}
+        quotationNumber={quoteNumber || undefined}
+        versionNumber={estimate?.versionNumber || 1}
+        onSubmit={async (note) => {
+          let targetQuotationId = effectiveQuotationId;
+          if (!targetQuotationId && id) {
+            setIsConverting(true);
+            try {
+              const convertRes = await convertMutation.mutateAsync(id);
+              const resData = (
+                convertRes as {
+                  data?: { quotation?: { _id?: string }; _id?: string };
+                }
+              )?.data;
+              targetQuotationId = resData?.quotation?._id || resData?._id;
+            } finally {
+              setIsConverting(false);
+            }
+          }
+          const targetId = targetQuotationId || id || "";
+          await submitQuotationForApprovalProvider(targetId, {
+            note: note.trim() || undefined,
+            estimateId: id,
+          });
+        }}
+        onSuccess={async () => {
+          setEstimate((prev) => {
+            if (!prev) return prev;
+            return updateEstimateConversion(prev, {
+              approvalStatus: "pending_approval",
+              workflowStatus: "pending_approval",
+              isConvertedToQuotation: true,
+            });
+          });
+          toast.success("Submitted for approval successfully");
+          await fetchEstimateDetail();
+        }}
+      />
+
+      {/* Send Quotation Modal */}
+      {effectiveQuotationId && (
+        <SendQuotationModal
+          open={isSendModalOpen}
+          onOpenChange={setIsSendModalOpen}
+          quotationId={effectiveQuotationId}
+          customerEmail={customerEmail}
+          customerName={customerLeadName}
+          workflowStatus={rawWorkflowStatus}
+          versionNumber={estimate?.versionNumber || 1}
+          approvedVersionNumber={estimate?.approval?.approvedVersionNumber}
+          onSuccess={async () => {
+            setEstimate((prev) => {
+              if (!prev) return prev;
+              return updateEstimateConversion(prev, {
+                approvalStatus: "approved",
+                workflowStatus: "sent",
+              });
+            });
+            await fetchEstimateDetail();
+          }}
+        />
+      )}
     </div>
   );
 }

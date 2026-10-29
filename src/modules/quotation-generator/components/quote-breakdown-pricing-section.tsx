@@ -200,10 +200,14 @@ export function QuoteBreakdownPricingSection({
     if (s.fileName !== lastLoadedFileNameRef.current) {
       lastLoadedFileNameRef.current = s.fileName;
       setShipperData(s);
-      setFile({ name: s.fileName, size: `${s.totalWeightLbs} lbs` });
+      setFile({
+        name: s.fileName,
+        size: `${s.detectedWeightLbs ?? s.totalWeightLbs} lbs`,
+      });
       if (s.squareFootage) {
         setSqFt(String(s.squareFootage));
       }
+      setIsManualSqFt(Boolean(s.squareFootageMeta?.source === "manual"));
     }
   }, [initialShipper, pembExtractedShipper]);
 
@@ -266,6 +270,7 @@ export function QuoteBreakdownPricingSection({
           _id: activeEstimateId,
           leadId: quotationForm?.leadId || pembLeadId || undefined,
           jobType,
+          companyBrand: storeState.companyBrand,
           scope: normalizeScope(scope),
           roofType: normalizeRoof(roofType),
           leadCompanyName:
@@ -702,9 +707,27 @@ export function QuoteBreakdownPricingSection({
             data.weightByCategory || res.weightByCategory;
           const fullQuote = data.fullQuote || res.fullQuote;
           const pricing = data.pricing || res.pricing || fullQuote?.pricing;
-          if (weightByCategory || pricing || fullQuote) {
+          const detectedWeightLbs = data.detectedWeightLbs ?? res.detectedWeightLbs;
+          const totalWeightLbs = data.totalWeightLbs ?? res.totalWeightLbs;
+          const unmappedWeightLbs = data.unmappedWeightLbs ?? res.unmappedWeightLbs;
+          const squareFootage = data.squareFootage ?? res.squareFootage;
+          const squareFootageMeta = data.squareFootageMeta ?? res.squareFootageMeta;
+
+          if (
+            weightByCategory ||
+            pricing ||
+            fullQuote ||
+            squareFootageMeta ||
+            squareFootage != null ||
+            detectedWeightLbs != null
+          ) {
             const updated: ExtractShipperResponseData = {
               ...current,
+              ...(detectedWeightLbs != null ? { detectedWeightLbs } : {}),
+              ...(totalWeightLbs != null ? { totalWeightLbs } : {}),
+              ...(unmappedWeightLbs != null ? { unmappedWeightLbs } : {}),
+              ...(squareFootage != null ? { squareFootage } : {}),
+              ...(squareFootageMeta ? { squareFootageMeta } : {}),
               ...(weightByCategory ? { weightByCategory } : {}),
               ...(pricing ? { pricing } : {}),
               ...(fullQuote ? { fullQuote } : {}),
@@ -799,9 +822,9 @@ export function QuoteBreakdownPricingSection({
   ]);
 
   const handleSelectSf = useCallback(
-    (selectedSf: number) => {
+    (selectedSf: number, isManual: boolean = true) => {
       setSqFt(String(selectedSf));
-      setIsManualSqFt(true);
+      setIsManualSqFt(isManual);
       setShipperData((prev) => {
         if (!prev) return prev;
         const updated = {
@@ -810,14 +833,14 @@ export function QuoteBreakdownPricingSection({
           squareFootageMeta: prev.squareFootageMeta
             ? {
                 ...prev.squareFootageMeta,
-                source: "manual",
+                source: isManual ? "manual" : "weight_formula",
                 selected: selectedSf,
-                inputSf: selectedSf,
+                inputSf: isManual ? selectedSf : 0,
               }
             : {
-                source: "manual",
+                source: isManual ? "manual" : "weight_formula",
                 selected: selectedSf,
-                inputSf: selectedSf,
+                inputSf: isManual ? selectedSf : 0,
               },
         };
         shipperDataRef.current = updated;
@@ -826,7 +849,7 @@ export function QuoteBreakdownPricingSection({
       executeCompute({
         squareFootage: selectedSf,
         sf: selectedSf,
-        useManualSquareFootage: true,
+        useManualSquareFootage: isManual,
       });
     },
     [executeCompute],
@@ -863,6 +886,10 @@ export function QuoteBreakdownPricingSection({
           shipperDataRef.current = res.data;
           setShipperData(res.data);
           setPembExtractedShipper(res.data);
+          setFile({
+            name: res.data.fileName,
+            size: `${res.data.detectedWeightLbs ?? res.data.totalWeightLbs} lbs`,
+          });
           if (res.data.squareFootage) {
             setSqFt(String(res.data.squareFootage));
           }

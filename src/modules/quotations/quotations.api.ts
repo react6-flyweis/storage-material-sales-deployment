@@ -45,16 +45,20 @@ export type ApprovalStatus =
   | "approved"
   | "rejected";
 
-export type WorkflowStatus =
+export type QuotationWorkflowStatus =
   | "draft"
   | "pending_approval"
   | "approved"
-  | "rejected"
   | "admin_rejected"
   | "sent"
+  | "accepted"
+  | "client_rejected";
+
+export type WorkflowStatus =
+  | QuotationWorkflowStatus
   | "customer_rejected"
   | "customer_accepted"
-  | "accepted";
+  | "rejected";
 
 export type QuotationApprovalHistoryItem = {
   status: ApprovalStatus | string;
@@ -187,6 +191,7 @@ export type QuotationItem = {
 };
 
 export * from "./quotations.utils";
+export * from "./components/quotation-workflow-badge";
 
 export type Quotation = QuotationItem;
 
@@ -370,29 +375,50 @@ export async function getQuotationsProvider(
 
   try {
     const response = await apiClient.get<QuotationsListResponse>(
-      "/api/quotations/approval/pending",
+      "/api/sales/quotations",
       { params },
     );
     if (response.data?.success && response.data?.data?.quotations) {
-      const rawData = response.data.data;
-      const pagination = (rawData as { pagination?: { total?: number } }).pagination;
-      const total = pagination?.total ?? rawData.total ?? rawData.quotations.length;
-      return {
-        ...response.data,
-        data: {
-          ...rawData,
-          total,
-        },
-      };
+      return response.data;
     }
   } catch {
-    // Fall back to /api/sales/quotations if /api/quotations/approval/pending is not accessible
+    // Fall back to /api/quotations
   }
 
   const response = await apiClient.get<QuotationsListResponse>(
-    "/api/sales/quotations",
+    "/api/quotations",
     { params },
   );
+
+  return response.data;
+}
+
+export async function getPendingApprovalsProvider(
+  pageOrParams: number | GetQuotationsParams = 1,
+  limit = 20
+) {
+  const params: GetQuotationsParams =
+    typeof pageOrParams === "object"
+      ? pageOrParams
+      : { page: pageOrParams, limit };
+
+  const response = await apiClient.get<QuotationsListResponse>(
+    "/api/quotations/approval/pending",
+    { params },
+  );
+
+  if (response.data?.success && response.data?.data?.quotations) {
+    const rawData = response.data.data;
+    const pagination = (rawData as { pagination?: { total?: number } }).pagination;
+    const total = pagination?.total ?? rawData.total ?? rawData.quotations.length;
+    return {
+      ...response.data,
+      data: {
+        ...rawData,
+        total,
+      },
+    };
+  }
 
   return response.data;
 }
@@ -554,6 +580,7 @@ export async function getLatestApprovedTaxByLeadProvider(leadId: string) {
   }
   return raw as LatestApprovedTaxResponse;
 }
+
 
 
 

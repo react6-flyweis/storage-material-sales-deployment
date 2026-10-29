@@ -247,7 +247,10 @@ export function useQuotationPricing({
   const buildingSfPriceFormatted =
     buildingSfPrice != null ? formatSfPrice2(buildingSfPrice) : "-";
 
-  const totalWeight = pricing?.totWt ?? extractedShipper?.totalWeightLbs;
+  const totalWeight =
+    extractedShipper?.detectedWeightLbs ??
+    pricing?.totWt ??
+    extractedShipper?.totalWeightLbs;
   const weightDisplay =
     totalWeight != null
       ? typeof totalWeight === "number"

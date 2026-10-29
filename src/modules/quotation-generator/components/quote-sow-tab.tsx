@@ -54,6 +54,7 @@ export function QuoteSowTab({
     staircaseUnitPrice,
     setStaircaseUnitPrice,
     steelFinish,
+    companyBrand,
     freightOverride,
     materialSellOverride,
     engineeringDrawings,
@@ -81,6 +82,7 @@ export function QuoteSowTab({
   const previewPayload: PreviewDocumentRequest = useMemo(
     () => ({
       estimateId: estimateId || undefined,
+      companyBrand,
       grandTotal: (extractedShipper?.fullQuote?.grandTotal ??
         extractedShipper?.pricing?.totSell) as number | undefined,
       jobType: "PEMB",
@@ -140,6 +142,7 @@ export function QuoteSowTab({
       freightOverride,
       materialSellOverride,
       engineeringDrawings,
+      companyBrand,
       extractedShipper?.parsedCategories,
     ],
   );
@@ -168,6 +171,7 @@ export function QuoteSowTab({
     try {
       const payload: PreviewDocumentRequest = {
         estimateId: estimateId || undefined,
+        companyBrand,
         grandTotal: (extractedShipper?.fullQuote?.grandTotal ??
           extractedShipper?.pricing?.totSell) as number | undefined,
         leadCompanyName: customerName,
