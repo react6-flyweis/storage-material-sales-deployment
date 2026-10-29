@@ -69,5 +69,8 @@ export function buildDefaultSchedulePayments(
     ];
   }
 
-  return [{ name: "", amount: "" }];
+  return [
+    { name: "Deposit", amount: "" },
+    { name: "", amount: "" },
+  ];
 }
