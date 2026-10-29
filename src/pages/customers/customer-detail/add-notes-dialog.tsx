@@ -131,10 +131,10 @@ export function AddNotesDialog({
             )}
           </DialogTrigger>
         )}
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <DialogHeader>
-              <DialogTitle className="text-xl font-semibold">
+              <DialogTitle className="text-xl font-semibold break-words">
                 {isEditing ? "Edit Note" : "Add Notes"}
               </DialogTitle>
               <div className="sr-only">
@@ -161,7 +161,7 @@ export function AddNotesDialog({
                 <Textarea
                   id="note-details"
                   rows={4}
-                  className="rounded-[10px] border border-slate-200 bg-slate-50 p-4"
+                  className="rounded-[10px] border border-slate-200 bg-slate-50 p-4 break-words [overflow-wrap:anywhere]"
                   placeholder={
                     isEditing
                       ? "Enter note details..."
@@ -169,6 +169,8 @@ export function AddNotesDialog({
                   }
                   {...register("notes", {
                     required: "Notes are required",
+                    validate: (value) =>
+                      value.trim().length > 0 || "Notes cannot be empty",
                   })}
                 />
                 {errors.notes && (
@@ -177,7 +179,7 @@ export function AddNotesDialog({
               </div>
 
               {errorMessage && (
-                <p className="text-sm text-destructive">{errorMessage}</p>
+                <p className="text-sm text-destructive break-words [overflow-wrap:anywhere]">{errorMessage}</p>
               )}
             </div>
 
