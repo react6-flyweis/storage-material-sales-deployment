@@ -28,7 +28,10 @@ import type {
   QuotationApprovalHistoryItem,
   QuotationItem,
 } from "@/modules/quotations/quotations.api";
-import { resolveQuotationLifecycle } from "@/modules/quotations/quotations.api";
+import {
+  resolveQuotationLifecycle,
+  QuotationWorkflowBadge,
+} from "@/modules/quotations/quotations.api";
 import { QuotationApprovalTimeline } from "@/modules/quotation-generator/components/quotation-approval-timeline";
 
 export default function QuotationDetailsPage() {
@@ -167,31 +170,19 @@ export default function QuotationDetailsPage() {
     };
   }, [approvalInfo, timelineHistory]);
 
-  const isCustomerRejected = lifecycle.isCustomerRejected;
-  const isAdminRejected = lifecycle.isAdminRejected;
+  const isCustomerRejected = workflowStatus === "client_rejected";
+  const isAdminRejected = workflowStatus === "admin_rejected";
   const isRejected = isCustomerRejected || isAdminRejected;
 
-  const isSent =
-    lifecycle.isSent || isCustomerRejected || lifecycle.isCustomerAccepted;
+  // PDF download is allowed once approved or beyond
+  const isDownloadAllowed =
+    workflowStatus === "approved" ||
+    workflowStatus === "sent" ||
+    workflowStatus === "accepted" ||
+    workflowStatus === "client_rejected";
 
-  const isApproved =
-    lifecycle.isApproved ||
-    lifecycle.isSent ||
-    lifecycle.isCustomerAccepted;
-  const isStaleApproved =
-    (approvalInfo?.status === "approved" || workflowStatus === "approved") &&
-    approvalInfo?.approvedVersionNumber !== undefined &&
-    approvalInfo?.approvedVersionNumber !== null &&
-    approvalInfo.approvedVersionNumber !== versionNumber;
-
-  const isDownloadAllowed = (isApproved || isSent) && !isStaleApproved;
-
-  // If a version is rejected, it cannot be re-submitted directly — it must be edited first
-  const canSubmit =
-    !isRejected &&
-    (workflowStatus === "draft" ||
-      approvalInfo?.status === "not_submitted" ||
-      isStaleApproved);
+  // Submit for Approval is strictly available when quotation is in draft
+  const canSubmit = workflowStatus === "draft";
 
   const customerName =
     quotation?.companyName ||
@@ -387,6 +378,7 @@ export default function QuotationDetailsPage() {
               <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200">
                 v{versionNumber}
               </span>
+              <QuotationWorkflowBadge status={workflowStatus} />
               {isStorage && (
                 <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 font-bold text-xs border border-amber-200">
                   Mini Storage
@@ -397,29 +389,27 @@ export default function QuotationDetailsPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {/* Send to Customer Button (if approved & not stale & not customer rejected) */}
-          {isApproved && !isStaleApproved && !isCustomerRejected && (
+          {/* Send to Customer Button (when approved or sent) */}
+          {(workflowStatus === "approved" || workflowStatus === "sent") && (
             <Button
               type="button"
               onClick={() => setShowSendModal(true)}
               className="px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 shadow-xs bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
             >
               <Send className="h-4 w-4" />
-              {isSent ? "Resend to Customer" : "Send to Customer"}
+              {workflowStatus === "sent" ? "Resend to Customer" : "Send to Customer"}
             </Button>
           )}
 
-          {/* Submit / Re-submit for Approval Button (Hidden when rejected — must edit first) */}
-          {canSubmit && (
+          {/* Submit / Send for Approval Button (strictly when draft) */}
+          {workflowStatus === "draft" && (
             <Button
               type="button"
               onClick={() => setShowSubmitModal(true)}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
             >
               <FileCheck className="h-4 w-4" />
-              {isStaleApproved
-                ? "Re-submit for Approval"
-                : "Submit for Approval"}
+              Send for Approval
             </Button>
           )}
 
@@ -558,9 +548,7 @@ export default function QuotationDetailsPage() {
         quotationId={quotation._id}
         customerEmail={customerEmail}
         customerName={customerName}
-        approvalStatus={workflowStatus}
         workflowStatus={workflowStatus}
-        status={quotation?.status}
         versionNumber={versionNumber}
         approvedVersionNumber={approvalInfo?.approvedVersionNumber}
         onSuccess={() => {
