@@ -262,6 +262,7 @@ export function useLoadEstimateToEditor() {
         // 6. Navigate Storage or PEMB
         if (isStorage) {
           store.setJobType("Storage");
+          store.setCompanyBrand(estimate.companyBrand === "SBD" ? "SBD" : "SM");
           if (estimate.scope) {
             const normScope = estimate.scope.toLowerCase();
             store.setScope(
@@ -312,6 +313,7 @@ export function useLoadEstimateToEditor() {
         );
 
         store.setJobType("PEMB");
+        store.setCompanyBrand(estimate.companyBrand === "SM" ? "SM" : "SBD");
         if (estimate.scope) {
           const normScope = estimate.scope.toLowerCase();
           store.setScope(
