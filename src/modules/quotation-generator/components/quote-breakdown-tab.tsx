@@ -23,7 +23,7 @@ interface QuoteBreakdownTabProps {
   onSaveDraft?: () => void;
   isSavingDraft?: boolean;
   extractedShipper?: ExtractShipperResponseData;
-  onSelectSf?: (sf: number) => void;
+  onSelectSf?: (sf: number, isManual?: boolean) => void;
   isManualSqFt?: boolean;
   estimateId?: string | null;
 }
@@ -95,7 +95,10 @@ export function QuoteBreakdownTab({
   const effectiveSqFt = pricing?.sf || extractedShipper?.squareFootage;
   const sqFt = effectiveSqFt ? formatNumber2(effectiveSqFt) : "-";
   const totalWeight = pricing?.totWt ?? extractedShipper?.totalWeightLbs;
-  const weightDisplay = totalWeight != null ? `${formatNumber2(totalWeight)} lbs` : "-";
+  const detectedWeight =
+    extractedShipper?.detectedWeightLbs ??
+    totalWeight;
+  const weightDisplay = detectedWeight != null ? `${formatNumber2(detectedWeight)} lbs` : "-";
   const trucks = pricing?.trucks != null ? pricing.trucks : "-";
   const vendorBlendSavings = formatCurrency2(pricing?.vendorBlendSavingsExact);
   const blendLabel = pricing?.blendLabel || "50% Quicken blend";
@@ -127,11 +130,16 @@ export function QuoteBreakdownTab({
       ? (Math.abs(weightSf - coverSf) / Math.max(weightSf, coverSf)) * 100
       : 0;
 
-  let sfSubtitle = `${sqFt} SF`;
+  const fromWeightVal = sfMeta?.fromWeight ?? (effectiveSqFt ? Number(effectiveSqFt) : undefined);
+  let sfSubtitle = `${fromWeightVal != null ? formatNumber2(fromWeightVal) : sqFt} SF`;
   if (sfMeta?.source === "weight_formula") {
-    sfSubtitle += ` (from weight: ${formatNumber2(sfMeta.fromWeight ?? totalWeight ?? 0)} / 9)`;
+    const weightLbsUsed =
+      sfMeta?.weightLbsUsed ??
+      extractedShipper?.detectedWeightLbs ??
+      detectedWeight;
+    sfSubtitle += ` (from weight: ${weightLbsUsed != null ? `${formatNumber2(weightLbsUsed)} lbs` : "-"} ÷ 9)`;
   } else if (sfMeta?.source === "manual" || isManualSqFt) {
-    sfSubtitle += " (manual override)";
+    sfSubtitle = `${sqFt} SF (manual override)`;
   }
   if (sfMeta?.coverDerivedSqft) {
     sfSubtitle += ` · cover sheet SF: ${formatNumber2(sfMeta.coverDerivedSqft)}`;
@@ -162,7 +170,7 @@ export function QuoteBreakdownTab({
             <Button
               type="button"
               size="sm"
-              onClick={() => onSelectSf?.(weightSf)}
+              onClick={() => onSelectSf?.(weightSf, false)}
               className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white text-xs px-3 py-1.5 h-auto font-semibold cursor-pointer"
             >
               Use Weight SF
@@ -171,7 +179,7 @@ export function QuoteBreakdownTab({
               type="button"
               size="sm"
               variant="outline"
-              onClick={() => onSelectSf?.(coverSf)}
+              onClick={() => onSelectSf?.(coverSf, true)}
               className="border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs px-3 py-1.5 h-auto font-semibold cursor-pointer"
             >
               Use Cover SF
@@ -359,7 +367,7 @@ export function QuoteBreakdownTab({
             <tr className="bg-slate-50/90 font-bold border-t border-slate-200">
               <td className="p-3 text-slate-900 font-bold">Material total (after blend)</td>
               <td className="p-3 text-slate-900 font-bold">
-                {totalWeight != null ? `${formatNumber2(totalWeight)} lbs` : "-"}
+                {detectedWeight != null ? `${formatNumber2(detectedWeight)} lbs` : "-"}
               </td>
               <td className="p-3"></td>
               <td className="p-3 text-slate-900 font-bold">{matCost}</td>
