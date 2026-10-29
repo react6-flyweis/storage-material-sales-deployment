@@ -38,6 +38,7 @@ export function QuoteContractTab({
 }: QuoteContractTabProps) {
   const {
     scope,
+    companyBrand,
     steelFinish,
     freightOverride,
     materialSellOverride,
@@ -113,6 +114,7 @@ export function QuoteContractTab({
   const previewPayload: PreviewDocumentRequest = useMemo(
     () => ({
       estimateId: estimateId || undefined,
+      companyBrand,
       jobType: "PEMB",
       leadCompanyName: customerLegalName || pricingData.customerLeadName,
       customerEmail: customerEmail || pricingData.customerEmail,
@@ -144,6 +146,7 @@ export function QuoteContractTab({
     }),
     [
       estimateId,
+      companyBrand,
       customerLegalName,
       customerEmail,
       customerAddress,
@@ -202,6 +205,7 @@ export function QuoteContractTab({
     try {
       const payload: PreviewDocumentRequest = {
         estimateId: estimateId || undefined,
+        companyBrand,
         grandTotal: (extractedShipper?.fullQuote?.grandTotal ??
           extractedShipper?.pricing?.totSell) as number | undefined,
         leadCompanyName: customerLegalName || pricingData.customerLeadName,
@@ -266,6 +270,7 @@ export function QuoteContractTab({
     try {
       const payload: PreviewDocumentRequest = {
         estimateId: estimateId || undefined,
+        companyBrand,
         grandTotal: (extractedShipper?.fullQuote?.grandTotal ??
           extractedShipper?.pricing?.totSell) as number | undefined,
         leadCompanyName: customerLegalName || pricingData.customerLeadName,
