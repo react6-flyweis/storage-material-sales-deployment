@@ -819,6 +819,14 @@ export interface ComputeStorageRequest {
   concrete?: ComputeConcreteConfig;
   insulation?: ComputeInsulationConfig;
   salesTax?: ComputeSalesTaxConfig;
+  pembAddOns?: Array<{
+    item: string;
+    cost: number;
+    markupPct: number;
+    inQuote: boolean;
+    inSow: boolean;
+    [key: string]: unknown;
+  }>;
   [key: string]: unknown;
 }
 
