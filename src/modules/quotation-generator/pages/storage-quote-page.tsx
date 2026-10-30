@@ -8,6 +8,7 @@ import {
 } from "react";
 import { useNavigate, useLocation, useSearchParams } from "react-router";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { formatInstallAddress } from "@/lib/address";
 import {
@@ -123,6 +124,8 @@ export default function StorageQuotePage() {
   );
 
   const {
+    companyBrand,
+    setCompanyBrand,
     setJobType,
     scope,
     setScope,
@@ -179,6 +182,8 @@ export default function StorageQuotePage() {
     insulationRValueRoof,
 
     insulationRValueWalls,
+    pembAddOns,
+    setPembAddOns,
   } = useQuotationStore();
 
   const storageData =
@@ -208,6 +213,23 @@ export default function StorageQuotePage() {
     storeJobNumber ||
     storageData?.project?.jobNumber ||
     "";
+
+  // Synchronize storage COG extras into the shared add-ons store when available
+  useEffect(() => {
+    if (storageData?.extras?.length && pembAddOns.length === 0) {
+      setPembAddOns(
+        storageData.extras.map((x, idx) => ({
+          id: `storage-addon-${idx}-${Date.now()}`,
+          item: x.name || x.item || "Extra Item",
+          cost: Number(x.cogs || x.cost || 0),
+          markupPct: Number(x.markup ?? 25),
+          note: x.note || "",
+          inQuote: x.include !== false,
+          inSow: true,
+        })),
+      );
+    }
+  }, [storageData?.extras, pembAddOns.length, setPembAddOns]);
 
   const { data: pricingRules } = usePricingRulesQuery();
 
@@ -428,11 +450,33 @@ export default function StorageQuotePage() {
         const effectiveInstallCost =
           scope.toLowerCase() === "supply" ? 0 : installCost;
 
+        const effectiveExtras: StorageExtraItem[] = (pembAddOns || []).map(
+          (addon) => {
+            const cost = Number(addon.cost) || 0;
+            const markup = Number(addon.markupPct) || 0;
+            const sell = Math.round(cost * (1 + markup / 100));
+            return {
+              name: addon.item,
+              item: addon.item,
+              cogs: cost,
+              cost,
+              markup,
+              sale: sell,
+              sellPrice: sell,
+              note: addon.note || "",
+              include: addon.inQuote !== false,
+            };
+          },
+        );
+
         const payload = {
           storageData: {
             buildings: currentStorageData.buildings || [],
             doors: currentStorageData.doors || [],
-            extras: currentStorageData.extras || [],
+            extras:
+              effectiveExtras.length > 0
+                ? effectiveExtras
+                : currentStorageData.extras || [],
             shipping: shippingVal,
             drawings: drawingsVal,
             installSellPerSf: effectiveInstallSell,
@@ -461,6 +505,14 @@ export default function StorageQuotePage() {
             rate: taxRate,
             include: includeTax,
           },
+          pembAddOns: (pembAddOns || []).map((addon) => ({
+            item: addon.item,
+            cost: Number(addon.cost) || 0,
+            markupPct: Number(addon.markupPct) || 0,
+            inQuote: Boolean(addon.inQuote),
+            inSow: Boolean(addon.inSow),
+            note: addon.note,
+          })),
         };
 
         const res = await computeStorageProvider(payload);
@@ -493,6 +545,7 @@ export default function StorageQuotePage() {
       insulationWallR,
       taxRate,
       includeTax,
+      pembAddOns,
       setStoragePricing,
     ],
   );
@@ -508,7 +561,7 @@ export default function StorageQuotePage() {
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     };
-  }, [storageData, triggerApiCompute]);
+  }, [storageData, pembAddOns, triggerApiCompute]);
 
   // Handle File Upload via POST /api/sales/estimates/extract-storage-cog
   const handleFileUpload = async (file: File) => {
@@ -647,6 +700,20 @@ export default function StorageQuotePage() {
       setStorageData(newStorageData);
       setSourceFileName(file.name);
 
+      if (extrasList.length > 0) {
+        setPembAddOns(
+          extrasList.map((x, idx) => ({
+            id: `storage-addon-${Date.now()}-${idx}`,
+            item: x.name || x.item || "Extra Item",
+            cost: Number(x.cogs || x.cost || 0),
+            markupPct: Number(x.markup ?? 25),
+            note: x.note || "",
+            inQuote: x.include !== false,
+            inSow: true,
+          })),
+        );
+      }
+
       if (responsePayload.storagePricing) {
         setStoragePricing(responsePayload.storagePricing as StoragePricing);
       } else {
@@ -710,10 +777,30 @@ export default function StorageQuotePage() {
   const handleSaveDraft = async () => {
     setIsSaving(true);
     try {
+      const effectiveExtras: StorageExtraItem[] = (pembAddOns || []).map(
+        (addon) => {
+          const cost = Number(addon.cost) || 0;
+          const markup = Number(addon.markupPct) || 0;
+          const sell = Math.round(cost * (1 + markup / 100));
+          return {
+            name: addon.item,
+            item: addon.item,
+            cogs: cost,
+            cost,
+            markup,
+            sale: sell,
+            sellPrice: sell,
+            note: addon.note || "",
+            include: addon.inQuote !== false,
+          };
+        },
+      );
+
       const payload: SaveEstimatePayload = {
         _id: estimateId || undefined,
         leadId: selectedLeadId || activeLeadId || undefined,
         jobType: "Storage",
+        companyBrand,
         scope:
           scope.toLowerCase() === "supply"
             ? "Supply"
@@ -729,8 +816,19 @@ export default function StorageQuotePage() {
         cityStateZip: customerAddress,
         jobNumber: jobNumber || storageData?.project?.jobNumber || "",
         sourceFileName,
-        storageData: storageData as Record<string, unknown>,
+        storageData: {
+          ...storageData,
+          extras: effectiveExtras,
+        } as Record<string, unknown>,
         storagePricingResult: storagePricing as Record<string, unknown>,
+        pembAddOns: (pembAddOns || []).map((addon) => ({
+          item: addon.item,
+          cost: Number(addon.cost) || 0,
+          markupPct: Number(addon.markupPct) || 0,
+          inQuote: Boolean(addon.inQuote),
+          inSow: Boolean(addon.inSow),
+          note: addon.note,
+        })),
         concreteAddon: {
           include: concreteInclude,
           costSF: concreteCostSf,
@@ -930,50 +1028,6 @@ export default function StorageQuotePage() {
     setStorageData(updatedData);
   };
 
-  // Extras table inline row helpers
-  const handleUpdateExtra = (
-    index: number,
-    field: keyof StorageExtraItem,
-    value: string | number | boolean,
-  ) => {
-    if (!storageData?.extras) return;
-    const updated = [...storageData.extras];
-    const x = { ...updated[index], [field]: value };
-    const cogs = Number(x.cogs || x.cost || 0);
-    const mu = Number(x.markup ?? 25);
-    x.sale = Math.round(cogs * (1 + mu / 100));
-    x.sellPrice = Math.round(cogs * (1 + mu / 100));
-    updated[index] = x;
-    const updatedData = { ...storageData, extras: updated };
-    setStorageData(updatedData);
-  };
-
-  const handleAddExtra = () => {
-    const newExtra: StorageExtraItem = {
-      name: "",
-      item: "",
-      cogs: 0,
-      cost: 0,
-      markup: globalMarkup,
-      sale: 0,
-      sellPrice: 0,
-      note: "",
-      include: true,
-    };
-    const updatedData = {
-      ...storageData,
-      extras: [...(storageData?.extras || []), newExtra],
-    };
-    setStorageData(updatedData);
-  };
-
-  const handleRemoveExtra = (index: number) => {
-    if (!storageData?.extras) return;
-    const updated = storageData.extras.filter((_, i) => i !== index);
-    const updatedData = { ...storageData, extras: updated };
-    setStorageData(updatedData);
-  };
-
   const handleAddDrawings = (files: File[]) => {
     if (!files.length) return;
     const promises = files.map(
@@ -1011,6 +1065,7 @@ export default function StorageQuotePage() {
           storageData,
           storagePricing,
           estimateId,
+          companyBrand,
           leadId: selectedLeadId || activeLeadId || undefined,
           sourceFileName,
           customerLeadName,
@@ -1034,7 +1089,6 @@ export default function StorageQuotePage() {
 
   const buildings = storageData?.buildings || [];
   const doors = storageData?.doors || [];
-  const extras = storageData?.extras || [];
 
   const totalSqFt =
     Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) ||
@@ -1090,6 +1144,7 @@ export default function StorageQuotePage() {
     () => ({
       jobType: "Storage",
       estimateId: estimateId || undefined,
+      companyBrand,
       scope:
         (scope || "Both").toLowerCase() === "supply"
           ? "Supply"
@@ -1128,7 +1183,33 @@ export default function StorageQuotePage() {
       pricingResult: storagePricing as Record<string, unknown>,
       storagePricingResult: storagePricing as Record<string, unknown>,
       storagePricing: storagePricing as Record<string, unknown>,
-      storageData: storageData as Record<string, unknown>,
+      storageData: {
+        ...storageData,
+        extras: (pembAddOns || []).map((addon) => {
+          const cost = Number(addon.cost) || 0;
+          const markup = Number(addon.markupPct) || 0;
+          const sell = Math.round(cost * (1 + markup / 100));
+          return {
+            name: addon.item,
+            item: addon.item,
+            cogs: cost,
+            cost,
+            markup,
+            sale: sell,
+            sellPrice: sell,
+            note: addon.note || "",
+            include: addon.inQuote !== false,
+          };
+        }),
+      } as Record<string, unknown>,
+      pembAddOns: (pembAddOns || []).map((addon) => ({
+        item: addon.item,
+        cost: Number(addon.cost) || 0,
+        markupPct: Number(addon.markupPct) || 0,
+        inQuote: Boolean(addon.inQuote),
+        inSow: Boolean(addon.inSow),
+        note: addon.note,
+      })),
       concreteAddon: {
         include: concreteInclude,
       },
@@ -1159,6 +1240,7 @@ export default function StorageQuotePage() {
     }),
     [
       estimateId,
+      companyBrand,
       scope,
       customerLeadName,
       customerEmail,
@@ -1171,6 +1253,7 @@ export default function StorageQuotePage() {
       includeTax,
       taxRate,
       grandTotal,
+      pembAddOns,
     ],
   );
 
@@ -1396,37 +1479,68 @@ export default function StorageQuotePage() {
       <Card className="border border-slate-200 pt-0">
         {/* Card Header: Select Lead Section */}
         <CardHeader className="border-b bg-slate-50/50 pt-5">
-          <div>
-            <label className="block text-sm font-semibold text-slate-800 mb-2">
-              Select Lead
-            </label>
-            <Select
-              value={selectedLeadId || activeLeadId}
-              onValueChange={handleLeadChange}
-              disabled={isLeadsLoading}
-            >
-              <SelectTrigger className="w-full max-w-md bg-[#F8FAFC] border-slate-200 text-slate-900 text-sm h-11 rounded-lg">
-                <SelectValue
-                  placeholder={
-                    isLeadsLoading ? "Loading leads..." : "Select lead"
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {leads.map((lead) => {
-                  const label = getLeadProjectName(lead, lead.customerId);
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex-1 max-w-md">
+              <label className="block text-sm font-semibold text-slate-800 mb-2">
+                Select Lead
+              </label>
+              <Select
+                value={selectedLeadId || activeLeadId}
+                onValueChange={handleLeadChange}
+                disabled={isLeadsLoading}
+              >
+                <SelectTrigger className="w-full max-w-md bg-[#F8FAFC] border-slate-200 text-slate-900 text-sm h-11 rounded-lg">
+                  <SelectValue
+                    placeholder={
+                      isLeadsLoading ? "Loading leads..." : "Select lead"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {leads.map((lead) => {
+                    const label = getLeadProjectName(lead, lead.customerId);
+                    return (
+                      <SelectItem key={lead._id} value={lead._id}>
+                        {label} (
+                        {lead.customerId?.firstName
+                          ? `${lead.customerId.firstName} ${lead.customerId.lastName ?? ""}`.trim()
+                          : "N/A"}
+                        )
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 uppercase mb-2">
+                LOGO
+              </label>
+              <div className="grid grid-cols-2 gap-1.5 w-64">
+                {[
+                  { label: "Steel Building", value: "SBD" as const },
+                  { label: "Storage Material", value: "SM" as const },
+                ].map((item) => {
+                  const isActive = companyBrand === item.value;
                   return (
-                    <SelectItem key={lead._id} value={lead._id}>
-                      {label} (
-                      {lead.customerId?.firstName
-                        ? `${lead.customerId.firstName} ${lead.customerId.lastName ?? ""}`.trim()
-                        : "N/A"}
-                      )
-                    </SelectItem>
+                    <button
+                      key={item.value}
+                      type="button"
+                      onClick={() => setCompanyBrand(item.value)}
+                      className={cn(
+                        "py-2 px-2.5 rounded-lg font-semibold text-xs transition-colors cursor-pointer text-center",
+                        isActive
+                          ? "bg-blue-600 text-white shadow-xs"
+                          : "bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200",
+                      )}
+                    >
+                      {item.label}
+                    </button>
                   );
                 })}
-              </SelectContent>
-            </Select>
+              </div>
+            </div>
           </div>
         </CardHeader>
 
@@ -2299,138 +2413,6 @@ export default function StorageQuotePage() {
                   </div>
                 </Card>
 
-                {/* Options & Add-ons (Extras) Table */}
-                <Card className="p-5 bg-white border border-slate-200 rounded-xl space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                    <div>
-                      <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                        ⚙️ Options & Add-ons
-                      </h3>
-                      <p className="text-[11px] text-slate-500">
-                        Insulation, concrete, seals, extras — check to include
-                        in total
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleAddExtra}
-                      className="h-8 text-xs font-semibold cursor-pointer"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      Add Line
-                    </Button>
-                  </div>
-
-                  <div className="overflow-x-auto rounded-lg border border-slate-200">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead>
-                        <tr className="bg-slate-100/80 text-slate-700 text-[11px] uppercase font-bold border-b border-slate-200">
-                          <th className="p-2.5">Item</th>
-                          <th className="p-2.5 text-right">COGS $</th>
-                          <th className="p-2.5 text-right">Markup %</th>
-                          <th className="p-2.5 text-right">Sale $</th>
-                          <th className="p-2.5">Note</th>
-                          <th className="p-2.5 text-center">Include</th>
-                          <th className="p-2.5 text-center"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-slate-700">
-                        {extras.map((x, idx) => (
-                          <tr key={idx} className="hover:bg-slate-50/50">
-                            <td className="p-2">
-                              <Input
-                                value={x.name || x.item || ""}
-                                onChange={(e) =>
-                                  handleUpdateExtra(idx, "name", e.target.value)
-                                }
-                                className="h-8 w-44 text-xs font-semibold"
-                              />
-                            </td>
-                            <td className="p-2 text-right">
-                              <Input
-                                type="number"
-                                value={
-                                  x.cogs !== undefined ? x.cogs : x.cost || ""
-                                }
-                                onChange={(e) =>
-                                  handleUpdateExtra(
-                                    idx,
-                                    "cogs",
-                                    parseFloat(e.target.value) || 0,
-                                  )
-                                }
-                                className="h-8 w-24 text-right text-xs"
-                              />
-                            </td>
-                            <td className="p-2 text-right">
-                              <Input
-                                type="number"
-                                value={x.markup !== undefined ? x.markup : 25}
-                                onChange={(e) =>
-                                  handleUpdateExtra(
-                                    idx,
-                                    "markup",
-                                    parseFloat(e.target.value) || 0,
-                                  )
-                                }
-                                className="h-8 w-16 text-right text-xs font-bold"
-                              />
-                            </td>
-                            <td className="p-2 text-right font-bold text-blue-900">
-                              {fmt(Number(x.sale || x.sellPrice || 0))}
-                            </td>
-                            <td className="p-2">
-                              <Input
-                                value={x.note || ""}
-                                onChange={(e) =>
-                                  handleUpdateExtra(idx, "note", e.target.value)
-                                }
-                                placeholder="Note..."
-                                className="h-8 text-xs"
-                              />
-                            </td>
-                            <td className="p-2 text-center">
-                              <input
-                                type="checkbox"
-                                checked={x.include !== false}
-                                onChange={(e) =>
-                                  handleUpdateExtra(
-                                    idx,
-                                    "include",
-                                    e.target.checked,
-                                  )
-                                }
-                                className="h-4 w-4 rounded accent-blue-600 cursor-pointer"
-                              />
-                            </td>
-                            <td className="p-2 text-center">
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveExtra(idx)}
-                                className="text-red-500 hover:text-red-700 cursor-pointer p-1"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr className="bg-slate-50 font-bold border-t-2 border-slate-200">
-                          <td colSpan={3} className="p-2.5">
-                            Options Total (included)
-                          </td>
-                          <td className="p-2.5 text-right text-blue-900">
-                            {fmt(storagePricing?.extrasSubtotal)}
-                          </td>
-                          <td colSpan={3}></td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                </Card>
-
                 {/* Bottom Actions */}
                 <div className="flex items-center gap-5 pt-2">
                   <Button
@@ -2464,6 +2446,38 @@ export default function StorageQuotePage() {
             {/* TAB 2: QUOTE PREVIEW */}
             <TabsContent value="quote" className="m-0 outline-none">
               <div className="space-y-4">
+                {/* Document Options Toolbar */}
+                <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+                      LOGO
+                    </label>
+                    <div className="grid grid-cols-2 gap-1 w-64">
+                      {[
+                        { label: "Steel Building", value: "SBD" as const },
+                        { label: "Storage Material", value: "SM" as const },
+                      ].map((item) => {
+                        const isActive = companyBrand === item.value;
+                        return (
+                          <button
+                            key={item.value}
+                            type="button"
+                            onClick={() => setCompanyBrand(item.value)}
+                            className={cn(
+                              "py-2 px-2.5 rounded-md font-semibold text-xs transition-colors cursor-pointer text-center",
+                              isActive
+                                ? "bg-blue-600 text-white shadow-xs"
+                                : "bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200",
+                            )}
+                          >
+                            {item.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
                 <ServerDocumentPreview
                   html={storageQuotePreviewHtml}
                   isLoading={isStorageQuotePreviewLoading}
