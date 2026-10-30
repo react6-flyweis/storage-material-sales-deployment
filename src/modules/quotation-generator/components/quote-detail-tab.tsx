@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Printer, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -9,10 +9,9 @@ import {
   downloadPdfProvider,
   type ExtractShipperResponseData,
   type ExtractDrawingResponseData,
-  type PreviewDocumentRequest,
 } from "../estimates.api";
 import { downloadPdfFromBase64 } from "../utils/pdf-download";
-import { useQuotationPricing } from "../hooks/use-quotation-pricing";
+import { usePembDocumentPayload } from "../hooks/use-pemb-document-payload";
 import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
 import { ServerDocumentPreview } from "./server-document-preview";
 
@@ -65,93 +64,24 @@ export function QuoteDetailTab({
     setInstallCost,
     installSell,
     setInstallSell,
-    isMultiStory,
-    staircaseCount,
-    staircaseUnitPrice,
-    pembAddOns,
-    steelFinish,
-    freightOverride,
-    materialSellOverride,
-    engineeringDrawings,
   } = useQuotationStore();
 
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
   const {
-    customerLeadName,
-    customerEmail,
-    customerAddress,
-    displayBuildingSize,
-    effectiveSqFt,
-  } = useQuotationPricing({
+    payload: previewPayload,
+    buildPayload,
+    pricingData,
+  } = usePembDocumentPayload({
+    estimateId,
     extractedShipper,
+    extractedDrawing,
+    quotationForm,
     sqFt,
     buildingSize,
-    quotationForm,
-    extractedDrawing,
+    pdfFileName,
+    sections: ["quote"],
   });
-
-  const previewPayload: PreviewDocumentRequest = useMemo(
-    () => ({
-      estimateId: estimateId || undefined,
-      companyBrand,
-      jobType: "PEMB",
-      leadCompanyName: customerLeadName,
-      customerEmail,
-      streetAddress: customerAddress,
-      cityStateZip: customerAddress,
-      buildingSize: displayBuildingSize,
-      squareFootage: effectiveSqFt,
-      jobNumber:
-        quotationForm?.jobNumber ||
-        extractedDrawing?.extracted?.jobnumber ||
-        "",
-      pricingResult: extractedShipper?.pricing,
-      fullQuote:
-        extractedShipper?.fullQuote ||
-        (extractedShipper?.pricing as Record<string, unknown> | undefined),
-      extractedDrawingFields: extractedDrawing?.extracted,
-      drawingAttachments: pdfFileName
-        ? [{ name: pdfFileName, includeInQuote: true }]
-        : [],
-      sections: ["quote"],
-      staircase: {
-        count: isMultiStory ? staircaseCount : 0,
-        unitCost: staircaseUnitPrice || 35000,
-        stories: 2,
-      },
-      multiStory: {
-        stories: 2,
-        staircaseCount: isMultiStory ? staircaseCount : 0,
-        staircaseUnitCost: staircaseUnitPrice || 35000,
-      },
-      pembAddOns: (pembAddOns || []).map((addon) => ({
-        item: addon.item,
-        cost: Number(addon.cost) || 0,
-        markupPct: Number(addon.markupPct) || 0,
-        inQuote: Boolean(addon.inQuote),
-        inSow: Boolean(addon.inSow),
-      })),
-    }),
-    [
-      estimateId,
-      companyBrand,
-      customerLeadName,
-      customerEmail,
-      customerAddress,
-      displayBuildingSize,
-      effectiveSqFt,
-      quotationForm?.jobNumber,
-      extractedDrawing?.extracted,
-      extractedShipper?.pricing,
-      extractedShipper?.fullQuote,
-      pdfFileName,
-      isMultiStory,
-      staircaseCount,
-      staircaseUnitPrice,
-      pembAddOns,
-    ],
-  );
 
   const {
     html: serverPreviewHtml,
@@ -164,7 +94,7 @@ export function QuoteDetailTab({
 
   const handlePrint = () => {
     const originalTitle = document.title;
-    const safeCustomer = (customerLeadName || "Quote").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const safeCustomer = (pricingData.customerLeadName || "Quote").replace(/[^a-zA-Z0-9_-]/g, "_");
     document.title = `Quote_Package_${safeCustomer}`;
     window.print();
     document.title = originalTitle;
@@ -173,54 +103,16 @@ export function QuoteDetailTab({
   const handleDownloadPdf = async () => {
     setIsDownloadingPdf(true);
     try {
-      const payload: PreviewDocumentRequest = {
-        estimateId: estimateId || undefined,
-        companyBrand,
-        grandTotal: (extractedShipper?.fullQuote?.grandTotal ??
-          extractedShipper?.pricing?.totSell) as number | undefined,
-        leadCompanyName: customerLeadName,
-        customerEmail,
-        streetAddress: customerAddress,
-        cityStateZip: customerAddress,
-        buildingSize: displayBuildingSize,
-        squareFootage: effectiveSqFt,
-        jobNumber: quotationForm?.jobNumber || extractedDrawing?.extracted?.jobnumber || "",
-        steelFinish: steelFinish || "red-iron",
-        freightOverride: parseFloat(freightOverride) || undefined,
-        materialSellOverride: parseFloat(materialSellOverride) || undefined,
-        matSellOverride: parseFloat(materialSellOverride) || undefined,
-        pembDrawings: parseFloat(engineeringDrawings) || 0,
-        parsedCategories: extractedShipper?.parsedCategories,
-        recompute: true,
-        pricingResult: extractedShipper?.pricing,
-        fullQuote: extractedShipper?.fullQuote || (extractedShipper?.pricing as Record<string, unknown> | undefined),
-        extractedDrawingFields: extractedDrawing?.extracted,
+      const payload = buildPayload({
         drawingAttachments: pdfFileName ? [{ name: pdfFileName, includeInQuote: true }] : [],
         sections: pdfFileName ? ["quote", "sow", "contract", "drawings"] : ["quote", "sow", "contract"],
-        staircase: {
-          count: isMultiStory ? staircaseCount : 0,
-          unitCost: staircaseUnitPrice || 35000,
-          stories: 2,
-        },
-        multiStory: {
-          stories: 2,
-          staircaseCount: isMultiStory ? staircaseCount : 0,
-          staircaseUnitCost: staircaseUnitPrice || 35000,
-        },
-        pembAddOns: (pembAddOns || []).map((addon) => ({
-          item: addon.item,
-          cost: Number(addon.cost) || 0,
-          markupPct: Number(addon.markupPct) || 0,
-          inQuote: Boolean(addon.inQuote),
-          inSow: Boolean(addon.inSow),
-        })),
-      };
+      });
       const res = await downloadPdfProvider(payload, estimateId || undefined);
       const pdfData = res?.data || res;
       if (pdfData?.fileBase64) {
         downloadPdfFromBase64(
           pdfData.fileBase64,
-          pdfData.fileName || `Quote_${(customerLeadName || "Package").replace(/\s+/g, "_")}.pdf`,
+          pdfData.fileName || `Quote_${(pricingData.customerLeadName || "Package").replace(/\s+/g, "_")}.pdf`,
           pdfData.mimeType || "application/pdf"
         );
         toast.success("PDF downloaded successfully");
@@ -430,7 +322,7 @@ export function QuoteDetailTab({
         isLoading={isPreviewLoading}
         error={previewError}
         onRetry={refetchPreview}
-        title={`Quote Document — ${customerLeadName || "Estimate Preview"}`}
+        title={`Quote Document — ${pricingData.customerLeadName || "Estimate Preview"}`}
         minHeight={750}
       />
 

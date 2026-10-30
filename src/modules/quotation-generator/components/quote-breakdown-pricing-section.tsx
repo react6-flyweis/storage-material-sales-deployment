@@ -165,10 +165,17 @@ export function QuoteBreakdownPricingSection({
   const [sqFt, setSqFt] = useState(
     effectiveInitial?.squareFootage
       ? String(effectiveInitial.squareFootage)
-      : "",
+      : quotationForm?.squareFootage ||
+        String(useQuotationStore.getState().squareFootage || "") ||
+        "",
   );
   const [isManualSqFt, setIsManualSqFt] = useState(false);
-  const [buildingSize, setBuildingSize] = useState("");
+  const [buildingSize, setBuildingSize] = useState(
+    quotationForm?.buildingSize ||
+      useQuotationStore.getState().buildingSize ||
+      useQuotationStore.getState().pembBuildingSize ||
+      "",
+  );
   const [additionalNotes, setAdditionalNotes] = useState("");
 
   const handleSqFtChange = useCallback((val: string) => {
@@ -176,9 +183,10 @@ export function QuoteBreakdownPricingSection({
     setIsManualSqFt(true);
   }, []);
 
-  const lastLoadedFileNameRef = useRef<string | null>(
-    effectiveInitial?.fileName || null,
-  );
+  const lastLoadedFileNameRef = useRef<string | null>(null);
+  const lastLoadedEstimateIdRef = useRef<string | null>(null);
+  const lastShipperRef = useRef<ExtractShipperResponseData | undefined>(undefined);
+
   const shipperDataRef = useRef<ExtractShipperResponseData | undefined>(
     shipperData,
   );
@@ -188,17 +196,26 @@ export function QuoteBreakdownPricingSection({
 
   useEffect(() => {
     const s = initialShipper || pembExtractedShipper;
+    const currentEstId = estimateId || propEstimateId || pembEstimateId || null;
+
     if (!s) {
       lastLoadedFileNameRef.current = null;
+      lastLoadedEstimateIdRef.current = null;
+      lastShipperRef.current = undefined;
       setShipperData(undefined);
       setFile(null);
       setSqFt("");
       return;
     }
 
-    // Only sync if it is a genuinely different file or first load
-    if (s.fileName !== lastLoadedFileNameRef.current) {
+    const isDifferentFile = s.fileName !== lastLoadedFileNameRef.current;
+    const isDifferentEstimate = currentEstId !== lastLoadedEstimateIdRef.current;
+    const isDifferentShipper = s !== lastShipperRef.current;
+
+    if (isDifferentFile || isDifferentEstimate || isDifferentShipper) {
       lastLoadedFileNameRef.current = s.fileName;
+      lastLoadedEstimateIdRef.current = currentEstId;
+      lastShipperRef.current = s;
       setShipperData(s);
       setFile({
         name: s.fileName,
@@ -206,10 +223,53 @@ export function QuoteBreakdownPricingSection({
       });
       if (s.squareFootage) {
         setSqFt(String(s.squareFootage));
+      } else if (quotationForm?.squareFootage) {
+        setSqFt(quotationForm.squareFootage);
       }
       setIsManualSqFt(Boolean(s.squareFootageMeta?.source === "manual"));
+
+      // Synchronize sales tax from shipper fullQuote/pricing if available
+      const rawShipperTax =
+        (s.fullQuote as Record<string, unknown> | undefined)?.salesTax ||
+        (s.fullQuote as Record<string, unknown> | undefined)?.sales_tax ||
+        (s.pricing as Record<string, unknown> | undefined)?.salesTax ||
+        (s.pricing as Record<string, unknown> | undefined)?.sales_tax;
+
+      if (rawShipperTax && typeof rawShipperTax === "object") {
+        const taxObj = rawShipperTax as Record<string, unknown>;
+        const qStore = useQuotationStore.getState();
+        const zip =
+          taxObj.zip ||
+          taxObj.taxZip ||
+          taxObj.postalCode ||
+          taxObj.zipCode ||
+          quotationForm?.cityStateZip?.match(/\b(\d{5})(?:-\d{4})?\b/)?.[1] ||
+          quotationForm?.street?.match(/\b(\d{5})(?:-\d{4})?\b/)?.[1];
+        const rate = taxObj.rate ?? taxObj.taxRate ?? taxObj.tax_rate;
+        const inc = taxObj.include ?? taxObj.includeTax ?? taxObj.isTaxIncluded;
+
+        if (zip && qStore.taxZip !== String(zip)) {
+          qStore.setTaxZip(String(zip));
+        }
+        if (rate !== undefined && rate !== null && !isNaN(Number(rate)) && qStore.taxRate !== Number(rate)) {
+          qStore.setTaxRate(Number(rate));
+        }
+        if (inc !== undefined && inc !== null && qStore.includeTax !== Boolean(inc)) {
+          qStore.setIncludeTax(Boolean(inc));
+        }
+      }
     }
-  }, [initialShipper, pembExtractedShipper]);
+  }, [initialShipper, pembExtractedShipper, estimateId, propEstimateId, pembEstimateId, quotationForm?.squareFootage]);
+
+  useEffect(() => {
+    const bSize =
+      quotationForm?.buildingSize ||
+      useQuotationStore.getState().buildingSize ||
+      useQuotationStore.getState().pembBuildingSize;
+    if (bSize && !buildingSize) {
+      setBuildingSize(bSize);
+    }
+  }, [quotationForm?.buildingSize, buildingSize]);
 
   const [isSavingDraft, setIsSavingDraft] = useState(false);
 

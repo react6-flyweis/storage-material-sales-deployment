@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { Sparkles, Check, RotateCcw, Edit3, Save, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -7,11 +7,11 @@ import {
   downloadPdfProvider,
   type ExtractShipperResponseData,
   type ExtractDrawingResponseData,
-  type PreviewDocumentRequest,
 } from "../estimates.api";
 import { downloadPdfFromBase64 } from "../utils/pdf-download";
 import { useSowDocument } from "../hooks/use-sow-document";
 import { useQuotationStore } from "../quotation.store";
+import { usePembDocumentPayload } from "../hooks/use-pemb-document-payload";
 import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
 import { ServerDocumentPreview } from "./server-document-preview";
 
@@ -53,11 +53,6 @@ export function QuoteSowTab({
     setStaircaseCount,
     staircaseUnitPrice,
     setStaircaseUnitPrice,
-    steelFinish,
-    companyBrand,
-    freightOverride,
-    materialSellOverride,
-    engineeringDrawings,
   } = useQuotationStore();
 
   const sow = useSowDocument({
@@ -66,6 +61,21 @@ export function QuoteSowTab({
     buildingSize,
     quotationForm,
     extractedDrawing,
+  });
+
+  const {
+    payload: previewPayload,
+    buildPayload,
+    pricingData,
+  } = usePembDocumentPayload({
+    estimateId,
+    extractedShipper,
+    extractedDrawing,
+    quotationForm,
+    sqFt,
+    buildingSize,
+    sections: ["sow"],
+    drawingAttachments: [],
   });
 
   const handleToggleMultiStory = (checked: boolean) => {
@@ -78,74 +88,6 @@ export function QuoteSowTab({
       toast.info("Switched SOW to standard single-story PEMB boilerplate");
     }
   };
-
-  const previewPayload: PreviewDocumentRequest = useMemo(
-    () => ({
-      estimateId: estimateId || undefined,
-      companyBrand,
-      grandTotal: (extractedShipper?.fullQuote?.grandTotal ??
-        extractedShipper?.pricing?.totSell) as number | undefined,
-      jobType: "PEMB",
-      leadCompanyName: sow.pricingData.customerLeadName || "Customer",
-      customerEmail: quotationForm?.email || sow.pricingData.customerEmail,
-      streetAddress: sow.pricingData.customerAddress,
-      cityStateZip: sow.pricingData.customerAddress,
-      buildingSize: sow.pricingData.displayBuildingSize,
-      squareFootage: sow.pricingData.effectiveSqFt,
-      jobNumber:
-        quotationForm?.jobNumber ||
-        extractedDrawing?.extracted?.jobnumber ||
-        "",
-      steelFinish: steelFinish || "red-iron",
-      freightOverride: parseFloat(freightOverride) || undefined,
-      materialSellOverride: parseFloat(materialSellOverride) || undefined,
-      matSellOverride: parseFloat(materialSellOverride) || undefined,
-      pembDrawings: parseFloat(engineeringDrawings) || 0,
-      parsedCategories: extractedShipper?.parsedCategories,
-      recompute: true,
-      pricingResult: extractedShipper?.pricing,
-      fullQuote:
-        extractedShipper?.fullQuote ||
-        (extractedShipper?.pricing as Record<string, unknown> | undefined),
-      extractedDrawingFields: extractedDrawing?.extracted,
-      drawingAttachments: [],
-      sections: ["sow"],
-      staircase: {
-        count: isMultiStory ? staircaseCount : 0,
-        unitCost: staircaseUnitPrice || 35000,
-        stories: 2,
-      },
-      multiStory: {
-        stories: 2,
-        staircaseCount: isMultiStory ? staircaseCount : 0,
-        staircaseUnitCost: staircaseUnitPrice || 35000,
-      },
-      redOxideConfirmed: isRedOxideConfirmed,
-    }),
-    [
-      estimateId,
-      sow.pricingData.customerLeadName,
-      sow.pricingData.customerEmail,
-      sow.pricingData.customerAddress,
-      sow.pricingData.displayBuildingSize,
-      sow.pricingData.effectiveSqFt,
-      quotationForm?.jobNumber,
-      quotationForm?.email,
-      extractedDrawing?.extracted,
-      extractedShipper?.pricing,
-      extractedShipper?.fullQuote,
-      isMultiStory,
-      isRedOxideConfirmed,
-      staircaseCount,
-      staircaseUnitPrice,
-      steelFinish,
-      freightOverride,
-      materialSellOverride,
-      engineeringDrawings,
-      companyBrand,
-      extractedShipper?.parsedCategories,
-    ],
-  );
 
   const {
     html: serverPreviewHtml,
@@ -167,46 +109,12 @@ export function QuoteSowTab({
 
   const handleDownloadSowPdf = async () => {
     setIsDownloadingSow(true);
-    const customerName = sow.pricingData.customerLeadName || "Customer";
+    const customerName = pricingData.customerLeadName || "Customer";
     try {
-      const payload: PreviewDocumentRequest = {
-        estimateId: estimateId || undefined,
-        companyBrand,
-        grandTotal: (extractedShipper?.fullQuote?.grandTotal ??
-          extractedShipper?.pricing?.totSell) as number | undefined,
-        leadCompanyName: customerName,
-        customerEmail: quotationForm?.email || sow.pricingData.customerEmail,
-        streetAddress: sow.pricingData.customerAddress,
-        cityStateZip: sow.pricingData.customerAddress,
-        buildingSize: sow.pricingData.displayBuildingSize,
-        squareFootage: sow.pricingData.effectiveSqFt,
-        jobNumber: quotationForm?.jobNumber || extractedDrawing?.extracted?.jobnumber || "",
-        steelFinish: steelFinish || "red-iron",
-        freightOverride: parseFloat(freightOverride) || undefined,
-        materialSellOverride: parseFloat(materialSellOverride) || undefined,
-        matSellOverride: parseFloat(materialSellOverride) || undefined,
-        pembDrawings: parseFloat(engineeringDrawings) || 0,
-        parsedCategories: extractedShipper?.parsedCategories,
-        recompute: true,
-        pricingResult: extractedShipper?.pricing,
-        fullQuote:
-          extractedShipper?.fullQuote ||
-          (extractedShipper?.pricing as Record<string, unknown> | undefined),
-        extractedDrawingFields: extractedDrawing?.extracted,
+      const payload = buildPayload({
         drawingAttachments: [],
         sections: ["sow"],
-        staircase: {
-          count: isMultiStory ? staircaseCount : 0,
-          unitCost: staircaseUnitPrice || 35000,
-          stories: 2,
-        },
-        multiStory: {
-          stories: 2,
-          staircaseCount: isMultiStory ? staircaseCount : 0,
-          staircaseUnitCost: staircaseUnitPrice || 35000,
-        },
-        redOxideConfirmed: isRedOxideConfirmed,
-      };
+      });
 
       const res = await downloadPdfProvider(payload, estimateId || undefined);
       const pdfData = res?.data || res;
@@ -458,7 +366,7 @@ export function QuoteSowTab({
         isLoading={isPreviewLoading}
         error={previewError}
         onRetry={refetchPreview}
-        title={`Statement of Work — ${sow.pricingData.customerLeadName || "Customer"}`}
+        title={`Statement of Work — ${pricingData.customerLeadName || "Customer"}`}
         minHeight={750}
       />
 

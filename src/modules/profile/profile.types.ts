@@ -1,30 +1,59 @@
-export interface StaffProfile {
+export type UserRole =
+  | "admin"
+  | "sales"
+  | "account"
+  | "plant"
+  | "construction"
+  | string;
+
+export interface NotificationSettings {
+  twoFactorAuth?: boolean;
+  emailNotification?: boolean;
+  smsNotification?: boolean;
+  dashboardNotifications?: boolean;
+  weeklyEmailReports?: boolean;
+  systemAlerts?: boolean;
+  loginAlertsViaMail?: boolean;
+  [key: string]: boolean | undefined;
+}
+
+export const DEFAULT_NOTIFICATION_SETTINGS: Required<NotificationSettings> = {
+  twoFactorAuth: false,
+  emailNotification: true,
+  smsNotification: false,
+  dashboardNotifications: true,
+  weeklyEmailReports: false,
+  systemAlerts: true,
+  loginAlertsViaMail: true,
+};
+
+export interface UserProfile {
   _id: string;
   name: string;
   email: string;
   phone?: string;
   mobile?: string;
   avatar?: string;
-  role?: string;
+  role: UserRole;
   department?: string;
   location?: string;
-  isActive?: boolean;
+  isActive: boolean;
   isMainAdmin?: boolean;
-  notificationSettings?: Record<string, unknown>;
+  notificationSettings?: NotificationSettings;
   createdAt?: string;
   updatedAt?: string;
 }
 
-export interface StaffProfileResponse {
+export interface GetProfileApiResponse {
   success: boolean;
   message: string;
   data: {
-    profile: StaffProfile;
-    user?: StaffProfile;
+    profile: UserProfile;
+    user?: UserProfile;
   };
 }
 
-export interface UpdateStaffProfilePayload {
+export interface UpdateProfileRequest {
   name?: string;
   email?: string;
   phone?: string;
@@ -33,22 +62,40 @@ export interface UpdateStaffProfilePayload {
   location?: string;
 }
 
-export interface UpdateStaffProfileResponse {
+export interface UpdateProfileApiResponse {
   success: boolean;
   message: string;
   data: {
-    profile: StaffProfile;
-    user?: StaffProfile;
+    profile: UserProfile;
+    user?: UserProfile;
   };
 }
 
-export interface ChangePasswordPayload {
+export interface ChangePasswordRequest {
   currentPassword: string;
   newPassword: string;
 }
 
-export interface ChangePasswordResponse {
+export interface ChangePasswordApiResponse {
   success: boolean;
   message: string;
   data?: Record<string, unknown>;
 }
+
+export type UpdateNotificationSettingsRequest = Partial<NotificationSettings>;
+
+export interface UpdateNotificationSettingsApiResponse {
+  success: boolean;
+  message: string;
+  data: {
+    notificationSettings: NotificationSettings;
+  };
+}
+
+// Backward-compatibility aliases for existing sales panel components
+export type StaffProfile = UserProfile;
+export type StaffProfileResponse = GetProfileApiResponse;
+export type UpdateStaffProfilePayload = UpdateProfileRequest;
+export type UpdateStaffProfileResponse = UpdateProfileApiResponse;
+export type ChangePasswordPayload = ChangePasswordRequest;
+export type ChangePasswordResponse = ChangePasswordApiResponse;

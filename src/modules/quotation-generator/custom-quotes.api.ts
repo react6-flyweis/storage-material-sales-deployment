@@ -31,6 +31,7 @@ export interface CreateCustomQuoteRequest {
   location?: string;
   size?: string;
   scope?: string;
+  company?: "SM" | "SBD" | string;
   expDays?: number;
   matCost: number;
   freight: number;
@@ -54,6 +55,7 @@ export interface CustomQuoteRecord {
   location?: string;
   size?: string;
   scope?: string;
+  company?: "SM" | "SBD" | string;
   expDays?: number;
   matCost: number;
   freight: number;
@@ -167,11 +169,14 @@ export async function deleteCustomQuoteProvider(
 
 export async function downloadCustomQuotePdfProvider(
   id: string,
-  options?: { format?: "html" | "pdf" }
+  options?: { format?: "html" | "pdf"; company?: "SM" | "SBD" | string }
 ): Promise<CustomQuotePdfResponse> {
+  const payload: Record<string, unknown> = {};
+  if (options?.format === "html") payload.format = "html";
+  if (options?.company) payload.company = options.company;
   const response = await apiClient.post<CustomQuotePdfResponse>(
     `/api/sales/custom-quotes/${encodeURIComponent(id)}/pdf`,
-    options?.format === "html" ? { format: "html" } : {}
+    payload
   );
   return response.data;
 }

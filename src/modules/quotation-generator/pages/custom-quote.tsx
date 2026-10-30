@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { Loader2, Download } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -27,13 +28,14 @@ interface CalculationResult {
 export default function CustomQuote() {
   const navigate = useNavigate();
 
-  const { setPembLeadData } = useQuotationStore();
+  const { setPembLeadData, setCompanyBrand } = useQuotationStore();
 
   // Project Details Form State
   const [customerCompany, setCustomerCompany] = useState("");
   const [location, setLocation] = useState("");
   const [buildingSize, setBuildingSizeInput] = useState("");
   const [scope, setScope] = useState("Supply, Delivery & Installation");
+  const [company, setCompany] = useState<"SM" | "SBD">("SM");
 
   // Cost and Pricing State
   const [materialCost, setMaterialCost] = useState("");
@@ -152,6 +154,7 @@ export default function CustomQuote() {
         location: location.trim(),
         size: buildingSize.trim(),
         scope,
+        company,
         expDays: validDays,
         matCost: mat,
         freight,
@@ -182,13 +185,14 @@ export default function CustomQuote() {
 
     const result = calcResult || calculateNumbers();
 
-    // Save lead details to store
+    // Save lead details and brand to store
     setPembLeadData({
       leadName: customerCompany.trim(),
       street: location.trim(),
       cityStateZip: location.trim(),
       buildingSize: buildingSize.trim(),
     });
+    setCompanyBrand(company);
 
     toast.success("Quote generated successfully!");
 
@@ -204,9 +208,13 @@ export default function CustomQuote() {
             year: "numeric",
           }),
           quoteValidDays: quoteValidDays || "15",
+          companyBrand: company,
+          company,
           ...(savedQuoteId ? { customQuoteId: savedQuoteId } : {}),
         },
         buildingSize: buildingSize.trim(),
+        companyBrand: company,
+        company,
         customPricing: {
           materialCost: mat,
           freightCost: freight,
@@ -217,6 +225,7 @@ export default function CustomQuote() {
           totalSell: result.totalSell,
           profit: result.profit,
           scope,
+          company,
           includedItems: includedScope.split("\n").filter(Boolean),
           excludedItems: excludedScope.split("\n").filter(Boolean),
         },
@@ -243,6 +252,7 @@ export default function CustomQuote() {
         location: location.trim(),
         size: buildingSize.trim(),
         scope,
+        company,
         expDays: validDays,
         matCost: mat,
         freight,
@@ -253,7 +263,7 @@ export default function CustomQuote() {
         exclusions: excludedScope.split("\n").filter(Boolean),
       });
 
-      const pdfRes = await downloadCustomQuotePdfProvider(savedDoc._id);
+      const pdfRes = await downloadCustomQuotePdfProvider(savedDoc._id, { company });
       const b64 = pdfRes.data?.fileBase64 || pdfRes.fileBase64;
       if (b64) {
         downloadPdfFromBase64(
@@ -318,8 +328,8 @@ export default function CustomQuote() {
             </div>
           </div>
 
-          {/* Row 2: Building Size & Scope */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Row 2: Building Size, Scope & Logo / Brand */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 Building Size
@@ -352,6 +362,37 @@ export default function CustomQuote() {
                   </SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Logo / Brand
+              </label>
+              <div className="grid grid-cols-2 gap-1.5 h-10">
+                {[
+                  { label: "Storage Material", value: "SM" as const },
+                  { label: "Steel Building", value: "SBD" as const },
+                ].map((item) => {
+                  const isActive = company === item.value;
+                  return (
+                    <button
+                      key={item.value}
+                      type="button"
+                      onClick={() => {
+                        setCompany(item.value);
+                        setCompanyBrand(item.value);
+                      }}
+                      className={cn(
+                        "h-full rounded-lg font-semibold text-xs transition-colors cursor-pointer text-center flex items-center justify-center border",
+                        isActive
+                          ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                          : "bg-[#f8fafc] text-slate-700 border-slate-200/90 hover:bg-slate-200",
+                      )}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -518,7 +559,7 @@ export default function CustomQuote() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Customer / Company
+                Included Scope (one per line)
               </label>
               <textarea
                 rows={4}
@@ -529,7 +570,7 @@ export default function CustomQuote() {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Location
+                Excluded Scope (one per line)
               </label>
               <textarea
                 rows={4}

@@ -120,6 +120,53 @@ export function QuotePreviewListPage() {
         useQuotationStore.getState().setPembEstimateId(targetEstimateId);
       }
 
+      // Synchronize sales tax from estimate to store and navigation state
+      const rawSalesTax =
+        estimate.salesTax ||
+        (estimate as Record<string, unknown>).sales_tax ||
+        (estimate.fullQuoteResult as Record<string, unknown>)?.salesTax ||
+        (estimate.fullQuoteResult as Record<string, unknown>)?.sales_tax ||
+        (estimate.pricingResult as Record<string, unknown>)?.salesTax ||
+        (estimate.pricingResult as Record<string, unknown>)?.sales_tax ||
+        ((estimate.pricingResult as Record<string, unknown>)?.fullQuote as Record<string, unknown>)?.salesTax;
+
+      const resolvedTaxObj = rawSalesTax as Record<string, unknown> | undefined;
+
+      const resolvedZip =
+        resolvedTaxObj?.zip ||
+        resolvedTaxObj?.taxZip ||
+        resolvedTaxObj?.postalCode ||
+        resolvedTaxObj?.zipCode ||
+        (estimate as Record<string, unknown>).taxZip ||
+        (estimate as Record<string, unknown>).tax_zip ||
+        (estimate.cityStateZip ? estimate.cityStateZip.match(/\b(\d{5})(?:-\d{4})?\b/)?.[1] : undefined) ||
+        (estimate.streetAddress ? estimate.streetAddress.match(/\b(\d{5})(?:-\d{4})?\b/)?.[1] : undefined);
+
+      const resolvedRate =
+        resolvedTaxObj?.rate ??
+        resolvedTaxObj?.taxRate ??
+        resolvedTaxObj?.tax_rate ??
+        (estimate as Record<string, unknown>).taxRate ??
+        (estimate as Record<string, unknown>).tax_rate;
+
+      const resolvedInclude =
+        resolvedTaxObj?.include ??
+        resolvedTaxObj?.includeTax ??
+        resolvedTaxObj?.isTaxIncluded ??
+        (estimate as Record<string, unknown>).includeTax ??
+        (estimate as Record<string, unknown>).include_tax;
+
+      const qStore = useQuotationStore.getState();
+      if (resolvedZip) {
+        qStore.setTaxZip(String(resolvedZip));
+      }
+      if (resolvedRate !== undefined && resolvedRate !== null && !isNaN(Number(resolvedRate))) {
+        qStore.setTaxRate(Number(resolvedRate));
+      }
+      if (resolvedInclude !== undefined && resolvedInclude !== null) {
+        qStore.setIncludeTax(Boolean(resolvedInclude));
+      }
+
       // Standard / PEMB quote preview
       const pricingRes = estimate.pricingResult as
         | Record<string, unknown>
@@ -187,6 +234,11 @@ export function QuotePreviewListPage() {
           pdfFileName: estimate.sourceFileName,
           estimateId: estimate._id,
           isFromList: true,
+          salesTax: {
+            rate: resolvedRate !== undefined && resolvedRate !== null ? Number(resolvedRate) : undefined,
+            include: resolvedInclude !== undefined && resolvedInclude !== null ? Boolean(resolvedInclude) : undefined,
+            zip: resolvedZip ? String(resolvedZip) : undefined,
+          },
         },
       });
     } catch (err) {

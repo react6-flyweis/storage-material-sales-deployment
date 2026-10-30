@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router";
 import { ArrowLeft, FolderUp, Loader2, FileSearch, Printer } from "lucide-react";
 import { toast } from "sonner";
@@ -11,11 +11,10 @@ import {
   saveEstimateProvider,
   type ExtractDrawingResponseData,
   type ExtractShipperResponseData,
-  type PreviewDocumentRequest,
 } from "../estimates.api";
 import { downloadPdfFromBase64 } from "../utils/pdf-download";
-import { useQuotationPricing } from "../hooks/use-quotation-pricing";
 import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
+import { usePembDocumentPayload } from "../hooks/use-pemb-document-payload";
 import { ServerDocumentPreview } from "../components/server-document-preview";
 
 export function QuotePreviewPage() {
@@ -35,6 +34,11 @@ export function QuotePreviewPage() {
     additionalNotes?: string;
     pdfFileName?: string;
     estimateId?: string;
+    salesTax?: {
+      rate?: number;
+      include?: boolean;
+      zip?: string;
+    };
   };
 
   const {
@@ -71,10 +75,6 @@ export function QuotePreviewPage() {
     marginLaborOverride,
     marginTargetMargin,
     marginFixedSellOverride,
-    isMultiStory,
-    staircaseCount,
-    staircaseUnitPrice,
-    pembAddOns,
     steelFinish,
     freightOverride,
     materialSellOverride,
@@ -96,27 +96,38 @@ export function QuotePreviewPage() {
     }
   }, [navState.estimateId, pembEstimateId, setPembEstimateId]);
 
-  const pricingData = useQuotationPricing({
-    extractedShipper: navState.extractedShipper,
-    sqFt: navState.sqFt,
-    buildingSize: navState.buildingSize,
-    quotationForm: navState.quotationForm,
-    extractedDrawing: navState.extractedDrawing,
-  });
+  useEffect(() => {
+    const rawTax =
+      navState.salesTax ||
+      (navState.extractedShipper?.fullQuote as Record<string, unknown> | undefined)?.salesTax ||
+      (navState.extractedShipper?.fullQuote as Record<string, unknown> | undefined)?.sales_tax ||
+      (navState.extractedShipper?.pricing as Record<string, unknown> | undefined)?.salesTax ||
+      (navState.extractedShipper?.pricing as Record<string, unknown> | undefined)?.sales_tax;
 
-  const {
-    customerLeadName,
-    customerAddress,
-    customerEmail,
-    quoteDate,
-    displayBuildingSize,
-    effectiveSqFt,
-    grandTotalFormatted: totalSellFormatted,
-  } = pricingData;
+    if (rawTax && typeof rawTax === "object") {
+      const taxObj = rawTax as Record<string, unknown>;
+      const qStore = useQuotationStore.getState();
+      const zip =
+        taxObj.zip ||
+        taxObj.taxZip ||
+        taxObj.postalCode ||
+        taxObj.zipCode ||
+        navState.quotationForm?.cityStateZip?.match(/\b(\d{5})(?:-\d{4})?\b/)?.[1] ||
+        navState.quotationForm?.street?.match(/\b(\d{5})(?:-\d{4})?\b/)?.[1];
+      const rate = taxObj.rate ?? taxObj.taxRate ?? taxObj.tax_rate;
+      const inc = taxObj.include ?? taxObj.includeTax ?? taxObj.isTaxIncluded;
 
-  const isEditing = Boolean(
-    estimateId || pembEstimateId || navState.estimateId,
-  );
+      if (zip && qStore.taxZip !== String(zip)) {
+        qStore.setTaxZip(String(zip));
+      }
+      if (rate !== undefined && rate !== null && !isNaN(Number(rate)) && qStore.taxRate !== Number(rate)) {
+        qStore.setTaxRate(Number(rate));
+      }
+      if (inc !== undefined && inc !== null && qStore.includeTax !== Boolean(inc)) {
+        qStore.setIncludeTax(Boolean(inc));
+      }
+    }
+  }, [navState.salesTax, navState.extractedShipper, navState.quotationForm]);
 
   const initialPdfName =
     navState.pdfFileName ||
@@ -131,109 +142,38 @@ export function QuotePreviewPage() {
     name: initialPdfName,
   });
 
-  // Server document preview payload
-  const activeEstimateId =
-    estimateId || pembEstimateId || navState.estimateId || undefined;
+  const {
+    payload: previewPayload,
+    buildPayload,
+    pricingData,
+    effectiveEstimateId,
+    hasData,
+  } = usePembDocumentPayload({
+    estimateId: navState.estimateId || estimateId,
+    extractedShipper: navState.extractedShipper,
+    extractedDrawing: navState.extractedDrawing,
+    quotationForm: navState.quotationForm,
+    sqFt: navState.sqFt,
+    buildingSize: navState.buildingSize,
+    pdfFileName: selectedPdf?.name,
+    sections: selectedPdf
+      ? ["quote", "sow", "contract", "drawings"]
+      : ["quote", "sow", "contract"],
+    drawingAttachments: selectedPdf
+      ? [{ name: selectedPdf.name, includeInQuote: true }]
+      : [],
+  });
 
-  const previewPayload: PreviewDocumentRequest = useMemo(
-    () => ({
-      estimateId: activeEstimateId,
-      companyBrand,
-      grandTotal: (navState.extractedShipper?.fullQuote?.grandTotal ??
-        navState.extractedShipper?.pricing?.totSell) as number | undefined,
-      jobType: "PEMB",
-      leadCompanyName: customerLeadName,
-      customerEmail,
-      streetAddress: customerAddress,
-      cityStateZip: customerAddress,
-      buildingSize: displayBuildingSize,
-      squareFootage: effectiveSqFt,
-      jobNumber:
-        navState.quotationForm?.jobNumber ||
-        navState.extractedDrawing?.extracted?.jobnumber ||
-        "",
-      steelFinish: steelFinish || "red-iron",
-      freightOverride: parseFloat(freightOverride) || undefined,
-      materialSellOverride: parseFloat(materialSellOverride) || undefined,
-      matSellOverride: parseFloat(materialSellOverride) || undefined,
-      pembDrawings: parseFloat(engineeringDrawings) || 0,
-      parsedCategories:
-        navState.extractedShipper?.parsedCategories ||
-        pembExtractedShipper?.parsedCategories,
-      recompute: true,
-      pricingResult: navState.extractedShipper?.pricing,
-      fullQuote:
-        navState.extractedShipper?.fullQuote ||
-        (navState.extractedShipper?.pricing as
-          | Record<string, unknown>
-          | undefined),
-      extractedDrawingFields: navState.extractedDrawing?.extracted,
-      contract: {
-        customer: customerLeadName,
-        address: customerAddress,
-        city: customerAddress,
-        email: customerEmail,
-        date: quoteDate,
-        deposit: "forty-percent (40%)",
-        type:
-          scope?.toLowerCase() === "both"
-            ? "both"
-            : scope?.toLowerCase() === "install"
-              ? "install"
-              : "supply",
-        value: totalSellFormatted,
-      },
-      drawingAttachments: selectedPdf
-        ? [{ name: selectedPdf.name, includeInQuote: true }]
-        : [],
-      sections: selectedPdf
-        ? ["quote", "sow", "contract", "drawings"]
-        : ["quote", "sow", "contract"],
-      staircase: {
-        count: isMultiStory ? staircaseCount : 0,
-        unitCost: staircaseUnitPrice || 35000,
-        stories: 2,
-      },
-      multiStory: {
-        stories: 2,
-        staircaseCount: isMultiStory ? staircaseCount : 0,
-        staircaseUnitCost: staircaseUnitPrice || 35000,
-      },
-      pembAddOns: (pembAddOns || []).map((addon) => ({
-        item: addon.item,
-        cost: Number(addon.cost) || 0,
-        markupPct: Number(addon.markupPct) || 0,
-        inQuote: Boolean(addon.inQuote),
-        inSow: Boolean(addon.inSow),
-      })),
-    }),
-    [
-      activeEstimateId,
-      companyBrand,
-      customerLeadName,
-      customerEmail,
-      customerAddress,
-      displayBuildingSize,
-      effectiveSqFt,
-      navState.quotationForm?.jobNumber,
-      navState.extractedDrawing?.extracted,
-      navState.extractedShipper?.pricing,
-      navState.extractedShipper?.fullQuote,
-      quoteDate,
-      scope,
-      totalSellFormatted,
-      selectedPdf,
-      isMultiStory,
-      staircaseCount,
-      staircaseUnitPrice,
-      pembAddOns,
-      steelFinish,
-      freightOverride,
-      materialSellOverride,
-      engineeringDrawings,
-      pembExtractedShipper?.parsedCategories,
-      navState.extractedShipper?.parsedCategories,
-    ],
+  const {
+    customerLeadName,
+    customerAddress,
+    customerEmail,
+    displayBuildingSize,
+    effectiveSqFt,
+  } = pricingData;
+
+  const isEditing = Boolean(
+    estimateId || pembEstimateId || navState.estimateId,
   );
 
   const {
@@ -266,80 +206,8 @@ export function QuotePreviewPage() {
   const handleDownloadPdf = async () => {
     setIsDownloadingPdf(true);
     try {
-      const activeEstId =
-        estimateId || pembEstimateId || navState.estimateId || undefined;
-      const payload: PreviewDocumentRequest = {
-        estimateId: activeEstId,
-        companyBrand,
-        grandTotal: (navState.extractedShipper?.fullQuote?.grandTotal ??
-          navState.extractedShipper?.pricing?.totSell) as number | undefined,
-        jobType: "PEMB",
-        leadCompanyName: customerLeadName,
-        customerEmail,
-        streetAddress: customerAddress,
-        cityStateZip: customerAddress,
-        buildingSize: displayBuildingSize,
-        squareFootage: effectiveSqFt,
-        jobNumber:
-          navState.quotationForm?.jobNumber ||
-          navState.extractedDrawing?.extracted?.jobnumber ||
-          "",
-        steelFinish: steelFinish || "red-iron",
-        freightOverride: parseFloat(freightOverride) || undefined,
-        materialSellOverride: parseFloat(materialSellOverride) || undefined,
-        matSellOverride: parseFloat(materialSellOverride) || undefined,
-        pembDrawings: parseFloat(engineeringDrawings) || 0,
-        parsedCategories:
-          navState.extractedShipper?.parsedCategories ||
-          pembExtractedShipper?.parsedCategories,
-        recompute: true,
-        pricingResult: navState.extractedShipper?.pricing,
-        fullQuote:
-          navState.extractedShipper?.fullQuote ||
-          (navState.extractedShipper?.pricing as
-            | Record<string, unknown>
-            | undefined),
-        contract: {
-          customer: customerLeadName,
-          address: customerAddress,
-          city: customerAddress,
-          email: customerEmail,
-          date: quoteDate,
-          deposit: "forty-percent (40%)",
-          type:
-            scope?.toLowerCase() === "both"
-              ? "both"
-              : scope?.toLowerCase() === "install"
-              ? "install"
-              : "supply",
-          value: totalSellFormatted,
-        },
-        extractedDrawingFields: navState.extractedDrawing?.extracted,
-        drawingAttachments: selectedPdf
-          ? [{ name: selectedPdf.name, includeInQuote: true }]
-          : [],
-        sections: selectedPdf
-          ? ["quote", "sow", "contract", "drawings"]
-          : ["quote", "sow", "contract"],
-        staircase: {
-          count: isMultiStory ? staircaseCount : 0,
-          unitCost: staircaseUnitPrice || 35000,
-          stories: 2,
-        },
-        multiStory: {
-          stories: 2,
-          staircaseCount: isMultiStory ? staircaseCount : 0,
-          staircaseUnitCost: staircaseUnitPrice || 35000,
-        },
-        pembAddOns: (pembAddOns || []).map((addon) => ({
-          item: addon.item,
-          cost: Number(addon.cost) || 0,
-          markupPct: Number(addon.markupPct) || 0,
-          inQuote: Boolean(addon.inQuote),
-          inSow: Boolean(addon.inSow),
-        })),
-      };
-      const res = await downloadPdfProvider(payload, activeEstId);
+      const payload = buildPayload();
+      const res = await downloadPdfProvider(payload, effectiveEstimateId);
       const pdfData = res?.data || res;
       if (pdfData?.fileBase64) {
         downloadPdfFromBase64(
@@ -534,14 +402,6 @@ export function QuotePreviewPage() {
   const handleClearAll = () => {
     setSelectedPdf(null);
   };
-
-  const hasData = Boolean(
-    navState.extractedShipper ||
-    navState.quotationForm ||
-    navState.extractedDrawing ||
-    navState.sqFt ||
-    navState.buildingSize,
-  );
 
   return (
     <div className="space-y-6 p-6">

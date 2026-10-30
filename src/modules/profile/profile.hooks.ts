@@ -1,49 +1,87 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  getProfileApi,
   getStaffProfileProvider,
+  updateProfileApi,
   updateStaffProfileProvider,
-  changeStaffPasswordProvider,
+  changePasswordApi,
+  updateNotificationSettingsApi,
 } from "./profile.api";
 import type {
-  UpdateStaffProfilePayload,
-  ChangePasswordPayload,
+  UpdateProfileRequest,
+  ChangePasswordRequest,
+  UpdateNotificationSettingsRequest,
 } from "./profile.types";
-import { useAuthStore } from "@/modules/auth/auth.store";
 
-export const PROFILE_QUERY_KEY = ["profile", "staff"] as const;
+export const PROFILE_QUERY_KEY = ["profile"] as const;
+
+export function useProfile() {
+  return useQuery({
+    queryKey: PROFILE_QUERY_KEY,
+    queryFn: getProfileApi,
+    refetchOnWindowFocus: true,
+  });
+}
 
 export function useStaffProfileQuery(options?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: PROFILE_QUERY_KEY,
+    queryKey: ["profile", "staff"],
     queryFn: getStaffProfileProvider,
     enabled: options?.enabled ?? true,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useUpdateProfileMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: UpdateProfileRequest) => updateProfileApi(payload),
+    onSuccess: (updatedProfile) => {
+      queryClient.setQueryData(PROFILE_QUERY_KEY, updatedProfile);
+      queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ["profile", "staff"] });
+    },
   });
 }
 
 export function useUpdateStaffProfileMutation() {
   const queryClient = useQueryClient();
-  const updateUser = useAuthStore((state) => state.updateUser);
 
   return useMutation({
-    mutationFn: (payload: UpdateStaffProfilePayload) =>
+    mutationFn: (payload: UpdateProfileRequest) =>
       updateStaffProfileProvider(payload),
-    onSuccess: (response) => {
-      void queryClient.invalidateQueries({ queryKey: ["profile"] });
-      const updatedProfile = response?.data?.profile;
-      if (updatedProfile) {
-        updateUser({
-          name: updatedProfile.name,
-          email: updatedProfile.email,
-          role: updatedProfile.role,
-        });
-      }
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ["profile", "staff"] });
     },
   });
 }
 
-export function useChangeStaffPasswordMutation() {
+export function useChangePasswordMutation() {
   return useMutation({
-    mutationFn: (payload: ChangePasswordPayload) =>
-      changeStaffPasswordProvider(payload),
+    mutationFn: (payload: ChangePasswordRequest) => changePasswordApi(payload),
+  });
+}
+
+export const useChangeStaffPasswordMutation = useChangePasswordMutation;
+
+export function useUpdateNotificationSettingsMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: UpdateNotificationSettingsRequest) =>
+      updateNotificationSettingsApi(payload),
+    onSuccess: (updatedSettings) => {
+      queryClient.setQueryData(PROFILE_QUERY_KEY, (prev: any) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          notificationSettings: updatedSettings,
+        };
+      });
+      queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ["profile", "staff"] });
+    },
   });
 }
