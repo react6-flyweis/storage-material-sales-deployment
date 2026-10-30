@@ -7,6 +7,7 @@ import {
   Printer,
 } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getApiErrorMessage } from "@/lib/api-error";
@@ -35,6 +36,8 @@ export function StoragePreviewPage() {
   const previewSectionRef = useRef<HTMLDivElement>(null);
 
   const {
+    companyBrand: storeCompanyBrand,
+    setCompanyBrand,
     scope: storeScope,
     concreteInclude: storeConcreteInclude,
     insulationInclude: storeInsulationInclude,
@@ -56,6 +59,7 @@ export function StoragePreviewPage() {
     storageData?: StorageData;
     storagePricing?: StoragePricing;
     estimateId?: string;
+    companyBrand?: "SBD" | "SM";
     sourceFileName?: string;
     customerLeadName?: string;
     customerAddress?: string;
@@ -147,6 +151,7 @@ export function StoragePreviewPage() {
     storeInsulationInclude ?? navState.insulationInclude ?? false;
   const includeTax = storeIncludeTax ?? navState.includeTax ?? true;
   const taxRate = storeTaxRate ?? navState.taxRate ?? 0;
+  const companyBrand = storeCompanyBrand || navState.companyBrand || "SM";
 
   const quoteDate = new Date().toLocaleDateString("en-US", {
     month: "long",
@@ -192,6 +197,7 @@ export function StoragePreviewPage() {
 
       const payload: PreviewDocumentRequest = {
         jobType: "Storage",
+        companyBrand,
         estimateId: activeEstId,
         scope:
           (scope || "Both").toLowerCase() === "supply"
@@ -284,6 +290,7 @@ export function StoragePreviewPage() {
         {
           _id: activeEstId,
           jobType: "Storage",
+          companyBrand,
           scope:
             (scope || "Both").toLowerCase() === "supply"
               ? "Supply"
@@ -341,6 +348,7 @@ export function StoragePreviewPage() {
   const previewPayload: PreviewDocumentRequest = useMemo(
     () => ({
       jobType: "Storage",
+      companyBrand,
       estimateId:
         estimateId ||
         storeStorageEstimateId ||
@@ -422,6 +430,7 @@ export function StoragePreviewPage() {
     }),
     [
       estimateId,
+      companyBrand,
       navState.estimateId,
       storeStorageEstimateId,
       scope,
@@ -526,7 +535,34 @@ export function StoragePreviewPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1.5 mr-1">
+            <span className="text-[11px] font-bold text-slate-600 uppercase">Logo:</span>
+            <div className="grid grid-cols-2 gap-1 w-52">
+              {[
+                { label: "Steel Building", value: "SBD" as const },
+                { label: "Storage Material", value: "SM" as const },
+              ].map((item) => {
+                const isActive = companyBrand === item.value;
+                return (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => setCompanyBrand(item.value)}
+                    className={cn(
+                      "py-1.5 px-2 rounded-md font-semibold text-xs transition-colors cursor-pointer text-center",
+                      isActive
+                        ? "bg-blue-600 text-white shadow-xs"
+                        : "bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200",
+                    )}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <Button
             type="button"
             onClick={handleDownloadPdf}
