@@ -1,4 +1,4 @@
-import { useState, type PropsWithChildren } from "react";
+import { type PropsWithChildren } from "react";
 import { useNavigate } from "react-router";
 import { useLogoutMutation } from "@/modules/auth/auth.hooks";
 import {
@@ -8,23 +8,24 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { ProfileDialog } from "@/components/profile-dialog";
+// import { ProfileDialog } from "@/components/profile-dialog";
 
 type UserMenuProps = PropsWithChildren & { onOpenProfile?: () => void };
 
-export function UserMenu({ children, onOpenProfile }: UserMenuProps) {
+export function UserMenu({ children }: UserMenuProps) {
   const navigate = useNavigate();
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  // const [isProfileOpen, setIsProfileOpen] = useState(false);
   const { mutateAsync: logout } = useLogoutMutation();
 
-  // const goSettings = () => navigate("/settings");
+  const goSettings = () => navigate("/settings");
 
   const handleProfileClick = () => {
-    if (onOpenProfile) {
-      onOpenProfile();
-    } else {
-      setIsProfileOpen(true);
-    }
+    navigate("/profile");
+    // if (onOpenProfile) {
+    //   onOpenProfile();
+    // } else {
+    //   setIsProfileOpen(true);
+    // }
   };
 
   const signOut = () => {
@@ -53,7 +54,7 @@ export function UserMenu({ children, onOpenProfile }: UserMenuProps) {
             >
               My profile
             </DropdownMenuItem>
-            {/* <DropdownMenuItem onClick={goSettings}>Settings</DropdownMenuItem> */}
+            <DropdownMenuItem onClick={goSettings}>Settings</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={signOut} className="text-red-500">
               Sign out
@@ -62,7 +63,7 @@ export function UserMenu({ children, onOpenProfile }: UserMenuProps) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <ProfileDialog open={isProfileOpen} onOpenChange={setIsProfileOpen} />
+      {/* <ProfileDialog open={isProfileOpen} onOpenChange={setIsProfileOpen} /> */}
     </>
   );
 }
