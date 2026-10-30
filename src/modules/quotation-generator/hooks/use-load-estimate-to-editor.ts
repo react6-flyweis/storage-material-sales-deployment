@@ -259,6 +259,39 @@ export function useLoadEstimateToEditor() {
           store.resetMarginSettings();
         }
 
+        // 5b. Synchronize Multi-story & Staircase
+        const ms = (estimate as Record<string, unknown>).multiStory || (estimate as Record<string, unknown>).staircase;
+        if (ms && typeof ms === "object") {
+          const msObj = ms as Record<string, unknown>;
+          const sCount = Number(msObj.staircaseCount ?? msObj.count ?? 0);
+          const sUnit = Number(msObj.staircaseUnitCost ?? msObj.unitCost ?? 35000);
+          store.setIsMultiStory(sCount > 0 || Boolean((estimate as Record<string, unknown>).isMultiStory));
+          store.setStaircaseCount(sCount);
+          store.setStaircaseUnitPrice(sUnit > 0 ? sUnit : 35000);
+        } else {
+          store.setIsMultiStory(Boolean((estimate as Record<string, unknown>).isMultiStory));
+          store.setStaircaseCount(0);
+          store.setStaircaseUnitPrice(35000);
+        }
+
+        // 5c. Synchronize PEMB Add-ons
+        const rawAddons = (estimate as Record<string, unknown>).pembAddOns;
+        if (Array.isArray(rawAddons)) {
+          store.setPembAddOns(rawAddons);
+        } else {
+          store.setPembAddOns([]);
+        }
+
+        // 5d. Synchronize red oxide confirmation
+        if ((estimate as Record<string, unknown>).redOxideConfirmed !== undefined) {
+          store.setIsRedOxideConfirmed(Boolean((estimate as Record<string, unknown>).redOxideConfirmed));
+        }
+
+        // 5e. Synchronize deleted row keys
+        if (Array.isArray((estimate as Record<string, unknown>).deletedRowKeys)) {
+          store.setDeletedRowKeys((estimate as Record<string, unknown>).deletedRowKeys as string[]);
+        }
+
         // 6. Navigate Storage or PEMB
         if (isStorage) {
           store.setJobType("Storage");
