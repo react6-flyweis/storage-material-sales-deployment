@@ -35,7 +35,11 @@ export const ChatDrawer: React.FC<ChatDrawerProps> = ({
     <div className="absolute right-0 top-0 bottom-0 lg:relative w-72 lg:w-80 border-l border-gray-200 bg-white flex flex-col shadow-2xl lg:shadow-none z-20 animate-in slide-in-from-right duration-300">
       <div className="p-3 border-b border-gray-100 flex items-center justify-between">
         <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-          {activeChat.type === "group" ? "Group Details" : "User Info"}
+          {activeChat.type === "group"
+            ? "Group Details"
+            : activeChat.type === "customer"
+            ? "Customer Info"
+            : "User Info"}
         </span>
         <button
           onClick={onClose}
@@ -67,6 +71,8 @@ export const ChatDrawer: React.FC<ChatDrawerProps> = ({
         <p className="text-xs text-[#637381] mt-0.5">
           {activeChat.type === "group"
             ? `${memberCount} members`
+            : activeChat.type === "customer"
+            ? "Customer"
             : activeChat.role || "Staff Member"}
         </p>
       </div>
@@ -139,6 +145,37 @@ export const ChatDrawer: React.FC<ChatDrawerProps> = ({
                 );
               })
             )
+          ) : activeChat.type === "customer" ? (
+            <div className="p-3 bg-slate-50 rounded-xl text-xs space-y-2.5">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500">Contact:</span>
+                <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full text-[10px]">
+                  Customer
+                </span>
+              </div>
+              {activeChat.email && (
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-gray-500">Email:</span>
+                  <span className="font-medium text-slate-800 truncate max-w-35" title={activeChat.email}>
+                    {activeChat.email}
+                  </span>
+                </div>
+              )}
+              {activeChat.phone && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Phone:</span>
+                  <span className="font-medium text-slate-800">
+                    {activeChat.phone}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500">Customer ID:</span>
+                <span className="font-mono text-[10px] text-slate-700 truncate max-w-35">
+                  {activeChat.id}
+                </span>
+              </div>
+            </div>
           ) : (
             <div className="p-3 bg-slate-50 rounded-xl text-xs space-y-2">
               <div className="flex justify-between">

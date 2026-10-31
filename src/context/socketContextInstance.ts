@@ -10,6 +10,8 @@ export interface SocketContextType {
   sendTypingStart: (channelType: "direct" | "group", channelId: string) => void;
   sendTypingStop: (channelType: "direct" | "group", channelId: string) => void;
   sendMessage: (payload: SendTeamMessagePayload) => void;
+  joinCustomerDirect: (customerId: string) => void;
+  leaveCustomerDirect: (customerId: string) => void;
 }
 
 export const SocketContext = createContext<SocketContextType | null>(null);

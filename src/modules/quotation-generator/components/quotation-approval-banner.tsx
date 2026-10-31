@@ -22,9 +22,12 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import type {
-  ApprovalStatus,
   WorkflowStatus,
   QuotationApprovalInfo,
+} from "@/modules/quotations/quotations.api";
+import {
+  normalizeWorkflowStatus,
+  QuotationWorkflowBadge,
 } from "@/modules/quotations/quotations.api";
 import { QuotationApprovalTimeline } from "./quotation-approval-timeline";
 
@@ -38,6 +41,7 @@ interface QuotationApprovalBannerProps {
   sentMessage?: string | null;
   approvalMessage?: string | null;
   approvalNote?: string | null;
+  clientNotes?: string | null;
   onViewTimeline?: () => void;
   onSubmitForApproval?: () => void;
   /** @deprecated Action buttons have been removed from this banner */
@@ -58,6 +62,7 @@ export function QuotationApprovalBanner({
   sentMessage,
   approvalMessage,
   approvalNote,
+  clientNotes,
   onViewTimeline,
   onSubmitForApproval,
   onEdit,
@@ -67,18 +72,7 @@ export function QuotationApprovalBanner({
 }: QuotationApprovalBannerProps) {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
 
-  const status: ApprovalStatus | string =
-    (workflowStatus === "sent"
-      ? "sent"
-      : workflowStatus === "pending_approval"
-      ? "pending_approval"
-      : workflowStatus === "rejected"
-      ? "rejected"
-      : workflowStatus === "approved"
-      ? "approved"
-      : approval?.status) ||
-    workflowStatus ||
-    "not_submitted";
+  const status = normalizeWorkflowStatus(workflowStatus);
 
   const rejectionReason = approval?.rejectionReason;
   const history = approval?.history || [];
@@ -102,20 +96,50 @@ export function QuotationApprovalBanner({
     approval?.approvedVersionNumber !== null &&
     approval.approvedVersionNumber !== versionNumber;
 
+  const isAnyRejected =
+    status === "admin_rejected" ||
+    status === "client_rejected";
+
   const canSubmit =
     Boolean(onSubmitForApproval) &&
-    (status === "not_submitted" ||
-      status === "draft" ||
-      (status === "rejected" && isEdited) ||
+    (status === "draft" ||
+      ((status === "admin_rejected" || status === "client_rejected") && isEdited) ||
       (status === "approved" && isStaleApproved));
 
   const submitButtonText =
-    (status === "rejected" && isEdited) || isStaleApproved
-      ? "Re-submit for Approval"
-      : "Submit for Approval";
+    ((status === "admin_rejected" || status === "client_rejected") && isEdited) ||
+    isStaleApproved
+      ? "Send for Approval again"
+      : "Send for Approval";
 
   const getConfig = () => {
     switch (status) {
+      case "client_rejected":
+        return {
+          containerClass: "bg-rose-50/80 border-rose-200 text-rose-950",
+          iconContainerClass: "bg-rose-100 text-rose-700",
+          icon: <XCircle className="w-4 h-4" />,
+          title: `Quotation Declined by Client (v${versionNumber})`,
+          badgeText: "Client rejected",
+          badgeClass: "bg-rose-100 text-rose-800 border-rose-300",
+          description: clientNotes
+            ? `Client Reason: "${clientNotes}" — Revise quotation specs/pricing and re-send.`
+            : "The customer declined this quotation in their portal.",
+          historyBtnClass: "text-rose-900 hover:bg-rose-100/80 border-rose-300",
+        };
+      case "accepted":
+        return {
+          containerClass: "bg-emerald-50/80 border-emerald-200 text-emerald-950",
+          iconContainerClass: "bg-emerald-100 text-emerald-700",
+          icon: <CheckCircle2 className="w-4 h-4" />,
+          title: `Accepted by Client (v${versionNumber})`,
+          badgeText: "Accepted",
+          badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-300",
+          description: clientNotes
+            ? `Client Note: "${clientNotes}"`
+            : "The customer accepted this quotation.",
+          historyBtnClass: "text-emerald-900 hover:bg-emerald-100/80 border-emerald-300",
+        };
       case "pending_approval":
         return {
           containerClass: "bg-amber-50/80 border-amber-200 text-amber-950",
@@ -152,7 +176,7 @@ export function QuotationApprovalBanner({
             : "Quotation has been approved by admin and is ready to be sent to the customer.",
           historyBtnClass: "text-emerald-900 hover:bg-emerald-100/80 border-emerald-300",
         };
-      case "rejected":
+      case "admin_rejected":
         if (isEdited) {
           return {
             containerClass: "bg-amber-50/80 border-amber-200 text-amber-950",
@@ -234,11 +258,7 @@ export function QuotationApprovalBanner({
               <h4 className="text-xs font-bold leading-none">
                 {config.title}
               </h4>
-              <span
-                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${config.badgeClass}`}
-              >
-                {config.badgeText}
-              </span>
+              <QuotationWorkflowBadge status={status} className="text-[11px]" />
             </div>
             <p className="text-xs opacity-80 mt-1 leading-snug">
               {config.description}
@@ -246,7 +266,7 @@ export function QuotationApprovalBanner({
           </div>
         </div>
 
-        {(canSubmit || (status === "rejected" && !isEdited && Boolean(onEdit)) || history.length > 0) && (
+        {(canSubmit || (isAnyRejected && !isEdited && Boolean(onEdit)) || history.length > 0) && (
           <div className="flex items-center gap-2 shrink-0">
             {canSubmit && (
               <Button
@@ -265,7 +285,7 @@ export function QuotationApprovalBanner({
               </Button>
             )}
 
-            {status === "rejected" && !isEdited && onEdit && (
+            {isAnyRejected && !isEdited && onEdit && (
               <Button
                 type="button"
                 size="sm"

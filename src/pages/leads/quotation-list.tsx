@@ -26,6 +26,8 @@ import {
   ADMIN_STATUS,
   type AdminStatus,
   type Quotation,
+  resolveQuotationLifecycle,
+  QuotationWorkflowBadge,
 } from "@/modules/quotations/quotations.api";
 import {
   useQuotationsQuery,
@@ -38,24 +40,17 @@ const STATUS_LABELS: Record<AdminStatus, string> = {
   pending_approval: "Pending Approval",
   approved: "Approved",
   rejected: "Rejected",
+  admin_rejected: "Admin Rejected",
   sent: "Sent",
   accepted: "Accepted",
+  customer_rejected: "Declined by Customer",
+  customer_accepted: "Accepted by Customer",
 };
 
 const BUILDING_TYPE_OPTIONS = BUILDING_TYPE.map((type) => ({
   value: type,
   label: type,
 }));
-
-const statusColors: Record<string, { bg: string; text: string }> = {
-  Approved: { bg: "bg-green-100", text: "text-green-700" },
-  "Pending Approval": { bg: "bg-amber-100", text: "text-amber-800" },
-  Pending: { bg: "bg-amber-100", text: "text-amber-800" },
-  Rejected: { bg: "bg-rose-100", text: "text-rose-700" },
-  Sent: { bg: "bg-blue-100", text: "text-blue-800" },
-  Accepted: { bg: "bg-emerald-100", text: "text-emerald-800" },
-  Draft: { bg: "bg-slate-100", text: "text-slate-700" },
-};
 
 function formatMoney(value?: number | null) {
   return new Intl.NumberFormat("en-US", {
@@ -81,31 +76,9 @@ function formatDate(value?: string | null) {
   }).format(date);
 }
 
-function normalizeStatus(status?: string | null) {
-  const raw = (status || "draft").trim().toLowerCase();
-
-  switch (raw) {
-    case "sent":
-      return "Sent";
-    case "approved":
-      return "Approved";
-    case "pending_approval":
-      return "Pending Approval";
-    case "pending":
-      return "Pending";
-    case "rejected":
-      return "Rejected";
-    case "accepted":
-      return "Accepted";
-    case "draft":
-      return "Draft";
-    default:
-      return raw.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  }
-}
-
-function getStatusClassName(status: string) {
-  return statusColors[status] ?? { bg: "bg-slate-100", text: "text-slate-700" };
+function getStatusBadge(quotation: Quotation) {
+  const lifecycle = resolveQuotationLifecycle(quotation);
+  return <QuotationWorkflowBadge status={lifecycle.lifecycleStatus} />;
 }
 
 function QuotationTableSkeleton() {
@@ -182,21 +155,25 @@ export default function QuotationListPage() {
       label: "Total Quotation",
       value: stats?.total ?? data?.data?.total ?? "-",
       bgColor: "bg-blue-600",
+      statusKey: "all",
     },
     {
       label: "Approved Quotation",
       value: stats?.approved ?? "-",
       bgColor: "bg-green-500",
+      statusKey: "approved",
     },
     {
       label: "Pending Approval",
       value: stats?.pendingApproval ?? stats?.pending_approval ?? "-",
-      bgColor: "bg-yellow-400",
+      bgColor: "bg-yellow-500",
+      statusKey: "pending_approval",
     },
     {
       label: "Rejected Quotation",
       value: stats?.rejected ?? "-",
-      bgColor: "bg-orange-400",
+      bgColor: "bg-orange-500",
+      statusKey: "rejected",
     },
   ];
 
@@ -233,7 +210,9 @@ export default function QuotationListPage() {
         {statBoxes.map((stat) => (
           <div
             key={stat.label}
-            className={`${stat.bgColor} rounded-lg p-6 text-white shadow-md`}
+            onClick={() => handleFilterChange("status", stat.statusKey)}
+            className={`${stat.bgColor} rounded-lg p-6 text-white shadow-md cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.99] select-none`}
+            title={`Filter by ${stat.label}`}
           >
             <p className="text-sm font-medium opacity-90">{stat.label}</p>
             <p className="text-3xl font-bold mt-2">{stat.value}</p>
@@ -342,11 +321,6 @@ export default function QuotationListPage() {
             ) : (
               <TableBody className="divide-y divide-gray-200">
                 {quotations.map((quotation) => {
-                  const status = normalizeStatus(
-                    quotation.status || quotation.workflowStatus
-                  );
-                  const colors = getStatusClassName(status);
-
                   // Lead & Customer information extraction
                   const customerObj =
                     typeof quotation.customerId === "object" &&
@@ -428,11 +402,7 @@ export default function QuotationListPage() {
 
                       {/* Status */}
                       <TableCell className="px-6 py-4 text-sm">
-                        <span
-                          className={`px-2 py-0.5 whitespace-nowrap rounded-full text-xs font-medium ${colors.bg} ${colors.text}`}
-                        >
-                          {status}
-                        </span>
+                        {getStatusBadge(quotation)}
                       </TableCell>
 
                       {/* Quotation Value */}

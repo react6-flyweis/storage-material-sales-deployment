@@ -1,16 +1,16 @@
-import { useState, useMemo } from "react";
-// import { Loader2 } from "lucide-react";
+import { useState } from "react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import SuccessDialog from "@/components/success-dialog";
-import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 import {
-  // downloadPdfProvider,
+  downloadPdfProvider,
   type ExtractShipperResponseData,
   type ExtractDrawingResponseData,
-  type PreviewDocumentRequest,
 } from "../estimates.api";
-import { useQuotationPricing } from "../hooks/use-quotation-pricing";
+import { downloadPdfFromBase64 } from "../utils/pdf-download";
 import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
+import { usePembDocumentPayload } from "../hooks/use-pemb-document-payload";
 import { ServerDocumentPreview } from "./server-document-preview";
 
 interface QuoteContractTabProps {
@@ -29,132 +29,30 @@ export function QuoteContractTab({
   quotationForm,
   extractedDrawing,
   sqFt,
-  // pdfFileName,
+  pdfFileName,
   estimateId,
   onBackToBreakdown,
   onQuotePreview,
 }: QuoteContractTabProps) {
-  const { scope } = useQuotationStore();
+  const [isGeneratingPackage, setIsGeneratingPackage] = useState(false);
+  const [isDownloadingContract, setIsDownloadingContract] = useState(false);
 
-  const pricingData = useQuotationPricing({
-    extractedShipper,
-    sqFt,
-    quotationForm,
-    extractedDrawing,
-  });
-
-  const defaultCustomerLegalName =
-    quotationForm?.leadName ||
-    extractedDrawing?.extracted?.customer ||
-    extractedShipper?.coverSheet?.labelMap?.customer ||
-    pricingData.customerLeadName ||
-    "";
-
-  const defaultCustomerAddress =
-    quotationForm?.street ||
-    extractedShipper?.coverSheet?.labelMap?.project ||
-    pricingData.customerAddress ||
-    "";
-
-  const defaultCustomerCityStateZip =
-    quotationForm?.cityStateZip ||
-    extractedShipper?.coverSheet?.labelMap?.location ||
-    "";
-
-  const defaultCustomerEmail =
-    quotationForm?.email || pricingData.customerEmail || "";
-
-  const defaultEffectiveDate =
-    quotationForm?.quoteDate ||
-    pricingData.quoteDate ||
-    new Date().toLocaleDateString("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    });
-
-  const computedContractType =
-    scope?.toLowerCase() === "supply"
-      ? "Supply & Delivery Only"
-      : scope?.toLowerCase() === "install"
-        ? "Installation Only"
-        : scope?.toLowerCase() === "both"
-          ? "Supply, Delivery & Erection"
-          : "Supply & Delivery Only";
-
-  const defaultTotalContractValue = pricingData.grandTotalFormatted || "-";
-
-  // Customer Form State
-  const [customerLegalName] = useState(defaultCustomerLegalName);
-  const [customerAddress] = useState(defaultCustomerAddress);
-  const [customerCityStateZip] = useState(defaultCustomerCityStateZip);
-  const [customerEmail] = useState(defaultCustomerEmail);
-  const [effectiveDate] = useState(defaultEffectiveDate);
-  const [contractType] = useState(computedContractType);
-  const [depositPct] = useState("Forty-percent (40%)");
-  const [totalContractValue] = useState(defaultTotalContractValue);
-
-  // Download states
-  // const [isGeneratingPackage, setIsGeneratingPackage] = useState(false);
-  // const [isDownloadingContract, setIsDownloadingContract] = useState(false);
-
-  // Success dialog state
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
   const [successMessage] = useState("");
 
-  const previewPayload: PreviewDocumentRequest = useMemo(
-    () => ({
-      estimateId: estimateId || undefined,
-      jobType: "PEMB",
-      leadCompanyName: customerLegalName || pricingData.customerLeadName,
-      customerEmail: customerEmail || pricingData.customerEmail,
-      streetAddress: customerAddress || pricingData.customerAddress,
-      cityStateZip: customerCityStateZip || pricingData.customerAddress,
-      buildingSize: pricingData.displayBuildingSize,
-      squareFootage: pricingData.effectiveSqFt,
-      jobNumber:
-        quotationForm?.jobNumber ||
-        extractedDrawing?.extracted?.jobnumber ||
-        "",
-      pricingResult: extractedShipper?.pricing,
-      fullQuote:
-        extractedShipper?.fullQuote ||
-        (extractedShipper?.pricing as Record<string, unknown> | undefined),
-      extractedDrawingFields: extractedDrawing?.extracted,
-      contract: {
-        customer: customerLegalName || pricingData.customerLeadName,
-        address: customerAddress || pricingData.customerAddress,
-        city: customerCityStateZip || pricingData.customerAddress,
-        email: customerEmail || pricingData.customerEmail,
-        date: effectiveDate,
-        deposit: depositPct,
-        type: contractType,
-        value: totalContractValue,
-      },
-      drawingAttachments: [],
-      sections: ["contract"],
-    }),
-    [
-      estimateId,
-      customerLegalName,
-      customerEmail,
-      customerAddress,
-      customerCityStateZip,
-      effectiveDate,
-      depositPct,
-      contractType,
-      totalContractValue,
-      pricingData.customerLeadName,
-      pricingData.customerEmail,
-      pricingData.customerAddress,
-      pricingData.displayBuildingSize,
-      pricingData.effectiveSqFt,
-      quotationForm?.jobNumber,
-      extractedDrawing?.extracted,
-      extractedShipper?.pricing,
-      extractedShipper?.fullQuote,
-    ],
-  );
+  const {
+    payload: previewPayload,
+    buildPayload,
+    pricingData,
+  } = usePembDocumentPayload({
+    estimateId,
+    extractedShipper,
+    extractedDrawing,
+    quotationForm,
+    sqFt,
+    pdfFileName,
+    sections: ["contract"],
+  });
 
   const {
     html: serverPreviewHtml,
@@ -165,133 +63,78 @@ export function QuoteContractTab({
     payload: previewPayload,
   });
 
-  /*
-  const handleAutoFill = () => {
-    setCustomerLegalName(defaultCustomerLegalName);
-    setCustomerAddress(defaultCustomerAddress);
-    setCustomerCityStateZip(defaultCustomerCityStateZip);
-    setCustomerEmail(defaultCustomerEmail);
-    setEffectiveDate(defaultEffectiveDate);
-    setContractType(computedContractType);
-    setDepositPct("Forty-percent (40%)");
-    setTotalContractValue(defaultTotalContractValue);
-    setSuccessMessage("Customer info auto-filled from quote successfully!");
-    setSuccessDialogOpen(true);
+  const handlePrint = (title?: string) => {
+    const originalTitle = document.title;
+    if (title) {
+      document.title = title;
+    }
+    window.print();
+    document.title = originalTitle;
   };
-  */
 
-  // const handlePrint = (title?: string) => {
-  //   const originalTitle = document.title;
-  //   if (title) {
-  //     document.title = title;
-  //   }
-  //   window.print();
-  //   document.title = originalTitle;
-  // };
+  const handleGenerateFullPackage = async () => {
+    setIsGeneratingPackage(true);
+    const customerName = pricingData.customerLeadName || "Customer";
+    try {
+      const payload = buildPayload({
+        drawingAttachments: pdfFileName ? [{ name: pdfFileName, includeInQuote: true }] : [],
+        sections: pdfFileName
+          ? ["quote", "sow", "contract", "drawings"]
+          : ["quote", "sow", "contract"],
+      });
 
-  // const handleGenerateFullPackage = async () => {
-  //   setIsGeneratingPackage(true);
-  //   try {
-  //     const payload: PreviewDocumentRequest = {
-  //       leadCompanyName: customerLegalName || pricingData.customerLeadName,
-  //       customerEmail: customerEmail || pricingData.customerEmail,
-  //       streetAddress: customerAddress || pricingData.customerAddress,
-  //       cityStateZip: customerCityStateZip || pricingData.customerAddress,
-  //       buildingSize: pricingData.displayBuildingSize,
-  //       squareFootage: pricingData.effectiveSqFt,
-  //       jobNumber: quotationForm?.jobNumber || extractedDrawing?.extracted?.jobnumber || "",
-  //       pricingResult: extractedShipper?.pricing,
-  //       fullQuote:
-  //         extractedShipper?.fullQuote ||
-  //         (extractedShipper?.pricing as Record<string, unknown> | undefined),
-  //       contract: {
-  //         customer: customerLegalName || pricingData.customerLeadName,
-  //         address: customerAddress || pricingData.customerAddress,
-  //         city: customerCityStateZip || pricingData.customerAddress,
-  //         email: customerEmail || pricingData.customerEmail,
-  //         date: effectiveDate,
-  //         deposit: depositPct,
-  //         type: contractType,
-  //         value: totalContractValue,
-  //       },
-  //       extractedDrawingFields: extractedDrawing?.extracted,
-  //       drawingAttachments: pdfFileName ? [{ name: pdfFileName, includeInQuote: true }] : [],
-  //       sections: pdfFileName
-  //         ? ["quote", "sow", "contract", "drawings"]
-  //         : ["quote", "sow", "contract"],
-  //     };
+      const res = await downloadPdfProvider(payload, estimateId || undefined);
+      const pdfData = res?.data || res;
 
-  //     const res = await downloadPdfProvider(payload, estimateId || undefined);
-  //     const pdfData = res.data || res;
+      if (pdfData?.fileBase64) {
+        downloadPdfFromBase64(
+          pdfData.fileBase64,
+          pdfData.fileName ||
+            `Quote_Package_${customerName.replace(/\s+/g, "_")}.pdf`,
+          pdfData.mimeType || "application/pdf"
+        );
+        toast.success("Package PDF downloaded");
+      } else {
+        handlePrint(`Quote_Package_${customerName}`);
+      }
+    } catch (err) {
+      console.error("Failed to download full package PDF, opening print dialog:", err);
+      handlePrint(`Quote_Package_${customerName}`);
+    } finally {
+      setIsGeneratingPackage(false);
+    }
+  };
 
-  //     if (pdfData?.fileBase64) {
-  //       const a = document.createElement("a");
-  //       a.href = `data:${pdfData.mimeType || "application/pdf"};base64,${pdfData.fileBase64}`;
-  //       a.download =
-  //         pdfData.fileName ||
-  //         `Quote_Package_${(customerLegalName || "Customer").replace(/\s+/g, "_")}.pdf`;
-  //       a.click();
-  //     } else {
-  //       handlePrint(`Quote_Package_${customerLegalName || "Customer"}`);
-  //     }
-  //   } catch (err) {
-  //     console.error("Failed to download full package PDF, opening print dialog:", err);
-  //     handlePrint(`Quote_Package_${customerLegalName || "Customer"}`);
-  //   } finally {
-  //     setIsGeneratingPackage(false);
-  //   }
-  // };
+  const handleContractOnlyPdf = async () => {
+    setIsDownloadingContract(true);
+    const customerName = pricingData.customerLeadName || "Agreement";
+    try {
+      const payload = buildPayload({
+        drawingAttachments: [],
+        sections: ["contract"],
+      });
 
-  // const handleContractOnlyPdf = async () => {
-  //   setIsDownloadingContract(true);
-  //   try {
-  //     const payload: PreviewDocumentRequest = {
-  //       leadCompanyName: customerLegalName || pricingData.customerLeadName,
-  //       customerEmail: customerEmail || pricingData.customerEmail,
-  //       streetAddress: customerAddress || pricingData.customerAddress,
-  //       cityStateZip: customerCityStateZip || pricingData.customerAddress,
-  //       buildingSize: pricingData.displayBuildingSize,
-  //       squareFootage: pricingData.effectiveSqFt,
-  //       jobNumber: quotationForm?.jobNumber || extractedDrawing?.extracted?.jobnumber || "",
-  //       pricingResult: extractedShipper?.pricing,
-  //       fullQuote:
-  //         extractedShipper?.fullQuote ||
-  //         (extractedShipper?.pricing as Record<string, unknown> | undefined),
-  //       contract: {
-  //         customer: customerLegalName || pricingData.customerLeadName,
-  //         address: customerAddress || pricingData.customerAddress,
-  //         city: customerCityStateZip || pricingData.customerAddress,
-  //         email: customerEmail || pricingData.customerEmail,
-  //         date: effectiveDate,
-  //         deposit: depositPct,
-  //         type: contractType,
-  //         value: totalContractValue,
-  //       },
-  //       extractedDrawingFields: extractedDrawing?.extracted,
-  //       drawingAttachments: [],
-  //       sections: ["contract"],
-  //     };
+      const res = await downloadPdfProvider(payload, estimateId || undefined);
+      const pdfData = res?.data || res;
 
-  //     const res = await downloadPdfProvider(payload, estimateId || undefined);
-  //     const pdfData = res.data || res;
-
-  //     if (pdfData?.fileBase64) {
-  //       const a = document.createElement("a");
-  //       a.href = `data:${pdfData.mimeType || "application/pdf"};base64,${pdfData.fileBase64}`;
-  //       a.download =
-  //         pdfData.fileName ||
-  //         `Contract_${(customerLegalName || "Agreement").replace(/\s+/g, "_")}.pdf`;
-  //       a.click();
-  //     } else {
-  //       handlePrint(`Contract_${customerLegalName || "Agreement"}`);
-  //     }
-  //   } catch (err) {
-  //     console.error("Failed to download Contract PDF, opening print dialog:", err);
-  //     handlePrint(`Contract_${customerLegalName || "Agreement"}`);
-  //   } finally {
-  //     setIsDownloadingContract(false);
-  //   }
-  // };
+      if (pdfData?.fileBase64) {
+        downloadPdfFromBase64(
+          pdfData.fileBase64,
+          pdfData.fileName ||
+            `Contract_${customerName.replace(/\s+/g, "_")}.pdf`,
+          pdfData.mimeType || "application/pdf"
+        );
+        toast.success("Contract PDF downloaded");
+      } else {
+        handlePrint(`Contract_${customerName}`);
+      }
+    } catch (err) {
+      console.error("Failed to download Contract PDF, opening print dialog:", err);
+      handlePrint(`Contract_${customerName}`);
+    } finally {
+      setIsDownloadingContract(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -323,7 +166,7 @@ export function QuoteContractTab({
           >
             Quote Preview
           </Button>
-          {/* <Button
+          <Button
             type="button"
             onClick={handleGenerateFullPackage}
             disabled={isGeneratingPackage}
@@ -345,7 +188,7 @@ export function QuoteContractTab({
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : null}
             {isDownloadingContract ? "Downloading..." : "Contract Only (PDF)"}
-          </Button> */}
+          </Button>
         </div>
       </div>
 
@@ -479,7 +322,7 @@ export function QuoteContractTab({
         isLoading={isPreviewLoading}
         error={previewError}
         onRetry={refetchPreview}
-        title={`Contract Agreement — ${customerLegalName || "Valued Client"}`}
+        title={`Contract Agreement — ${pricingData.customerLeadName || "Valued Client"}`}
         minHeight={750}
       />
 

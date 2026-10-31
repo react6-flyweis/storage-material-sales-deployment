@@ -4,19 +4,45 @@ import type {
   ExtractShipperResponseData,
   JobType,
   Scope,
+  CompanyBrand,
 } from "./estimates.api";
 import { DEFAULT_JOB_TYPE, DEFAULT_SCOPE } from "./estimates.api";
+
+export type { CompanyBrand };
+
+export interface PembAddOnItem {
+  id: string;
+  item: string;
+  cost: number;
+  markupPct: number;
+  note?: string;
+  inQuote: boolean;
+  inSow: boolean;
+}
 
 export interface QuotationState {
   // Shared fields between Sidebar, Sticky Header, and Quotation Views
   jobType: JobType;
+  companyBrand: CompanyBrand;
   scope: Scope;
   roofType: string;
+  steelFinish: "red-iron" | "galvanized";
   installCost: number;
   installSell: number;
   blendPercentage: number;
   installDifficulty: string;
   squareFootage: number;
+  materialSellOverride: string;
+  deletedRowKeys: string[];
+
+  // Multi-Story, Red Oxide & Staircase settings
+  isMultiStory: boolean;
+  isRedOxideConfirmed: boolean;
+  staircaseCount: number;
+  staircaseUnitPrice: number;
+
+  // Add-Ons settings
+  pembAddOns: PembAddOnItem[];
 
   // PEMB Specific State
   pembLeadId: string;
@@ -58,6 +84,10 @@ export interface QuotationState {
   includeTax: boolean;
   isTaxLoading: boolean;
 
+  // Shipping & Drawings settings
+  freightOverride: string;
+  engineeringDrawings: string;
+
   // COGS Override settings
   cogsOverrideApplied: boolean;
   cogsCostInput: string;
@@ -87,8 +117,10 @@ export interface QuotationState {
 
   // Actions
   setJobType: (jobType: JobType) => void;
+  setCompanyBrand: (companyBrand: CompanyBrand) => void;
   setScope: (scope: Scope) => void;
   setRoofType: (roofType: string) => void;
+  setSteelFinish: (steelFinish: "red-iron" | "galvanized") => void;
   setInstallCost: (cost: number) => void;
   setInstallSell: (sell: number) => void;
   setBlendPercentage: (percentage: number) => void;
@@ -96,6 +128,19 @@ export interface QuotationState {
   buildingSize: string;
   setBuildingSize: (buildingSize: string) => void;
   setSquareFootage: (squareFootage: number) => void;
+  setMaterialSellOverride: (override: string) => void;
+  setDeletedRowKeys: (keys: string[]) => void;
+  addDeletedRowKey: (key: string) => void;
+  removeDeletedRowKey: (key: string) => void;
+  clearDeletedRowKeys: () => void;
+  setIsMultiStory: (isMultiStory: boolean) => void;
+  setIsRedOxideConfirmed: (isRedOxideConfirmed: boolean) => void;
+  setStaircaseCount: (staircaseCount: number) => void;
+  setStaircaseUnitPrice: (staircaseUnitPrice: number) => void;
+  setPembAddOns: (items: PembAddOnItem[]) => void;
+  addPembAddOn: (item?: Partial<PembAddOnItem>) => void;
+  updatePembAddOn: (id: string, updates: Partial<PembAddOnItem>) => void;
+  removePembAddOn: (id: string) => void;
 
   // PEMB Actions
   setPembLeadData: (data: {
@@ -163,6 +208,8 @@ export interface QuotationState {
   setTaxRate: (taxRate: number) => void;
   setIncludeTax: (includeTax: boolean) => void;
   setIsTaxLoading: (isTaxLoading: boolean) => void;
+  setFreightOverride: (freightOverride: string) => void;
+  setEngineeringDrawings: (engineeringDrawings: string) => void;
 
   // COGS Actions
   setCogsOverrideApplied: (applied: boolean) => void;
@@ -182,14 +229,27 @@ export interface QuotationState {
 
 export const useQuotationStore = create<QuotationState>((set) => ({
   jobType: DEFAULT_JOB_TYPE,
+  companyBrand: "SBD",
   scope: DEFAULT_SCOPE,
   roofType: "screw-down",
+  steelFinish: "red-iron",
   installCost: 5.5,
   installSell: 8.5,
   blendPercentage: 50,
-  installDifficulty: "easy",
+  installDifficulty: "medium",
   buildingSize: "",
   squareFootage: 0,
+  materialSellOverride: "",
+  deletedRowKeys: [],
+
+  // Multi-Story, Red Oxide & Staircase initial state
+  isMultiStory: true,
+  isRedOxideConfirmed: false,
+  staircaseCount: 0,
+  staircaseUnitPrice: 35000,
+
+  // Add-Ons initial state
+  pembAddOns: [],
 
   // Concrete initial state
   concreteInclude: false,
@@ -227,6 +287,8 @@ export const useQuotationStore = create<QuotationState>((set) => ({
   taxRate: 7,
   includeTax: true,
   isTaxLoading: false,
+  freightOverride: "",
+  engineeringDrawings: "",
 
   // COGS Override initial state
   cogsOverrideApplied: false,
@@ -293,14 +355,29 @@ export const useQuotationStore = create<QuotationState>((set) => ({
             state.installSell === 3.25 ? 8.5 : state.installSell,
         }),
     })),
+  setCompanyBrand: (companyBrand) => set({ companyBrand }),
   setScope: (scope) => set({ scope }),
   setRoofType: (roofType) => set({ roofType }),
+  setSteelFinish: (steelFinish) => set({ steelFinish }),
   setInstallCost: (installCost) => set({ installCost }),
   setInstallSell: (installSell) => set({ installSell }),
   setBlendPercentage: (blendPercentage) => set({ blendPercentage }),
   setInstallDifficulty: (installDifficulty) => set({ installDifficulty }),
   setBuildingSize: (buildingSize) => set({ buildingSize }),
   setSquareFootage: (squareFootage) => set({ squareFootage }),
+  setMaterialSellOverride: (materialSellOverride) => set({ materialSellOverride }),
+  setDeletedRowKeys: (deletedRowKeys) => set({ deletedRowKeys }),
+  addDeletedRowKey: (key) =>
+    set((state) => ({
+      deletedRowKeys: state.deletedRowKeys.includes(key)
+        ? state.deletedRowKeys
+        : [...state.deletedRowKeys, key],
+    })),
+  removeDeletedRowKey: (key) =>
+    set((state) => ({
+      deletedRowKeys: state.deletedRowKeys.filter((k) => k !== key),
+    })),
+  clearDeletedRowKeys: () => set({ deletedRowKeys: [] }),
 
   // PEMB Actions
   setPembLeadData: (data) =>
@@ -338,6 +415,8 @@ export const useQuotationStore = create<QuotationState>((set) => ({
       pembExtractedShipper: null,
       pembPdfFileName: "",
       pembEstimateId: null,
+      materialSellOverride: "",
+      deletedRowKeys: [],
     }),
   resetPembFiles: () =>
     set((state) => ({
@@ -345,6 +424,8 @@ export const useQuotationStore = create<QuotationState>((set) => ({
       pembExtractedShipper: null,
       pembPdfFileName: "",
       pembEstimateId: null,
+      materialSellOverride: "",
+      deletedRowKeys: [],
       buildingSize: state.pembBuildingSize || "",
       squareFootage: state.pembSquareFootage
         ? parseFloat(state.pembSquareFootage) || 0
@@ -488,6 +569,8 @@ export const useQuotationStore = create<QuotationState>((set) => ({
   setTaxRate: (taxRate) => set({ taxRate }),
   setIncludeTax: (includeTax) => set({ includeTax }),
   setIsTaxLoading: (isTaxLoading) => set({ isTaxLoading }),
+  setFreightOverride: (freightOverride) => set({ freightOverride }),
+  setEngineeringDrawings: (engineeringDrawings) => set({ engineeringDrawings }),
 
   // COGS Actions
   setCogsOverrideApplied: (cogsOverrideApplied) => set({ cogsOverrideApplied }),
@@ -516,4 +599,38 @@ export const useQuotationStore = create<QuotationState>((set) => ({
       marginTargetMargin: "",
       marginFixedSellOverride: "",
     }),
+
+  // Multi-Story, Red Oxide & Staircase Actions
+  setIsMultiStory: (isMultiStory) => set({ isMultiStory }),
+  setIsRedOxideConfirmed: (isRedOxideConfirmed) => set({ isRedOxideConfirmed }),
+  setStaircaseCount: (staircaseCount) => set({ staircaseCount }),
+  setStaircaseUnitPrice: (staircaseUnitPrice) => set({ staircaseUnitPrice }),
+
+  // Add-Ons Actions
+  setPembAddOns: (pembAddOns) => set({ pembAddOns }),
+  addPembAddOn: (item) =>
+    set((state) => ({
+      pembAddOns: [
+        ...state.pembAddOns,
+        {
+          id: Math.random().toString(36).substring(2, 9),
+          item: item?.item || "",
+          cost: item?.cost ?? 50,
+          markupPct: item?.markupPct ?? 25,
+          note: item?.note || "",
+          inQuote: item?.inQuote ?? true,
+          inSow: item?.inSow ?? true,
+        },
+      ],
+    })),
+  updatePembAddOn: (id, updates) =>
+    set((state) => ({
+      pembAddOns: state.pembAddOns.map((addon) =>
+        addon.id === id ? { ...addon, ...updates } : addon
+      ),
+    })),
+  removePembAddOn: (id) =>
+    set((state) => ({
+      pembAddOns: state.pembAddOns.filter((addon) => addon.id !== id),
+    })),
 }));

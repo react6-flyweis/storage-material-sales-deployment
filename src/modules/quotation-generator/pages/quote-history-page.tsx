@@ -4,12 +4,15 @@ import {
   ArrowLeft,
   Search,
   Trash2,
-  ExternalLink,
   Loader2,
   RefreshCw,
   Eye,
+  FolderOpen,
+  Banknote,
+  Milestone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import ConfirmModal from "@/components/common/confirm-modal";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/lib/api-error";
 import {
@@ -25,6 +28,15 @@ import {
   deleteEstimateProvider,
   type SaveEstimatePayload,
 } from "../estimates.api";
+import {
+  resolveQuotationLifecycle,
+  QuotationWorkflowBadge,
+} from "@/modules/quotations/quotations.api";
+import {
+  ChangeOrderModal,
+  RequestDepositModal,
+  MilestonePaymentsModal,
+} from "../components";
 import { useLoadEstimateToEditor } from "../hooks/use-load-estimate-to-editor";
 import {
   formatCurrency2,
@@ -124,35 +136,21 @@ export function QuoteHistoryPage() {
     }
   }, [currentPage, totalPages]);
 
-  const handleClearAll = () => {
-    setEstimatesList([]);
-    setTotalItems(0);
-  };
+  // const handleClearAll = () => {
+  //   setEstimatesList([]);
+  //   setTotalItems(0);
+  // };
 
-  const handleDeleteQuote = async (id?: string) => {
-    if (!id) return;
-    try {
-      await deleteEstimateProvider(id);
-      setEstimatesList((prev) => prev.filter((q) => q._id !== id));
-      setTotalItems((prev) => Math.max(0, prev - 1));
-      toast.success("Estimate deleted successfully");
-      fetchHistory();
-    } catch (err) {
-      console.error("Failed to delete estimate:", err);
-      const msg = getApiErrorMessage(
-        err,
-        "Failed to delete estimate. Please try again.",
-      );
-      toast.error(msg);
-      fetchHistory();
-    }
-  };
 
-  const { loadAndEdit, loadingId: hookLoadingId } =
-    useLoadEstimateToEditor();
+  const { loadAndEdit, loadingId: hookLoadingId } = useLoadEstimateToEditor();
 
   const handleLoadAndEdit = async (item: SaveEstimatePayload) => {
     try {
+      const isCustom = item.jobType?.toUpperCase() === "CUSTOM";
+      if (isCustom && item._id) {
+        navigate(`/quotation/custom?id=${item._id}`);
+        return;
+      }
       await loadAndEdit(item);
     } catch (err) {
       console.error("Failed to load estimate detail:", err);
@@ -165,8 +163,40 @@ export function QuoteHistoryPage() {
   };
 
   const handlePreviewQuote = (item: SaveEstimatePayload) => {
-    if (item._id) {
-      navigate(`/quotation/history/${item._id}`);
+    if (!item._id) return;
+    navigate(`/quotation/history/${item._id}`);
+  };
+
+  const [activeChangeOrderQuote, setActiveChangeOrderQuote] =
+    useState<SaveEstimatePayload | null>(null);
+  const [activeDepositQuote, setActiveDepositQuote] =
+    useState<SaveEstimatePayload | null>(null);
+  const [activeMilestoneQuote, setActiveMilestoneQuote] =
+    useState<SaveEstimatePayload | null>(null);
+  const [quoteToDelete, setQuoteToDelete] =
+    useState<SaveEstimatePayload | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteConfirm = async () => {
+    if (!quoteToDelete?._id) return;
+    try {
+      setIsDeleting(true);
+      await deleteEstimateProvider(quoteToDelete._id);
+      setEstimatesList((prev) => prev.filter((q) => q._id !== quoteToDelete._id));
+      setTotalItems((prev) => Math.max(0, prev - 1));
+      toast.success("Estimate deleted successfully");
+      setQuoteToDelete(null);
+      fetchHistory();
+    } catch (err) {
+      console.error("Failed to delete estimate:", err);
+      const msg = getApiErrorMessage(
+        err,
+        "Failed to delete estimate. Please try again.",
+      );
+      toast.error(msg);
+      fetchHistory();
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -230,7 +260,7 @@ export function QuoteHistoryPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </InputGroup>
-          <Button
+          {/* <Button
             type="button"
             variant="outline"
             onClick={() => {
@@ -252,7 +282,7 @@ export function QuoteHistoryPage() {
             className="border border-slate-400 cursor-pointer"
           >
             Clear All
-          </Button>
+          </Button> */}
         </div>
       </div>
 
@@ -492,6 +522,11 @@ export function QuoteHistoryPage() {
               const isStorage =
                 quote.jobType?.toUpperCase() === "STORAGE" ||
                 Boolean(quote.storageData);
+              const isCustom =
+                quote.jobType?.toUpperCase() === "CUSTOM" ||
+                Boolean(quote.customQuote) ||
+                (quote as Record<string, unknown>)?.quoteKind === "custom" ||
+                (quote as Record<string, unknown>)?.kind === "custom";
               const pricingRes = (quote.pricingResult ||
                 quote.storagePricingResult) as
                 | Record<string, unknown>
@@ -504,17 +539,23 @@ export function QuoteHistoryPage() {
                 Number(
                   quote.grandTotal ??
                     quote.totalSell ??
+                    (quote as Record<string, unknown>).sell ??
                     fullQuote?.grandTotal ??
                     pricingRes?.totSell ??
                     pricingRes?.grandTotal,
                 ) || 0;
               const prof =
                 Number(
-                  quote.profit ?? fullQuote?.totalProfit ?? pricingRes?.profit,
+                  quote.profit ??
+                    (quote as Record<string, unknown>).profit ??
+                    fullQuote?.totalProfit ??
+                    pricingRes?.profit,
                 ) || 0;
               const marginPct =
                 Number(
                   quote.marginPercent ??
+                    (quote as Record<string, unknown>).marginPct ??
+                    (quote as Record<string, unknown>).profPct ??
                     fullQuote?.grandMargin ??
                     pricingRes?.profPct ??
                     pricingRes?.marginPercent,
@@ -540,7 +581,9 @@ export function QuoteHistoryPage() {
               const storageBuildings = (
                 quote.storageData as { buildings?: unknown[] } | undefined
               )?.buildings;
-              const displayBuilding = isStorage
+              const displayBuilding = isCustom
+                ? quote.buildingSize || quote.scope || "Custom Metal Building"
+                : isStorage
                 ? `${storageBuildings?.length || 1} Storage Building${(storageBuildings?.length || 1) > 1 ? "s" : ""}`
                 : quote.buildingSize || "Building";
 
@@ -557,24 +600,52 @@ export function QuoteHistoryPage() {
 
               const quoteNumber =
                 quote.conversion?.quoteNumber || quote.quoteNumber;
-              const effectiveWorkflowStatus =
-                quote.conversion?.workflowStatus ||
-                quote.workflowStatus ||
-                quote.approval?.status ||
-                quote.status ||
-                "draft";
+
+              const bldgVal =
+                Number(
+                  quote.buildingSubtotal ??
+                    quote.materialCost ??
+                    (quote as Record<string, unknown>).matCost ??
+                    pricingRes?.matSell ??
+                    pricingRes?.matCost,
+                ) || 0;
+
+              const installVal =
+                Number(
+                  quote.installCost ??
+                    (quote as Record<string, unknown>).laborCost ??
+                    pricingRes?.instSell ??
+                    pricingRes?.instCost,
+                ) || 0;
+
+              const formatK = (val: number) => {
+                if (!val) return "$0";
+                if (val >= 1000) {
+                  return `$${Math.round(val / 1000)}k`;
+                }
+                return `$${Math.round(val).toLocaleString()}`;
+              };
+
+              // const blendPctVal =
+              //   quote.blendPct ??
+              //   (pricingRes?.blendPct as number | undefined) ??
+              //   50;
 
               return (
                 <div
                   key={quote._id || String(quote.jobNumber || Math.random())}
-                  className="bg-[#f2fcf6] border-l-4 border-l-[#22c55e] border border-emerald-200/60 rounded-xl p-4 md:p-5 shadow-xs flex flex-col md:flex-row md:items-stretch justify-between gap-4 transition-all hover:shadow-sm"
+                  className="bg-[#f2fcf6] border border-emerald-300/80 rounded-2xl p-4 md:p-5 shadow-xs flex flex-col gap-4 transition-all hover:shadow-sm"
                 >
-                  {/* Left Side Quote Details */}
-                  <div className="flex flex-col justify-between space-y-1.5 min-w-0">
-                    <div>
+                  {/* Top Section */}
+                  <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                    {/* Left Details */}
+                    <div className="space-y-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-sm font-bold text-slate-900 leading-snug">
-                          {quote.leadCompanyName || "Customer Quote"}
+                        <h3 className="text-sm md:text-base font-bold text-slate-900 leading-snug">
+                          {quote.cityStateZip ||
+                            quote.streetAddress ||
+                            quote.leadCompanyName ||
+                            "Location"}
                         </h3>
                         {quoteNumber && (
                           <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-bold text-[10px] border border-blue-200">
@@ -582,143 +653,156 @@ export function QuoteHistoryPage() {
                           </span>
                         )}
                       </div>
-                      <div className="text-xs text-slate-500 font-normal mt-1 flex flex-wrap items-center gap-1.5">
-                        <span>{quote.scope?.toUpperCase() || "SUPPLY"}</span>
+                      <div className="text-xs text-slate-500 font-medium flex flex-wrap items-center gap-1.5">
+                        <span>{quote.leadCompanyName || "TBD"}</span>
                         <span>·</span>
-                        <span>{formatNumber2(effectiveSqFt)} SF</span>
+                        <span>{quote.scope?.toUpperCase() || "Supply"}</span>
+                        {effectiveSqFt > 0 && (
+                          <>
+                            <span>·</span>
+                            <span>{formatNumber2(effectiveSqFt)} SF</span>
+                          </>
+                        )}
                         <span>·</span>
                         <span>{displayBuilding}</span>
-                        <span>·</span>
-                        <span>
-                          {quote.cityStateZip ||
-                            quote.streetAddress ||
-                            "Location"}
-                        </span>
+                        {formattedDate && (
+                          <>
+                            <span>·</span>
+                            <span>{formattedDate}</span>
+                          </>
+                        )}
                       </div>
+                      {(bldgVal > 0 || installVal > 0) && (
+                        <div className="flex items-center gap-3 pt-1">
+                          {bldgVal > 0 && (
+                            <span className="text-xs font-bold text-[#2563eb]">
+                              {isCustom ? "Material" : "Bldgs"} {formatK(bldgVal)}
+                            </span>
+                          )}
+                          {installVal > 0 && (
+                            <span className="text-xs font-bold text-[#16a34a]">
+                              {isCustom ? "Labor" : "Install"} {formatK(installVal)}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <div className="text-xs font-semibold text-[#2563eb] pt-1">
-                      Job #{quote.jobNumber || "Draft"} ·{" "}
-                      {quote.sourceFileName ||
-                        (isStorage ? "Storage_COG.xlsx" : "Drawing.pdf")}
-                      {formattedDate ? ` · ${formattedDate}` : ""}
+
+                    {/* Right Details: Badges & Financial Metrics */}
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      {/* Top Badges Row */}
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        {isCustom ? (
+                          <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 font-bold text-xs uppercase">
+                            CUSTOM
+                          </span>
+                        ) : isStorage ? (
+                          <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold text-xs uppercase">
+                            STORAGE
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold text-xs uppercase">
+                            PEMB
+                          </span>
+                        )}
+                        <QuotationWorkflowBadge
+                          status={resolveQuotationLifecycle(quote).lifecycleStatus}
+                          showIcon
+                        />
+                        {/* <span className="text-xs font-semibold text-slate-500">
+                          {blendPctVal}% Quicken blend
+                        </span> */}
+                      </div>
+
+                      {/* Financial Numbers Stack */}
+                      <div className="text-right leading-tight space-y-0.5 pt-1">
+                        <div className="text-base md:text-lg font-black text-[#2563eb]">
+                          {formatCurrency2(totSell)}
+                        </div>
+                        <div className="text-[11px] font-normal text-slate-500">
+                          {formatSfPrice2(sfPrice)}/SF
+                        </div>
+                        <div className="flex items-center justify-end gap-1 text-xs font-semibold text-[#16a34a]">
+                          <span>💰</span>
+                          <span>{formatCurrency2(prof)}</span>
+                        </div>
+                        <div className="text-xs font-semibold text-[#16a34a]">
+                          {formatPercent2(marginPct)}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Right Side Quote Metrics & Action Buttons */}
-                  <div className="flex flex-col items-end justify-between gap-4 shrink-0">
-                    {/* Top Right Price Metrics Stack */}
-                    <div className="text-right leading-tight space-y-0.5">
-                      <div className="flex items-center justify-end gap-2">
-                        {(() => {
-                          switch (effectiveWorkflowStatus) {
-                            case "pending_approval":
-                              return (
-                                <span className="px-3 py-1 rounded-md bg-amber-100 text-amber-800 font-bold text-sm border border-amber-300 shadow-2xs">
-                                  Pending Approval
-                                </span>
-                              );
-                            case "approved":
-                              return (
-                                <span className="px-3 py-1 rounded-md bg-emerald-100 text-emerald-800 font-bold text-sm border border-emerald-300 shadow-2xs">
-                                  Approved
-                                </span>
-                              );
-                            case "rejected":
-                              return (
-                                <span
-                                  className="px-3 py-1 rounded-md bg-rose-100 text-rose-800 font-bold text-sm border border-rose-300 shadow-2xs"
-                                  title={
-                                    quote.approval?.rejectionReason ||
-                                    "Approval Rejected"
-                                  }
-                                >
-                                  Rejected
-                                </span>
-                              );
-                            case "sent":
-                              return (
-                                <span className="px-3 py-1 rounded-md bg-blue-100 text-blue-800 font-bold text-sm border border-blue-300 shadow-2xs">
-                                  Sent
-                                </span>
-                              );
-                            default:
-                              return (
-                                <span className="px-3 py-1 rounded-md bg-slate-100 text-slate-700 font-semibold text-sm border border-slate-300">
-                                  Draft
-                                </span>
-                              );
-                          }
-                        })()}
-                        <div className="text-sm font-bold text-[#2563eb]">
-                          {formatCurrency2(totSell)}
-                        </div>
-                      </div>
-                      <div className="text-[11px] font-normal text-slate-500">
-                        {formatSfPrice2(sfPrice)}/SF
-                      </div>
-                      <div className="flex items-center justify-end gap-1 text-xs font-semibold text-[#16a34a]">
-                        <span>💰</span>
-                        <span>{formatCurrency2(prof)}</span>
-                      </div>
-                      <div className="text-xs font-semibold text-[#16a34a]">
-                        {formatPercent2(marginPct)}
-                      </div>
-                    </div>
+                  {/* Bottom Row Action Buttons */}
+                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-emerald-200/60">
+                    <Button
+                      type="button"
+                      onClick={() => handleLoadAndEdit(quote)}
+                      disabled={hookLoadingId === quote._id}
+                      className="bg-[#1e3a8a] hover:bg-[#172554] text-white h-8 px-3 text-xs font-medium rounded-md cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                    >
+                      {hookLoadingId === quote._id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <FolderOpen className="h-3.5 w-3.5" />
+                      )}
+                      <span>Load & Edit</span>
+                    </Button>
 
-                    {/* Bottom Right Badge & Action Buttons */}
-                    <div className="flex flex-wrap items-center gap-2.5">
-                      <div className="flex items-center gap-1.5 mr-1">
-                        <span
-                          className={`px-1.5 py-0.5 rounded-xs text-[10px] font-bold tracking-wide uppercase ${
-                            isStorage
-                              ? "bg-amber-100 text-amber-900"
-                              : "bg-[#dbeafe] text-[#2563eb]"
-                          }`}
+                    <Button
+                      type="button"
+                      onClick={() => setActiveChangeOrderQuote(quote)}
+                      className="bg-[#1e3a8a] hover:bg-[#172554] text-white h-8 px-3 text-xs font-medium rounded-md cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      <span>Change Order</span>
+                    </Button>
+
+                    {!isCustom && (
+                      <>
+                        <Button
+                          type="button"
+                          onClick={() => setActiveDepositQuote(quote)}
+                          className="bg-[#15803d] hover:bg-[#166534] text-white h-8 px-3 text-xs font-medium rounded-md cursor-pointer flex items-center gap-1.5 shadow-2xs"
                         >
-                          {isStorage
-                            ? "STORAGE COG"
-                            : quote.jobType?.toUpperCase() || "PEMB"}
-                        </span>
-                      </div>
+                          <Banknote className="h-3.5 w-3.5" />
+                          <span>Request Deposit</span>
+                        </Button>
 
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => handleDeleteQuote(quote._id)}
-                        className="border border-[#f97316] text-[#f97316] hover:bg-orange-50 h-8 px-2.5 text-xs font-medium rounded-md bg-white cursor-pointer flex items-center gap-1.5"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Delete
-                      </Button>
+                        <Button
+                          type="button"
+                          onClick={() => setActiveMilestoneQuote(quote)}
+                          className="bg-[#7c3aed] hover:bg-[#6d28d9] text-white h-8 px-3 text-xs font-medium rounded-md cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                        >
+                          <Milestone className="h-3.5 w-3.5" />
+                          <span>Milestones</span>
+                        </Button>
+                      </>
+                    )}
 
-                      <Button
-                        type="button"
-                        onClick={() => handleLoadAndEdit(quote)}
-                        disabled={hookLoadingId === quote._id}
-                        className="bg-[#1e3e66] hover:bg-[#152e4d] text-white h-8 px-3 text-xs font-medium rounded-md cursor-pointer flex items-center gap-1.5 shadow-xs"
-                      >
-                        {hookLoadingId === quote._id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        )}
-                        Load & Edit
-                      </Button>
+                    <Button
+                      type="button"
+                      onClick={() => handlePreviewQuote(quote)}
+                      disabled={hookLoadingId === quote._id}
+                      className="bg-[#f1f5f9] hover:bg-slate-200 text-slate-800 border border-slate-300 h-8 px-3 text-xs font-medium rounded-md cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                    >
+                      {hookLoadingId === quote._id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Eye className="h-3.5 w-3.5" />
+                      )}
+                      <span>Preview</span>
+                    </Button>
 
-                      <Button
-                        type="button"
-                        onClick={() => handlePreviewQuote(quote)}
-                        disabled={hookLoadingId === quote._id}
-                        className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white h-8 px-3.5 text-xs font-semibold rounded-md cursor-pointer flex items-center gap-1.5 shadow-xs"
-                      >
-                        {hookLoadingId === quote._id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Eye className="h-3.5 w-3.5" />
-                        )}
-                        Preview
-                      </Button>
-                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setQuoteToDelete(quote)}
+                      className="border border-[#f97316] text-[#f97316] hover:bg-orange-50 bg-white h-8 px-2.5 text-xs font-medium rounded-md cursor-pointer flex items-center gap-1.5 ml-auto sm:ml-0"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span>Delete</span>
+                    </Button>
                   </div>
                 </div>
               );
@@ -742,6 +826,73 @@ export function QuoteHistoryPage() {
           </div>
         )}
       </div>
+
+      {/* Action Modals */}
+      <ChangeOrderModal
+        open={Boolean(activeChangeOrderQuote)}
+        onOpenChange={(open) => !open && setActiveChangeOrderQuote(null)}
+        quote={activeChangeOrderQuote}
+        onSuccess={() => fetchHistory()}
+      />
+
+      <RequestDepositModal
+        open={Boolean(activeDepositQuote)}
+        onOpenChange={(open) => !open && setActiveDepositQuote(null)}
+        quote={activeDepositQuote}
+        onSuccess={() => fetchHistory()}
+      />
+
+      <MilestonePaymentsModal
+        open={Boolean(activeMilestoneQuote)}
+        onOpenChange={(open) => !open && setActiveMilestoneQuote(null)}
+        quote={activeMilestoneQuote}
+        onSuccess={() => fetchHistory()}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        open={Boolean(quoteToDelete)}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) {
+            setQuoteToDelete(null);
+          }
+        }}
+        title="Delete Quote?"
+        description="This estimate will be permanently removed from your library."
+        confirmText="Delete"
+        variant="danger"
+        isLoading={isDeleting}
+        loadingText="Deleting..."
+        onConfirm={handleDeleteConfirm}
+      >
+        {quoteToDelete && (
+          <div className="rounded-lg border border-slate-200/80 bg-slate-50 px-3 py-2 text-xs text-slate-700 space-y-0.5">
+            <div className="font-semibold text-slate-900 truncate">
+              {quoteToDelete.cityStateZip ||
+                quoteToDelete.streetAddress ||
+                quoteToDelete.leadCompanyName ||
+                "Quotation"}
+            </div>
+            <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-1.5">
+              {quoteToDelete.leadCompanyName && (
+                <>
+                  <span className="truncate max-w-[120px]">{quoteToDelete.leadCompanyName}</span>
+                  <span>·</span>
+                </>
+              )}
+              {quoteToDelete.quoteNumber && (
+                <>
+                  <span className="font-medium text-slate-700">Quote #{quoteToDelete.quoteNumber}</span>
+                  <span>·</span>
+                </>
+              )}
+              <span className="uppercase text-[10px] font-semibold text-slate-500">
+                {quoteToDelete.scope || "Supply"}
+              </span>
+            </div>
+          </div>
+        )}
+      </ConfirmModal>
     </div>
   );
 }

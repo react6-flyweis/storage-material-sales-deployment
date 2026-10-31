@@ -1,5 +1,14 @@
+import axios from "axios";
 import { apiClient } from "@/modules/auth/auth.api";
 import type { InvoiceLineItem } from "@/modules/invoices/invoices.api";
+import type { InstallAddress } from "@/types/address.types";
+export * from "./customer-documents.types";
+import type {
+  CreateCustomerDocumentPayload,
+  CreateCustomerDocumentResponse,
+  DeleteCustomerDocumentResponse,
+  GetCustomerDocumentsResponse,
+} from "./customer-documents.types";
 
 type AdminCustomerPhone = {
   number?: string;
@@ -37,7 +46,13 @@ export type AdminCustomerProject = {
   _id: string;
   customerId: string;
   buildingType?: string;
+  businessUnit?: string | null;
+  businessUnitLabel?: string;
   location?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  installAddress?: InstallAddress;
   source?: string;
   quoteValue?: number;
   lifecycleStatus?: string;
@@ -179,7 +194,12 @@ export async function getSalesCustomerDetailProvider(customerId: string) {
 
 export type SalesCustomerProject = {
   _id: string;
+  projectId?: string;
+  jobId?: string;
   projectName?: string;
+  businessUnit?: string | null;
+  businessUnitLabel?: string;
+  numberOfBuildings?: number;
   lifecycleStatus?: string;
   quoteValue?: number;
   budget?: number | null;
@@ -201,10 +221,18 @@ export async function getSalesCustomerProjectsProvider(
   customerId: string,
   page = 1,
   limit = 20,
+  businessUnit?: string,
 ) {
+  const params: { page: number; limit: number; businessUnit?: string } = {
+    page,
+    limit,
+  };
+  if (businessUnit && businessUnit !== "all") {
+    params.businessUnit = businessUnit;
+  }
   const response = await apiClient.get<GetSalesCustomerProjectsResponse>(
     `/api/sales/customers/${customerId}/projects`,
-    { params: { page, limit } },
+    { params },
   );
 
   return response.data;
@@ -213,7 +241,12 @@ export async function getSalesCustomerProjectsProvider(
 export type CreateSalesCustomerProjectPayload = {
   projectName: string;
   buildingType: string;
+  businessUnit?: string | null;
   location: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  installAddress?: InstallAddress;
   roofStyle: string;
   quoteValue: number;
   width: number;
@@ -240,4 +273,79 @@ export async function createSalesCustomerProjectProvider(
   );
 
   return response.data;
+}
+
+export async function getCustomerDocumentsProvider(customerId: string) {
+  const response = await apiClient.get<GetCustomerDocumentsResponse>(
+    `/api/sales/customers/${customerId}/documents`,
+  );
+  return response.data;
+}
+
+export async function createCustomerDocumentProvider(
+  customerId: string,
+  payload: CreateCustomerDocumentPayload,
+) {
+  const response = await apiClient.post<CreateCustomerDocumentResponse>(
+    `/api/sales/customers/${customerId}/documents`,
+    payload,
+  );
+  return response.data;
+}
+
+export async function deleteCustomerDocumentProvider(
+  customerId: string,
+  docId: string,
+) {
+  const response = await apiClient.delete<DeleteCustomerDocumentResponse>(
+    `/api/sales/customers/${customerId}/documents/${docId}`,
+  );
+  return response.data;
+}
+
+export async function uploadCustomerDocumentToS3(
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<{ fileUrl: string; key: string }> {
+  // Step A: Request presigned URL
+  const presignResponse = await apiClient.post<{
+    success: boolean;
+    message: string;
+    data: {
+      uploadUrl: string;
+      fileUrl: string;
+      key: string;
+    };
+  }>("/api/upload/presigned-url", {
+    fileName: file.name,
+    fileType: file.type || "application/octet-stream",
+    folder: "documents",
+  });
+
+  const uploadUrl = presignResponse.data?.data?.uploadUrl;
+  const fileUrl = presignResponse.data?.data?.fileUrl;
+  const key = presignResponse.data?.data?.key;
+
+  if (!uploadUrl || !fileUrl) {
+    throw new Error(
+      presignResponse.data?.message || "Failed to retrieve upload URL from server.",
+    );
+  }
+
+  // Step B: S3 PUT without staff JWT Authorization header
+  await axios.put(uploadUrl, file, {
+    headers: {
+      "Content-Type": file.type || "application/octet-stream",
+    },
+    onUploadProgress: (progressEvent) => {
+      if (progressEvent.total && onProgress) {
+        const percent = Math.round(
+          (progressEvent.loaded * 100) / progressEvent.total,
+        );
+        onProgress(percent);
+      }
+    },
+  });
+
+  return { fileUrl, key: key || "" };
 }

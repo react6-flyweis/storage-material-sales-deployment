@@ -1,7 +1,7 @@
-import { Input } from "@/components/ui/input";
-import { Search, Menu, User } from "lucide-react";
+import { Menu, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+import { HeaderSearch } from "@/components/header-search";
 import { NotificationMenu } from "@/components/notification-menu";
 import { UserMenu } from "@/components/user-menu";
 import steelLogo from "@/assets/steel-building-depot-logo.png";
@@ -25,13 +25,8 @@ export function Header({ onMenuClick }: HeaderProps) {
         </Button>
 
         {/* Search Bar */}
-        <div className="hidden md:block relative w-48 md:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-          <Input
-            type="text"
-            placeholder="Search leads, projects..."
-            className="pl-10 bg-gray-50 border-gray-200"
-          />
+        <div className="hidden md:block">
+          <HeaderSearch />
         </div>
 
         {/* Right Side - Notifications and Logo */}

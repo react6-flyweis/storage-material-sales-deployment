@@ -72,9 +72,11 @@ export async function extractDrawingProvider(
   return response.data;
 }
 
-export const JOB_TYPE = ["PEMB", "Storage"] as const;
+export const JOB_TYPE = ["PEMB", "Storage", "Custom"] as const;
 export type JobType = (typeof JOB_TYPE)[number];
 export const DEFAULT_JOB_TYPE: JobType = "PEMB";
+
+export type CompanyBrand = "SBD" | "SM";
 
 export const SCOPE = ["Supply", "Install", "Both"] as const;
 export type Scope = (typeof SCOPE)[number];
@@ -84,8 +86,8 @@ export const DEFAULT_SCOPE: Scope = "Both";
 export interface ExtractShipperRequest {
   fileBase64: string;
   fileName: string;
-  jobType?: JobType;
-  scope?: Scope;
+  jobType?: JobType | string;
+  scope?: Scope | string;
   roof?: "screw-down" | "standing-seam" | string;
   install?: string;
   squareFootage?: number;
@@ -94,6 +96,13 @@ export interface ExtractShipperRequest {
   blendPct?: number;
   installCostPerSf?: number;
   sellPerSf?: number;
+  steelFinish?: "red-iron" | "galvanized" | string;
+  freightOverride?: number;
+  matMuOverride?: number;
+  matMuPct?: number;
+  materialSellOverride?: number;
+  matSellOverride?: number;
+  deletedRowKeys?: string[];
 }
 
 export interface FullQuoteConcrete {
@@ -181,6 +190,9 @@ export interface FullQuoteData {
   concrete?: FullQuoteConcrete;
   insulation?: FullQuoteInsulation;
   salesTax?: FullQuoteSalesTax;
+  pembAddOns?: unknown[];
+  pembAddOnTotals?: { sell: number; profit: number };
+  staircase?: { count: number; unitCost: number; staircaseSell: number; include: boolean };
   buildingSubtotal?: number;
   grandTotal?: number;
   pricePerSf?: string | number;
@@ -237,6 +249,11 @@ export interface ShipperPricing {
   quicken?: number;
   jobType?: JobType;
   scope?: Scope;
+  companyBrand?: CompanyBrand | string;
+  company?: CompanyBrand | string;
+  brand?: CompanyBrand | string;
+  logoBrand?: CompanyBrand | string;
+  companyLogoUrl?: string;
   roof?: string;
   install?: string;
   isSS?: boolean;
@@ -248,6 +265,8 @@ export interface ShipperPricing {
   vendorBlendAdjustment?: number;
   cogsOverrideApplied?: boolean;
   marginOverrideApplied?: boolean;
+  materialSellOverrideApplied?: boolean;
+  materialSellExFreight?: number;
   [key: string]: unknown;
 }
 
@@ -257,6 +276,9 @@ export interface SquareFootageMeta {
   selected?: number;
   coverDerivedSqft?: number;
   inputSf?: number;
+  weightLbsUsed?: number;
+  mappedWeightLbs?: number;
+  formula?: string;
   [key: string]: unknown;
 }
 
@@ -264,6 +286,8 @@ export interface ExtractShipperResponseData {
   fileName: string;
   sheetCount: number;
   totalWeightLbs: number;
+  detectedWeightLbs?: number;
+  unmappedWeightLbs?: number;
   squareFootage: number;
   squareFootageMeta?: SquareFootageMeta | null;
   tabSummary: ShipperTabSummary[];
@@ -292,19 +316,76 @@ export async function extractShipperProvider(
     "/api/sales/estimates/extract-shipper",
     {
       jobType: DEFAULT_JOB_TYPE,
-      scope: DEFAULT_SCOPE,
+      scope: "both",
       roof: "screw-down",
-      install: "easy",
+      install: "medium",
       squareFootage: 0,
       sf: 0,
       useManualSquareFootage: false,
       blendPct: 50,
       installCostPerSf: 5.5,
       sellPerSf: 8.5,
+      deletedRowKeys: [],
       ...payload,
     }
   );
   return response.data;
+}
+
+export interface CreateEstimateFromShipperRequest {
+  leadId?: string;
+  fileBase64: string;
+  fileName: string;
+  jobType?: JobType | string;
+  companyBrand?: CompanyBrand | string;
+  scope?: Scope | string;
+  roof?: string;
+  roofType?: string;
+  install?: string;
+  installDifficulty?: string;
+  squareFootage?: number;
+  sf?: number;
+  useManualSquareFootage?: boolean;
+  blendPct?: number;
+  installCostPerSf?: number;
+  sellPerSf?: number;
+  steelFinish?: string;
+  freightOverride?: number;
+  materialSellOverride?: number;
+  deletedRowKeys?: string[];
+  [key: string]: unknown;
+}
+
+export interface CreateEstimateFromShipperResponse {
+  success: boolean;
+  message?: string;
+  data: ExtractShipperResponseData & {
+    estimateId: string;
+    estimate?: SaveEstimatePayload & { _id: string };
+  };
+}
+
+/**
+ * EstimateId-first flow: Upload shipper file with leadId -> get estimateId immediately.
+ * Attempts proposed POST /api/sales/estimates/from-shipper first;
+ * falls back to extracting shipper then immediately creating a draft estimate via POST /api/sales/estimates.
+ */
+export async function createEstimateFromShipperProvider(
+  payload: CreateEstimateFromShipperRequest
+): Promise<CreateEstimateFromShipperResponse> {
+  const res = await apiClient.post<CreateEstimateFromShipperResponse>(
+    "/api/sales/estimates/from-shipper",
+    payload
+  );
+  const resData = res.data?.data;
+  const estId = resData?.estimateId || resData?.estimate?._id;
+  return {
+    ...res.data,
+    data: {
+      ...resData,
+      estimateId: estId || "",
+    },
+  };
 }
 
 export interface ComputeConcreteConfig {
@@ -360,6 +441,8 @@ export interface ComputeCogsOverrideConfig {
   marginPct?: number | null;
   sellDollar?: number | null;
   costPctAdj?: number | null;
+  materialSellOverride?: number | null;
+  sellIncludesFreight?: boolean;
   [key: string]: unknown;
 }
 
@@ -373,8 +456,8 @@ export interface ComputeMarginOverrideConfig {
 
 export interface ComputeEstimateRequest {
   parsedCategories?: Record<string, unknown>;
-  jobType?: JobType;
-  scope?: Scope;
+  jobType?: JobType | string;
+  scope?: Scope | string;
   squareFootage?: number;
   sf?: number;
   useManualSquareFootage?: boolean;
@@ -383,6 +466,29 @@ export interface ComputeEstimateRequest {
   install?: string;
   installCostPerSf?: number;
   sellPerSf?: number;
+  steelFinish?: "red-iron" | "galvanized" | string;
+  freightOverride?: number;
+  matMuOverride?: number | null;
+  matMuPct?: number;
+  materialSellOverride?: number | null;
+  matSellOverride?: number | null;
+  pembDrawings?: number;
+  pembIncludeErection?: boolean;
+  pembAddOns?: Array<{
+    item: string;
+    cost: number;
+    markupPct: number;
+    inQuote: boolean;
+    inSow: boolean;
+    [key: string]: unknown;
+  }>;
+  staircase?: {
+    count: number;
+    unitCost: number;
+    stories: number;
+    [key: string]: unknown;
+  };
+  deletedRowKeys?: string[];
   concrete?: ComputeConcreteConfig;
   insulation?: ComputeInsulationConfig;
   salesTax?: ComputeSalesTaxConfig;
@@ -392,6 +498,11 @@ export interface ComputeEstimateRequest {
 }
 
 export interface ComputeEstimateResponseData {
+  squareFootage?: number;
+  squareFootageMeta?: SquareFootageMeta | null;
+  detectedWeightLbs?: number;
+  totalWeightLbs?: number;
+  unmappedWeightLbs?: number;
   weightByCategory?: ShipperWeightByCategoryItem[];
   pricing?: ShipperPricing;
   fullQuote?: FullQuoteData;
@@ -402,16 +513,28 @@ export interface ComputeEstimateResponse {
   success?: boolean;
   message?: string;
   data?: ComputeEstimateResponseData;
+  squareFootage?: number;
+  squareFootageMeta?: SquareFootageMeta | null;
+  detectedWeightLbs?: number;
+  totalWeightLbs?: number;
+  unmappedWeightLbs?: number;
   weightByCategory?: ShipperWeightByCategoryItem[];
   pricing?: ShipperPricing;
   fullQuote?: FullQuoteData;
 }
 
 export async function computeEstimateProvider(
-  payload: ComputeEstimateRequest
+  payload: ComputeEstimateRequest,
+  estimateId?: string
 ): Promise<ComputeEstimateResponse> {
+  const targetId =
+    estimateId || (payload as { estimateId?: string }).estimateId;
+  const url = targetId
+    ? `/api/sales/estimates/${encodeURIComponent(targetId)}/compute`
+    : "/api/sales/estimates/compute";
+
   const response = await apiClient.post<ComputeEstimateResponse>(
-    "/api/sales/estimates/compute",
+    url,
     payload
   );
   return response.data;
@@ -421,6 +544,9 @@ export interface TaxLookupResponseData {
   zip?: string;
   rate?: number;
   taxRate?: number;
+  label?: string;
+  source?: string;
+  message?: string;
   state?: string;
   city?: string;
   [key: string]: unknown;
@@ -461,11 +587,15 @@ export interface EstimateConversion {
 // ----------------------------------------------------------------------------
 export interface SaveEstimatePayload extends Record<string, unknown> {
   _id?: string;
+  quoteKind?: "custom" | string;
+  customQuoteId?: string;
+  customQuote?: Record<string, unknown>;
   createdBy?: string;
   leadId?: string | null;
   conversion?: EstimateConversion;
   jobType?: JobType;
   scope?: Scope;
+  companyBrand?: CompanyBrand;
   roofType?: string;
   leadCompanyName?: string;
   customerEmail?: string;
@@ -484,6 +614,11 @@ export interface SaveEstimatePayload extends Record<string, unknown> {
   blendPct?: number;
   installLevel?: string;
   installDifficulty?: string;
+  steelFinish?: "red-iron" | "galvanized" | string;
+  freightOverride?: number | null;
+  materialSellOverride?: number | null;
+  matSellOverride?: number | null;
+  pembDrawings?: number;
   parsedCategories?: Record<string, unknown>;
   tabSummary?: ShipperTabSummary[];
   breakdownRows?: ShipperPricingRow[];
@@ -496,6 +631,8 @@ export interface SaveEstimatePayload extends Record<string, unknown> {
   cogsOverride?: ComputeCogsOverrideConfig | null;
   marginOverride?: ComputeMarginOverrideConfig | null;
   contractDetails?: Record<string, unknown> | null;
+  contract?: PreviewContractPayload | Record<string, unknown>;
+  sections?: string[];
   drawingAttachments?: Array<{ name: string; includeInQuote?: boolean; [key: string]: unknown }>;
   additionalInfo?: string;
   fullQuoteResult?: FullQuoteData | Record<string, unknown>;
@@ -532,6 +669,10 @@ export interface SaveEstimatePayload extends Record<string, unknown> {
       at?: string | null;
     }>;
   };
+  milestoneSchedule?: MilestoneRowPayload[];
+  milestones?: MilestoneRowPayload[];
+  milestoneNote?: string;
+  depositTerms?: unknown;
   createdAt?: string;
   updatedAt?: string;
   grandTotal?: number;
@@ -740,10 +881,23 @@ export async function extractStorageCogProvider(
 }
 
 export interface ComputeStorageRequest {
+  estimateId?: string;
   storageData?: Record<string, unknown>;
+  shipping?: number;
+  drawings?: number;
+  installSellPerSf?: number;
+  installCostPerSf?: number;
   concrete?: ComputeConcreteConfig;
   insulation?: ComputeInsulationConfig;
   salesTax?: ComputeSalesTaxConfig;
+  pembAddOns?: Array<{
+    item: string;
+    cost: number;
+    markupPct: number;
+    inQuote: boolean;
+    inSow: boolean;
+    [key: string]: unknown;
+  }>;
   [key: string]: unknown;
 }
 
@@ -891,13 +1045,153 @@ export interface ComputeStorageResponse {
   storagePricing?: StoragePricingResult;
 }
 
-export async function computeStorageProvider(
-  payload: ComputeStorageRequest
-): Promise<ComputeStorageResponse> {
-  const response = await apiClient.post<ComputeStorageResponse>(
-    "/api/sales/estimates/compute-storage",
-    payload
+export interface CreateEstimateFromStorageCogRequest {
+  estimateId?: string;
+  leadId?: string;
+  fileBase64: string;
+  fileName: string;
+  companyBrand?: CompanyBrand | string;
+  scope?: Scope | string;
+  [key: string]: unknown;
+}
+
+export interface CreateEstimateFromStorageCogResponse {
+  success: boolean;
+  message?: string;
+  estimateId?: string;
+  data: {
+    estimateId: string;
+    estimate?: SaveEstimatePayload & { _id: string; [key: string]: unknown };
+    squareFootage?: number;
+    storageData?: {
+      buildings?: Record<string, unknown>[];
+      doors?: Record<string, unknown>[];
+      extras?: Record<string, unknown>[];
+      shipping?: number;
+      installSellPerSf?: number;
+      installCostPerSf?: number;
+      [key: string]: unknown;
+    };
+    storagePricing?: StoragePricingResult | Record<string, unknown>;
+    storagePricingResult?: StoragePricingResult | Record<string, unknown>;
+    buildings?: Record<string, unknown>[];
+    doors?: Record<string, unknown>[];
+    extras?: Record<string, unknown>[];
+    shippingDefault?: unknown;
+    project?: Record<string, unknown>;
+    format?: string;
+    note?: string;
+    [key: string]: unknown;
+  };
+}
+
+/**
+ * EstimateId-first flow: Upload Storage COG file with leadId -> get estimateId immediately.
+ * Attempts proposed POST /api/sales/estimates/from-storage-cog first;
+ * falls back to extracting storage COG then immediately creating a draft estimate via POST /api/sales/estimates.
+ */
+export async function createEstimateFromStorageCogProvider(
+  payload: CreateEstimateFromStorageCogRequest
+): Promise<CreateEstimateFromStorageCogResponse> {
+  try {
+    const res = await apiClient.post<CreateEstimateFromStorageCogResponse>(
+      "/api/sales/estimates/from-storage-cog",
+      payload
+    );
+    const rawData = res.data as unknown as Record<string, unknown> | undefined;
+    const resData = (rawData?.data || rawData) as Record<string, unknown> | undefined;
+    const estId =
+      (rawData?.estimateId as string) ||
+      (resData?.estimateId as string) ||
+      ((resData?.estimate as Record<string, unknown>)?._id as string) ||
+      (rawData?._id as string) ||
+      (resData?._id as string) ||
+      payload.estimateId ||
+      "";
+
+    if (res.data?.success !== false) {
+      return {
+        ...res.data,
+        estimateId: estId,
+        data: {
+          ...resData,
+          estimateId: estId,
+        },
+      } as CreateEstimateFromStorageCogResponse;
+    }
+  } catch (err) {
+    console.warn(
+      "POST /api/sales/estimates/from-storage-cog failed, falling back to extractStorageCogProvider + saveEstimateProvider:",
+      err
+    );
+  }
+
+  // Fallback: extract storage COG then create a draft estimate
+  const extractRes = await extractStorageCogProvider({
+    fileBase64: payload.fileBase64,
+    fileName: payload.fileName,
+  });
+  const extData =
+    extractRes.data || (extractRes as unknown as Record<string, unknown>);
+  const buildings = (extData.buildings || []) as Record<string, unknown>[];
+  const doors = (extData.doors || []) as Record<string, unknown>[];
+  const extras = (extData.extras || []) as Record<string, unknown>[];
+  const storageData = (extData.storageData || {
+    buildings,
+    doors,
+    extras,
+    project: extData.project || {},
+  }) as Record<string, unknown>;
+
+  const draftRes = await saveEstimateProvider(
+    {
+      _id: payload.estimateId,
+      leadId: payload.leadId,
+      jobType: "Storage",
+      companyBrand: payload.companyBrand as CompanyBrand | undefined,
+      scope: payload.scope as Scope | undefined,
+      sourceFileName: payload.fileName,
+      storageData,
+      status: "draft",
+    },
+    payload.estimateId
   );
+  const draftData = draftRes.data || draftRes;
+  const newEstId =
+    draftData?.estimate?._id || draftData?._id || payload.estimateId || "";
+
+  return {
+    success: true,
+    estimateId: newEstId,
+    data: {
+      estimateId: newEstId,
+      estimate: draftData?.estimate,
+      storageData,
+      buildings,
+      doors,
+      extras,
+      project: (extData.project || {}) as Record<string, unknown>,
+    },
+  };
+}
+
+export async function computeStorageProvider(
+  payload: ComputeStorageRequest,
+  estimateId?: string
+): Promise<ComputeStorageResponse> {
+  const targetId =
+    estimateId ||
+    payload.estimateId ||
+    (payload as { _id?: string })._id ||
+    (payload as { id?: string }).id;
+  const url = targetId
+    ? `/api/sales/estimates/${encodeURIComponent(targetId)}/compute-storage`
+    : "/api/sales/estimates/compute-storage";
+
+  const response = await apiClient.post<ComputeStorageResponse>(url, {
+    ...payload,
+    ...(targetId ? { estimateId: targetId } : {}),
+  });
   return response.data;
 }
 
@@ -918,6 +1212,9 @@ export interface PreviewContractPayload {
 
 export interface PreviewDocumentRequest {
   estimateId?: string;
+  quoteKind?: "custom" | string;
+  customQuoteId?: string;
+  grandTotal?: number;
   leadCompanyName?: string;
   customerEmail?: string;
   streetAddress?: string;
@@ -928,18 +1225,67 @@ export interface PreviewDocumentRequest {
   jobNumber?: string;
   jobType?: JobType;
   scope?: Scope;
+  companyBrand?: CompanyBrand;
+  steelFinish?: "red-iron" | "galvanized" | string;
+  freightOverride?: number | null;
+  materialSellOverride?: number | null;
+  matSellOverride?: number | null;
+  pembDrawings?: number;
+  engineeringDrawings?: number;
+  parsedCategories?: Record<string, unknown>;
+  recompute?: boolean;
+  cogsOverride?: ComputeCogsOverrideConfig | null;
+  marginOverride?: ComputeMarginOverrideConfig | null;
   pricingResult?: ShipperPricing | Record<string, unknown>;
   fullQuote?: FullQuoteData | Record<string, unknown>;
   contract?: PreviewContractPayload | Record<string, unknown>;
   extractedDrawingFields?: ExtractedDrawingData;
   drawingAttachments?: Array<{ name?: string; fileBase64?: string; data?: string; includeInQuote?: boolean; [key: string]: unknown }>;
   sections?: string[];
+  milestoneSchedule?: MilestoneRowPayload[];
+  milestones?: MilestoneRowPayload[];
+  milestoneNote?: string;
+  depositTerms?: unknown;
   storageData?: Record<string, unknown>;
   storagePricingResult?: Record<string, unknown>;
   storagePricing?: Record<string, unknown>;
   concreteAddon?: { include?: boolean; [key: string]: unknown };
   insulationAddon?: { include?: boolean; [key: string]: unknown };
-  salesTax?: { include?: boolean; rate?: number; [key: string]: unknown };
+  salesTax?: {
+    include?: boolean;
+    includeTax?: boolean;
+    rate?: number;
+    taxRate?: number;
+    zip?: string;
+    taxZip?: string;
+    amount?: number;
+    taxableBase?: number;
+    [key: string]: unknown;
+  };
+  taxRate?: number;
+  includeTax?: boolean;
+  taxZip?: string;
+  zip?: string;
+  staircase?: {
+    count: number;
+    unitCost: number;
+    stories?: number;
+    [key: string]: unknown;
+  };
+  multiStory?: {
+    stories?: number;
+    staircaseCount?: number;
+    staircaseUnitCost?: number;
+    [key: string]: unknown;
+  };
+  pembAddOns?: Array<{
+    item: string;
+    cost: number;
+    markupPct: number;
+    inQuote: boolean;
+    inSow: boolean;
+    [key: string]: unknown;
+  }>;
   [key: string]: unknown;
 }
 
@@ -948,6 +1294,13 @@ export interface PreviewDocumentResponseData {
   sowHtml?: string | null;
   contractHtml?: string | null;
   assembledHtml?: string | null;
+  grandTotal?: number;
+  milestoneSchedule?: MilestoneRowPayload[];
+  milestones?: MilestoneRowPayload[];
+  milestoneNote?: string;
+  depositTerms?: unknown;
+  pricing?: unknown;
+  fullQuote?: unknown;
   [key: string]: unknown;
 }
 
@@ -964,10 +1317,11 @@ export interface PreviewDocumentResponse {
 export async function previewDocumentProvider(
   payload: PreviewDocumentRequest
 ): Promise<PreviewDocumentResponse> {
-  const response = await apiClient.post<PreviewDocumentResponse>(
-    "/api/sales/estimates/documents/preview",
-    payload
-  );
+  const url = payload.estimateId
+    ? `/api/sales/estimates/${encodeURIComponent(payload.estimateId)}/documents/preview`
+    : "/api/sales/estimates/documents/preview";
+
+  const response = await apiClient.post<PreviewDocumentResponse>(url, payload);
   return response.data;
 }
 
@@ -1058,6 +1412,250 @@ export async function previewMarginProvider(
 ): Promise<PreviewMarginResponse> {
   const response = await apiClient.post<PreviewMarginResponse>(
     "/api/sales/estimates/margin/preview",
+    payload
+  );
+  return response.data;
+}
+
+// ----------------------------------------------------------------------------
+// DEPOSITS, MILESTONES & MULTI-STORY (v7)
+// ----------------------------------------------------------------------------
+export interface DepositPreviewRequest {
+  estimateId?: string;
+  grand?: number;
+  pct?: number;
+  flat?: number;
+  [key: string]: unknown;
+}
+
+export interface DepositPreviewData {
+  grand: number;
+  pct: number;
+  deposit: number;
+  balance: number;
+  flat?: number;
+  note?: string;
+  depositTerms?: {
+    pct?: number;
+    flat?: number;
+    amount?: number;
+    deposit?: number;
+    note?: string;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+export interface DepositPreviewResponse {
+  success?: boolean;
+  message?: string;
+  data?: DepositPreviewData;
+}
+
+export async function previewDepositProvider(
+  payload: DepositPreviewRequest
+): Promise<DepositPreviewData> {
+  const url = payload.estimateId
+    ? `/api/sales/estimates/${encodeURIComponent(payload.estimateId)}/deposit/preview`
+    : "/api/sales/estimates/deposit/preview";
+  const response = await apiClient.post<DepositPreviewResponse>(
+    url,
+    payload
+  );
+  return (response.data?.data || response.data) as DepositPreviewData;
+}
+
+export interface MilestoneRowPayload {
+  label: string;
+  amount?: number;
+  type?: "pct" | "percent" | "fixed" | "dollar" | string;
+  pct?: number;
+  [key: string]: unknown;
+}
+
+export interface MilestonesPreviewRequest {
+  estimateId?: string;
+  grand?: number;
+  rows?: MilestoneRowPayload[];
+  milestones?: MilestoneRowPayload[];
+  [key: string]: unknown;
+}
+
+export interface MilestonesPreviewData {
+  grand: number;
+  rows: Array<MilestoneRowPayload & { type: string }>;
+  scheduled: number;
+  remaining: number;
+  pct: number;
+  fullyScheduled: boolean;
+  milestoneNote?: string;
+  milestones?: Array<MilestoneRowPayload & { type: string }>;
+  depositTerms?: unknown;
+  [key: string]: unknown;
+}
+
+export interface MilestonesPreviewResponse {
+  success?: boolean;
+  message?: string;
+  data?: MilestonesPreviewData;
+}
+
+export async function previewMilestonesProvider(
+  payload: MilestonesPreviewRequest
+): Promise<MilestonesPreviewData> {
+  const url = payload.estimateId
+    ? `/api/sales/estimates/${encodeURIComponent(payload.estimateId)}/milestones/preview`
+    : "/api/sales/estimates/milestones/preview";
+  const response = await apiClient.post<MilestonesPreviewResponse>(
+    url,
+    payload
+  );
+  return (response.data?.data || response.data) as MilestonesPreviewData;
+}
+
+export interface StaircasePreviewRequest {
+  count: number;
+  unitCost: number;
+  stories: number;
+}
+
+export interface StaircasePreviewData {
+  count: number;
+  unitCost: number;
+  staircaseSell: number;
+  stories: number;
+  include: boolean;
+}
+
+export interface StaircasePreviewResponse {
+  success?: boolean;
+  message?: string;
+  data?: StaircasePreviewData;
+}
+
+export async function previewStaircaseProvider(
+  payload: StaircasePreviewRequest
+): Promise<StaircasePreviewData> {
+  const response = await apiClient.post<StaircasePreviewResponse>(
+    "/api/sales/estimates/staircase/preview",
+    payload
+  );
+  return response.data?.data as StaircasePreviewData;
+}
+
+export interface EstimateQuotationSync {
+  synced?: boolean;
+  requiresSubmitForApproval?: boolean;
+  approvalStatus?: string;
+  workflowStatus?: string;
+  quotationId?: string;
+  [key: string]: unknown;
+}
+
+export interface SaveEstimateMilestonesResponseData {
+  quotationSync?: EstimateQuotationSync;
+  rawResponse?: unknown;
+  [key: string]: unknown;
+}
+
+export async function saveEstimateDepositProvider(
+  estimateId: string,
+  payload: { pct?: number; flat?: number; note?: string; grand?: number }
+): Promise<SaveEstimateMilestonesResponseData> {
+  const response = await apiClient.put(
+    `/api/sales/estimates/${encodeURIComponent(estimateId)}/deposit`,
+    payload
+  );
+  const data = response.data?.data || {};
+  const quotationSync =
+    response.data?.quotationSync ||
+    (response.data?.data as Record<string, unknown>)?.quotationSync;
+  return {
+    ...(typeof data === "object" ? data : { data }),
+    quotationSync,
+    rawResponse: response.data,
+  };
+}
+
+export async function saveEstimateMilestonesProvider(
+  estimateId: string,
+  payload: {
+    rows?: MilestoneRowPayload[];
+    milestones?: MilestoneRowPayload[];
+    note?: string;
+    grand?: number;
+    [key: string]: unknown;
+  }
+): Promise<SaveEstimateMilestonesResponseData> {
+  const response = await apiClient.put(
+    `/api/sales/estimates/${encodeURIComponent(estimateId)}/milestones`,
+    payload
+  );
+  const data = response.data?.data || {};
+  const quotationSync =
+    response.data?.quotationSync ||
+    (response.data?.data as Record<string, unknown>)?.quotationSync;
+  return {
+    ...(typeof data === "object" ? data : { data }),
+    quotationSync,
+    rawResponse: response.data,
+  };
+}
+
+export async function saveEstimateMultiStoryProvider(
+  estimateId: string,
+  payload: { count: number; unitCost?: number; stories?: number }
+) {
+  const response = await apiClient.put(
+    `/api/sales/estimates/${encodeURIComponent(estimateId)}/multi-story`,
+    payload
+  );
+  return response.data?.data;
+}
+
+export interface EstimateDocumentReceiptResponse {
+  success?: boolean;
+  message?: string;
+  data?: {
+    fileName?: string;
+    mimeType?: string;
+    fileBase64?: string;
+    sizeBytes?: number;
+    html?: string;
+  };
+  fileName?: string;
+  mimeType?: string;
+  fileBase64?: string;
+  sizeBytes?: number;
+  html?: string;
+}
+
+export async function downloadDepositReceiptPdfProvider(payload: {
+  estimateId?: string;
+  quote?: unknown;
+  grand?: number;
+  pct?: number;
+  flat?: number;
+  note?: string;
+  format?: "html" | "pdf";
+}): Promise<EstimateDocumentReceiptResponse> {
+  const response = await apiClient.post<EstimateDocumentReceiptResponse>(
+    "/api/sales/estimates/documents/deposit-receipt/pdf",
+    payload
+  );
+  return response.data;
+}
+
+export async function downloadMilestonesPdfProvider(payload: {
+  estimateId?: string;
+  quote?: unknown;
+  grand?: number;
+  rows?: MilestoneRowPayload[];
+  note?: string;
+  format?: "html" | "pdf";
+}): Promise<EstimateDocumentReceiptResponse> {
+  const response = await apiClient.post<EstimateDocumentReceiptResponse>(
+    "/api/sales/estimates/documents/milestones/pdf",
     payload
   );
   return response.data;

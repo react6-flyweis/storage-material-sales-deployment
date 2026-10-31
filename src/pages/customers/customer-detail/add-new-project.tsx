@@ -25,13 +25,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import BusinessUnitSelector from "@/components/business-unit-selector";
+import InstallAddressFields from "@/components/common/install-address-fields";
+import { buildLocationString } from "@/lib/address";
+
 const requiredNumber = (message: string) => z.number().min(0, message);
 
 const priorityValues = ["Low", "Medium", "High"] as const;
 
 const addNewProjectSchema = z.object({
   projectName: z.string().trim().min(1, "Project name is required"),
-  location: z.string().trim().min(1, "Location is required"),
+  businessUnit: z.string().optional(),
+  addressLine1: z.string().trim().min(1, "Street address is required"),
+  city: z.string().trim().min(1, "City is required"),
+  state: z.string().trim().min(1, "State is required"),
+  postalCode: z.string().trim().min(1, "ZIP / postal code is required"),
   buildingType: z.string().trim().min(1, "Building type is required"),
   roofStyle: z.string().trim().min(1, "Roof style is required"),
   estimatedValue: z.string().trim().optional(),
@@ -48,7 +56,11 @@ type AddNewProjectFormValues = z.infer<typeof addNewProjectSchema>;
 
 const defaultValues: AddNewProjectFormValues = {
   projectName: "",
-  location: "",
+  businessUnit: "",
+  addressLine1: "",
+  city: "",
+  state: "",
+  postalCode: "",
   buildingType: "",
   roofStyle: "",
   estimatedValue: "",
@@ -75,6 +87,8 @@ export default function AddNewProjectPage() {
     handleSubmit,
     reset,
     setError,
+    setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<AddNewProjectFormValues>({
     defaultValues,
@@ -88,10 +102,31 @@ export default function AddNewProjectPage() {
 
   const onSubmit = async (values: AddNewProjectFormValues) => {
     try {
+      const compiledLocation = buildLocationString({
+        line1: values.addressLine1,
+        city: values.city,
+        state: values.state,
+        postalCode: values.postalCode,
+      });
+
       await createProjectMutation.mutateAsync({
         projectName: values.projectName,
+        businessUnit: values.businessUnit ? values.businessUnit.trim().toLowerCase() : null,
         buildingType: values.buildingType,
-        location: values.location,
+        location: compiledLocation,
+        city: values.city.trim(),
+        state: values.state.trim(),
+        pincode: values.postalCode.trim(),
+        installAddress: {
+          companyName: "",
+          line1: values.addressLine1.trim(),
+          line2: "",
+          city: values.city.trim(),
+          state: values.state.trim(),
+          postalCode: values.postalCode.trim(),
+          country: "US",
+          lines: [],
+        },
         roofStyle: values.roofStyle,
         quoteValue: values.estimatedValue
           ? Number.parseInt(values.estimatedValue, 10)
@@ -164,20 +199,49 @@ export default function AddNewProjectPage() {
               )}
             </Field>
 
-            <Field
-              className="md:col-span-2"
-              data-invalid={Boolean(errors.location)}
-            >
-              <FieldLabel htmlFor="location">Location</FieldLabel>
-              <Input
-                id="location"
-                type="text"
-                placeholder="Enter location"
-                aria-invalid={Boolean(errors.location)}
-                {...register("location")}
+            <Field>
+              <FieldLabel htmlFor="businessUnit">Business Unit</FieldLabel>
+              <Controller
+                control={control}
+                name="businessUnit"
+                render={({ field }) => (
+                  <BusinessUnitSelector
+                    id="businessUnit"
+                    value={field.value}
+                    onChange={field.onChange}
+                    includeClear
+                    clearLabel="Not set"
+                    placeholder="Select Business Unit"
+                    triggerClassName="w-full bg-white"
+                  />
+                )}
               />
-              {errors.location && <FieldError errors={[errors.location]} />}
             </Field>
+
+            <div className="md:col-span-2">
+              <InstallAddressFields
+                values={{
+                  line1: watch("addressLine1") || "",
+                  city: watch("city") || "",
+                  state: watch("state") || "",
+                  postalCode: watch("postalCode") || "",
+                }}
+                onChange={(field, val) => {
+                  if (field === "line1") setValue("addressLine1", val, { shouldValidate: true });
+                  else if (field === "city") setValue("city", val, { shouldValidate: true });
+                  else if (field === "state") setValue("state", val, { shouldValidate: true });
+                  else if (field === "postalCode") setValue("postalCode", val, { shouldValidate: true });
+                }}
+                errors={{
+                  line1: errors.addressLine1?.message,
+                  city: errors.city?.message,
+                  state: errors.state?.message,
+                  postalCode: errors.postalCode?.message,
+                }}
+                disabled={isLoading}
+                idPrefix="add-project-addr"
+              />
+            </div>
             <Field>
               <FieldLabel htmlFor="estimatedValue">Estimated Value</FieldLabel>
               <Input

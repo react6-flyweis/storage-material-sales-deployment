@@ -12,5 +12,8 @@ export * from "./pages/quote-preview-list-page";
 export * from "./pages/pricing-rules-page";
 export * from "./pricing-rules.api";
 export * from "./pricing-rules.hooks";
+export * from "./change-orders.api";
+export * from "./custom-quotes.api";
+export * from "./estimates.api";
 export * from "./hooks";
 

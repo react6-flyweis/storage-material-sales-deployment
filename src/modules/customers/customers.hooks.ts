@@ -10,6 +10,10 @@ import {
   getSalesCustomerDetailProvider,
   getSalesCustomerProjectsProvider,
   getSalesCustomersProvider,
+  getCustomerDocumentsProvider,
+  createCustomerDocumentProvider,
+  deleteCustomerDocumentProvider,
+  type CreateCustomerDocumentPayload,
   type CreateSalesCustomerProjectPayload,
 } from "./customers.api";
 
@@ -47,10 +51,11 @@ export function useSalesCustomerProjectsQuery(
   customerId: string,
   page = 1,
   limit = 20,
+  businessUnit?: string,
 ) {
   return useQuery({
-    queryKey: ["customers", "sales-projects", customerId, page, limit],
-    queryFn: () => getSalesCustomerProjectsProvider(customerId, page, limit),
+    queryKey: ["customers", "sales-projects", customerId, page, limit, businessUnit],
+    queryFn: () => getSalesCustomerProjectsProvider(customerId, page, limit, businessUnit),
     enabled: Boolean(customerId) && customerId !== "unknown",
   });
 }
@@ -72,3 +77,48 @@ export function useCreateSalesCustomerProjectMutation(customerId: string) {
     },
   });
 }
+
+export function useCustomerDocumentsQuery(customerId: string) {
+  return useQuery({
+    queryKey: ["customers", "documents", customerId],
+    queryFn: () => getCustomerDocumentsProvider(customerId),
+    enabled: Boolean(customerId) && customerId !== "unknown",
+  });
+}
+
+export function useCreateCustomerDocumentMutation(customerId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: CreateCustomerDocumentPayload) =>
+      createCustomerDocumentProvider(customerId, payload),
+    onSuccess: (response) => {
+      if (!response.success) {
+        return;
+      }
+
+      void queryClient.invalidateQueries({
+        queryKey: ["customers", "documents", customerId],
+      });
+    },
+  });
+}
+
+export function useDeleteCustomerDocumentMutation(customerId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (docId: string) =>
+      deleteCustomerDocumentProvider(customerId, docId),
+    onSuccess: (response) => {
+      if (!response.success) {
+        return;
+      }
+
+      void queryClient.invalidateQueries({
+        queryKey: ["customers", "documents", customerId],
+      });
+    },
+  });
+}
+

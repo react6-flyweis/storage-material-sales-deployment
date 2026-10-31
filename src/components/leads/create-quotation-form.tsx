@@ -19,6 +19,7 @@ import ColorSelector, {
   DEFAULT_COLORS,
   ROOF_COLORS,
 } from "@/components/color-selector";
+import BuildingTypeSelector from "@/components/building-type-selector";
 import {
   Select,
   SelectContent,
@@ -31,6 +32,7 @@ import { useCreateQuotationMutation } from "@/modules/quotations/quotations.hook
 import { useAuthStore } from "@/modules/auth/auth.store";
 import SuccessDialog from "@/components/success-dialog";
 import type { LeadListItem } from "@/modules/leads/leads.api";
+import { formatInstallAddress } from "@/lib/address";
 
 const requiredText = (message: string) => z.string().trim().min(1, message);
 
@@ -72,7 +74,7 @@ const createQuotationSchema = z.object({
   phone: optionalText,
   location: requiredText("Location is required"),
   company: optionalText,
-  buildingType: z.enum(["workshop", "garage", "commercial", "agricultural"]),
+  buildingType: requiredText("Building type is required"),
   width: requiredNumber("Width is required"),
   length: requiredNumber("Length is required"),
   height: requiredNumber("Height is required"),
@@ -149,7 +151,7 @@ type CreateQuotationFormValues = {
   phone: string;
   location: string;
   company: string;
-  buildingType: "workshop" | "garage" | "commercial" | "agricultural";
+  buildingType: string;
   width: number;
   length: number;
   height: number;
@@ -232,16 +234,8 @@ const toCapitalizedText = (value: string) =>
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(" ");
 
-const mapBuildingType = (
-  value?: string,
-): CreateQuotationFormValues["buildingType"] => {
-  if (!value) return "workshop";
-  const v = value.toLowerCase();
-  if (v.includes("work")) return "workshop";
-  if (v.includes("garage")) return "garage";
-  if (v.includes("commercial")) return "commercial";
-  if (v.includes("agri") || v.includes("agricultural")) return "agricultural";
-  return "workshop";
+const mapBuildingType = (value?: string): string => {
+  return value?.trim() || "Workshops";
 };
 
 const getPaymentTermsLabel = (
@@ -295,7 +289,7 @@ export default function CreateQuotationForm({
         initialValues?.customerName ?? leadData?.customerId?.firstName ?? "",
       email: initialValues?.email ?? leadData?.customerId?.email ?? "",
       phone: initialValues?.phone ?? "",
-      location: initialValues?.location ?? leadData?.location ?? "",
+      location: initialValues?.location ?? (leadData ? formatInstallAddress(leadData.installAddress, leadData.location) : ""),
       company: initialValues?.company ?? "",
       buildingType:
         initialValues?.buildingType ?? mapBuildingType(leadData?.buildingType),
@@ -687,7 +681,7 @@ export default function CreateQuotationForm({
           <FieldGroup className="">
             <h3 className="font-semibold text-sm">Building Requirements</h3>
 
-            <Field>
+            <Field data-invalid={Boolean(errors.buildingType)}>
               <FieldLabel htmlFor="buildingType" className="text-xs">
                 Building Type <span className="text-red-500">*</span>
               </FieldLabel>
@@ -696,22 +690,13 @@ export default function CreateQuotationForm({
                   name="buildingType"
                   control={control}
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger
-                        id="buildingType"
-                        className="w-full h-9 text-sm"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="workshop">Workshop</SelectItem>
-                        <SelectItem value="garage">Garage</SelectItem>
-                        <SelectItem value="commercial">Commercial</SelectItem>
-                        <SelectItem value="agricultural">
-                          Agricultural
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <BuildingTypeSelector
+                      id="buildingType"
+                      value={field.value}
+                      onChange={field.onChange}
+                      triggerClassName="w-full h-9 text-sm"
+                      placeholder="Select Building Type"
+                    />
                   )}
                 />
                 <FieldError errors={[errors.buildingType]} />

@@ -8,9 +8,10 @@ export const QUERY_SETTINGS = {
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: QUERY_SETTINGS.ENABLE_OPTIMIZATIONS ? false : true,
+      refetchOnWindowFocus: true,
+      refetchOnMount: "always",
       retry: QUERY_SETTINGS.ENABLE_OPTIMIZATIONS ? 1 : 0,
-      staleTime: QUERY_SETTINGS.ENABLE_OPTIMIZATIONS ? 60 * 1000 : 0,
+      staleTime: 0,
       gcTime: QUERY_SETTINGS.ENABLE_OPTIMIZATIONS ? 5 * 60 * 1000 : 0,
     },
     mutations: {

@@ -3,15 +3,18 @@ import { Megaphone, BarChart2, Hammer, Factory, DollarSign, UsersRound } from "l
 import type { ChatUser } from "@/modules/team-chat/team-chat.api";
 
 export interface ActiveChatState {
-  type: "direct" | "group";
-  id: string; // userId or groupId
+  type: "direct" | "group" | "customer";
+  id: string; // userId, groupId, or customerId
   name: string;
   role?: string;
+  email?: string;
+  phone?: string;
   avatar?: string;
   category?: string;
   membersCount?: number;
   members?: ChatUser[];
   color?: string;
+  leadId?: string;
 }
 
 export const getDepartmentIcon = (category?: string): React.ReactElement => {

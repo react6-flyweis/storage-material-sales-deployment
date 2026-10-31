@@ -1,4 +1,5 @@
 import { apiClient } from "@/modules/auth/auth.api";
+import type { InstallAddress } from "@/types/address.types";
 
 export type CommunicationTimelineLeadRef = {
   _id: string;
@@ -45,7 +46,10 @@ export type UpcomingLeadRef = {
   projectName?: string;
   jobId?: string;
   buildingType?: string;
+  businessUnit?: string | null;
+  businessUnitLabel?: string;
   location?: string;
+  installAddress?: InstallAddress;
   projectId?: string;
 };
 
@@ -321,6 +325,7 @@ export type FollowUpActivityLeadItem = {
     projectName?: string;
     customerName?: string;
     location?: string;
+    installAddress?: InstallAddress;
     quoteValue?: number;
     lifecycleStatus?: string;
     assignedSales?: {

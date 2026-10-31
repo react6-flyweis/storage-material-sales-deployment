@@ -1,7 +1,7 @@
 import { apiClient } from "@/modules/auth/auth.api";
 import type { SaveEstimatePayload } from "@/modules/quotation-generator/estimates.api";
 
-export const BUILDING_TYPE = ["PEMB", "Storage"] as const;
+export const BUILDING_TYPE = ["PEMB", "Storage", "Custom"] as const;
 export type BuildingType = (typeof BUILDING_TYPE)[number];
 export const DEFAULT_BUILDING_TYPE: BuildingType = "PEMB";
 
@@ -16,8 +16,11 @@ export const ADMIN_STATUS = [
   "pending_approval",
   "approved",
   "rejected",
+  "admin_rejected",
   "sent",
   "accepted",
+  "customer_rejected",
+  "customer_accepted",
 ] as const;
 export type AdminStatus = (typeof ADMIN_STATUS)[number];
 
@@ -42,12 +45,20 @@ export type ApprovalStatus =
   | "approved"
   | "rejected";
 
-export type WorkflowStatus =
+export type QuotationWorkflowStatus =
   | "draft"
   | "pending_approval"
   | "approved"
-  | "rejected"
-  | "sent";
+  | "admin_rejected"
+  | "sent"
+  | "accepted"
+  | "client_rejected";
+
+export type WorkflowStatus =
+  | QuotationWorkflowStatus
+  | "customer_rejected"
+  | "customer_accepted"
+  | "rejected";
 
 export type QuotationApprovalHistoryItem = {
   status: ApprovalStatus | string;
@@ -118,6 +129,8 @@ export type QuotationItem = {
     | "accepted"
     | string
     | null;
+  quotationStatus?: string | null;
+  quotation_status?: string | null;
   proposalDate?: string | null;
   companyName?: string | null;
   customerName?: string | null;
@@ -160,18 +173,28 @@ export type QuotationItem = {
   sourceEstimateId?: string | null;
   sourceEstimate?: SaveEstimatePayload | null;
   estimate?: SaveEstimatePayload | null;
+  sourceCustomQuoteId?: string | null;
+  sourceCustomQuote?: Record<string, unknown> | null;
   pdfLink?: string | null;
   htmlPreviewLink?: string | null;
   documents?: Array<Record<string, unknown>> | null;
   documentMeta?: {
     source?: string;
     sourceEstimateId?: string;
+    sourceCustomQuoteId?: string;
     hasPricingData?: boolean;
     previewEndpoint?: string;
     pdfEndpoint?: string;
     defaultSections?: string[];
   } | null;
+  clientNotes?: string | null;
+  customerDecisionAt?: string | null;
+  customerRejectedAt?: string | null;
+  customerAcceptedAt?: string | null;
 };
+
+export * from "./quotations.utils";
+export * from "./components/quotation-workflow-badge";
 
 export type Quotation = QuotationItem;
 
@@ -353,15 +376,68 @@ export async function getQuotationsProvider(
       ? pageOrParams
       : { page: pageOrParams, limit };
 
+  try {
+    const response = await apiClient.get<QuotationsListResponse>(
+      "/api/sales/quotations",
+      { params },
+    );
+    if (response.data?.success && response.data?.data?.quotations) {
+      return response.data;
+    }
+  } catch {
+    // Fall back to /api/quotations
+  }
+
   const response = await apiClient.get<QuotationsListResponse>(
-    "/api/sales/quotations",
+    "/api/quotations",
     { params },
   );
 
   return response.data;
 }
 
+export async function getPendingApprovalsProvider(
+  pageOrParams: number | GetQuotationsParams = 1,
+  limit = 20
+) {
+  const params: GetQuotationsParams =
+    typeof pageOrParams === "object"
+      ? pageOrParams
+      : { page: pageOrParams, limit };
+
+  const response = await apiClient.get<QuotationsListResponse>(
+    "/api/quotations/approval/pending",
+    { params },
+  );
+
+  if (response.data?.success && response.data?.data?.quotations) {
+    const rawData = response.data.data;
+    const pagination = (rawData as { pagination?: { total?: number } }).pagination;
+    const total = pagination?.total ?? rawData.total ?? rawData.quotations.length;
+    return {
+      ...response.data,
+      data: {
+        ...rawData,
+        total,
+      },
+    };
+  }
+
+  return response.data;
+}
+
 export async function getQuotationStatsProvider(): Promise<QuotationStatsResponse> {
+  try {
+    const response = await apiClient.get<QuotationStatsResponse>(
+      "/api/quotations/stats"
+    );
+    if (response.data?.success && response.data?.data) {
+      return response.data;
+    }
+  } catch {
+    // Fall back to /api/sales/quotations/stats
+  }
+
   const response = await apiClient.get<QuotationStatsResponse>(
     "/api/sales/quotations/stats"
   );
@@ -401,6 +477,21 @@ export async function convertEstimateToQuotationProvider(estimateId: string) {
     message?: string;
     data: QuotationItem;
   }>(`/api/quotations/from-estimate/${encodeURIComponent(estimateId)}`);
+  return response.data;
+}
+
+export async function convertCustomQuoteToQuotationProvider(
+  customQuoteId: string,
+  payload?: { leadId?: string }
+) {
+  const response = await apiClient.post<{
+    success: boolean;
+    message?: string;
+    data: QuotationItem;
+  }>(
+    `/api/quotations/from-custom-quote/${encodeURIComponent(customQuoteId)}`,
+    payload || {}
+  );
   return response.data;
 }
 
@@ -507,6 +598,7 @@ export async function getLatestApprovedTaxByLeadProvider(leadId: string) {
   }
   return raw as LatestApprovedTaxResponse;
 }
+
 
 
 

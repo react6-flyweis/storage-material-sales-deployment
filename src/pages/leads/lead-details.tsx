@@ -1,7 +1,9 @@
 import { useLocation, useNavigate, useParams } from "react-router";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Archive, RotateCcw } from "lucide-react";
 import UploadAgreementDialog from "@/components/leads/upload-agreement-dialog";
 import MoveToOrdersDialog from "@/components/leads/move-to-orders-dialog";
+import ArchiveLeadDialog from "@/components/leads/archive-lead-dialog";
+import RestoreLeadDialog from "@/components/leads/restore-lead-dialog";
 import BasicDetails from "@/components/leads/basic-details";
 import LeadQuotationsCard from "@/components/leads/lead-quotations-card";
 import ChatCard from "@/components/leads/chat-card";
@@ -148,6 +150,23 @@ export default function LeadDetails() {
           </div>
 
           <div className="flex items-center gap-3">
+            {!detail?.lead.isArchived && (
+              <ArchiveLeadDialog
+                leadId={leadId}
+                leadName={detail?.lead.projectName || detail?.customer?.firstName}
+                jobId={detail?.lead.jobId}
+                trigger={
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-sm shadow-md border-slate-200"
+                  >
+                    <span>Archive Lead</span>
+                  </Button>
+                }
+              />
+            )}
+
             <Button
               size="sm"
               variant="outline"
@@ -187,6 +206,55 @@ export default function LeadDetails() {
             )}
           </div>
         </div>
+
+        {detail?.lead.isArchived && (
+          <div className="mt-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-amber-200/80 bg-amber-50/60 px-4 py-3.5 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+                <Archive className="h-4.5 w-4.5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-slate-900">
+                    This lead is archived
+                  </span>
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                    Archived
+                  </span>
+                </div>
+                <p className="mt-0.5 text-xs text-slate-600">
+                  {detail.lead.archiveReason ? (
+                    <span>
+                      <strong className="font-medium text-slate-700">Reason:</strong>{" "}
+                      {detail.lead.archiveReason}
+                    </span>
+                  ) : (
+                    "No archive reason specified."
+                  )}
+                  {detail.lead.archivedAt && (
+                    <span className="ml-2 text-slate-400">
+                      • Archived on {new Date(detail.lead.archivedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <RestoreLeadDialog
+              leadId={leadId}
+              leadName={detail.lead.projectName || detail.customer?.firstName}
+              trigger={
+                <Button
+                  size="sm"
+                  className="bg-[#1D51A4] hover:bg-[#1D51A4]/90 text-white rounded-[6px] shrink-0 cursor-pointer"
+                >
+                  <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                  Restore Lead
+                </Button>
+              }
+            />
+          </div>
+        )}
 
         <div className="mt-6">
           <Tabs

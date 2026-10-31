@@ -66,6 +66,7 @@ export default function PaymentScheduleDialog({
   children,
   leadId,
   maxAmount,
+  depositType = "%",
   depositValue = "",
   existingScheduleId,
   initialType = "%",
@@ -80,7 +81,7 @@ export default function PaymentScheduleDialog({
     existingScheduleId ?? null,
   );
 
-  const { control, register, handleSubmit, reset, setValue } =
+  const { control, register, handleSubmit, reset, setValue, getValues } =
     useForm<FormValues>({
       defaultValues: { type: initialType, payments: initialPayments },
       mode: "onChange",
@@ -116,8 +117,15 @@ export default function PaymentScheduleDialog({
   const watchedPayments = useWatch({ control, name: "payments" });
   const watchedType = useWatch({ control, name: "type" }) || initialType;
 
+  const isDepositPayment = (payment: Payment, index: number) => {
+    return (
+      isDepositStageName(payment.name) ||
+      (index === 0 && !payment.name?.trim())
+    );
+  };
+
   const schedulePayments = (watchedPayments || []).filter(
-    (payment) => !isDepositStageName(payment.name || ""),
+    (payment, index) => !isDepositPayment(payment, index),
   );
 
   const paymentAmounts = schedulePayments.map(
@@ -130,28 +138,29 @@ export default function PaymentScheduleDialog({
 
   const hasMaxAmount = Number.isFinite(maxAmount) && (maxAmount ?? 0) > 0;
   const invoiceTotal = maxAmount ?? 0;
-  const depositPaymentFromForm = (watchedPayments || []).find((payment) =>
-    isDepositStageName(payment.name || ""),
+  const depositPaymentFromForm = (watchedPayments || []).find(
+    (payment, index) => isDepositPayment(payment, index),
   );
-  const currentDepositValue = depositPaymentFromForm?.amount ?? "";
-  const currentDepositType = watchedType;
-  const hasDeposit = Boolean(currentDepositValue.trim());
+  const formDepositAmount = depositPaymentFromForm?.amount?.trim() ?? "";
+  const currentDepositValue = formDepositAmount || depositValue.trim();
+  const currentDepositType = formDepositAmount
+    ? watchedType
+    : (depositType || watchedType);
+  const hasDeposit = Boolean(
+    currentDepositValue && (parseFloat(currentDepositValue) || 0) > 0,
+  );
 
-  const maxSchedulePercent = hasMaxAmount
-    ? getRemainingPercentAfterAdjustment(
-      invoiceTotal,
-      currentDepositValue,
-      currentDepositType,
-    )
-    : 100;
+  const maxSchedulePercent = getRemainingPercentAfterAdjustment(
+    invoiceTotal,
+    currentDepositValue,
+    currentDepositType,
+  );
 
-  const maxScheduleDollars = hasMaxAmount
-    ? getRemainingAfterAdjustment(
-      invoiceTotal,
-      currentDepositValue,
-      currentDepositType,
-    )
-    : Infinity;
+  const maxScheduleDollars = getRemainingAfterAdjustment(
+    invoiceTotal,
+    currentDepositValue,
+    currentDepositType,
+  );
 
   const validationError =
     watchedType === "%"
@@ -172,13 +181,9 @@ export default function PaymentScheduleDialog({
       const rem = roundPercent(Math.max(0, maxSchedulePercent - totalAmount));
       return `${rem.toFixed(2)}% Remaining`;
     }
-    if (hasMaxAmount) {
-      const rem = roundMoney(Math.max(0, maxScheduleDollars - totalAmount));
-      return `$${rem.toFixed(2)} Remaining`;
-    }
-    return `$${roundMoney(totalAmount).toFixed(2)} Total`;
+    const rem = roundMoney(Math.max(0, maxScheduleDollars - totalAmount));
+    return `$${rem.toFixed(2)} Remaining`;
   }, [
-    hasMaxAmount,
     maxScheduleDollars,
     maxSchedulePercent,
     totalAmount,
@@ -186,10 +191,10 @@ export default function PaymentScheduleDialog({
   ]);
 
   const resolveDepositPayment = (payments: Payment[]): Payment | null => {
-    const depositFromForm = payments.find((payment) =>
-      isDepositStageName(payment.name || ""),
+    const depositFromForm = payments.find((payment, index) =>
+      isDepositPayment(payment, index),
     );
-    if (depositFromForm) {
+    if (depositFromForm && depositFromForm.amount?.trim()) {
       return {
         name: "Deposit",
         amount: (depositFromForm.amount || "").trim(),
@@ -204,7 +209,8 @@ export default function PaymentScheduleDialog({
     const nonDepositPayments = payments
       .map(normalizePayment)
       .filter(
-        (payment) => isValidPayment(payment) && !isDepositStageName(payment.name),
+        (payment, index) =>
+          isValidPayment(payment) && !isDepositPayment(payment, index),
       );
 
     const depositPayment = resolveDepositPayment(payments);
@@ -222,6 +228,26 @@ export default function PaymentScheduleDialog({
     }
 
     setOpen(nextOpen);
+  };
+
+  const handleTypeChange = (newType: "%" | "$") => {
+    if (newType === watchedType) return;
+    setValue("type", newType);
+    if (hasMaxAmount && invoiceTotal > 0) {
+      const currentPayments = getValues("payments") || [];
+      const updatedPayments = currentPayments.map((p) => {
+        const val = parseFloat(p.amount);
+        if (!val || isNaN(val)) return p;
+        if (newType === "$") {
+          const dollars = roundMoney((invoiceTotal * val) / 100);
+          return { ...p, amount: String(dollars) };
+        } else {
+          const pct = roundPercent((val / invoiceTotal) * 100);
+          return { ...p, amount: String(pct) };
+        }
+      });
+      setValue("payments", updatedPayments);
+    }
   };
 
   const onSubmit = (data: FormValues) => {
@@ -283,7 +309,7 @@ export default function PaymentScheduleDialog({
                       value="%"
                       {...register("type")}
                       checked={watchedType === "%"}
-                      onChange={() => setValue("type", "%")}
+                      onChange={() => handleTypeChange("%")}
                       className="w-4 h-4"
                     />
                     <span className="text-sm">%</span>
@@ -295,7 +321,7 @@ export default function PaymentScheduleDialog({
                       value="$"
                       {...register("type")}
                       checked={watchedType === "$"}
-                      onChange={() => setValue("type", "$")}
+                      onChange={() => handleTypeChange("$")}
                       className="w-4 h-4"
                     />
                     <span className="text-sm">$</span>

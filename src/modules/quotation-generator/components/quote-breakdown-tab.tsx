@@ -23,7 +23,7 @@ interface QuoteBreakdownTabProps {
   onSaveDraft?: () => void;
   isSavingDraft?: boolean;
   extractedShipper?: ExtractShipperResponseData;
-  onSelectSf?: (sf: number) => void;
+  onSelectSf?: (sf: number, isManual?: boolean) => void;
   isManualSqFt?: boolean;
   estimateId?: string | null;
 }
@@ -70,7 +70,12 @@ export function QuoteBreakdownTab({
   isManualSqFt,
   estimateId,
 }: QuoteBreakdownTabProps) {
-  const { scope, pembEstimateId } = useQuotationStore();
+  const {
+    scope,
+    pembEstimateId,
+    materialSellOverride,
+    setMaterialSellOverride,
+  } = useQuotationStore();
   const isEditing = Boolean(estimateId || pembEstimateId);
   const [isSfBannerDismissed, setIsSfBannerDismissed] = useState(false);
 
@@ -90,11 +95,25 @@ export function QuoteBreakdownTab({
   const effectiveSqFt = pricing?.sf || extractedShipper?.squareFootage;
   const sqFt = effectiveSqFt ? formatNumber2(effectiveSqFt) : "-";
   const totalWeight = pricing?.totWt ?? extractedShipper?.totalWeightLbs;
-  const weightDisplay = totalWeight != null ? `${formatNumber2(totalWeight)} lbs` : "-";
+  const detectedWeight =
+    extractedShipper?.detectedWeightLbs ??
+    totalWeight;
+  const weightDisplay = detectedWeight != null ? `${formatNumber2(detectedWeight)} lbs` : "-";
   const trucks = pricing?.trucks != null ? pricing.trucks : "-";
   const vendorBlendSavings = formatCurrency2(pricing?.vendorBlendSavingsExact);
   const blendLabel = pricing?.blendLabel || "50% Quicken blend";
   const fileName = extractedShipper?.fileName || "";
+
+  const defaultExFreightSell =
+    pricing?.materialSellExFreight != null
+      ? pricing.materialSellExFreight
+      : pricing?.matSell != null && pricing?.freight != null
+        ? pricing.matSell - pricing.freight
+        : undefined;
+  const placeholderVal =
+    defaultExFreightSell != null
+      ? String(Math.round(defaultExFreightSell))
+      : "Auto";
 
   // Square Footage metadata from backend
   const sfMeta = extractedShipper?.squareFootageMeta;
@@ -111,11 +130,16 @@ export function QuoteBreakdownTab({
       ? (Math.abs(weightSf - coverSf) / Math.max(weightSf, coverSf)) * 100
       : 0;
 
-  let sfSubtitle = `${sqFt} SF`;
+  const fromWeightVal = sfMeta?.fromWeight ?? (effectiveSqFt ? Number(effectiveSqFt) : undefined);
+  let sfSubtitle = `${fromWeightVal != null ? formatNumber2(fromWeightVal) : sqFt} SF`;
   if (sfMeta?.source === "weight_formula") {
-    sfSubtitle += ` (from weight: ${formatNumber2(sfMeta.fromWeight ?? totalWeight ?? 0)} / 9)`;
+    const weightLbsUsed =
+      sfMeta?.weightLbsUsed ??
+      extractedShipper?.detectedWeightLbs ??
+      detectedWeight;
+    sfSubtitle += ` (from weight: ${weightLbsUsed != null ? `${formatNumber2(weightLbsUsed)} lbs` : "-"} ÷ 9)`;
   } else if (sfMeta?.source === "manual" || isManualSqFt) {
-    sfSubtitle += " (manual override)";
+    sfSubtitle = `${sqFt} SF (manual override)`;
   }
   if (sfMeta?.coverDerivedSqft) {
     sfSubtitle += ` · cover sheet SF: ${formatNumber2(sfMeta.coverDerivedSqft)}`;
@@ -146,7 +170,7 @@ export function QuoteBreakdownTab({
             <Button
               type="button"
               size="sm"
-              onClick={() => onSelectSf?.(weightSf)}
+              onClick={() => onSelectSf?.(weightSf, false)}
               className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white text-xs px-3 py-1.5 h-auto font-semibold cursor-pointer"
             >
               Use Weight SF
@@ -155,7 +179,7 @@ export function QuoteBreakdownTab({
               type="button"
               size="sm"
               variant="outline"
-              onClick={() => onSelectSf?.(coverSf)}
+              onClick={() => onSelectSf?.(coverSf, true)}
               className="border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs px-3 py-1.5 h-auto font-semibold cursor-pointer"
             >
               Use Cover SF
@@ -343,7 +367,7 @@ export function QuoteBreakdownTab({
             <tr className="bg-slate-50/90 font-bold border-t border-slate-200">
               <td className="p-3 text-slate-900 font-bold">Material total (after blend)</td>
               <td className="p-3 text-slate-900 font-bold">
-                {totalWeight != null ? `${formatNumber2(totalWeight)} lbs` : "-"}
+                {detectedWeight != null ? `${formatNumber2(detectedWeight)} lbs` : "-"}
               </td>
               <td className="p-3"></td>
               <td className="p-3 text-slate-900 font-bold">{matCost}</td>
@@ -355,6 +379,53 @@ export function QuoteBreakdownTab({
                         : `+ ${formatCurrency2(pricing.vendorBlendAdjustment)}`
                     }`
                   : ""}
+              </td>
+            </tr>
+
+            {/* Material Sell Override Row (Matching SM-QuotingTool-v5) */}
+            <tr className="bg-[#F0F7FF] border-t border-b border-[#BCD7F5]">
+              <td className="p-3" colSpan={3}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm select-none">📝</span>
+                  <span className="font-bold text-[#1E3A8A] text-xs sm:text-sm">
+                    Material Sell Override
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-normal">
+                    Enter to override shipper price
+                  </span>
+                  {pricing?.materialSellOverrideApplied && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      Applied
+                    </span>
+                  )}
+                </div>
+              </td>
+              <td className="p-3" colSpan={2}>
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-600 font-bold text-xs">$</span>
+                  <input
+                    type="number"
+                    step="1"
+                    placeholder={placeholderVal}
+                    value={materialSellOverride}
+                    onChange={(e) => setMaterialSellOverride(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.currentTarget.blur();
+                      }
+                    }}
+                    className="w-32 px-2.5 py-1 text-xs font-semibold text-slate-900 bg-white border border-[#2B6CB0] rounded-md shadow-2xs focus:outline-none focus:ring-1 focus:ring-[#2B6CB0]"
+                  />
+                  {materialSellOverride && (
+                    <button
+                      type="button"
+                      onClick={() => setMaterialSellOverride("")}
+                      className="px-2.5 py-1 bg-slate-400 hover:bg-slate-500 text-white rounded text-[11px] font-medium transition-colors cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
               </td>
             </tr>
 
