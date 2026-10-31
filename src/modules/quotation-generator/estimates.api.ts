@@ -72,7 +72,7 @@ export async function extractDrawingProvider(
   return response.data;
 }
 
-export const JOB_TYPE = ["PEMB", "Storage"] as const;
+export const JOB_TYPE = ["PEMB", "Storage", "Custom"] as const;
 export type JobType = (typeof JOB_TYPE)[number];
 export const DEFAULT_JOB_TYPE: JobType = "PEMB";
 
@@ -100,6 +100,8 @@ export interface ExtractShipperRequest {
   freightOverride?: number;
   matMuOverride?: number;
   matMuPct?: number;
+  materialSellOverride?: number;
+  matSellOverride?: number;
   deletedRowKeys?: string[];
 }
 
@@ -330,6 +332,62 @@ export async function extractShipperProvider(
   return response.data;
 }
 
+export interface CreateEstimateFromShipperRequest {
+  leadId?: string;
+  fileBase64: string;
+  fileName: string;
+  jobType?: JobType | string;
+  companyBrand?: CompanyBrand | string;
+  scope?: Scope | string;
+  roof?: string;
+  roofType?: string;
+  install?: string;
+  installDifficulty?: string;
+  squareFootage?: number;
+  sf?: number;
+  useManualSquareFootage?: boolean;
+  blendPct?: number;
+  installCostPerSf?: number;
+  sellPerSf?: number;
+  steelFinish?: string;
+  freightOverride?: number;
+  materialSellOverride?: number;
+  deletedRowKeys?: string[];
+  [key: string]: unknown;
+}
+
+export interface CreateEstimateFromShipperResponse {
+  success: boolean;
+  message?: string;
+  data: ExtractShipperResponseData & {
+    estimateId: string;
+    estimate?: SaveEstimatePayload & { _id: string };
+  };
+}
+
+/**
+ * EstimateId-first flow: Upload shipper file with leadId -> get estimateId immediately.
+ * Attempts proposed POST /api/sales/estimates/from-shipper first;
+ * falls back to extracting shipper then immediately creating a draft estimate via POST /api/sales/estimates.
+ */
+export async function createEstimateFromShipperProvider(
+  payload: CreateEstimateFromShipperRequest
+): Promise<CreateEstimateFromShipperResponse> {
+  const res = await apiClient.post<CreateEstimateFromShipperResponse>(
+    "/api/sales/estimates/from-shipper",
+    payload
+  );
+  const resData = res.data?.data;
+  const estId = resData?.estimateId || resData?.estimate?._id;
+  return {
+    ...res.data,
+    data: {
+      ...resData,
+      estimateId: estId || "",
+    },
+  };
+}
+
 export interface ComputeConcreteConfig {
   include: boolean;
   costSF?: number;
@@ -466,10 +524,17 @@ export interface ComputeEstimateResponse {
 }
 
 export async function computeEstimateProvider(
-  payload: ComputeEstimateRequest
+  payload: ComputeEstimateRequest,
+  estimateId?: string
 ): Promise<ComputeEstimateResponse> {
+  const targetId =
+    estimateId || (payload as { estimateId?: string }).estimateId;
+  const url = targetId
+    ? `/api/sales/estimates/${encodeURIComponent(targetId)}/compute`
+    : "/api/sales/estimates/compute";
+
   const response = await apiClient.post<ComputeEstimateResponse>(
-    "/api/sales/estimates/compute",
+    url,
     payload
   );
   return response.data;
@@ -522,6 +587,9 @@ export interface EstimateConversion {
 // ----------------------------------------------------------------------------
 export interface SaveEstimatePayload extends Record<string, unknown> {
   _id?: string;
+  quoteKind?: "custom" | string;
+  customQuoteId?: string;
+  customQuote?: Record<string, unknown>;
   createdBy?: string;
   leadId?: string | null;
   conversion?: EstimateConversion;
@@ -563,6 +631,8 @@ export interface SaveEstimatePayload extends Record<string, unknown> {
   cogsOverride?: ComputeCogsOverrideConfig | null;
   marginOverride?: ComputeMarginOverrideConfig | null;
   contractDetails?: Record<string, unknown> | null;
+  contract?: PreviewContractPayload | Record<string, unknown>;
+  sections?: string[];
   drawingAttachments?: Array<{ name: string; includeInQuote?: boolean; [key: string]: unknown }>;
   additionalInfo?: string;
   fullQuoteResult?: FullQuoteData | Record<string, unknown>;
@@ -974,13 +1044,67 @@ export interface ComputeStorageResponse {
   storagePricing?: StoragePricingResult;
 }
 
-export async function computeStorageProvider(
-  payload: ComputeStorageRequest
-): Promise<ComputeStorageResponse> {
-  const response = await apiClient.post<ComputeStorageResponse>(
-    "/api/sales/estimates/compute-storage",
+export interface CreateEstimateFromStorageCogRequest {
+  leadId?: string;
+  fileBase64: string;
+  fileName: string;
+  companyBrand?: CompanyBrand | string;
+  scope?: Scope | string;
+  [key: string]: unknown;
+}
+
+export interface CreateEstimateFromStorageCogResponse {
+  success: boolean;
+  message?: string;
+  data: {
+    estimateId: string;
+    estimate?: SaveEstimatePayload & { _id: string };
+    storageData?: Record<string, unknown>;
+    storagePricing?: StoragePricingResult | Record<string, unknown>;
+    storagePricingResult?: StoragePricingResult | Record<string, unknown>;
+    buildings?: Record<string, unknown>[];
+    doors?: Record<string, unknown>[];
+    extras?: Record<string, unknown>[];
+    shippingDefault?: unknown;
+    project?: Record<string, unknown>;
+    [key: string]: unknown;
+  };
+}
+
+/**
+ * EstimateId-first flow: Upload Storage COG file with leadId -> get estimateId immediately.
+ * Attempts proposed POST /api/sales/estimates/from-storage-cog first;
+ * falls back to extracting storage COG then immediately creating a draft estimate via POST /api/sales/estimates.
+ */
+export async function createEstimateFromStorageCogProvider(
+  payload: CreateEstimateFromStorageCogRequest
+): Promise<CreateEstimateFromStorageCogResponse> {
+  const res = await apiClient.post<CreateEstimateFromStorageCogResponse>(
+    "/api/sales/estimates/from-storage-cog",
     payload
   );
+  const resData = res.data?.data;
+  const estId = resData?.estimateId || resData?.estimate?._id;
+  return {
+    ...res.data,
+    data: {
+      ...resData,
+      estimateId: estId || "",
+    },
+  };
+}
+
+export async function computeStorageProvider(
+  payload: ComputeStorageRequest,
+  estimateId?: string
+): Promise<ComputeStorageResponse> {
+  const targetId =
+    estimateId || (payload as { estimateId?: string }).estimateId;
+  const url = targetId
+    ? `/api/sales/estimates/${encodeURIComponent(targetId)}/compute-storage`
+    : "/api/sales/estimates/compute-storage";
+
+  const response = await apiClient.post<ComputeStorageResponse>(url, payload);
   return response.data;
 }
 
@@ -1001,6 +1125,8 @@ export interface PreviewContractPayload {
 
 export interface PreviewDocumentRequest {
   estimateId?: string;
+  quoteKind?: "custom" | string;
+  customQuoteId?: string;
   grandTotal?: number;
   leadCompanyName?: string;
   customerEmail?: string;
@@ -1038,7 +1164,21 @@ export interface PreviewDocumentRequest {
   storagePricing?: Record<string, unknown>;
   concreteAddon?: { include?: boolean; [key: string]: unknown };
   insulationAddon?: { include?: boolean; [key: string]: unknown };
-  salesTax?: { include?: boolean; rate?: number; [key: string]: unknown };
+  salesTax?: {
+    include?: boolean;
+    includeTax?: boolean;
+    rate?: number;
+    taxRate?: number;
+    zip?: string;
+    taxZip?: string;
+    amount?: number;
+    taxableBase?: number;
+    [key: string]: unknown;
+  };
+  taxRate?: number;
+  includeTax?: boolean;
+  taxZip?: string;
+  zip?: string;
   staircase?: {
     count: number;
     unitCost: number;
@@ -1090,10 +1230,11 @@ export interface PreviewDocumentResponse {
 export async function previewDocumentProvider(
   payload: PreviewDocumentRequest
 ): Promise<PreviewDocumentResponse> {
-  const response = await apiClient.post<PreviewDocumentResponse>(
-    "/api/sales/estimates/documents/preview",
-    payload
-  );
+  const url = payload.estimateId
+    ? `/api/sales/estimates/${encodeURIComponent(payload.estimateId)}/documents/preview`
+    : "/api/sales/estimates/documents/preview";
+
+  const response = await apiClient.post<PreviewDocumentResponse>(url, payload);
   return response.data;
 }
 
