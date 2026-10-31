@@ -881,6 +881,7 @@ export async function extractStorageCogProvider(
 }
 
 export interface ComputeStorageRequest {
+  estimateId?: string;
   storageData?: Record<string, unknown>;
   shipping?: number;
   drawings?: number;
@@ -1045,6 +1046,7 @@ export interface ComputeStorageResponse {
 }
 
 export interface CreateEstimateFromStorageCogRequest {
+  estimateId?: string;
   leadId?: string;
   fileBase64: string;
   fileName: string;
@@ -1056,10 +1058,20 @@ export interface CreateEstimateFromStorageCogRequest {
 export interface CreateEstimateFromStorageCogResponse {
   success: boolean;
   message?: string;
+  estimateId?: string;
   data: {
     estimateId: string;
-    estimate?: SaveEstimatePayload & { _id: string };
-    storageData?: Record<string, unknown>;
+    estimate?: SaveEstimatePayload & { _id: string; [key: string]: unknown };
+    squareFootage?: number;
+    storageData?: {
+      buildings?: Record<string, unknown>[];
+      doors?: Record<string, unknown>[];
+      extras?: Record<string, unknown>[];
+      shipping?: number;
+      installSellPerSf?: number;
+      installCostPerSf?: number;
+      [key: string]: unknown;
+    };
     storagePricing?: StoragePricingResult | Record<string, unknown>;
     storagePricingResult?: StoragePricingResult | Record<string, unknown>;
     buildings?: Record<string, unknown>[];
@@ -1067,6 +1079,8 @@ export interface CreateEstimateFromStorageCogResponse {
     extras?: Record<string, unknown>[];
     shippingDefault?: unknown;
     project?: Record<string, unknown>;
+    format?: string;
+    note?: string;
     [key: string]: unknown;
   };
 }
@@ -1079,17 +1093,84 @@ export interface CreateEstimateFromStorageCogResponse {
 export async function createEstimateFromStorageCogProvider(
   payload: CreateEstimateFromStorageCogRequest
 ): Promise<CreateEstimateFromStorageCogResponse> {
-  const res = await apiClient.post<CreateEstimateFromStorageCogResponse>(
-    "/api/sales/estimates/from-storage-cog",
-    payload
+  try {
+    const res = await apiClient.post<CreateEstimateFromStorageCogResponse>(
+      "/api/sales/estimates/from-storage-cog",
+      payload
+    );
+    const rawData = res.data as unknown as Record<string, unknown> | undefined;
+    const resData = (rawData?.data || rawData) as Record<string, unknown> | undefined;
+    const estId =
+      (rawData?.estimateId as string) ||
+      (resData?.estimateId as string) ||
+      ((resData?.estimate as Record<string, unknown>)?._id as string) ||
+      (rawData?._id as string) ||
+      (resData?._id as string) ||
+      payload.estimateId ||
+      "";
+
+    if (res.data?.success !== false) {
+      return {
+        ...res.data,
+        estimateId: estId,
+        data: {
+          ...resData,
+          estimateId: estId,
+        },
+      } as CreateEstimateFromStorageCogResponse;
+    }
+  } catch (err) {
+    console.warn(
+      "POST /api/sales/estimates/from-storage-cog failed, falling back to extractStorageCogProvider + saveEstimateProvider:",
+      err
+    );
+  }
+
+  // Fallback: extract storage COG then create a draft estimate
+  const extractRes = await extractStorageCogProvider({
+    fileBase64: payload.fileBase64,
+    fileName: payload.fileName,
+  });
+  const extData =
+    extractRes.data || (extractRes as unknown as Record<string, unknown>);
+  const buildings = (extData.buildings || []) as Record<string, unknown>[];
+  const doors = (extData.doors || []) as Record<string, unknown>[];
+  const extras = (extData.extras || []) as Record<string, unknown>[];
+  const storageData = (extData.storageData || {
+    buildings,
+    doors,
+    extras,
+    project: extData.project || {},
+  }) as Record<string, unknown>;
+
+  const draftRes = await saveEstimateProvider(
+    {
+      _id: payload.estimateId,
+      leadId: payload.leadId,
+      jobType: "Storage",
+      companyBrand: payload.companyBrand as CompanyBrand | undefined,
+      scope: payload.scope as Scope | undefined,
+      sourceFileName: payload.fileName,
+      storageData,
+      status: "draft",
+    },
+    payload.estimateId
   );
-  const resData = res.data?.data;
-  const estId = resData?.estimateId || resData?.estimate?._id;
+  const draftData = draftRes.data || draftRes;
+  const newEstId =
+    draftData?.estimate?._id || draftData?._id || payload.estimateId || "";
+
   return {
-    ...res.data,
+    success: true,
+    estimateId: newEstId,
     data: {
-      ...resData,
-      estimateId: estId || "",
+      estimateId: newEstId,
+      estimate: draftData?.estimate,
+      storageData,
+      buildings,
+      doors,
+      extras,
+      project: (extData.project || {}) as Record<string, unknown>,
     },
   };
 }
@@ -1099,12 +1180,18 @@ export async function computeStorageProvider(
   estimateId?: string
 ): Promise<ComputeStorageResponse> {
   const targetId =
-    estimateId || (payload as { estimateId?: string }).estimateId;
+    estimateId ||
+    payload.estimateId ||
+    (payload as { _id?: string })._id ||
+    (payload as { id?: string }).id;
   const url = targetId
     ? `/api/sales/estimates/${encodeURIComponent(targetId)}/compute-storage`
     : "/api/sales/estimates/compute-storage";
 
-  const response = await apiClient.post<ComputeStorageResponse>(url, payload);
+  const response = await apiClient.post<ComputeStorageResponse>(url, {
+    ...payload,
+    ...(targetId ? { estimateId: targetId } : {}),
+  });
   return response.data;
 }
 

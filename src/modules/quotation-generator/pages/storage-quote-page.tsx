@@ -51,6 +51,8 @@ import {
   taxLookupProvider,
   type SaveEstimatePayload,
   type PreviewDocumentRequest,
+  type ComputeStorageRequest,
+  type CreateEstimateFromStorageCogResponse,
 } from "../estimates.api";
 import { hydrateEstimateIntoStore } from "../hooks/use-load-estimate-to-editor";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
@@ -194,7 +196,31 @@ export default function StorageQuotePage() {
     navState.storagePricing ||
     (storeStoragePricing as StoragePricing | null) ||
     null;
-  const estimateId = navState.estimateId || storeStorageEstimateId || null;
+  const [searchParams] = useSearchParams();
+  const urlEstimateId =
+    searchParams.get("estimateId") || searchParams.get("id");
+  const initialEstimateId =
+    navState.estimateId || urlEstimateId || storeStorageEstimateId || null;
+  const [estimateId, setEstimateId] = useState<string | null>(initialEstimateId);
+  const estimateIdRef = useRef<string | null>(initialEstimateId);
+
+  useEffect(() => {
+    estimateIdRef.current = estimateId;
+  }, [estimateId]);
+
+  useEffect(() => {
+    const eid = navState.estimateId || urlEstimateId || storeStorageEstimateId;
+    if (eid && eid !== estimateIdRef.current) {
+      estimateIdRef.current = eid;
+      setEstimateId(eid);
+      setStorageEstimateId(eid);
+    }
+  }, [
+    navState.estimateId,
+    urlEstimateId,
+    storeStorageEstimateId,
+    setStorageEstimateId,
+  ]);
   const sourceFileName = navState.sourceFileName || storeStorageFileName || "";
   const globalMarkup = storeGlobalMarkup ?? 0;
   const shippingVal = storeShipping ?? 0;
@@ -265,7 +291,13 @@ export default function StorageQuotePage() {
       setStorageData(navState.storageData as Record<string, unknown>);
     if (navState.storagePricing)
       setStoragePricing(navState.storagePricing as Record<string, unknown>);
-    if (navState.estimateId) setStorageEstimateId(navState.estimateId);
+    const resolvedEid =
+      navState.estimateId || urlEstimateId || storeStorageEstimateId;
+    if (resolvedEid) {
+      setStorageEstimateId(resolvedEid);
+      setEstimateId(resolvedEid);
+      estimateIdRef.current = resolvedEid;
+    }
     if (navState.sourceFileName) setStorageFileName(navState.sourceFileName);
     if (navState.customerLeadName)
       setStorageCustomerLeadName(navState.customerLeadName);
@@ -275,6 +307,8 @@ export default function StorageQuotePage() {
     if (navState.jobNumber) setStorageJobNumber(navState.jobNumber);
   }, [
     navState,
+    urlEstimateId,
+    storeStorageEstimateId,
     setStorageData,
     setStoragePricing,
     setStorageEstimateId,
@@ -297,7 +331,6 @@ export default function StorageQuotePage() {
   const setSourceFileName = setStorageFileName;
   const insulationRoofR = insulationRValueRoof || "R-19";
   const insulationWallR = insulationRValueWalls || "R-13";
-  const [searchParams] = useSearchParams();
   const initialLeadId =
     searchParams.get("lead") ||
     searchParams.get("leadId") ||
@@ -418,10 +451,13 @@ export default function StorageQuotePage() {
     setSquareFootage,
   ]);
 
-  const urlEstimateId =
-    searchParams.get("estimateId") || searchParams.get("id");
   const effectiveEstimateId =
-    navState.estimateId || urlEstimateId || storeStorageEstimateId || null;
+    estimateIdRef.current ||
+    estimateId ||
+    navState.estimateId ||
+    urlEstimateId ||
+    storeStorageEstimateId ||
+    null;
 
   // Hydrate from GET /api/sales/estimates/:estimateId if estimateId exists but storageData is missing
   const [isHydratingStorageEstimate, setIsHydratingStorageEstimate] =
@@ -474,9 +510,22 @@ export default function StorageQuotePage() {
   // API-driven recalculation
   const triggerApiCompute = useCallback(
     async (currentStorageData: StorageData | null) => {
-      if (!currentStorageData) return;
+      if (
+        !currentStorageData ||
+        !currentStorageData.buildings ||
+        currentStorageData.buildings.length === 0
+      ) {
+        return;
+      }
       setIsComputing(true);
       try {
+        let activeEstId =
+          estimateIdRef.current ||
+          estimateId ||
+          storeStorageEstimateId ||
+          urlEstimateId ||
+          undefined;
+
         const effectiveInstallSell =
           scope.toLowerCase() === "supply" ? 0 : installSell;
         const effectiveInstallCost =
@@ -500,19 +549,75 @@ export default function StorageQuotePage() {
           },
         );
 
-        const payload = {
-          storageData: {
-            buildings: currentStorageData.buildings || [],
-            doors: currentStorageData.doors || [],
-            extras:
-              effectiveExtras.length > 0
-                ? effectiveExtras
-                : currentStorageData.extras || [],
-            shipping: shippingVal,
-            drawings: drawingsVal,
-            installSellPerSf: effectiveInstallSell,
-            installCostPerSf: effectiveInstallCost,
-          },
+        const currentStoragePayloadData = {
+          ...currentStorageData,
+          buildings: currentStorageData.buildings || [],
+          doors: currentStorageData.doors || [],
+          extras: effectiveExtras,
+          shipping: shippingVal,
+          drawings: drawingsVal,
+          installSellPerSf: effectiveInstallSell,
+          installCostPerSf: effectiveInstallCost,
+        };
+
+        const saveEstimateBody: SaveEstimatePayload = {
+          _id: activeEstId,
+          leadId: selectedLeadId || activeLeadId || undefined,
+          jobType: "Storage",
+          companyBrand,
+          scope:
+            scope.toLowerCase() === "supply"
+              ? "Supply"
+              : scope.toLowerCase() === "install"
+                ? "Install"
+                : "Both",
+          leadCompanyName:
+            customerLeadName ||
+            currentStorageData.project?.customer ||
+            "Storage Project",
+          customerEmail,
+          streetAddress: customerAddress,
+          cityStateZip: customerAddress,
+          jobNumber:
+            jobNumber || currentStorageData.project?.jobNumber || "",
+          sourceFileName,
+          storageData: currentStoragePayloadData as Record<string, unknown>,
+          status: "draft",
+        };
+
+        // Ensure estimate exists and has storageData.buildings saved before computing
+        if (!activeEstId) {
+          try {
+            const draftRes = await saveEstimateProvider(saveEstimateBody);
+            const draftData = draftRes.data || draftRes;
+            const newId = draftData?.estimate?._id || draftData?._id;
+            if (newId) {
+              activeEstId = newId;
+              estimateIdRef.current = newId;
+              setEstimateId(newId);
+              setStorageEstimateId(newId);
+            }
+          } catch (createErr) {
+            console.warn(
+              "Failed to auto-create draft estimate before computing storage:",
+              createErr,
+            );
+          }
+        } else {
+          // Update server estimate first so storageData.buildings exists on the estimate document
+          try {
+            await saveEstimateProvider(saveEstimateBody, activeEstId);
+          } catch (saveErr) {
+            console.warn("Failed to sync storageData before compute-storage:", saveErr);
+          }
+        }
+
+        const payload: ComputeStorageRequest = {
+          estimateId: activeEstId,
+          storageData: currentStoragePayloadData as Record<string, unknown>,
+          buildings: currentStorageData.buildings || [],
+          doors: currentStorageData.doors || [],
+          extras: effectiveExtras,
           shipping: shippingVal,
           drawings: drawingsVal,
           installSellPerSf: effectiveInstallSell,
@@ -554,45 +659,10 @@ export default function StorageQuotePage() {
           })),
         };
 
-        const activeEstId = estimateId || storeStorageEstimateId || undefined;
         const res = await computeStorageProvider(payload, activeEstId);
         const data = res.data || res;
         if (data?.storagePricing) {
           setStoragePricing(data.storagePricing as StoragePricing);
-
-          // Keep server estimate updated as single source of truth
-          if (activeEstId) {
-            saveEstimateProvider(
-              {
-                _id: activeEstId,
-                leadId: selectedLeadId || activeLeadId || undefined,
-                jobType: "Storage",
-                companyBrand,
-                scope:
-                  scope.toLowerCase() === "supply"
-                    ? "Supply"
-                    : scope.toLowerCase() === "install"
-                      ? "Install"
-                      : "Both",
-                leadCompanyName:
-                  customerLeadName ||
-                  currentStorageData.project?.customer ||
-                  "Storage Project",
-                customerEmail,
-                streetAddress: customerAddress,
-                cityStateZip: customerAddress,
-                jobNumber:
-                  jobNumber || currentStorageData.project?.jobNumber || "",
-                sourceFileName,
-                storageData: {
-                  ...currentStorageData,
-                  extras: effectiveExtras,
-                } as Record<string, unknown>,
-                status: "draft",
-              },
-              activeEstId,
-            ).catch(() => {});
-          }
         }
       } catch (err) {
         console.error("Failed to compute storage pricing via API:", err);
@@ -601,6 +671,17 @@ export default function StorageQuotePage() {
       }
     },
     [
+      estimateId,
+      storeStorageEstimateId,
+      urlEstimateId,
+      selectedLeadId,
+      activeLeadId,
+      companyBrand,
+      customerLeadName,
+      customerEmail,
+      customerAddress,
+      jobNumber,
+      sourceFileName,
       shippingVal,
       drawingsVal,
       scope,
@@ -619,8 +700,10 @@ export default function StorageQuotePage() {
       insulationWallR,
       taxRate,
       includeTax,
+      taxZip,
       pembAddOns,
       setStoragePricing,
+      setStorageEstimateId,
     ],
   );
 
@@ -648,7 +731,15 @@ export default function StorageQuotePage() {
 
     try {
       const base64 = await fileToBase64(file);
+      const curEstId =
+        estimateIdRef.current ||
+        estimateId ||
+        storeStorageEstimateId ||
+        urlEstimateId ||
+        undefined;
+
       const apiRes = await createEstimateFromStorageCogProvider({
+        estimateId: curEstId,
         leadId: selectedLeadId || activeLeadId || undefined,
         fileBase64: base64,
         fileName: file.name,
@@ -656,44 +747,71 @@ export default function StorageQuotePage() {
         scope,
       });
 
-      const responsePayload = apiRes.data || apiRes;
-      const newEstimateId = responsePayload.estimateId;
+      const rawRes = apiRes as unknown as Record<string, unknown>;
+      const responsePayload =
+        (apiRes.data || apiRes) as unknown as CreateEstimateFromStorageCogResponse["data"];
+      const newEstimateId =
+        (rawRes?.estimateId as string) ||
+        responsePayload?.estimateId ||
+        responsePayload?.estimate?._id ||
+        (responsePayload as { _id?: string })?._id ||
+        curEstId;
+
       if (newEstimateId) {
+        estimateIdRef.current = newEstimateId;
+        setEstimateId(newEstimateId);
         setStorageEstimateId(newEstimateId);
       }
 
-      const buildingsList: StorageBuildingItem[] = (
-        responsePayload.buildings || []
-      ).map((b: Record<string, unknown>, idx: number) => {
-        const cogs = Number(b.cogs || b.cost || 0);
-        const markup = Number(b.markup ?? 25);
-        const sqft = Number(b.sqft || b.squareFootage || 0);
-        const psf = sqft > 0 ? cogs / sqft : Number(b.psf || 0);
-        return {
-          name: String(b.name || `Building ${idx + 1}`),
-          width: Number(b.width || 0),
-          length: Number(b.length || 0),
-          loEave: Number(b.loEave || b.eaveHeight || 0),
-          hiEave: Number(b.hiEave || b.loEave || b.eaveHeight || 0),
-          eaveHeight: Number(b.loEave || b.eaveHeight || 0),
-          roofPitch: String(b.roofPitch || b.pitch || "0.5:12"),
-          slope: String(b.slope || b.roofPitch || "0.5:12"),
-          sqft,
-          squareFootage: sqft,
-          psf,
-          cogs,
-          cost: cogs,
-          markup,
-          sellPrice: Number(b.sellPrice || b.sale) || 0,
-          roofType: String(b.roofType || "screw-down"),
-          wallPanel: String(b.wallPanel || b.wallColor || "26ga R-Loc"),
-          roofPanel: String(b.roofPanel || "26ga Galvalume"),
-          wallColor: String(b.wallPanel || b.wallColor || "26ga R-Loc"),
-          doors: String(b.doors || ""),
-        };
-      });
+      const rawStorageData =
+        (responsePayload.storageData as Record<string, unknown>) ||
+        (responsePayload.estimate?.storageData as Record<string, unknown>) ||
+        {};
 
-      const doorsList: StorageDoorItem[] = (responsePayload.doors || []).map(
+      const rawBuildings = (rawStorageData.buildings ||
+        responsePayload.buildings ||
+        []) as Record<string, unknown>[];
+
+      const rawDoors = (rawStorageData.doors ||
+        responsePayload.doors ||
+        []) as Record<string, unknown>[];
+
+      const rawExtras = (rawStorageData.extras ||
+        responsePayload.extras ||
+        []) as Record<string, unknown>[];
+
+      const buildingsList: StorageBuildingItem[] = rawBuildings.map(
+        (b: Record<string, unknown>, idx: number) => {
+          const cogs = Number(b.cogs || b.cost || 0);
+          const markup = Number(b.markup ?? 25);
+          const sqft = Number(b.sqft || b.squareFootage || 0);
+          const psf = sqft > 0 ? cogs / sqft : Number(b.psf || 0);
+          return {
+            name: String(b.name || `Building ${idx + 1}`),
+            width: Number(b.width || 0),
+            length: Number(b.length || 0),
+            loEave: Number(b.loEave || b.eaveHeight || 0),
+            hiEave: Number(b.hiEave || b.loEave || b.eaveHeight || 0),
+            eaveHeight: Number(b.loEave || b.eaveHeight || 0),
+            roofPitch: String(b.roofPitch || b.pitch || "0.5:12"),
+            slope: String(b.slope || b.roofPitch || "0.5:12"),
+            sqft,
+            squareFootage: sqft,
+            psf,
+            cogs,
+            cost: cogs,
+            markup,
+            sellPrice: Number(b.sellPrice || b.sale || b.sell) || 0,
+            roofType: String(b.roofType || "screw-down"),
+            wallPanel: String(b.wallPanel || b.wallColor || "26ga R-Loc"),
+            roofPanel: String(b.roofPanel || "26ga Galvalume"),
+            wallColor: String(b.wallPanel || b.wallColor || "26ga R-Loc"),
+            doors: String(b.doors || ""),
+          };
+        },
+      );
+
+      const doorsList: StorageDoorItem[] = rawDoors.map(
         (d: Record<string, unknown>) => {
           const qty = Number(d.qty || d.quantity || d.count || 0);
           const unitCost = Number(d.unitCost || d.costPerUnit || 0);
@@ -710,15 +828,15 @@ export default function StorageQuotePage() {
             cogs,
             totalCost: cogs,
             markup,
-            sale: Number(d.sale || d.totalSell) || 0,
+            sale: Number(d.sale || d.totalSell || d.sell) || 0,
             sellPerUnit: Number(d.sellPerUnit) || 0,
-            totalSell: Number(d.sale || d.totalSell) || 0,
+            totalSell: Number(d.sale || d.totalSell || d.sell) || 0,
             color: String(d.color || "Standard"),
           };
         },
       );
 
-      const extrasList: StorageExtraItem[] = (responsePayload.extras || []).map(
+      const extrasList: StorageExtraItem[] = rawExtras.map(
         (x: Record<string, unknown>) => {
           const cogs = Number(x.cogs || x.cost || 0);
           const markup = Number(x.markup ?? 25);
@@ -737,18 +855,42 @@ export default function StorageQuotePage() {
       );
 
       const shipVal =
-        typeof responsePayload.shippingDefault === "number"
+        Number(rawStorageData.shipping) ||
+        (typeof responsePayload.shippingDefault === "number"
           ? responsePayload.shippingDefault
           : Number(
               (responsePayload.shippingDefault as Record<string, unknown>)
                 ?.freightCost,
-            ) || 0;
+            ) || 0);
       setShippingVal(shipVal);
 
-      const proj = responsePayload.project || {};
-      if (proj.customer) setCustomerLeadName(String(proj.customer));
-      if (proj.location) setCustomerAddress(String(proj.location));
-      if (proj.jobNumber) setJobNumber(String(proj.jobNumber));
+      const installSellVal = Number(rawStorageData.installSellPerSf);
+      if (installSellVal > 0) setInstallSell(installSellVal);
+      const installCostVal = Number(rawStorageData.installCostPerSf);
+      if (installCostVal > 0) setInstallCost(installCostVal);
+
+      const proj =
+        responsePayload.project ||
+        (rawStorageData.project as Record<string, unknown>) ||
+        {};
+      const custName =
+        proj.customer ||
+        responsePayload.estimate?.leadCompanyName ||
+        "";
+      if (custName) setCustomerLeadName(String(custName));
+
+      const custAddr =
+        proj.location ||
+        responsePayload.estimate?.cityStateZip ||
+        responsePayload.estimate?.streetAddress ||
+        "";
+      if (custAddr) setCustomerAddress(String(custAddr));
+
+      const jobNum =
+        proj.jobNumber ||
+        responsePayload.estimate?.jobNumber ||
+        "";
+      if (jobNum) setJobNumber(String(jobNum));
 
       const newStorageData: StorageData = {
         buildings: buildingsList,
@@ -760,10 +902,12 @@ export default function StorageQuotePage() {
           trucks: 1,
         },
         project: {
-          customer: String(proj.customer || ""),
-          location: String(proj.location || ""),
-          quoteDate: String(proj.date || ""),
-          jobNumber: String(proj.jobNumber || ""),
+          customer: String(custName || ""),
+          location: String(custAddr || ""),
+          quoteDate: String(
+            proj.date || responsePayload.estimate?.quoteDate || "",
+          ),
+          jobNumber: String(jobNum || ""),
         },
       };
 
@@ -784,11 +928,13 @@ export default function StorageQuotePage() {
         );
       }
 
-      if (responsePayload.storagePricing || responsePayload.storagePricingResult) {
-        setStoragePricing(
-          (responsePayload.storagePricing ||
-            responsePayload.storagePricingResult) as StoragePricing,
-        );
+      const pricingObj =
+        responsePayload.storagePricing ||
+        responsePayload.estimate?.storagePricingResult ||
+        responsePayload.storagePricingResult;
+
+      if (pricingObj) {
+        setStoragePricing(pricingObj as StoragePricing);
       } else {
         triggerApiCompute(newStorageData);
       }
