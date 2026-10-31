@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Loader2,
@@ -17,11 +18,11 @@ import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/lib/api-error";
 import {
-  getEstimateByIdProvider,
   downloadPdfProvider,
   type SaveEstimatePayload,
   type PreviewDocumentRequest,
 } from "../estimates.api";
+import { downloadCustomQuotePdfProvider } from "../custom-quotes.api";
 import { downloadPdfFromBase64 } from "../utils/pdf-download";
 import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
 import { ServerDocumentPreview } from "../components/server-document-preview";
@@ -31,7 +32,9 @@ import {
   submitQuotationForApprovalProvider,
   QuotationWorkflowBadge,
   normalizeWorkflowStatus,
+  convertCustomQuoteToQuotationProvider,
 } from "@/modules/quotations/quotations.api";
+import { useEstimateDetailQuery } from "../estimates.hooks";
 import { MilestonePaymentsModal } from "../components/milestone-payments-modal";
 import { RequestDepositModal } from "../components/request-deposit-modal";
 import { SubmitApprovalModal } from "../components/submit-approval-modal";
@@ -40,11 +43,40 @@ import { SendQuotationModal } from "../components/send-quotation-modal";
 export function EstimateDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const previewSectionRef = useRef<HTMLDivElement>(null);
 
-  const [estimate, setEstimate] = useState<SaveEstimatePayload | null>(null);
-  const [isFetching, setIsFetching] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const {
+    data: queriedEstimate,
+    isLoading: isFetching,
+    error: queryError,
+    refetch: refetchEstimateDetail,
+  } = useEstimateDetailQuery(id);
+
+  const [localEstimateOverride, setLocalEstimateOverride] =
+    useState<SaveEstimatePayload | null>(null);
+
+  // Fallback to query error message if query failed
+  const fetchError = queryError
+    ? (queryError as { response?: { data?: { message?: string } } })?.response
+        ?.data?.message ||
+      queryError.message ||
+      "Failed to load estimate details. Please try again."
+    : null;
+
+  // Active estimate: prefer local optimistic update if present, otherwise React Query cache
+  const estimate = localEstimateOverride ?? queriedEstimate ?? null;
+  const setEstimate = (
+    updater:
+      | SaveEstimatePayload
+      | null
+      | ((prev: SaveEstimatePayload | null) => SaveEstimatePayload | null),
+  ) => {
+    setLocalEstimateOverride((prev) => {
+      const current = prev ?? queriedEstimate ?? null;
+      return typeof updater === "function" ? updater(current) : updater;
+    });
+  };
 
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
@@ -56,39 +88,19 @@ export function EstimateDetailPage() {
   const { loadAndEdit, isLoading: isEditing } = useLoadEstimateToEditor();
   const convertMutation = useConvertEstimateToQuotationMutation();
 
-  const fetchEstimateDetail = useCallback(async () => {
-    if (!id) return;
-    setIsFetching(true);
-    setFetchError(null);
-    try {
-      const res = await getEstimateByIdProvider(id);
-      const fetchedData = res.data || res;
-      if ((fetchedData as { estimate?: SaveEstimatePayload })?.estimate) {
-        setEstimate(
-          (fetchedData as { estimate: SaveEstimatePayload }).estimate,
-        );
-      } else {
-        setEstimate(fetchedData as SaveEstimatePayload);
-      }
-    } catch (err: unknown) {
-      console.error("Failed to load estimate detail:", err);
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message || "Failed to load estimate details. Please try again.";
-      setFetchError(msg);
-    } finally {
-      setIsFetching(false);
-    }
-  }, [id]);
-
-  useEffect(() => {
-    fetchEstimateDetail();
-  }, [fetchEstimateDetail]);
-
   const isStorage = useMemo(() => {
     return (
       estimate?.jobType?.toUpperCase() === "STORAGE" ||
       Boolean(estimate?.storageData)
+    );
+  }, [estimate]);
+
+  const isCustom = useMemo(() => {
+    return Boolean(
+      estimate?.quoteKind === "custom" ||
+      (estimate as Record<string, unknown>)?.kind === "custom" ||
+      estimate?.jobType?.toUpperCase() === "CUSTOM" ||
+      (estimate as Record<string, unknown>)?.customQuote
     );
   }, [estimate]);
 
@@ -104,9 +116,7 @@ export function EstimateDetailPage() {
   const effectiveQuotationId = conversion?.quotationId;
 
   const rawWorkflowStatus =
-    conversion?.workflowStatus ||
-    estimate?.workflowStatus ||
-    "draft";
+    conversion?.workflowStatus || estimate?.workflowStatus || "draft";
 
   const effectiveStatus = useMemo(() => {
     // If not converted to quotation yet, it is a draft
@@ -120,14 +130,27 @@ export function EstimateDetailPage() {
     rawWorkflowStatus,
   ]);
 
-  // Server document preview request payload (History requires only estimateId and sections)
+  // Server document preview request payload (reflects opened/saved sections, attachments & add-ons)
+  const resolvedSections = useMemo(() => {
+    if (estimate?.sections && estimate.sections.length > 0) {
+      return estimate.sections;
+    }
+    if (estimate?.drawingAttachments && estimate.drawingAttachments.length > 0) {
+      return ["quote", "sow", "contract", "drawings"];
+    }
+    return ["quote", "sow", "contract"];
+  }, [estimate?.sections, estimate?.drawingAttachments]);
+
   const previewPayload: PreviewDocumentRequest | null = useMemo(() => {
-    if (!id) return null;
+    if (!id || !estimate) return null;
     return {
       estimateId: id,
+      quoteKind: isCustom ? "custom" : undefined,
+      customQuoteId: isCustom ? id : undefined,
       companyBrand: estimate?.companyBrand,
-      sections: ["quote", "sow", "contract"],
-      jobType: isStorage ? "Storage" : "PEMB",
+      sections: resolvedSections,
+      drawingAttachments: estimate?.drawingAttachments,
+      jobType: isCustom ? "Custom" : isStorage ? "Storage" : "PEMB",
       sourceFileName: estimate?.sourceFileName,
       customerLeadName,
       customerAddress,
@@ -136,12 +159,23 @@ export function EstimateDetailPage() {
       pricingResult: estimate?.pricingResult,
       storageData: estimate?.storageData || undefined,
       storagePricingResult: estimate?.storagePricingResult || undefined,
-      fullQuote: estimate?.fullQuoteResult,
+      fullQuote:
+        estimate?.fullQuoteResult ||
+        ((estimate as Record<string, unknown>)?.fullQuote as
+          | Record<string, unknown>
+          | undefined),
+      concreteAddon: estimate?.concreteAddon,
+      insulationAddon: estimate?.insulationAddon,
+      salesTax: estimate?.salesTax,
+      contract: estimate?.contract,
+      milestones: estimate?.milestoneSchedule || estimate?.milestones,
     };
   }, [
     id,
     estimate,
+    isCustom,
     isStorage,
+    resolvedSections,
     customerLeadName,
     customerAddress,
     customerEmail,
@@ -163,10 +197,30 @@ export function EstimateDetailPage() {
     if (!id) return;
     setIsDownloadingPdf(true);
     try {
+      if (isCustom) {
+        const pdfRes = await downloadCustomQuotePdfProvider(id, {
+          company: estimate?.companyBrand,
+        });
+        const b64 = pdfRes.data?.fileBase64 || pdfRes.fileBase64;
+        if (b64) {
+          downloadPdfFromBase64(
+            b64,
+            pdfRes.data?.fileName ||
+              pdfRes.fileName ||
+              `${customerLeadName || "Custom"}_Quote.pdf`,
+            pdfRes.data?.mimeType || pdfRes.mimeType || "application/pdf",
+          );
+          toast.success("PDF downloaded successfully");
+        } else {
+          toast.error("No PDF content returned by server");
+        }
+        return;
+      }
+
       const res = await downloadPdfProvider(
         {
           estimateId: id,
-          jobType: isStorage ? "Storage" : "PEMB",
+          jobType: isCustom ? "Custom" : isStorage ? "Storage" : "PEMB",
           format: "pdf",
           customerLeadName,
           customerEmail,
@@ -175,10 +229,20 @@ export function EstimateDetailPage() {
           pricingResult: estimate?.pricingResult,
           storageData: estimate?.storageData || undefined,
           storagePricingResult: estimate?.storagePricingResult || undefined,
-          fullQuote: estimate?.fullQuoteResult,
-          sections: ["quote", "sow", "contract"],
+          fullQuote:
+            estimate?.fullQuoteResult ||
+            ((estimate as Record<string, unknown>)?.fullQuote as
+              | Record<string, unknown>
+              | undefined),
+          sections: resolvedSections,
+          drawingAttachments: estimate?.drawingAttachments,
+          concreteAddon: estimate?.concreteAddon,
+          insulationAddon: estimate?.insulationAddon,
+          salesTax: estimate?.salesTax,
+          contract: estimate?.contract,
+          milestones: estimate?.milestoneSchedule || estimate?.milestones,
         },
-        id
+        id,
       );
 
       const pdfData = res?.data || res;
@@ -186,7 +250,7 @@ export function EstimateDetailPage() {
         downloadPdfFromBase64(
           pdfData.fileBase64,
           pdfData.fileName || `${customerLeadName || "Estimate"}_Quote.pdf`,
-          pdfData.mimeType || "application/pdf"
+          pdfData.mimeType || "application/pdf",
         );
         toast.success("PDF downloaded successfully");
       } else {
@@ -208,16 +272,27 @@ export function EstimateDetailPage() {
     (
       prev: SaveEstimatePayload,
       updates: {
-        approvalStatus: "not_submitted" | "pending_approval" | "approved" | "rejected";
-        workflowStatus: "draft" | "pending_approval" | "approved" | "rejected" | "sent";
+        approvalStatus:
+          | "not_submitted"
+          | "pending_approval"
+          | "approved"
+          | "rejected";
+        workflowStatus:
+          | "draft"
+          | "pending_approval"
+          | "approved"
+          | "rejected"
+          | "sent";
         quotationId?: string | null;
         isConvertedToQuotation?: boolean;
-      }
+      },
     ): SaveEstimatePayload => {
       const currentConversion = prev.conversion;
       const isConverted =
         updates.isConvertedToQuotation ??
-        Boolean(updates.quotationId || currentConversion?.isConvertedToQuotation);
+        Boolean(
+          updates.quotationId || currentConversion?.isConvertedToQuotation,
+        );
 
       return {
         ...prev,
@@ -240,11 +315,15 @@ export function EstimateDetailPage() {
         },
       };
     },
-    []
+    [],
   );
 
   const handleEditClick = async () => {
     try {
+      if (isCustom) {
+        navigate(`/quotation/custom?id=${estimate?._id || id}`);
+        return;
+      }
       if (estimate) {
         await loadAndEdit(estimate);
       } else if (id) {
@@ -292,7 +371,10 @@ export function EstimateDetailPage() {
             </Button>
             <Button
               type="button"
-              onClick={fetchEstimateDetail}
+              onClick={() => {
+                setLocalEstimateOverride(null);
+                void refetchEstimateDetail();
+              }}
               className="bg-rose-600 hover:bg-rose-700 text-white"
             >
               Retry
@@ -327,9 +409,17 @@ export function EstimateDetailPage() {
                   Quote #{quoteNumber}
                 </span>
               )}
-              {isStorage && (
+              {isCustom ? (
+                <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 font-bold text-xs border border-purple-200">
+                  Custom Quote
+                </span>
+              ) : isStorage ? (
                 <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 font-bold text-xs border border-amber-200">
                   Mini Storage
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-bold text-xs border border-blue-200">
+                  PEMB
                 </span>
               )}
             </div>
@@ -365,9 +455,7 @@ export function EstimateDetailPage() {
               type="button"
               onClick={() => {
                 if (effectiveQuotationId) {
-                  navigate(
-                    `/leads/quotation-details/${effectiveQuotationId}`,
-                  );
+                  navigate(`/leads/quotation-details/${effectiveQuotationId}`);
                 } else {
                   navigate("/leads/quotation-list");
                 }
@@ -400,9 +488,7 @@ export function EstimateDetailPage() {
                   type="button"
                   variant="outline"
                   onClick={() =>
-                    navigate(
-                      `/leads/quotation-details/${effectiveQuotationId}`,
-                    )
+                    navigate(`/leads/quotation-details/${effectiveQuotationId}`)
                   }
                   className="px-3.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs border-slate-300"
                   title="View official quotation"
@@ -442,9 +528,7 @@ export function EstimateDetailPage() {
             <Button
               type="button"
               onClick={() =>
-                navigate(
-                  `/leads/quotation-details/${effectiveQuotationId}`,
-                )
+                navigate(`/leads/quotation-details/${effectiveQuotationId}`)
               }
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
               title="View sent quotation"
@@ -479,21 +563,21 @@ export function EstimateDetailPage() {
           {/* Edit Estimate Button (Always available for sales unless rejected CTA shown above) */}
           {effectiveStatus !== "admin_rejected" &&
             effectiveStatus !== "client_rejected" && (
-            <Button
-              type="button"
-              onClick={handleEditClick}
-              disabled={isEditing}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
-              title="Load this estimate into generator editor to modify"
-            >
-              {isEditing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <FileEdit className="h-4 w-4" />
-              )}
-              Edit Estimate
-            </Button>
-          )}
+              <Button
+                type="button"
+                onClick={handleEditClick}
+                disabled={isEditing}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
+                title="Load this estimate into generator editor to modify"
+              >
+                {isEditing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FileEdit className="h-4 w-4" />
+                )}
+                Edit Estimate
+              </Button>
+            )}
 
           {/* Generate & Print PDF */}
           <Button
@@ -533,7 +617,11 @@ export function EstimateDetailPage() {
       <MilestonePaymentsModal
         open={isMilestoneModalOpen}
         onOpenChange={setIsMilestoneModalOpen}
-        quote={estimate ? { ...estimate, _id: id } : ({ _id: id } as SaveEstimatePayload)}
+        quote={
+          estimate
+            ? { ...estimate, _id: id }
+            : ({ _id: id } as SaveEstimatePayload)
+        }
         onSuccess={(saveRes) => {
           if (
             saveRes?.quotationSync?.requiresSubmitForApproval ||
@@ -552,7 +640,10 @@ export function EstimateDetailPage() {
               "Payment schedule updated. Click 'Send for Approval' to submit for Admin review.",
             );
           }
-          fetchEstimateDetail();
+          void queryClient.invalidateQueries({
+            queryKey: ["sales", "estimate-detail", id],
+          });
+          void refetchEstimateDetail();
           refetchPreview();
         }}
       />
@@ -561,7 +652,11 @@ export function EstimateDetailPage() {
       <RequestDepositModal
         open={isDepositModalOpen}
         onOpenChange={setIsDepositModalOpen}
-        quote={estimate ? { ...estimate, _id: id } : ({ _id: id } as SaveEstimatePayload)}
+        quote={
+          estimate
+            ? { ...estimate, _id: id }
+            : ({ _id: id } as SaveEstimatePayload)
+        }
         onSuccess={(saveRes) => {
           if (
             saveRes?.quotationSync?.requiresSubmitForApproval ||
@@ -580,7 +675,10 @@ export function EstimateDetailPage() {
               "Deposit terms updated. Click 'Send for Approval' to submit for Admin review.",
             );
           }
-          fetchEstimateDetail();
+          void queryClient.invalidateQueries({
+            queryKey: ["sales", "estimate-detail", id],
+          });
+          void refetchEstimateDetail();
         }}
       />
 
@@ -598,13 +696,31 @@ export function EstimateDetailPage() {
           if (!targetQuotationId && id) {
             setIsConverting(true);
             try {
-              const convertRes = await convertMutation.mutateAsync(id);
-              const resData = (
-                convertRes as {
-                  data?: { quotation?: { _id?: string }; _id?: string };
-                }
-              )?.data;
-              targetQuotationId = resData?.quotation?._id || resData?._id;
+              if (isCustom) {
+                const customLeadId =
+                  (estimate as Record<string, unknown>)?.leadId ||
+                  (estimate?.customQuote as Record<string, unknown>)?.leadId;
+                const convertRes = await convertCustomQuoteToQuotationProvider(
+                  id,
+                  customLeadId && typeof customLeadId === "string"
+                    ? { leadId: customLeadId }
+                    : undefined,
+                );
+                const resData = (
+                  convertRes as {
+                    data?: { quotation?: { _id?: string }; _id?: string };
+                  }
+                )?.data;
+                targetQuotationId = resData?.quotation?._id || resData?._id;
+              } else {
+                const convertRes = await convertMutation.mutateAsync(id);
+                const resData = (
+                  convertRes as {
+                    data?: { quotation?: { _id?: string }; _id?: string };
+                  }
+                )?.data;
+                targetQuotationId = resData?.quotation?._id || resData?._id;
+              }
             } finally {
               setIsConverting(false);
             }
@@ -612,7 +728,7 @@ export function EstimateDetailPage() {
           const targetId = targetQuotationId || id || "";
           await submitQuotationForApprovalProvider(targetId, {
             note: note.trim() || undefined,
-            estimateId: id,
+            estimateId: isCustom ? undefined : id,
           });
         }}
         onSuccess={async () => {
@@ -625,7 +741,10 @@ export function EstimateDetailPage() {
             });
           });
           toast.success("Submitted for approval successfully");
-          await fetchEstimateDetail();
+          void queryClient.invalidateQueries({
+            queryKey: ["sales", "estimate-detail", id],
+          });
+          await refetchEstimateDetail();
         }}
       />
 
@@ -648,7 +767,10 @@ export function EstimateDetailPage() {
                 workflowStatus: "sent",
               });
             });
-            await fetchEstimateDetail();
+            void queryClient.invalidateQueries({
+              queryKey: ["sales", "estimate-detail", id],
+            });
+            await refetchEstimateDetail();
           }}
         />
       )}
