@@ -4,6 +4,7 @@ import {
   type PreviewDocumentRequest,
   type PreviewDocumentResponseData,
 } from "../estimates.api";
+import { getCustomQuoteDocumentPreviewProvider } from "../custom-quotes.api";
 
 export interface UseServerDocumentPreviewOptions {
   payload: PreviewDocumentRequest | null;
@@ -42,6 +43,51 @@ export function useServerDocumentPreview({
   const fetchPreview = useCallback(async (forcedPayload?: PreviewDocumentRequest) => {
     const activePayload = forcedPayload || payloadRef.current;
     if (!enabled || !activePayload) {
+      return;
+    }
+
+    const isCustom = Boolean(
+      activePayload.quoteKind === "custom" ||
+      activePayload.jobType?.toUpperCase() === "CUSTOM" ||
+      activePayload.customQuoteId
+    );
+    const targetCustomId = activePayload.customQuoteId || activePayload.estimateId;
+
+    if (isCustom && targetCustomId) {
+      const currentReqId = ++requestIdRef.current;
+      setIsLoading(true);
+      setError(null);
+      try {
+        const customRes = await getCustomQuoteDocumentPreviewProvider(
+          targetCustomId,
+          activePayload.companyBrand
+        );
+        if (currentReqId !== requestIdRef.current) return;
+        if (customRes?.html) {
+          lastFetchedJsonRef.current = JSON.stringify(activePayload);
+          setData({
+            assembledHtml: customRes.html,
+            quoteHtml: customRes.html,
+            sowHtml: null,
+            contractHtml: null,
+          });
+        } else {
+          setError("No HTML content returned for custom quote preview.");
+          setData(null);
+        }
+      } catch (err: unknown) {
+        if (currentReqId !== requestIdRef.current) return;
+        const errMsg =
+          err instanceof Error
+            ? err.message
+            : (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+              "Failed to load custom quote preview from server.";
+        setError(errMsg);
+      } finally {
+        if (currentReqId === requestIdRef.current) {
+          setIsLoading(false);
+        }
+      }
       return;
     }
 

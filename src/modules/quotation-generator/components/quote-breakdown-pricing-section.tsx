@@ -19,7 +19,7 @@ import { QuoteInsulationTab } from "./quote-insulation-tab";
 import { QuoteAddOnsTab } from "./quote-addons-tab";
 import { QuoteContractTab } from "./quote-contract-tab";
 import {
-  extractShipperProvider,
+  createEstimateFromShipperProvider,
   computeEstimateProvider,
   saveEstimateProvider,
   type ExtractShipperResponseData,
@@ -288,6 +288,17 @@ export function QuoteBreakdownPricingSection({
         additionalNotes,
         pdfFileName,
         estimateId: activeEstimateId,
+        salesTax: {
+          include: includeTax,
+          includeTax,
+          rate: taxRate,
+          taxRate,
+          zip: taxZip,
+          taxZip,
+        },
+        includeTax,
+        taxRate,
+        taxZip,
       },
     });
   }, [
@@ -302,6 +313,9 @@ export function QuoteBreakdownPricingSection({
     estimateId,
     propEstimateId,
     pembEstimateId,
+    includeTax,
+    taxRate,
+    taxZip,
   ]);
 
   const handleSaveDraft = useCallback(async () => {
@@ -358,13 +372,6 @@ export function QuoteBreakdownPricingSection({
           materialSellOverride: matSellOverrideVal ?? (materialSellOverride === "" ? null : undefined),
           matSellOverride: matSellOverrideVal ?? (materialSellOverride === "" ? null : undefined),
           deletedRowKeys: deletedRowKeys || [],
-          parsedCategories: shipperData.parsedCategories,
-          tabSummary: shipperData.tabSummary,
-          breakdownRows: shipperData.pricing?.rows,
-          pricingResult: shipperData.pricing,
-          fullQuoteResult:
-            shipperData.fullQuote ||
-            (shipperData.pricing as Record<string, unknown> | undefined),
           extractedDrawingFields: extractedDrawing?.extracted,
           concreteAddon: {
             include: concreteInclude,
@@ -759,7 +766,9 @@ export function QuoteBreakdownPricingSection({
           ...overrides,
         };
 
-        const res = await computeEstimateProvider(payload);
+        const activeEstimateId =
+          estimateId || propEstimateId || pembEstimateId || undefined;
+        const res = await computeEstimateProvider(payload, activeEstimateId);
 
         if (res) {
           const data = res.data || res;
@@ -795,6 +804,41 @@ export function QuoteBreakdownPricingSection({
             shipperDataRef.current = updated;
             setShipperData(updated);
             setPembExtractedShipper(updated);
+
+            // Keep server estimate updated as single source of truth
+            if (activeEstimateId) {
+              saveEstimateProvider(
+                {
+                  _id: activeEstimateId,
+                  leadId: quotationForm?.leadId || pembLeadId || undefined,
+                  jobType,
+                  companyBrand: storeState.companyBrand,
+                  scope: normalizeScope(scope),
+                  roofType: normalizeRoof(roofType),
+                  buildingSize: buildingSize || quotationForm?.buildingSize || "",
+                  squareFootage: parsedSqFt,
+                  sf: parsedSqFt,
+                  useManualSquareFootage: isManualSqFt,
+                  jobNumber:
+                    quotationForm?.jobNumber ||
+                    extractedDrawing?.extracted?.jobnumber ||
+                    "",
+                  sourceFileName: pdfFileName || current.fileName || "",
+                  blendPct: blendPercentage,
+                  installLevel: installDifficulty || "medium",
+                  installCostPerSf: installCost,
+                  sellPerSf: installSell,
+                  steelFinish: steelFinish || "red-iron",
+                  freightOverride: parseFloat(freightOverride) || undefined,
+                  materialSellOverride:
+                    matSellOverrideVal ??
+                    (materialSellOverride === "" ? null : undefined),
+                  deletedRowKeys: deletedRowKeys || [],
+                  status: "draft",
+                },
+                activeEstimateId,
+              ).catch(() => {});
+            }
           }
         }
       } catch (err) {
@@ -924,10 +968,13 @@ export function QuoteBreakdownPricingSection({
       setIsParsing(true);
       try {
         const fileBase64 = await fileToBase64(rawFile);
-        const res = await extractShipperProvider({
+        const storeState = useQuotationStore.getState();
+        const res = await createEstimateFromShipperProvider({
+          leadId: quotationForm?.leadId || pembLeadId || undefined,
           fileBase64,
           fileName: rawFile.name,
           jobType,
+          companyBrand: storeState.companyBrand,
           scope: normalizeScope(scope).toLowerCase(),
           roof: normalizeRoof(roofType),
           install: installDifficulty || "medium",
@@ -939,9 +986,17 @@ export function QuoteBreakdownPricingSection({
           sellPerSf: installSell,
           steelFinish: steelFinish || "red-iron",
           freightOverride: parseFloat(freightOverride) || undefined,
+          materialSellOverride: materialSellOverride
+            ? parseFloat(materialSellOverride)
+            : undefined,
           deletedRowKeys: deletedRowKeys || [],
         });
         if (res.success && res.data) {
+          const newEstimateId = res.data.estimateId;
+          if (newEstimateId) {
+            setEstimateId(newEstimateId);
+            setPembEstimateId(newEstimateId);
+          }
           lastLoadedFileNameRef.current = res.data.fileName;
           shipperDataRef.current = res.data;
           setShipperData(res.data);
@@ -954,6 +1009,12 @@ export function QuoteBreakdownPricingSection({
             setSqFt(String(res.data.squareFootage));
           }
           setIsManualSqFt(false);
+
+          toast.success(
+            newEstimateId
+              ? `Shipper extracted & estimate created (${newEstimateId.slice(-6)})`
+              : "Shipper file extracted successfully",
+          );
 
           // Mark signature as already computed for this freshly uploaded file
           lastComputedSignatureRef.current = JSON.stringify({

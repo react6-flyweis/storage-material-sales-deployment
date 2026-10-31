@@ -1,16 +1,14 @@
-export type BusinessUnitType = "storage_material" | "platform" | "steel";
+export type BusinessUnitType = "steel" | "storage_material";
 
 export const BUSINESS_UNIT_OPTIONS = [
-  { value: "storage_material", label: "Storage Material" },
-  { value: "platform", label: "Platform" },
-  { value: "steel", label: "Steel" },
+  { value: "steel", label: "Steel Building Depot" },
+  { value: "storage_material", label: "Storage Material Platform" },
 ] as const;
 
 export const BUSINESS_UNIT_FILTER_OPTIONS = [
   { value: "all", label: "All Business Units" },
-  { value: "storage_material", label: "Storage Material" },
-  { value: "platform", label: "Platform" },
-  { value: "steel", label: "Steel" },
+  { value: "steel", label: "Steel Building Depot" },
+  { value: "storage_material", label: "Storage Material Platform" },
   { value: "none", label: "Not set" },
 ] as const;
 
@@ -20,8 +18,15 @@ export const BUSINESS_UNIT_FILTER_OPTIONS = [
 export function normalizeBusinessUnit(value?: string | null): BusinessUnitType | null {
   if (!value) return null;
   const trimmed = value.trim().toLowerCase();
-  if (trimmed === "storage_material" || trimmed === "platform" || trimmed === "steel") {
-    return trimmed as BusinessUnitType;
+  if (trimmed === "steel" || trimmed === "steel building depot") {
+    return "steel";
+  }
+  if (
+    trimmed === "storage_material" ||
+    trimmed === "storage material" ||
+    trimmed === "storage material platform"
+  ) {
+    return "storage_material";
   }
   return null;
 }
@@ -50,12 +55,10 @@ export function formatBusinessUnit(
 export function getBusinessUnitBadgeClassName(unit?: string | null): string {
   const normalized = normalizeBusinessUnit(unit);
   switch (normalized) {
-    case "storage_material":
-      return "bg-blue-50 text-blue-700 border-blue-200";
-    case "platform":
-      return "bg-purple-50 text-purple-700 border-purple-200";
     case "steel":
       return "bg-amber-50 text-amber-700 border-amber-200";
+    case "storage_material":
+      return "bg-blue-50 text-blue-700 border-blue-200";
     default:
       return "bg-slate-50 text-slate-600 border-slate-200";
   }

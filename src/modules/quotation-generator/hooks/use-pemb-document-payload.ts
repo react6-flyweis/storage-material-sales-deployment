@@ -159,11 +159,16 @@ export function usePembDocumentPayload({
           parseFloat(store.materialSellOverride) || undefined,
         matSellOverride: parseFloat(store.materialSellOverride) || undefined,
         pembDrawings: parseFloat(store.engineeringDrawings) || 0,
-        parsedCategories: effectiveShipper?.parsedCategories,
-        pricingResult: effectiveShipper?.pricing,
-        fullQuote:
-          effectiveShipper?.fullQuote ||
-          (effectiveShipper?.pricing as Record<string, unknown> | undefined),
+        parsedCategories: activeEstimateId
+          ? undefined
+          : effectiveShipper?.parsedCategories,
+        pricingResult: activeEstimateId
+          ? undefined
+          : effectiveShipper?.pricing,
+        fullQuote: activeEstimateId
+          ? undefined
+          : (effectiveShipper?.fullQuote ||
+            (effectiveShipper?.pricing as Record<string, unknown> | undefined)),
         extractedDrawingFields: effectiveDrawing?.extracted,
         concreteAddon: {
           include: store.concreteInclude,
@@ -190,9 +195,16 @@ export function usePembDocumentPayload({
         },
         salesTax: {
           include: store.includeTax,
+          includeTax: store.includeTax,
           rate: store.taxRate,
+          taxRate: store.taxRate,
+          zip: store.taxZip,
           taxZip: store.taxZip,
         },
+        taxRate: store.taxRate,
+        includeTax: store.includeTax,
+        taxZip: store.taxZip,
+        zip: store.taxZip,
         cogsOverride: store.cogsOverrideApplied
           ? {
               applied: true,

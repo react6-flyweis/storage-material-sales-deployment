@@ -146,6 +146,11 @@ export function QuoteHistoryPage() {
 
   const handleLoadAndEdit = async (item: SaveEstimatePayload) => {
     try {
+      const isCustom = item.jobType?.toUpperCase() === "CUSTOM";
+      if (isCustom && item._id) {
+        navigate(`/quotation/custom?id=${item._id}`);
+        return;
+      }
       await loadAndEdit(item);
     } catch (err) {
       console.error("Failed to load estimate detail:", err);
@@ -158,9 +163,8 @@ export function QuoteHistoryPage() {
   };
 
   const handlePreviewQuote = (item: SaveEstimatePayload) => {
-    if (item._id) {
-      navigate(`/quotation/history/${item._id}`);
-    }
+    if (!item._id) return;
+    navigate(`/quotation/history/${item._id}`);
   };
 
   const [activeChangeOrderQuote, setActiveChangeOrderQuote] =
@@ -518,6 +522,7 @@ export function QuoteHistoryPage() {
               const isStorage =
                 quote.jobType?.toUpperCase() === "STORAGE" ||
                 Boolean(quote.storageData);
+              const isCustom = quote.jobType?.toUpperCase() === "CUSTOM";
               const pricingRes = (quote.pricingResult ||
                 quote.storagePricingResult) as
                 | Record<string, unknown>
@@ -530,17 +535,23 @@ export function QuoteHistoryPage() {
                 Number(
                   quote.grandTotal ??
                     quote.totalSell ??
+                    (quote as Record<string, unknown>).sell ??
                     fullQuote?.grandTotal ??
                     pricingRes?.totSell ??
                     pricingRes?.grandTotal,
                 ) || 0;
               const prof =
                 Number(
-                  quote.profit ?? fullQuote?.totalProfit ?? pricingRes?.profit,
+                  quote.profit ??
+                    (quote as Record<string, unknown>).profit ??
+                    fullQuote?.totalProfit ??
+                    pricingRes?.profit,
                 ) || 0;
               const marginPct =
                 Number(
                   quote.marginPercent ??
+                    (quote as Record<string, unknown>).marginPct ??
+                    (quote as Record<string, unknown>).profPct ??
                     fullQuote?.grandMargin ??
                     pricingRes?.profPct ??
                     pricingRes?.marginPercent,
@@ -566,7 +577,9 @@ export function QuoteHistoryPage() {
               const storageBuildings = (
                 quote.storageData as { buildings?: unknown[] } | undefined
               )?.buildings;
-              const displayBuilding = isStorage
+              const displayBuilding = isCustom
+                ? quote.buildingSize || quote.scope || "Custom Metal Building"
+                : isStorage
                 ? `${storageBuildings?.length || 1} Storage Building${(storageBuildings?.length || 1) > 1 ? "s" : ""}`
                 : quote.buildingSize || "Building";
 
@@ -588,6 +601,7 @@ export function QuoteHistoryPage() {
                 Number(
                   quote.buildingSubtotal ??
                     quote.materialCost ??
+                    (quote as Record<string, unknown>).matCost ??
                     pricingRes?.matSell ??
                     pricingRes?.matCost,
                 ) || 0;
@@ -595,6 +609,7 @@ export function QuoteHistoryPage() {
               const installVal =
                 Number(
                   quote.installCost ??
+                    (quote as Record<string, unknown>).laborCost ??
                     pricingRes?.instSell ??
                     pricingRes?.instCost,
                 ) || 0;
@@ -638,8 +653,12 @@ export function QuoteHistoryPage() {
                         <span>{quote.leadCompanyName || "TBD"}</span>
                         <span>·</span>
                         <span>{quote.scope?.toUpperCase() || "Supply"}</span>
-                        <span>·</span>
-                        <span>{formatNumber2(effectiveSqFt)} SF</span>
+                        {effectiveSqFt > 0 && (
+                          <>
+                            <span>·</span>
+                            <span>{formatNumber2(effectiveSqFt)} SF</span>
+                          </>
+                        )}
                         <span>·</span>
                         <span>{displayBuilding}</span>
                         {formattedDate && (
@@ -653,12 +672,12 @@ export function QuoteHistoryPage() {
                         <div className="flex items-center gap-3 pt-1">
                           {bldgVal > 0 && (
                             <span className="text-xs font-bold text-[#2563eb]">
-                              Bldgs {formatK(bldgVal)}
+                              {isCustom ? "Material" : "Bldgs"} {formatK(bldgVal)}
                             </span>
                           )}
                           {installVal > 0 && (
                             <span className="text-xs font-bold text-[#16a34a]">
-                              Install {formatK(installVal)}
+                              {isCustom ? "Labor" : "Install"} {formatK(installVal)}
                             </span>
                           )}
                         </div>
@@ -669,11 +688,19 @@ export function QuoteHistoryPage() {
                     <div className="flex flex-col items-end gap-1.5 shrink-0">
                       {/* Top Badges Row */}
                       <div className="flex flex-wrap items-center justify-end gap-2">
-                        <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold text-xs uppercase">
-                          {isStorage
-                            ? "STORAGE"
-                            : quote.jobType?.toUpperCase() || "PEMB"}
-                        </span>
+                        {isCustom ? (
+                          <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 font-bold text-xs uppercase">
+                            CUSTOM
+                          </span>
+                        ) : isStorage ? (
+                          <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold text-xs uppercase">
+                            STORAGE
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold text-xs uppercase">
+                            PEMB
+                          </span>
+                        )}
                         <QuotationWorkflowBadge
                           status={resolveQuotationLifecycle(quote).lifecycleStatus}
                           showIcon

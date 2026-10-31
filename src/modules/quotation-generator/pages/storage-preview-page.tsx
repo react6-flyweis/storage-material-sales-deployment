@@ -14,12 +14,15 @@ import { getApiErrorMessage } from "@/lib/api-error";
 import {
   downloadPdfProvider,
   saveEstimateProvider,
+  getEstimateByIdProvider,
   type PreviewDocumentRequest,
+  type SaveEstimatePayload,
 } from "../estimates.api";
 import { downloadPdfFromBase64 } from "../utils/pdf-download";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
 import { ServerDocumentPreview } from "../components/server-document-preview";
+import { hydrateEstimateIntoStore } from "../hooks/use-load-estimate-to-editor";
 import type {
   StorageData,
   StoragePricing,
@@ -43,6 +46,7 @@ export function StoragePreviewPage() {
     insulationInclude: storeInsulationInclude,
     includeTax: storeIncludeTax,
     taxRate: storeTaxRate,
+    taxZip: storeTaxZip,
     storageData: storeStorageData,
     storagePricing: storeStoragePricing,
     storageEstimateId: storeStorageEstimateId,
@@ -70,6 +74,15 @@ export function StoragePreviewPage() {
     insulationInclude?: boolean;
     includeTax?: boolean;
     taxRate?: number;
+    taxZip?: string;
+    salesTax?: {
+      rate?: number;
+      taxRate?: number;
+      include?: boolean;
+      includeTax?: boolean;
+      zip?: string;
+      taxZip?: string;
+    };
     drawingAttachments?: Array<{
       name?: string;
       fileBase64?: string;
@@ -118,6 +131,25 @@ export function StoragePreviewPage() {
     if (eid) {
       setEstimateId(eid);
       setStorageEstimateId(eid);
+      getEstimateByIdProvider(eid)
+        .then((res) => {
+          const estData = (res?.data?.estimate ||
+            res?.estimate ||
+            res?.data ||
+            res) as SaveEstimatePayload | undefined;
+          if (
+            estData &&
+            (estData._id ||
+              estData.jobType ||
+              estData.storageData ||
+              estData.parsedCategories)
+          ) {
+            hydrateEstimateIntoStore(estData, eid);
+          }
+        })
+        .catch((err) => {
+          console.warn("Failed to load storage estimate for preview:", err);
+        });
     }
   }, [navState.estimateId, storeStorageEstimateId, setStorageEstimateId]);
 
@@ -238,15 +270,23 @@ export function StoragePreviewPage() {
         storagePricing: storagePricing as Record<string, unknown>,
         storageData: storageData as Record<string, unknown>,
         concreteAddon: {
-          include: navState.concreteInclude,
+          include: navState.concreteInclude ?? storeConcreteInclude,
         },
         insulationAddon: {
-          include: navState.insulationInclude,
+          include: navState.insulationInclude ?? storeInsulationInclude,
         },
         salesTax: {
-          include: navState.includeTax,
-          rate: navState.taxRate,
+          include: navState.includeTax ?? storeIncludeTax,
+          includeTax: navState.includeTax ?? storeIncludeTax,
+          rate: navState.taxRate ?? storeTaxRate,
+          taxRate: navState.taxRate ?? storeTaxRate,
+          zip: navState.taxZip ?? storeTaxZip,
+          taxZip: navState.taxZip ?? storeTaxZip,
         },
+        taxRate: navState.taxRate ?? storeTaxRate,
+        includeTax: navState.includeTax ?? storeIncludeTax,
+        taxZip: navState.taxZip ?? storeTaxZip,
+        zip: navState.taxZip ?? storeTaxZip,
         drawingAttachments,
         sections: drawingAttachments.length > 0
           ? ["quote", "sow", "contract", "drawings"]
@@ -304,7 +344,6 @@ export function StoragePreviewPage() {
           jobNumber,
           sourceFileName: navState.sourceFileName || "Storage_COG.xlsx",
           storageData: storageData as Record<string, unknown>,
-          storagePricingResult: storagePricing as Record<string, unknown>,
           drawingAttachments: activeDrawings.map((d) => ({
             name: d.name,
             fileBase64: d.data,
@@ -401,8 +440,16 @@ export function StoragePreviewPage() {
       },
       salesTax: {
         include: includeTax,
+        includeTax,
         rate: taxRate,
+        taxRate,
+        zip: storeTaxZip,
+        taxZip: storeTaxZip,
       },
+      taxRate,
+      includeTax,
+      taxZip: storeTaxZip,
+      zip: storeTaxZip,
       contract: {
         customer: customerLeadName,
         address: customerAddress,

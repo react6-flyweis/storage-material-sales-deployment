@@ -44,13 +44,15 @@ import {
 } from "@/modules/leads/leads.hooks";
 import { getLeadProjectName } from "@/modules/leads/leads.utils";
 import {
-  extractStorageCogProvider,
+  createEstimateFromStorageCogProvider,
   computeStorageProvider,
   saveEstimateProvider,
+  getEstimateByIdProvider,
   taxLookupProvider,
   type SaveEstimatePayload,
   type PreviewDocumentRequest,
 } from "../estimates.api";
+import { hydrateEstimateIntoStore } from "../hooks/use-load-estimate-to-editor";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
 import { ServerDocumentPreview } from "../components/server-document-preview";
@@ -416,6 +418,36 @@ export default function StorageQuotePage() {
     setSquareFootage,
   ]);
 
+  const urlEstimateId =
+    searchParams.get("estimateId") || searchParams.get("id");
+  const effectiveEstimateId =
+    navState.estimateId || urlEstimateId || storeStorageEstimateId || null;
+
+  // Hydrate from GET /api/sales/estimates/:estimateId if estimateId exists but storageData is missing
+  const [isHydratingStorageEstimate, setIsHydratingStorageEstimate] =
+    useState(false);
+  useEffect(() => {
+    if (effectiveEstimateId && !storageData && !isHydratingStorageEstimate) {
+      setIsHydratingStorageEstimate(true);
+      getEstimateByIdProvider(effectiveEstimateId)
+        .then((res) => {
+          const fetchedData = res.data || res;
+          const est =
+            ((fetchedData as Record<string, unknown>)?.estimate ||
+              fetchedData) as SaveEstimatePayload;
+          if (est && typeof est === "object") {
+            hydrateEstimateIntoStore(est, effectiveEstimateId);
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to hydrate storage estimate by ID:", err);
+        })
+        .finally(() => {
+          setIsHydratingStorageEstimate(false);
+        });
+    }
+  }, [effectiveEstimateId, storageData, isHydratingStorageEstimate]);
+
   const [activeTab, setActiveTab] = useState<
     | "breakdown"
     | "quote"
@@ -454,15 +486,14 @@ export default function StorageQuotePage() {
           (addon) => {
             const cost = Number(addon.cost) || 0;
             const markup = Number(addon.markupPct) || 0;
-            const sell = Math.round(cost * (1 + markup / 100));
             return {
               name: addon.item,
               item: addon.item,
               cogs: cost,
               cost,
               markup,
-              sale: sell,
-              sellPrice: sell,
+              sale: 0,
+              sellPrice: 0,
               note: addon.note || "",
               include: addon.inQuote !== false,
             };
@@ -503,8 +534,16 @@ export default function StorageQuotePage() {
           },
           salesTax: {
             rate: taxRate,
+            taxRate,
             include: includeTax,
+            includeTax,
+            zip: taxZip,
+            taxZip,
           },
+          taxRate,
+          includeTax,
+          taxZip,
+          zip: taxZip,
           pembAddOns: (pembAddOns || []).map((addon) => ({
             item: addon.item,
             cost: Number(addon.cost) || 0,
@@ -515,10 +554,45 @@ export default function StorageQuotePage() {
           })),
         };
 
-        const res = await computeStorageProvider(payload);
+        const activeEstId = estimateId || storeStorageEstimateId || undefined;
+        const res = await computeStorageProvider(payload, activeEstId);
         const data = res.data || res;
         if (data?.storagePricing) {
           setStoragePricing(data.storagePricing as StoragePricing);
+
+          // Keep server estimate updated as single source of truth
+          if (activeEstId) {
+            saveEstimateProvider(
+              {
+                _id: activeEstId,
+                leadId: selectedLeadId || activeLeadId || undefined,
+                jobType: "Storage",
+                companyBrand,
+                scope:
+                  scope.toLowerCase() === "supply"
+                    ? "Supply"
+                    : scope.toLowerCase() === "install"
+                      ? "Install"
+                      : "Both",
+                leadCompanyName:
+                  customerLeadName ||
+                  currentStorageData.project?.customer ||
+                  "Storage Project",
+                customerEmail,
+                streetAddress: customerAddress,
+                cityStateZip: customerAddress,
+                jobNumber:
+                  jobNumber || currentStorageData.project?.jobNumber || "",
+                sourceFileName,
+                storageData: {
+                  ...currentStorageData,
+                  extras: effectiveExtras,
+                } as Record<string, unknown>,
+                status: "draft",
+              },
+              activeEstId,
+            ).catch(() => {});
+          }
         }
       } catch (err) {
         console.error("Failed to compute storage pricing via API:", err);
@@ -563,7 +637,7 @@ export default function StorageQuotePage() {
     };
   }, [storageData, pembAddOns, triggerApiCompute]);
 
-  // Handle File Upload via POST /api/sales/estimates/extract-storage-cog
+  // Handle File Upload via POST /api/sales/estimates/from-storage-cog (EstimateId-first flow)
   const handleFileUpload = async (file: File) => {
     if (!file) return;
     setIsUploading(true);
@@ -574,12 +648,19 @@ export default function StorageQuotePage() {
 
     try {
       const base64 = await fileToBase64(file);
-      const apiRes = await extractStorageCogProvider({
+      const apiRes = await createEstimateFromStorageCogProvider({
+        leadId: selectedLeadId || activeLeadId || undefined,
         fileBase64: base64,
         fileName: file.name,
+        companyBrand,
+        scope,
       });
 
       const responsePayload = apiRes.data || apiRes;
+      const newEstimateId = responsePayload.estimateId;
+      if (newEstimateId) {
+        setStorageEstimateId(newEstimateId);
+      }
 
       const buildingsList: StorageBuildingItem[] = (
         responsePayload.buildings || []
@@ -603,8 +684,7 @@ export default function StorageQuotePage() {
           cogs,
           cost: cogs,
           markup,
-          sellPrice:
-            Number(b.sellPrice) || Math.round(cogs * (1 + markup / 100)),
+          sellPrice: Number(b.sellPrice || b.sale) || 0,
           roofType: String(b.roofType || "screw-down"),
           wallPanel: String(b.wallPanel || b.wallColor || "26ga R-Loc"),
           roofPanel: String(b.roofPanel || "26ga Galvalume"),
@@ -630,15 +710,9 @@ export default function StorageQuotePage() {
             cogs,
             totalCost: cogs,
             markup,
-            sale:
-              Number(d.sale || d.totalSell) ||
-              Math.round(cogs * (1 + markup / 100)),
-            sellPerUnit:
-              Number(d.sellPerUnit) ||
-              Math.round(unitCost * (1 + markup / 100)),
-            totalSell:
-              Number(d.sale || d.totalSell) ||
-              Math.round(cogs * (1 + markup / 100)),
+            sale: Number(d.sale || d.totalSell) || 0,
+            sellPerUnit: Number(d.sellPerUnit) || 0,
+            totalSell: Number(d.sale || d.totalSell) || 0,
             color: String(d.color || "Standard"),
           };
         },
@@ -654,12 +728,8 @@ export default function StorageQuotePage() {
             cogs,
             cost: cogs,
             markup,
-            sale:
-              Number(x.sale || x.sellPrice) ||
-              Math.round(cogs * (1 + markup / 100)),
-            sellPrice:
-              Number(x.sale || x.sellPrice) ||
-              Math.round(cogs * (1 + markup / 100)),
+            sale: Number(x.sale || x.sellPrice) || 0,
+            sellPrice: Number(x.sale || x.sellPrice) || 0,
             note: String(x.note || ""),
             include: x.include !== false,
           };
@@ -714,15 +784,20 @@ export default function StorageQuotePage() {
         );
       }
 
-      if (responsePayload.storagePricing) {
-        setStoragePricing(responsePayload.storagePricing as StoragePricing);
+      if (responsePayload.storagePricing || responsePayload.storagePricingResult) {
+        setStoragePricing(
+          (responsePayload.storagePricing ||
+            responsePayload.storagePricingResult) as StoragePricing,
+        );
       } else {
         triggerApiCompute(newStorageData);
       }
 
       setFeedbackMsg({
         type: "success",
-        text: `✓ Backend successfully extracted ${buildingsList.length} buildings and ${doorsList.length} door types from ${file.name}!`,
+        text: `✓ Backend successfully extracted and created draft estimate ${
+          newEstimateId ? `(${newEstimateId.slice(-6)})` : ""
+        } from ${file.name}!`,
       });
     } catch (err: unknown) {
       console.error("Storage COG backend extract error:", err);
@@ -781,15 +856,14 @@ export default function StorageQuotePage() {
         (addon) => {
           const cost = Number(addon.cost) || 0;
           const markup = Number(addon.markupPct) || 0;
-          const sell = Math.round(cost * (1 + markup / 100));
           return {
             name: addon.item,
             item: addon.item,
             cogs: cost,
             cost,
             markup,
-            sale: sell,
-            sellPrice: sell,
+            sale: 0,
+            sellPrice: 0,
             note: addon.note || "",
             include: addon.inQuote !== false,
           };
@@ -820,7 +894,6 @@ export default function StorageQuotePage() {
           ...storageData,
           extras: effectiveExtras,
         } as Record<string, unknown>,
-        storagePricingResult: storagePricing as Record<string, unknown>,
         pembAddOns: (pembAddOns || []).map((addon) => ({
           item: addon.item,
           cost: Number(addon.cost) || 0,
@@ -887,14 +960,10 @@ export default function StorageQuotePage() {
   // Apply global markup to all buildings
   const handleApplyGlobalMarkup = () => {
     if (!storageData) return;
-    const updated = (storageData.buildings || []).map((b) => {
-      const cogs = Number(b.cost || b.cogs || 0);
-      return {
-        ...b,
-        markup: globalMarkup,
-        sellPrice: Math.round(cogs * (1 + globalMarkup / 100)),
-      };
-    });
+    const updated = (storageData.buildings || []).map((b) => ({
+      ...b,
+      markup: globalMarkup,
+    }));
     const updatedData = { ...storageData, buildings: updated };
     setStorageData(updatedData);
     triggerApiCompute(updatedData);
@@ -921,16 +990,6 @@ export default function StorageQuotePage() {
       const sqft = Number(b.sqft || 0);
       b.cogs = psf * sqft;
       b.cost = psf * sqft;
-    }
-    if (
-      field === "markup" ||
-      field === "cost" ||
-      field === "cogs" ||
-      field === "psf"
-    ) {
-      const cogs = Number(b.cost || b.cogs || 0);
-      const mu = Number(b.markup ?? 25);
-      b.sellPrice = Math.round(cogs * (1 + mu / 100));
     }
     updated[index] = b;
     const updatedData = { ...storageData, buildings: updated };
@@ -985,13 +1044,9 @@ export default function StorageQuotePage() {
     const d = { ...updated[index], [field]: value };
     const qty = Number(d.qty || d.quantity || 0);
     const uCost = Number(d.unitCost || d.costPerUnit || 0);
-    const mu = Number(d.markup ?? 25);
     const cogs = qty * uCost;
     d.cogs = cogs;
     d.totalCost = cogs;
-    d.sale = Math.round(cogs * (1 + mu / 100));
-    d.totalSell = Math.round(cogs * (1 + mu / 100));
-    d.sellPerUnit = Math.round(uCost * (1 + mu / 100));
     updated[index] = d;
     const updatedData = { ...storageData, doors: updated };
     setStorageData(updatedData);
@@ -1218,8 +1273,16 @@ export default function StorageQuotePage() {
       },
       salesTax: {
         include: includeTax,
+        includeTax,
         rate: taxRate,
+        taxRate,
+        zip: taxZip,
+        taxZip,
       },
+      taxRate,
+      includeTax,
+      taxZip,
+      zip: taxZip,
       contract: {
         customer: customerLeadName || "Customer Legal Entity",
         address: customerAddress || "",

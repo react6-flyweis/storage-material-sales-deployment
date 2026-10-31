@@ -218,10 +218,23 @@ export default function QuotationDetailsPage() {
       ? (rawEstimateId as { _id?: string })._id
       : (rawEstimateId as string | undefined);
 
+  const rawCustomQuoteId =
+    quotation?.sourceCustomQuoteId ||
+    quotation?.documentMeta?.sourceCustomQuoteId;
+  const sourceCustomQuoteId =
+    typeof rawCustomQuoteId === "object" && rawCustomQuoteId !== null
+      ? (rawCustomQuoteId as { _id?: string })._id
+      : (rawCustomQuoteId as string | undefined);
+
   const isStorage =
     estimate?.jobType?.toUpperCase() === "STORAGE" ||
     Boolean(estimate?.storageData) ||
     quotation?.buildingType?.toLowerCase().includes("storage");
+
+  const isCustom =
+    Boolean(sourceCustomQuoteId) ||
+    estimate?.jobType?.toUpperCase() === "CUSTOM" ||
+    quotation?.buildingType?.toLowerCase().includes("custom");
 
   // Effective quotation ID
   const effectiveQuotationId = quotation?._id || id;
@@ -299,6 +312,12 @@ export default function QuotationDetailsPage() {
 
   const handleEditEstimate = async () => {
     try {
+      if (sourceCustomQuoteId || estimate?.jobType?.toUpperCase() === "CUSTOM") {
+        navigate(
+          `/quotation/custom?id=${sourceCustomQuoteId || estimate?._id}&quotationId=${quotation?._id || id}`
+        );
+        return;
+      }
       if (estimate) {
         await loadAndEdit(estimate);
       } else if (sourceEstimateId) {
@@ -379,9 +398,17 @@ export default function QuotationDetailsPage() {
                 v{versionNumber}
               </span>
               <QuotationWorkflowBadge status={workflowStatus} />
-              {isStorage && (
+              {isCustom ? (
+                <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 font-bold text-xs border border-purple-200">
+                  Custom Quote
+                </span>
+              ) : isStorage ? (
                 <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 font-bold text-xs border border-amber-200">
                   Mini Storage
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-bold text-xs border border-blue-200">
+                  PEMB
                 </span>
               )}
             </div>
@@ -441,6 +468,25 @@ export default function QuotationDetailsPage() {
             </Button>
           )}
 
+          {/* Edit Custom Quote Button (if backed by custom quote) */}
+          {sourceCustomQuoteId && (
+            <Button
+              type="button"
+              onClick={() => {
+                navigate(`/quotation/custom?id=${sourceCustomQuoteId}&quotationId=${quotation?._id || id}`);
+              }}
+              className={`px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs ${
+                isRejected
+                  ? "bg-rose-600 hover:bg-rose-700 text-white shadow-md ring-2 ring-rose-300"
+                  : "bg-blue-600 hover:bg-blue-700 text-white"
+              }`}
+              title="Load custom quote into editor to modify"
+            >
+              <FileEdit className="h-4 w-4" />
+              {isRejected ? "Edit Custom Quote to Revise" : "Edit Custom Quote"}
+            </Button>
+          )}
+
           {/* Source Estimate Link Button */}
           {sourceEstimateId && (
             <Button
@@ -494,7 +540,16 @@ export default function QuotationDetailsPage() {
           quotation?.approvalNote || effectiveApprovalInfo?.approvalNote
         }
         clientNotes={lifecycle.clientNotes}
-        onEdit={sourceEstimateId ? handleEditEstimate : undefined}
+        onEdit={
+          sourceEstimateId
+            ? handleEditEstimate
+            : sourceCustomQuoteId
+            ? () =>
+                navigate(
+                  `/quotation/custom?id=${sourceCustomQuoteId}&quotationId=${quotation?._id || id}`
+                )
+            : undefined
+        }
         onSubmitForApproval={
           canSubmit ? () => setShowSubmitModal(true) : undefined
         }

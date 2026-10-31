@@ -358,22 +358,36 @@ export function QuoteDetailTab({
         </Button>
         <Button
           type="button"
-          onClick={() =>
-            onQuotePreview
-              ? onQuotePreview()
-              : navigate("/quotation/quote-preview/view", {
-                  state: {
-                    quotationForm,
-                    extractedDrawing,
-                    extractedShipper,
-                    sqFt,
-                    buildingSize,
-                    additionalNotes,
-                    pdfFileName,
-                    estimateId,
-                  },
-                })
-          }
+          onClick={() => {
+            if (onQuotePreview) {
+              onQuotePreview();
+              return;
+            }
+            const qState = useQuotationStore.getState();
+            navigate("/quotation/quote-preview/view", {
+              state: {
+                quotationForm,
+                extractedDrawing,
+                extractedShipper,
+                sqFt,
+                buildingSize,
+                additionalNotes,
+                pdfFileName,
+                estimateId,
+                salesTax: {
+                  include: qState.includeTax,
+                  includeTax: qState.includeTax,
+                  rate: qState.taxRate,
+                  taxRate: qState.taxRate,
+                  zip: qState.taxZip,
+                  taxZip: qState.taxZip,
+                },
+                includeTax: qState.includeTax,
+                taxRate: qState.taxRate,
+                taxZip: qState.taxZip,
+              },
+            });
+          }}
           className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-6 py-2.5 rounded-lg text-xs font-semibold cursor-pointer shadow-xs"
         >
           Quote Preview

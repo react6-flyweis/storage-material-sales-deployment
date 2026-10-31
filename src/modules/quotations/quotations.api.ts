@@ -1,7 +1,7 @@
 import { apiClient } from "@/modules/auth/auth.api";
 import type { SaveEstimatePayload } from "@/modules/quotation-generator/estimates.api";
 
-export const BUILDING_TYPE = ["PEMB", "Storage"] as const;
+export const BUILDING_TYPE = ["PEMB", "Storage", "Custom"] as const;
 export type BuildingType = (typeof BUILDING_TYPE)[number];
 export const DEFAULT_BUILDING_TYPE: BuildingType = "PEMB";
 
@@ -173,12 +173,15 @@ export type QuotationItem = {
   sourceEstimateId?: string | null;
   sourceEstimate?: SaveEstimatePayload | null;
   estimate?: SaveEstimatePayload | null;
+  sourceCustomQuoteId?: string | null;
+  sourceCustomQuote?: Record<string, unknown> | null;
   pdfLink?: string | null;
   htmlPreviewLink?: string | null;
   documents?: Array<Record<string, unknown>> | null;
   documentMeta?: {
     source?: string;
     sourceEstimateId?: string;
+    sourceCustomQuoteId?: string;
     hasPricingData?: boolean;
     previewEndpoint?: string;
     pdfEndpoint?: string;
@@ -474,6 +477,21 @@ export async function convertEstimateToQuotationProvider(estimateId: string) {
     message?: string;
     data: QuotationItem;
   }>(`/api/quotations/from-estimate/${encodeURIComponent(estimateId)}`);
+  return response.data;
+}
+
+export async function convertCustomQuoteToQuotationProvider(
+  customQuoteId: string,
+  payload?: { leadId?: string }
+) {
+  const response = await apiClient.post<{
+    success: boolean;
+    message?: string;
+    data: QuotationItem;
+  }>(
+    `/api/quotations/from-custom-quote/${encodeURIComponent(customQuoteId)}`,
+    payload || {}
+  );
   return response.data;
 }
 
