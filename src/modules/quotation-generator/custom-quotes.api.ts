@@ -27,6 +27,7 @@ export interface CustomQuotePreviewResponse {
 }
 
 export interface CreateCustomQuoteRequest {
+  leadId?: string;
   customer: string;
   location?: string;
   size?: string;
@@ -51,6 +52,7 @@ export interface CreateCustomQuoteRequest {
 
 export interface CustomQuoteRecord {
   _id: string;
+  leadId?: string;
   customer: string;
   location?: string;
   size?: string;
@@ -73,6 +75,10 @@ export interface CustomQuoteRecord {
   createdBy?: string;
   createdAt?: string;
   updatedAt?: string;
+  quotationId?: string;
+  quoteNumber?: string;
+  workflowStatus?: string;
+  status?: "draft" | "converted" | "archived" | string;
   [key: string]: unknown;
 }
 
@@ -190,4 +196,46 @@ export async function downloadInlineCustomQuotePdfProvider(
   );
   return response.data;
 }
+
+export interface CustomQuoteDocumentPreviewData {
+  html: string;
+  quoteKind: "custom" | string;
+  customQuoteId: string;
+}
+
+export interface CustomQuoteDocumentPreviewResponse {
+  success: boolean;
+  message?: string;
+  data: CustomQuoteDocumentPreviewData;
+}
+
+export async function getCustomQuoteDocumentPreviewProvider(
+  id: string,
+  company?: "SM" | "SBD" | string
+): Promise<CustomQuoteDocumentPreviewData> {
+  if (company) {
+    const response = await apiClient.post<CustomQuoteDocumentPreviewResponse>(
+      `/api/sales/custom-quotes/${encodeURIComponent(id)}/preview`,
+      { company }
+    );
+    return response.data?.data;
+  }
+  const response = await apiClient.get<CustomQuoteDocumentPreviewResponse>(
+    `/api/sales/custom-quotes/${encodeURIComponent(id)}/preview`
+  );
+  return response.data?.data;
+}
+
+export async function convertCustomQuoteToQuotationProvider(
+  customQuoteId: string,
+  payload?: { leadId?: string }
+) {
+  const response = await apiClient.post<{
+    success: boolean;
+    message?: string;
+    data: unknown;
+  }>(`/api/quotations/from-custom-quote/${encodeURIComponent(customQuoteId)}`, payload || {});
+  return response.data;
+}
+
 
