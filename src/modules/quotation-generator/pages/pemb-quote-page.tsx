@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router";
+import { useNavigate, useLocation, useSearchParams } from "react-router";
 import { ArrowLeft, User, ChevronDown, ChevronUp, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,9 +14,12 @@ import { QuoteBreakdownPricingSection } from "../components/quote-breakdown-pric
 import { QuotationStickerTool } from "../components/quotation-sticker-tool";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 import { usePricingRulesQuery } from "../pricing-rules.hooks";
-import type {
-  ExtractDrawingResponseData,
-  ExtractShipperResponseData,
+import { hydrateEstimateIntoStore } from "../hooks/use-load-estimate-to-editor";
+import {
+  getEstimateByIdProvider,
+  type ExtractDrawingResponseData,
+  type ExtractShipperResponseData,
+  type SaveEstimatePayload,
 } from "../estimates.api";
 
 export default function PembQuotePage() {
@@ -114,6 +117,11 @@ export default function PembQuotePage() {
     pembQuoteDate,
   ]);
 
+  const [searchParams] = useSearchParams();
+  const urlEstimateId = searchParams.get("estimateId") || searchParams.get("id");
+  const activeEstimateId =
+    navState.estimateId || urlEstimateId || pembEstimateId || undefined;
+
   // Check if lead data or loaded estimate data is available in state or store. If not, redirect to /quotation/pemb/create
   const hasLeadData = Boolean(
     (quotationForm &&
@@ -122,7 +130,7 @@ export default function PembQuotePage() {
         quotationForm.jobNumber ||
         quotationForm.cityStateZip)) ||
     navState.extractedShipper ||
-    navState.estimateId ||
+    activeEstimateId ||
     pembExtractedShipper,
   );
 
@@ -139,6 +147,43 @@ export default function PembQuotePage() {
   const [extractedShipper, setExtractedShipper] = useState<
     ExtractShipperResponseData | undefined
   >(navState.extractedShipper || pembExtractedShipper || undefined);
+
+  // Hydrate from GET /api/sales/estimates/:estimateId if estimateId exists but shipper data is missing
+  const [isHydratingEstimate, setIsHydratingEstimate] = useState(false);
+  useEffect(() => {
+    if (
+      activeEstimateId &&
+      !extractedShipper &&
+      !pembExtractedShipper &&
+      !isHydratingEstimate
+    ) {
+      setIsHydratingEstimate(true);
+      getEstimateByIdProvider(activeEstimateId)
+        .then((res) => {
+          const fetchedData = res.data || res;
+          const est =
+            ((fetchedData as Record<string, unknown>)?.estimate ||
+              fetchedData) as SaveEstimatePayload;
+          if (est && typeof est === "object") {
+            const hydration = hydrateEstimateIntoStore(est, activeEstimateId);
+            if (hydration.shipperData) {
+              setExtractedShipper(hydration.shipperData);
+            }
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to hydrate estimate by ID:", err);
+        })
+        .finally(() => {
+          setIsHydratingEstimate(false);
+        });
+    }
+  }, [
+    activeEstimateId,
+    extractedShipper,
+    pembExtractedShipper,
+    isHydratingEstimate,
+  ]);
 
   const [pdfFileName, setPdfFileName] = useState<string>(
     navState.pdfFileName ||
