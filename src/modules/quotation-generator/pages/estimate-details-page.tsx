@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -53,9 +53,6 @@ export function EstimateDetailPage() {
     refetch: refetchEstimateDetail,
   } = useEstimateDetailQuery(id);
 
-  const [localEstimateOverride, setLocalEstimateOverride] =
-    useState<SaveEstimatePayload | null>(null);
-
   // Fallback to query error message if query failed
   const fetchError = queryError
     ? (queryError as { response?: { data?: { message?: string } } })?.response
@@ -64,19 +61,26 @@ export function EstimateDetailPage() {
       "Failed to load estimate details. Please try again."
     : null;
 
-  // Active estimate: prefer local optimistic update if present, otherwise React Query cache
-  const estimate = localEstimateOverride ?? queriedEstimate ?? null;
-  const setEstimate = (
-    updater:
-      | SaveEstimatePayload
-      | null
-      | ((prev: SaveEstimatePayload | null) => SaveEstimatePayload | null),
-  ) => {
-    setLocalEstimateOverride((prev) => {
-      const current = prev ?? queriedEstimate ?? null;
-      return typeof updater === "function" ? updater(current) : updater;
-    });
-  };
+  // Active estimate directly from React Query cache
+  const estimate = queriedEstimate ?? null;
+
+  const setEstimate = useCallback(
+    (
+      updater:
+        | SaveEstimatePayload
+        | null
+        | ((prev: SaveEstimatePayload | null) => SaveEstimatePayload | null),
+    ) => {
+      queryClient.setQueryData<SaveEstimatePayload | null>(
+        ["sales", "estimate-detail", id],
+        (prev) => {
+          const current = prev ?? null;
+          return typeof updater === "function" ? updater(current) : updater;
+        },
+      );
+    },
+    [id, queryClient],
+  );
 
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
@@ -192,6 +196,24 @@ export function EstimateDetailPage() {
     enabled: Boolean(id),
     debounceMs: 100,
   });
+
+  // Auto-refetch estimate details and document preview when tab/window becomes visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && id) {
+        void refetchEstimateDetail();
+        void refetchPreview();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleVisibilityChange);
+    };
+  }, [id, refetchEstimateDetail, refetchPreview]);
 
   const handleDownloadPdf = async () => {
     if (!id) return;
@@ -372,7 +394,6 @@ export function EstimateDetailPage() {
             <Button
               type="button"
               onClick={() => {
-                setLocalEstimateOverride(null);
                 void refetchEstimateDetail();
               }}
               className="bg-rose-600 hover:bg-rose-700 text-white"
