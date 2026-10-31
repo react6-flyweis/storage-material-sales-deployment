@@ -6,6 +6,7 @@ import {
 import {
   createQuotationProvider,
   convertEstimateToQuotationProvider,
+  convertCustomQuoteToQuotationProvider,
   getQuotationByIdProvider,
   getQuotationsProvider,
   getPendingApprovalsProvider,
@@ -83,6 +84,29 @@ export function useConvertEstimateToQuotationMutation() {
       if (estimateId) {
         void queryClient.invalidateQueries({
           queryKey: ["sales", "estimate", estimateId],
+        });
+      }
+    },
+  });
+}
+
+export function useConvertCustomQuoteToQuotationMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      customQuoteId,
+      leadId,
+    }: {
+      customQuoteId: string;
+      leadId?: string;
+    }) => convertCustomQuoteToQuotationProvider(customQuoteId, { leadId }),
+    onSuccess: (_, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ["sales", "custom-quotes"] });
+      void queryClient.invalidateQueries({ queryKey: ["sales", "quotations"] });
+      if (variables.customQuoteId) {
+        void queryClient.invalidateQueries({
+          queryKey: ["sales", "custom-quote", variables.customQuoteId],
         });
       }
     },
