@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/lib/api-error";
-import { useQuotationQuery } from "@/modules/quotations/quotations.hooks";
+import { useQuotationQuery, useSubmitQuotationForApprovalMutation } from "@/modules/quotations/quotations.hooks";
 import { useLeadDetailQuery } from "@/modules/leads/leads.hooks";
 import { SubmitApprovalModal } from "@/modules/quotation-generator/components/submit-approval-modal";
 import { SendQuotationModal } from "@/modules/quotation-generator/components/send-quotation-modal";
@@ -48,6 +48,8 @@ export default function QuotationDetailsPage() {
 
   const { loadAndEdit, isLoading: isEditingEstimate } =
     useLoadEstimateToEditor();
+
+  const submitApprovalMutation = useSubmitQuotationForApprovalMutation();
 
   // Fetch quotation details with includeEstimate=true and includeDocuments=true
   const {
@@ -333,6 +335,16 @@ export default function QuotationDetailsPage() {
     }
   };
 
+  const handleSubmitForApproval = async (note?: string) => {
+    const targetId = quotation?._id || id || sourceEstimateId;
+    if (!targetId) return;
+    await submitApprovalMutation.mutateAsync({
+      quotationId: quotation?._id || id,
+      estimateId: sourceEstimateId,
+      note: note?.trim() || undefined,
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="p-12 flex flex-col items-center justify-center min-h-100 gap-4">
@@ -433,10 +445,17 @@ export default function QuotationDetailsPage() {
             <Button
               type="button"
               onClick={() => setShowSubmitModal(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
+              disabled={submitApprovalMutation.isPending}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <FileCheck className="h-4 w-4" />
-              Send for Approval
+              {submitApprovalMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileCheck className="h-4 w-4" />
+              )}
+              {submitApprovalMutation.isPending
+                ? "Submitting..."
+                : "Send for Approval"}
             </Button>
           )}
 
@@ -550,6 +569,7 @@ export default function QuotationDetailsPage() {
                 )
             : undefined
         }
+        isSubmitting={submitApprovalMutation.isPending}
         onSubmitForApproval={
           canSubmit ? () => setShowSubmitModal(true) : undefined
         }
@@ -592,6 +612,8 @@ export default function QuotationDetailsPage() {
               })}`
             : undefined
         }
+        isLoading={submitApprovalMutation.isPending}
+        onSubmit={handleSubmitForApproval}
         onSuccess={() => {
           void refetch();
         }}
