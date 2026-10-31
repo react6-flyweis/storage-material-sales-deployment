@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router";
 import { ArrowLeft, FolderUp, Loader2, FileSearch, Printer } from "lucide-react";
 import { toast } from "sonner";
@@ -9,13 +9,17 @@ import { useQuotationStore } from "@/modules/quotation-generator/quotation.store
 import {
   downloadPdfProvider,
   saveEstimateProvider,
+  getEstimateByIdProvider,
   type ExtractDrawingResponseData,
   type ExtractShipperResponseData,
+  type SaveEstimatePayload,
 } from "../estimates.api";
+import { downloadCustomQuotePdfProvider } from "../custom-quotes.api";
 import { downloadPdfFromBase64 } from "../utils/pdf-download";
 import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
 import { usePembDocumentPayload } from "../hooks/use-pemb-document-payload";
 import { ServerDocumentPreview } from "../components/server-document-preview";
+import { hydrateEstimateIntoStore } from "../hooks/use-load-estimate-to-editor";
 
 export function QuotePreviewPage() {
   const navigate = useNavigate();
@@ -34,10 +38,31 @@ export function QuotePreviewPage() {
     additionalNotes?: string;
     pdfFileName?: string;
     estimateId?: string;
+    customQuoteId?: string;
+    quoteKind?: string;
+    jobType?: string;
+    isCustom?: boolean;
+    customPricing?: {
+      matCost: number;
+      freight: number;
+      laborCost: number;
+      marginPct: number;
+      sell: number;
+      profit: number;
+      profPct: number;
+      totalCost: number;
+      sellOverride?: number | null;
+    };
+    taxRate?: number;
+    includeTax?: boolean;
+    taxZip?: string;
     salesTax?: {
       rate?: number;
+      taxRate?: number;
       include?: boolean;
+      includeTax?: boolean;
       zip?: string;
+      taxZip?: string;
     };
   };
 
@@ -93,6 +118,25 @@ export function QuotePreviewPage() {
     if (eid) {
       setEstimateId(eid);
       setPembEstimateId(eid);
+      getEstimateByIdProvider(eid)
+        .then((res) => {
+          const estData = (res?.data?.estimate ||
+            res?.estimate ||
+            res?.data ||
+            res) as SaveEstimatePayload | undefined;
+          if (
+            estData &&
+            (estData._id ||
+              estData.jobType ||
+              estData.parsedCategories ||
+              estData.storageData)
+          ) {
+            hydrateEstimateIntoStore(estData, eid);
+          }
+        })
+        .catch((err) => {
+          console.warn("Failed to load estimate for preview:", err);
+        });
     }
   }, [navState.estimateId, pembEstimateId, setPembEstimateId]);
 
@@ -104,30 +148,53 @@ export function QuotePreviewPage() {
       (navState.extractedShipper?.pricing as Record<string, unknown> | undefined)?.salesTax ||
       (navState.extractedShipper?.pricing as Record<string, unknown> | undefined)?.sales_tax;
 
-    if (rawTax && typeof rawTax === "object") {
-      const taxObj = rawTax as Record<string, unknown>;
-      const qStore = useQuotationStore.getState();
-      const zip =
-        taxObj.zip ||
-        taxObj.taxZip ||
-        taxObj.postalCode ||
-        taxObj.zipCode ||
-        navState.quotationForm?.cityStateZip?.match(/\b(\d{5})(?:-\d{4})?\b/)?.[1] ||
-        navState.quotationForm?.street?.match(/\b(\d{5})(?:-\d{4})?\b/)?.[1];
-      const rate = taxObj.rate ?? taxObj.taxRate ?? taxObj.tax_rate;
-      const inc = taxObj.include ?? taxObj.includeTax ?? taxObj.isTaxIncluded;
+    const qStore = useQuotationStore.getState();
+    const taxObj =
+      rawTax && typeof rawTax === "object"
+        ? (rawTax as Record<string, unknown>)
+        : null;
 
-      if (zip && qStore.taxZip !== String(zip)) {
-        qStore.setTaxZip(String(zip));
-      }
-      if (rate !== undefined && rate !== null && !isNaN(Number(rate)) && qStore.taxRate !== Number(rate)) {
-        qStore.setTaxRate(Number(rate));
-      }
-      if (inc !== undefined && inc !== null && qStore.includeTax !== Boolean(inc)) {
-        qStore.setIncludeTax(Boolean(inc));
-      }
+    const zip =
+      taxObj?.zip ||
+      taxObj?.taxZip ||
+      taxObj?.postalCode ||
+      taxObj?.zipCode ||
+      navState.taxZip ||
+      navState.quotationForm?.cityStateZip?.match(/\b(\d{5})(?:-\d{4})?\b/)?.[1] ||
+      navState.quotationForm?.street?.match(/\b(\d{5})(?:-\d{4})?\b/)?.[1];
+    const rate =
+      taxObj?.rate ??
+      taxObj?.taxRate ??
+      taxObj?.tax_rate ??
+      navState.taxRate;
+    const inc =
+      taxObj?.include ??
+      taxObj?.includeTax ??
+      taxObj?.isTaxIncluded ??
+      navState.includeTax;
+
+    if (zip && qStore.taxZip !== String(zip)) {
+      qStore.setTaxZip(String(zip));
     }
-  }, [navState.salesTax, navState.extractedShipper, navState.quotationForm]);
+    if (
+      rate !== undefined &&
+      rate !== null &&
+      !isNaN(Number(rate)) &&
+      qStore.taxRate !== Number(rate)
+    ) {
+      qStore.setTaxRate(Number(rate));
+    }
+    if (inc !== undefined && inc !== null && qStore.includeTax !== Boolean(inc)) {
+      qStore.setIncludeTax(Boolean(inc));
+    }
+  }, [
+    navState.salesTax,
+    navState.taxZip,
+    navState.taxRate,
+    navState.includeTax,
+    navState.extractedShipper,
+    navState.quotationForm,
+  ]);
 
   const initialPdfName =
     navState.pdfFileName ||
@@ -172,6 +239,29 @@ export function QuotePreviewPage() {
     effectiveSqFt,
   } = pricingData;
 
+  const isCustomQuote = Boolean(
+    navState.isCustom ||
+      navState.quoteKind === "custom" ||
+      navState.jobType === "Custom" ||
+      Boolean(navState.customQuoteId) ||
+      jobType === "Custom"
+  );
+  const customQuoteId =
+    navState.customQuoteId || navState.estimateId || estimateId || undefined;
+
+  const effectivePreviewPayload = useMemo(() => {
+    if (isCustomQuote) {
+      return {
+        ...previewPayload,
+        quoteKind: "custom" as const,
+        jobType: "Custom" as const,
+        customQuoteId,
+        companyBrand: (companyBrand || "SM") as "SM" | "SBD",
+      };
+    }
+    return previewPayload;
+  }, [isCustomQuote, previewPayload, customQuoteId, companyBrand]);
+
   const isEditing = Boolean(
     estimateId || pembEstimateId || navState.estimateId,
   );
@@ -182,7 +272,7 @@ export function QuotePreviewPage() {
     error: previewError,
     refetch: refetchPreview,
   } = useServerDocumentPreview({
-    payload: previewPayload,
+    payload: effectivePreviewPayload,
   });
 
   const handleScrollToPreview = () => {
@@ -206,6 +296,19 @@ export function QuotePreviewPage() {
   const handleDownloadPdf = async () => {
     setIsDownloadingPdf(true);
     try {
+      if (isCustomQuote && customQuoteId) {
+        const brand = (companyBrand === "SBD" ? "SBD" : "SM") as "SM" | "SBD";
+        const pdfData = await downloadCustomQuotePdfProvider(customQuoteId, { company: brand });
+        if (pdfData?.fileBase64) {
+          downloadPdfFromBase64(
+            pdfData.fileBase64,
+            pdfData.fileName || `Custom_Quote_${(customerLeadName || "Package").replace(/\s+/g, "_")}.pdf`,
+            pdfData.mimeType || "application/pdf"
+          );
+          toast.success("PDF downloaded successfully");
+          return;
+        }
+      }
       const payload = buildPayload();
       const res = await downloadPdfProvider(payload, effectiveEstimateId);
       const pdfData = res?.data || res;
@@ -228,6 +331,15 @@ export function QuotePreviewPage() {
   };
 
   const handleSaveToHistory = async () => {
+    if (isCustomQuote) {
+      toast.success("Custom quote saved");
+      if (customQuoteId) {
+        navigate(`/quotation/history/${customQuoteId}`);
+      } else {
+        navigate("/quotation/history");
+      }
+      return;
+    }
     setIsSavingEstimate(true);
     try {
       const activeEstId =
@@ -281,26 +393,6 @@ export function QuotePreviewPage() {
             navState.extractedShipper?.fileName ||
             pembExtractedShipper?.fileName ||
             "",
-          parsedCategories:
-            navState.extractedShipper?.parsedCategories ||
-            pembExtractedShipper?.parsedCategories,
-          tabSummary:
-            navState.extractedShipper?.tabSummary ||
-            pembExtractedShipper?.tabSummary,
-          breakdownRows:
-            navState.extractedShipper?.pricing?.rows ||
-            pembExtractedShipper?.pricing?.rows,
-          pricingResult:
-            navState.extractedShipper?.pricing || pembExtractedShipper?.pricing,
-          fullQuoteResult:
-            navState.extractedShipper?.fullQuote ||
-            pembExtractedShipper?.fullQuote ||
-            (navState.extractedShipper?.pricing as
-              | Record<string, unknown>
-              | undefined) ||
-            (pembExtractedShipper?.pricing as
-              | Record<string, unknown>
-              | undefined),
           extractedDrawingFields: navState.extractedDrawing?.extracted,
           concreteAddon: {
             include: concreteInclude,
@@ -326,8 +418,11 @@ export function QuotePreviewPage() {
           },
           salesTax: {
             rate: taxRate,
+            taxRate,
             include: includeTax,
+            includeTax,
             zip: taxZip,
+            taxZip,
           },
           cogsOverride: cogsOverrideApplied
             ? {
@@ -461,7 +556,7 @@ export function QuotePreviewPage() {
         </div>
       </div>
 
-      {!hasData && (
+      {!hasData && !isCustomQuote && (
         <Card className="p-8 text-center bg-blue-50/50 border border-blue-200 rounded-xl mb-4">
           <div className="flex flex-col items-center justify-center gap-3">
             <FileSearch className="h-8 w-8 text-blue-600" />
