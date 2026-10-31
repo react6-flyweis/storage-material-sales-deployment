@@ -13,7 +13,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/lib/api-error";
-import { useQuotationQuery, useSubmitQuotationForApprovalMutation } from "@/modules/quotations/quotations.hooks";
+import {
+  useQuotationQuery,
+  useSubmitQuotationForApprovalMutation,
+} from "@/modules/quotations/quotations.hooks";
 import { useLeadDetailQuery } from "@/modules/leads/leads.hooks";
 import { SubmitApprovalModal } from "@/modules/quotation-generator/components/submit-approval-modal";
 import { SendQuotationModal } from "@/modules/quotation-generator/components/send-quotation-modal";
@@ -73,14 +76,14 @@ export default function QuotationDetailsPage() {
       : quotation?.leadId;
   const { data: leadDetailData } = useLeadDetailQuery(
     leadIdStr || "",
-    Boolean(leadIdStr)
+    Boolean(leadIdStr),
   );
 
   const quoteNumber =
     quotation?.quoteNumber || estimate?.quoteNumber || "QUO-DRAFT";
   const lifecycle = useMemo(
     () => resolveQuotationLifecycle(quotation),
-    [quotation]
+    [quotation],
   );
   const workflowStatus: WorkflowStatus = lifecycle.lifecycleStatus;
   const versionNumber =
@@ -96,8 +99,7 @@ export default function QuotationDetailsPage() {
         ?.rejectionReason,
       approvalMessage: (quotation as { approvalMessage?: string })
         ?.approvalMessage,
-      approvalNote: (quotation as { approvalNote?: string })
-        ?.approvalNote,
+      approvalNote: (quotation as { approvalNote?: string })?.approvalNote,
       approvedVersionNumber: (quotation as { approvedVersionNumber?: number })
         ?.approvedVersionNumber,
     };
@@ -314,9 +316,12 @@ export default function QuotationDetailsPage() {
 
   const handleEditEstimate = async () => {
     try {
-      if (sourceCustomQuoteId || estimate?.jobType?.toUpperCase() === "CUSTOM") {
+      if (
+        sourceCustomQuoteId ||
+        estimate?.jobType?.toUpperCase() === "CUSTOM"
+      ) {
         navigate(
-          `/quotation/custom?id=${sourceCustomQuoteId || estimate?._id}&quotationId=${quotation?._id || id}`
+          `/quotation/custom?id=${sourceCustomQuoteId || estimate?._id}&quotationId=${quotation?._id || id}`,
         );
         return;
       }
@@ -337,12 +342,28 @@ export default function QuotationDetailsPage() {
 
   const handleSubmitForApproval = async (note?: string) => {
     const targetId = quotation?._id || id || sourceEstimateId;
-    if (!targetId) return;
-    await submitApprovalMutation.mutateAsync({
-      quotationId: quotation?._id || id,
-      estimateId: sourceEstimateId,
-      note: note?.trim() || undefined,
-    });
+    if (!targetId) {
+      toast.error("No quotation ID found to submit for approval.");
+      return;
+    }
+
+    try {
+      await submitApprovalMutation.mutateAsync({
+        quotationId: quotation?._id || id,
+        estimateId: sourceEstimateId,
+        note: note?.trim() || undefined,
+      });
+      toast.success("Submitted for approval successfully");
+      void refetch();
+    } catch (err) {
+      console.error("Failed to submit quotation for approval:", err);
+      const msg = getApiErrorMessage(
+        err,
+        "Failed to submit quotation for approval. Please try again.",
+      );
+      toast.error(msg);
+      throw err;
+    }
   };
 
   if (isLoading) {
@@ -436,7 +457,9 @@ export default function QuotationDetailsPage() {
               className="px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 shadow-xs bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
             >
               <Send className="h-4 w-4" />
-              {workflowStatus === "sent" ? "Resend to Customer" : "Send to Customer"}
+              {workflowStatus === "sent"
+                ? "Resend to Customer"
+                : "Send to Customer"}
             </Button>
           )}
 
@@ -474,8 +497,8 @@ export default function QuotationDetailsPage() {
                 isCustomerRejected
                   ? "The customer declined this quotation. Click to edit estimate in generator editor before re-submitting."
                   : isRejected
-                  ? "This quotation version was rejected. Click to edit estimate in generator editor before re-submitting."
-                  : "Load estimate into generator editor to modify"
+                    ? "This quotation version was rejected. Click to edit estimate in generator editor before re-submitting."
+                    : "Load estimate into generator editor to modify"
               }
             >
               {isEditingEstimate ? (
@@ -492,7 +515,9 @@ export default function QuotationDetailsPage() {
             <Button
               type="button"
               onClick={() => {
-                navigate(`/quotation/custom?id=${sourceCustomQuoteId}&quotationId=${quotation?._id || id}`);
+                navigate(
+                  `/quotation/custom?id=${sourceCustomQuoteId}&quotationId=${quotation?._id || id}`,
+                );
               }}
               className={`px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs ${
                 isRejected
@@ -563,11 +588,11 @@ export default function QuotationDetailsPage() {
           sourceEstimateId
             ? handleEditEstimate
             : sourceCustomQuoteId
-            ? () =>
-                navigate(
-                  `/quotation/custom?id=${sourceCustomQuoteId}&quotationId=${quotation?._id || id}`
-                )
-            : undefined
+              ? () =>
+                  navigate(
+                    `/quotation/custom?id=${sourceCustomQuoteId}&quotationId=${quotation?._id || id}`,
+                  )
+              : undefined
         }
         isSubmitting={submitApprovalMutation.isPending}
         onSubmitForApproval={

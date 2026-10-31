@@ -560,26 +560,30 @@ export function EstimateDetailPage() {
           )}
 
           {/* Request Deposit Terms */}
-          <Button
-            type="button"
-            onClick={() => setIsDepositModalOpen(true)}
-            className="bg-[#15803d] hover:bg-[#166534] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
-            title="Request deposit and generate deposit receipt"
-          >
-            <Banknote className="h-4 w-4" />
-            Deposit
-          </Button>
+          {!isCustom && (
+            <Button
+              type="button"
+              onClick={() => setIsDepositModalOpen(true)}
+              className="bg-[#15803d] hover:bg-[#166534] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
+              title="Request deposit and generate deposit receipt"
+            >
+              <Banknote className="h-4 w-4" />
+              Deposit
+            </Button>
+          )}
 
           {/* Milestone Payments Schedule */}
-          <Button
-            type="button"
-            onClick={() => setIsMilestoneModalOpen(true)}
-            className="bg-[#7c3aed] hover:bg-[#6d28d9] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
-            title="Configure milestone payment schedule for this estimate"
-          >
-            <Milestone className="h-4 w-4" />
-            Milestones
-          </Button>
+          {!isCustom && (
+            <Button
+              type="button"
+              onClick={() => setIsMilestoneModalOpen(true)}
+              className="bg-[#7c3aed] hover:bg-[#6d28d9] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
+              title="Configure milestone payment schedule for this estimate"
+            >
+              <Milestone className="h-4 w-4" />
+              Milestones
+            </Button>
+          )}
 
           {/* Edit Estimate Button (Always available for sales unless rejected CTA shown above) */}
           {effectiveStatus !== "admin_rejected" &&

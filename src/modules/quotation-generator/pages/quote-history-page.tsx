@@ -522,7 +522,11 @@ export function QuoteHistoryPage() {
               const isStorage =
                 quote.jobType?.toUpperCase() === "STORAGE" ||
                 Boolean(quote.storageData);
-              const isCustom = quote.jobType?.toUpperCase() === "CUSTOM";
+              const isCustom =
+                quote.jobType?.toUpperCase() === "CUSTOM" ||
+                Boolean(quote.customQuote) ||
+                (quote as Record<string, unknown>)?.quoteKind === "custom" ||
+                (quote as Record<string, unknown>)?.kind === "custom";
               const pricingRes = (quote.pricingResult ||
                 quote.storagePricingResult) as
                 | Record<string, unknown>
@@ -754,23 +758,27 @@ export function QuoteHistoryPage() {
                       <span>Change Order</span>
                     </Button>
 
-                    <Button
-                      type="button"
-                      onClick={() => setActiveDepositQuote(quote)}
-                      className="bg-[#15803d] hover:bg-[#166534] text-white h-8 px-3 text-xs font-medium rounded-md cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                    >
-                      <Banknote className="h-3.5 w-3.5" />
-                      <span>Request Deposit</span>
-                    </Button>
+                    {!isCustom && (
+                      <>
+                        <Button
+                          type="button"
+                          onClick={() => setActiveDepositQuote(quote)}
+                          className="bg-[#15803d] hover:bg-[#166534] text-white h-8 px-3 text-xs font-medium rounded-md cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                        >
+                          <Banknote className="h-3.5 w-3.5" />
+                          <span>Request Deposit</span>
+                        </Button>
 
-                    <Button
-                      type="button"
-                      onClick={() => setActiveMilestoneQuote(quote)}
-                      className="bg-[#7c3aed] hover:bg-[#6d28d9] text-white h-8 px-3 text-xs font-medium rounded-md cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                    >
-                      <Milestone className="h-3.5 w-3.5" />
-                      <span>Milestones</span>
-                    </Button>
+                        <Button
+                          type="button"
+                          onClick={() => setActiveMilestoneQuote(quote)}
+                          className="bg-[#7c3aed] hover:bg-[#6d28d9] text-white h-8 px-3 text-xs font-medium rounded-md cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                        >
+                          <Milestone className="h-3.5 w-3.5" />
+                          <span>Milestones</span>
+                        </Button>
+                      </>
+                    )}
 
                     <Button
                       type="button"
