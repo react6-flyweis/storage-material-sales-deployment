@@ -86,6 +86,25 @@ export function QuotePreviewListPage() {
         estimate._id = targetEstimateId;
       }
 
+      const isCustom = estimate.jobType?.toUpperCase() === "CUSTOM";
+      if (isCustom) {
+        navigate("/quotation/quote-preview/view", {
+          state: {
+            estimateId: targetEstimateId,
+            customQuoteId: targetEstimateId,
+            quoteKind: "custom",
+            jobType: "Custom",
+            isCustom: true,
+            buildingSize: estimate.buildingSize || "Custom Quote",
+            quotationForm: {
+              customerName: estimate.leadCompanyName || "",
+              street: estimate.streetAddress || estimate.cityStateZip || "",
+            },
+          },
+        });
+        return;
+      }
+
       const isStorage =
         estimate.jobType?.toUpperCase() === "STORAGE" ||
         Boolean(estimate.storageData);
@@ -277,11 +296,17 @@ export function QuotePreviewListPage() {
     });
   }, [estimatesList, activeFilter, searchTerm]);
 
-  const pembCount = estimatesList.filter(
-    (q) => q.jobType?.toUpperCase() !== "STORAGE" && !q.storageData,
+  const customCount = estimatesList.filter(
+    (q) => q.jobType?.toUpperCase() === "CUSTOM"
   ).length;
   const storageCount = estimatesList.filter(
     (q) => q.jobType?.toUpperCase() === "STORAGE" || Boolean(q.storageData),
+  ).length;
+  const pembCount = estimatesList.filter(
+    (q) =>
+      q.jobType?.toUpperCase() !== "STORAGE" &&
+      !q.storageData &&
+      q.jobType?.toUpperCase() !== "CUSTOM",
   ).length;
 
   return (
@@ -358,6 +383,17 @@ export function QuotePreviewListPage() {
           >
             Storage COG ({storageCount})
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveFilter("custom")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+              activeFilter === "custom"
+                ? "bg-purple-600 text-white shadow-xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            Custom ({customCount})
+          </button>
         </div>
 
         <div className="text-xs text-slate-500 font-medium">
@@ -392,6 +428,7 @@ export function QuotePreviewListPage() {
               const isStorage =
                 quote.jobType?.toUpperCase() === "STORAGE" ||
                 Boolean(quote.storageData);
+              const isCustom = quote.jobType?.toUpperCase() === "CUSTOM";
               const pricingRes = (quote.pricingResult ||
                 quote.storagePricingResult) as
                 | Record<string, unknown>
@@ -404,17 +441,23 @@ export function QuotePreviewListPage() {
                 Number(
                   quote.grandTotal ??
                     quote.totalSell ??
+                    (quote as Record<string, unknown>).sell ??
                     fullQuote?.grandTotal ??
                     pricingRes?.totSell ??
                     pricingRes?.grandTotal,
                 ) || 0;
               const prof =
                 Number(
-                  quote.profit ?? fullQuote?.totalProfit ?? pricingRes?.profit,
+                  quote.profit ??
+                    (quote as Record<string, unknown>).profit ??
+                    fullQuote?.totalProfit ??
+                    pricingRes?.profit,
                 ) || 0;
               const marginPct =
                 Number(
                   quote.marginPercent ??
+                    (quote as Record<string, unknown>).marginPct ??
+                    (quote as Record<string, unknown>).profPct ??
                     fullQuote?.grandMargin ??
                     pricingRes?.profPct ??
                     pricingRes?.marginPercent,
@@ -532,17 +575,25 @@ export function QuotePreviewListPage() {
                       <div className="flex items-center gap-1.5 mr-1">
                         <span
                           className={`px-1.5 py-0.5 rounded-xs text-[10px] font-bold tracking-wide uppercase ${
-                            isStorage
+                            isCustom
+                              ? "bg-purple-100 text-purple-900"
+                              : isStorage
                               ? "bg-amber-100 text-amber-900"
                               : "bg-[#dbeafe] text-[#2563eb]"
                           }`}
                         >
-                          {isStorage
+                          {isCustom
+                            ? "CUSTOM"
+                            : isStorage
                             ? "STORAGE COG"
                             : quote.jobType?.toUpperCase() || "PEMB"}
                         </span>
                         <span className="text-xs text-slate-500 font-normal hidden sm:inline">
-                          {isStorage ? "Mini storage" : "Vendor blend"}
+                          {isCustom
+                            ? "Manual quote"
+                            : isStorage
+                            ? "Mini storage"
+                            : "Vendor blend"}
                         </span>
                       </div>
 
