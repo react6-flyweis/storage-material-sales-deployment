@@ -5,11 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import type { SaveEstimatePayload } from "../estimates.api";
 import {
   createChangeOrderProvider,
@@ -56,9 +52,12 @@ function ChangeOrderContent({
       })
     : "Oct 19, 2026";
 
-  const pricingRes = (quote?.pricingResult ||
-    quote?.storagePricingResult) as Record<string, unknown> | undefined;
-  const fullQuote = quote?.fullQuoteResult as Record<string, unknown> | undefined;
+  const pricingRes = (quote?.pricingResult || quote?.storagePricingResult) as
+    | Record<string, unknown>
+    | undefined;
+  const fullQuote = quote?.fullQuoteResult as
+    | Record<string, unknown>
+    | undefined;
   const initialOrigValue =
     Number(
       quote?.grandTotal ??
@@ -68,14 +67,14 @@ function ChangeOrderContent({
         pricingRes?.grandTotal,
     ) || 3512753;
 
-  const [customer, setCustomer] = useState(initialCustomer);
-  const [coDate, setCoDate] = useState(initialCoDate);
-  const [origContractDate, setOrigContractDate] = useState(initialOrigDate);
-  const [origContractValue, setOrigContractValue] = useState<number>(initialOrigValue);
+  const [customer] = useState(initialCustomer);
+  const [coDate] = useState(initialCoDate);
+  const [origContractDate] = useState(initialOrigDate);
+  const [origContractValue] = useState<number>(initialOrigValue);
   const [description, setDescription] = useState("");
   const [sellAmount, setSellAmount] = useState<string>("");
   const [costAmount, setCostAmount] = useState<string>("");
-  const [markupPct, setMarkupPct] = useState<string>("");
+  const [marginPctInput, setMarginPctInput] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [existingCOs, setExistingCOs] = useState<ChangeOrderRecord[]>([]);
 
@@ -93,34 +92,48 @@ function ChangeOrderContent({
   const parsedSell = parseFloat(sellAmount) || 0;
   const parsedCost = parseFloat(costAmount) || 0;
   const revisedTotal = origContractValue + parsedSell;
-  const coProfit = parsedSell && parsedCost ? parsedSell - parsedCost : null;
+  const hasSell = sellAmount.trim() !== "" && !isNaN(parsedSell);
+  const hasCost = costAmount.trim() !== "" && !isNaN(parsedCost);
+  const coProfit = hasSell && hasCost ? parsedSell - parsedCost : null;
   const marginPct =
     coProfit !== null && parsedSell > 0 ? (coProfit / parsedSell) * 100 : null;
 
   const handleSellChange = (val: string) => {
     setSellAmount(val);
     const s = parseFloat(val);
-    const m = parseFloat(markupPct);
-    if (!isNaN(s) && !isNaN(m) && m > 0 && !costAmount) {
-      setCostAmount((s / (1 + m / 100)).toFixed(2));
+    const c = parseFloat(costAmount);
+    const m = parseFloat(marginPctInput);
+
+    if (!isNaN(s) && !isNaN(c) && s > 0) {
+      setMarginPctInput((((s - c) / s) * 100).toFixed(1));
+    } else if (!isNaN(s) && !isNaN(m) && m < 100 && !costAmount) {
+      setCostAmount((s * (1 - m / 100)).toFixed(2));
     }
   };
 
   const handleCostChange = (val: string) => {
     setCostAmount(val);
     const c = parseFloat(val);
-    const m = parseFloat(markupPct);
-    if (!isNaN(c) && !isNaN(m) && m > 0) {
-      setSellAmount((c * (1 + m / 100)).toFixed(2));
+    const s = parseFloat(sellAmount);
+    const m = parseFloat(marginPctInput);
+
+    if (!isNaN(c) && !isNaN(m) && m < 100) {
+      setSellAmount((c / (1 - m / 100)).toFixed(2));
+    } else if (!isNaN(c) && !isNaN(s) && s > 0) {
+      setMarginPctInput((((s - c) / s) * 100).toFixed(1));
     }
   };
 
-  const handleMarkupChange = (val: string) => {
-    setMarkupPct(val);
+  const handleMarginChange = (val: string) => {
+    setMarginPctInput(val);
     const m = parseFloat(val);
     const c = parseFloat(costAmount);
-    if (!isNaN(m) && !isNaN(c) && c > 0) {
-      setSellAmount((c * (1 + m / 100)).toFixed(2));
+    const s = parseFloat(sellAmount);
+
+    if (!isNaN(m) && !isNaN(c) && c > 0 && m < 100) {
+      setSellAmount((c / (1 - m / 100)).toFixed(2));
+    } else if (!isNaN(m) && !isNaN(s) && s > 0 && m < 100) {
+      setCostAmount((s * (1 - m / 100)).toFixed(2));
     }
   };
 
@@ -200,7 +213,7 @@ function ChangeOrderContent({
             </div>
             <div class="card">
               <div class="card-label">CO Cost</div>
-              <div class="card-value">${parsedCost ? `$${parsedCost.toLocaleString()}` : "-"}</div>
+              <div class="card-value">${hasCost ? `$${parsedCost.toLocaleString()}` : "-"}</div>
             </div>
             <div class="card">
               <div class="card-label">CO Profit</div>
@@ -257,22 +270,33 @@ function ChangeOrderContent({
         company: "SM",
       });
 
-      const pdfRes = await downloadChangeOrderPdfProvider(coRecord._id).catch(() => null);
+      const pdfRes = await downloadChangeOrderPdfProvider(coRecord._id).catch(
+        () => null,
+      );
       const b64 = pdfRes?.data?.fileBase64 || pdfRes?.fileBase64;
       if (b64) {
         downloadPdfFromBase64(
           b64,
-          pdfRes?.data?.fileName || pdfRes?.fileName || `Change-Order-${coRecord.coNum || nextCoNum}.pdf`
+          pdfRes?.data?.fileName ||
+            pdfRes?.fileName ||
+            `Change-Order-${coRecord.coNum || nextCoNum}.pdf`,
         );
-        toast.success(`Change Order #${coRecord.coNum || nextCoNum} created and PDF downloaded!`);
+        toast.success(
+          `Change Order #${coRecord.coNum || nextCoNum} created and PDF downloaded!`,
+        );
       } else {
         openClientPrintPopup();
-        toast.success(`Change Order #${coRecord.coNum || nextCoNum} saved successfully!`);
+        toast.success(
+          `Change Order #${coRecord.coNum || nextCoNum} saved successfully!`,
+        );
       }
       onSuccess?.();
       onOpenChange(false);
     } catch (err) {
-      console.error("Failed to save change order to server, using client print:", err);
+      console.error(
+        "Failed to save change order to server, using client print:",
+        err,
+      );
       openClientPrintPopup();
       toast.success("Change Order printed");
       onSuccess?.();
@@ -295,7 +319,8 @@ function ChangeOrderContent({
               Change Order #{nextCoNum}
             </DialogTitle>
             <div className="text-xs text-blue-100 font-normal">
-              {customer} · Original contract: ${origContractValue.toLocaleString()}
+              {customer} · Original contract: $
+              {origContractValue.toLocaleString()}
             </div>
           </div>
         </div>
@@ -316,10 +341,10 @@ function ChangeOrderContent({
               CUSTOMER
             </Label>
             <Input
+              disabled
               value={customer}
-              onChange={(e) => setCustomer(e.target.value)}
               placeholder="Customer Name"
-              className="h-10 text-sm font-medium border-slate-300"
+              className="h-10 text-sm font-medium border-slate-300 bg-slate-100/70 text-slate-700 cursor-not-allowed"
             />
           </div>
           <div className="space-y-1.5">
@@ -327,10 +352,10 @@ function ChangeOrderContent({
               CO DATE
             </Label>
             <Input
+              disabled
               value={coDate}
-              onChange={(e) => setCoDate(e.target.value)}
               placeholder="Date"
-              className="h-10 text-sm font-medium border-slate-300"
+              className="h-10 text-sm font-medium border-slate-300 bg-slate-100/70 text-slate-700 cursor-not-allowed"
             />
           </div>
         </div>
@@ -341,10 +366,10 @@ function ChangeOrderContent({
               ORIGINAL CONTRACT DATE
             </Label>
             <Input
+              disabled
               value={origContractDate}
-              onChange={(e) => setOrigContractDate(e.target.value)}
               placeholder="Original Date"
-              className="h-10 text-sm font-medium border-slate-300"
+              className="h-10 text-sm font-medium border-slate-300 bg-slate-100/70 text-slate-700 cursor-not-allowed"
             />
           </div>
           <div className="space-y-1.5">
@@ -352,11 +377,11 @@ function ChangeOrderContent({
               ORIGINAL CONTRACT VALUE
             </Label>
             <Input
+              disabled
               type="number"
               value={origContractValue || ""}
-              onChange={(e) => setOrigContractValue(Number(e.target.value))}
               placeholder="3512753"
-              className="h-10 text-sm font-medium border-slate-300"
+              className="h-10 text-sm font-medium border-slate-300 bg-slate-100/70 text-slate-700 cursor-not-allowed"
             />
           </div>
         </div>
@@ -408,13 +433,13 @@ function ChangeOrderContent({
             </div>
             <div className="space-y-1.5">
               <Label className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">
-                MARKUP %
+                MARGIN %
               </Label>
               <Input
                 type="number"
-                value={markupPct}
-                onChange={(e) => handleMarkupChange(e.target.value)}
-                placeholder="e.g. 25"
+                value={marginPctInput}
+                onChange={(e) => handleMarginChange(e.target.value)}
+                placeholder="e.g. 10"
                 className="h-10 text-sm border-slate-300"
               />
             </div>
@@ -435,7 +460,7 @@ function ChangeOrderContent({
                 CO COST
               </div>
               <div className="text-lg font-bold text-slate-700 mt-1.5">
-                {parsedCost ? `$${Math.round(parsedCost).toLocaleString()}` : "-"}
+                {hasCost ? `$${Math.round(parsedCost).toLocaleString()}` : "-"}
               </div>
             </div>
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-col justify-between">
@@ -498,7 +523,7 @@ export function ChangeOrderModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="max-h-[85vh] sm:max-w-lg p-0 gap-0 overflow-hidden border border-slate-200 shadow-2xl rounded-2xl flex flex-col"
+        className="max-h-[85vh] sm:max-w-2xl p-0 gap-0 overflow-hidden border border-slate-200 shadow-2xl rounded-lg flex flex-col"
       >
         {open && (
           <ChangeOrderContent
