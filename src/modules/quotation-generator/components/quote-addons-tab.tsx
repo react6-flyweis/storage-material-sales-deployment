@@ -13,6 +13,7 @@ export function QuoteAddOnsTab({ onTriggerCompute }: QuoteAddOnsTabProps) {
     addPembAddOn,
     updatePembAddOn,
     removePembAddOn,
+    pembExtractedShipper,
   } = useQuotationStore();
 
   const handleAddLineItem = () => {
@@ -40,14 +41,21 @@ export function QuoteAddOnsTab({ onTriggerCompute }: QuoteAddOnsTabProps) {
     onTriggerCompute?.();
   };
 
-  const includedTotal = pembAddOns
-    .filter((item) => item.inQuote)
-    .reduce((sum, item) => {
-      const cost = Number(item.cost) || 0;
-      const markup = Number(item.markupPct) || 0;
-      const sell = Math.round(cost * (1 + markup / 100));
-      return sum + sell;
-    }, 0);
+  const serverAddOnTotals =
+    pembExtractedShipper?.fullQuote?.pembAddOnTotals?.sell ??
+    (pembExtractedShipper?.fullQuote as Record<string, unknown>)?.pembAddOnsTotal;
+
+  const includedTotal =
+    typeof serverAddOnTotals === "number"
+      ? serverAddOnTotals
+      : pembAddOns
+          .filter((item) => item.inQuote)
+          .reduce((sum, item) => {
+            const cost = Number(item.cost) || 0;
+            const markup = Number(item.markupPct) || 0;
+            const sell = Math.round(cost * (1 + markup / 100));
+            return sum + sell;
+          }, 0);
 
   return (
     <Card className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
