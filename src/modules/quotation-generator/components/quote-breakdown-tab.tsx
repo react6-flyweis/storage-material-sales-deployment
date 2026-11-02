@@ -104,17 +104,6 @@ export function QuoteBreakdownTab({
   const blendLabel = pricing?.blendLabel || "50% Quicken blend";
   const fileName = extractedShipper?.fileName || "";
 
-  const defaultExFreightSell =
-    pricing?.materialSellExFreight != null
-      ? pricing.materialSellExFreight
-      : pricing?.matSell != null && pricing?.freight != null
-        ? pricing.matSell - pricing.freight
-        : undefined;
-  const placeholderVal =
-    defaultExFreightSell != null
-      ? String(Math.round(defaultExFreightSell))
-      : "Auto";
-
   // Square Footage metadata from backend
   const sfMeta = extractedShipper?.squareFootageMeta;
   const weightSf = Number(sfMeta?.fromWeight || sfMeta?.selected || 0);
@@ -406,7 +395,7 @@ export function QuoteBreakdownTab({
                   <input
                     type="number"
                     step="1"
-                    placeholder={placeholderVal}
+                    placeholder="Auto"
                     value={materialSellOverride}
                     onChange={(e) => setMaterialSellOverride(e.target.value)}
                     onKeyDown={(e) => {

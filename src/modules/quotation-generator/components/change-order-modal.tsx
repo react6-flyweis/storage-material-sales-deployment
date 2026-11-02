@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { RefreshCw, Printer, X, Loader2 } from "lucide-react";
+import { RefreshCw, Download, X, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import type { SaveEstimatePayload } from "../estimates.api";
 import {
   createChangeOrderProvider,
   downloadChangeOrderPdfProvider,
+  getChangeOrderDocumentProvider,
   getChangeOrdersListProvider,
   type ChangeOrderRecord,
 } from "../change-orders.api";
@@ -76,6 +77,7 @@ function ChangeOrderContent({
   const [costAmount, setCostAmount] = useState<string>("");
   const [marginPctInput, setMarginPctInput] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [existingCOs, setExistingCOs] = useState<ChangeOrderRecord[]>([]);
 
   useEffect(() => {
@@ -99,6 +101,7 @@ function ChangeOrderContent({
     coProfit !== null && parsedSell > 0 ? (coProfit / parsedSell) * 100 : null;
 
   const handleSellChange = (val: string) => {
+    if (formError) setFormError(null);
     setSellAmount(val);
     const s = parseFloat(val);
     const c = parseFloat(costAmount);
@@ -112,6 +115,7 @@ function ChangeOrderContent({
   };
 
   const handleCostChange = (val: string) => {
+    if (formError) setFormError(null);
     setCostAmount(val);
     const c = parseFloat(val);
     const s = parseFloat(sellAmount);
@@ -125,6 +129,7 @@ function ChangeOrderContent({
   };
 
   const handleMarginChange = (val: string) => {
+    if (formError) setFormError(null);
     setMarginPctInput(val);
     const m = parseFloat(val);
     const c = parseFloat(costAmount);
@@ -137,131 +142,51 @@ function ChangeOrderContent({
     }
   };
 
-  const openClientPrintPopup = () => {
-    const printWindow = window.open("", "_blank", "width=850,height=900");
-    if (!printWindow) {
-      toast.error("Please allow popups to print Change Order");
-      return;
+  const handleDownloadExistingPdf = async (co: ChangeOrderRecord) => {
+    if (formError) setFormError(null);
+    try {
+      const pdfRes = await downloadChangeOrderPdfProvider(co._id);
+      let b64 = pdfRes?.data?.fileBase64 || pdfRes?.fileBase64;
+      let fn = pdfRes?.data?.fileName || pdfRes?.fileName;
+      if (!b64) {
+        const docRes = await getChangeOrderDocumentProvider(co._id, { format: "pdf" });
+        b64 = docRes?.fileBase64;
+        fn = docRes?.fileName || fn;
+      }
+      if (b64) {
+        downloadPdfFromBase64(b64, fn || `Change-Order-${co.coNum}.pdf`);
+      } else {
+        setFormError(`PDF file data is not available for CO #${co.coNum}.`);
+      }
+    } catch (err: unknown) {
+      console.error("Failed to download existing change order PDF:", err);
+      const apiErrorMsg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ||
+        (err instanceof Error ? err.message : null) ||
+        `Failed to download PDF for CO #${co.coNum}.`;
+      setFormError(apiErrorMsg);
     }
-
-    const printHtml = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Change Order #${nextCoNum} - ${customer}</title>
-          <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 40px; color: #1e293b; }
-            .header { border-bottom: 2px solid #1e3a8a; padding-bottom: 16px; margin-bottom: 24px; }
-            .title { font-size: 24px; font-weight: 800; color: #1e3a8a; margin: 0; }
-            .subtitle { font-size: 14px; color: #64748b; margin-top: 4px; }
-            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
-            .field-label { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; }
-            .field-value { font-size: 14px; font-weight: 600; color: #0f172a; margin-top: 2px; }
-            .section-title { font-size: 13px; font-weight: 800; color: #1e3a8a; text-transform: uppercase; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px; margin-top: 24px; margin-bottom: 16px; }
-            .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px; }
-            .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; }
-            .card-label { font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; }
-            .card-value { font-size: 18px; font-weight: 800; color: #1e3a8a; margin-top: 4px; }
-            .desc-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; font-size: 13px; min-height: 60px; }
-            .signatures { margin-top: 60px; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
-            .sign-line { border-top: 1px solid #475569; padding-top: 8px; font-size: 12px; font-weight: 600; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1 class="title">CHANGE ORDER #${nextCoNum}</h1>
-            <div class="subtitle">${customer} · Original Contract: $${origContractValue.toLocaleString()}</div>
-          </div>
-          <div class="grid">
-            <div>
-              <div class="field-label">Customer</div>
-              <div class="field-value">${customer}</div>
-            </div>
-            <div>
-              <div class="field-label">Change Order Date</div>
-              <div class="field-value">${coDate}</div>
-            </div>
-            <div>
-              <div class="field-label">Original Contract Date</div>
-              <div class="field-value">${origContractDate}</div>
-            </div>
-            <div>
-              <div class="field-label">Original Contract Value</div>
-              <div class="field-value">$${origContractValue.toLocaleString()}</div>
-            </div>
-          </div>
-
-          <div class="section-title">Description of Change</div>
-          <div class="desc-box">${description || "No description provided."}</div>
-
-          <div class="section-title">Pricing Breakdown</div>
-          <div class="grid">
-            <div>
-              <div class="field-label">Change Order Sell Amount (+/-)</div>
-              <div class="field-value">${parsedSell ? `$${parsedSell.toLocaleString()}` : "$0"}</div>
-            </div>
-            <div>
-              <div class="field-label">Change Order Cost</div>
-              <div class="field-value">${parsedCost ? `$${parsedCost.toLocaleString()}` : "$0"}</div>
-            </div>
-          </div>
-
-          <div class="cards">
-            <div class="card">
-              <div class="card-label">Revised Total</div>
-              <div class="card-value">$${revisedTotal.toLocaleString()}</div>
-            </div>
-            <div class="card">
-              <div class="card-label">CO Cost</div>
-              <div class="card-value">${hasCost ? `$${parsedCost.toLocaleString()}` : "-"}</div>
-            </div>
-            <div class="card">
-              <div class="card-label">CO Profit</div>
-              <div class="card-value">${coProfit !== null ? `$${coProfit.toLocaleString()}` : "-"}</div>
-            </div>
-            <div class="card">
-              <div class="card-label">Margin</div>
-              <div class="card-value">${marginPct !== null ? `${marginPct.toFixed(1)}%` : "-"}</div>
-            </div>
-          </div>
-
-          <div class="signatures">
-            <div>
-              <div class="sign-line">Authorized Customer Signature & Date</div>
-            </div>
-            <div>
-              <div class="sign-line">Contractor / Sales Rep Signature & Date</div>
-            </div>
-          </div>
-          <script>
-            window.onload = function() {
-              window.print();
-            };
-          </script>
-        </body>
-      </html>
-    `;
-
-    printWindow.document.write(printHtml);
-    printWindow.document.close();
   };
 
-  const handlePrintPdf = async () => {
+  const handleSaveAndDownloadPdf = async () => {
     if (!description.trim()) {
-      toast.error("Please enter a description for the change order");
+      setFormError("Please enter a description for the change order.");
       return;
     }
     if (!parsedSell) {
-      toast.error("Please enter a valid sell amount");
+      setFormError("Please enter a valid sell amount.");
       return;
     }
 
+    setFormError(null);
     setIsSubmitting(true);
     try {
       const coRecord = await createChangeOrderProvider({
         estimateId: quote?._id,
         parentQuoteRef: quote?._id ? undefined : String(quote?.id || ""),
         customer,
+        coDate,
         origDate: origContractDate,
         origVal: origContractValue,
         amount: parsedSell,
@@ -270,37 +195,72 @@ function ChangeOrderContent({
         company: "SM",
       });
 
-      const pdfRes = await downloadChangeOrderPdfProvider(coRecord._id).catch(
-        () => null,
-      );
-      const b64 = pdfRes?.data?.fileBase64 || pdfRes?.fileBase64;
-      if (b64) {
-        downloadPdfFromBase64(
-          b64,
-          pdfRes?.data?.fileName ||
-            pdfRes?.fileName ||
-            `Change-Order-${coRecord.coNum || nextCoNum}.pdf`,
-        );
-        toast.success(
-          `Change Order #${coRecord.coNum || nextCoNum} created and PDF downloaded!`,
-        );
-      } else {
-        openClientPrintPopup();
-        toast.success(
-          `Change Order #${coRecord.coNum || nextCoNum} saved successfully!`,
-        );
+      let fileBase64: string | undefined;
+      let fileName: string | undefined;
+
+      // 1. Call POST /api/sales/change-orders/:coId/pdf without format to receive PDF base64
+      try {
+        const pdfRes = await downloadChangeOrderPdfProvider(coRecord._id);
+        const dataObj = pdfRes?.data;
+        fileBase64 = dataObj?.fileBase64 || pdfRes?.fileBase64;
+        fileName = dataObj?.fileName || pdfRes?.fileName;
+      } catch (pdfErr) {
+        console.warn("Change order PDF endpoint failed, attempting document PDF endpoint:", pdfErr);
       }
-      onSuccess?.();
-      onOpenChange(false);
-    } catch (err) {
-      console.error(
-        "Failed to save change order to server, using client print:",
-        err,
-      );
-      openClientPrintPopup();
-      toast.success("Change Order printed");
-      onSuccess?.();
-      onOpenChange(false);
+
+      // 2. Fallback to GET /api/sales/change-orders/:coId/document?format=pdf if base64 not yet present
+      if (!fileBase64) {
+        try {
+          const docRes = await getChangeOrderDocumentProvider(coRecord._id, { format: "pdf" });
+          fileBase64 = docRes?.fileBase64;
+          fileName = docRes?.fileName || fileName;
+        } catch (docErr) {
+          console.error("Failed to fetch change order document PDF:", docErr);
+        }
+      }
+
+      // 3. Download the PDF directly (no preview generated)
+      if (fileBase64) {
+        downloadPdfFromBase64(
+          fileBase64,
+          fileName || `Change-Order-${coRecord.coNum || nextCoNum}.pdf`
+        );
+        toast.success(
+          `Change Order #${coRecord.coNum || nextCoNum} created and PDF downloaded!`
+        );
+        onSuccess?.();
+        onOpenChange(false);
+      } else {
+        setFormError(
+          `Change Order #${coRecord.coNum || nextCoNum} saved, but PDF data could not be downloaded from the server.`
+        );
+        onSuccess?.();
+      }
+    } catch (err: unknown) {
+      console.error("Failed to save change order:", err);
+      const resData = (err as {
+        response?: {
+          data?: {
+            message?: string;
+            errors?: {
+              finalize?: { hint?: string; message?: string } | string;
+            };
+          };
+        };
+      })?.response?.data;
+
+      const finalizeObj = resData?.errors?.finalize;
+      const finalizeHint =
+        typeof finalizeObj === "object"
+          ? finalizeObj?.hint || finalizeObj?.message
+          : finalizeObj;
+
+      const apiErrorMsg =
+        finalizeHint ||
+        resData?.message ||
+        (err instanceof Error ? err.message : null) ||
+        "Failed to save change order. Please try again.";
+      setFormError(apiErrorMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -335,6 +295,20 @@ function ChangeOrderContent({
 
       {/* Modal Form Body */}
       <div className="p-6 space-y-4 flex-1 overflow-y-auto bg-white">
+        {formError && (
+          <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2.5 animate-in fade-in">
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-red-600" />
+            <div className="flex-1 font-medium leading-relaxed">{formError}</div>
+            <button
+              type="button"
+              onClick={() => setFormError(null)}
+              className="text-red-400 hover:text-red-700 cursor-pointer p-0.5"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">
@@ -393,7 +367,10 @@ function ChangeOrderContent({
           <Textarea
             rows={3}
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={(e) => {
+              if (formError) setFormError(null);
+              setDescription(e.target.value);
+            }}
             placeholder="e.g. Added 1 additional 30x50 storage unit, upgraded roof panel to Galvalume..."
             className="text-sm resize-none border-slate-300"
           />
@@ -482,6 +459,54 @@ function ChangeOrderContent({
               </div>
             </div>
           </div>
+
+          {/* Prior Change Orders List */}
+          {existingCOs.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-slate-200">
+              <div className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                Prior Change Orders ({existingCOs.length})
+              </div>
+              <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                {existingCOs.map((co) => (
+                  <div
+                    key={co._id}
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs"
+                  >
+                    <div className="min-w-0 flex-1 pr-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-[#1e3a8a]">CO #{co.coNum}</span>
+                        <span className="font-semibold text-slate-700">
+                          {co.amount >= 0
+                            ? `+$${Number(co.amount).toLocaleString()}`
+                            : `-$${Math.abs(Number(co.amount)).toLocaleString()}`}
+                        </span>
+                        {co.createdAt && (
+                          <span className="text-[11px] text-slate-400">
+                            · {new Date(co.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                          </span>
+                        )}
+                      </div>
+                      {co.description && (
+                        <p className="text-slate-500 truncate text-[11px] mt-0.5">
+                          {co.description}
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDownloadExistingPdf(co)}
+                      className="h-7 px-2.5 text-[11px] font-semibold text-[#1e3a8a] border-blue-200 hover:bg-blue-50 shrink-0 cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Download className="h-3 w-3" />
+                      Download PDF
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -498,15 +523,15 @@ function ChangeOrderContent({
         <Button
           type="button"
           disabled={isSubmitting}
-          onClick={handlePrintPdf}
+          onClick={handleSaveAndDownloadPdf}
           className="bg-[#1e3a8a] hover:bg-[#172554] text-white cursor-pointer font-semibold flex items-center gap-2"
         >
           {isSubmitting ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
-            <Printer className="h-4 w-4" />
+            <Download className="h-4 w-4" />
           )}
-          {isSubmitting ? "Generating..." : "Save & Create PDF"}
+          {isSubmitting ? "Saving & Downloading..." : "Save & Download PDF"}
         </Button>
       </div>
     </>

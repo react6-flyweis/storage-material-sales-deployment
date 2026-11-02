@@ -6,7 +6,6 @@ import {
   Building2,
   FileCheck,
   Save,
-  Eye,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -101,7 +100,6 @@ export default function CustomQuote() {
   const [calcResult, setCalcResult] = useState<CalculationResult | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isPreviewing, setIsPreviewing] = useState(false);
 
   const isEdit = Boolean(initialQuoteId || customQuoteId);
 
@@ -391,85 +389,6 @@ export default function CustomQuote() {
       return created._id;
     }
     return null;
-  };
-
-  const handlePreviewQuote = async () => {
-    if (!selectedLeadId) {
-      toast.error("Please select a Lead");
-      return;
-    }
-
-    const mat = parseFloat(materialCost) || 0;
-    const freight = parseFloat(freightCost) || 0;
-    const labor = parseFloat(laborCost) || 0;
-    const marginPct = parseFloat(targetMargin) || 0;
-    const fixedSell = parseFloat(fixedSellPrice) || null;
-
-    setIsPreviewing(true);
-    let savedQuoteId = customQuoteId;
-    try {
-      const resId = await saveCustomQuoteRecord();
-      if (resId) {
-        savedQuoteId = resId;
-      }
-    } catch (err) {
-      console.warn("Server custom-quote creation failed, proceeding with local preview state:", err);
-    } finally {
-      setIsPreviewing(false);
-    }
-
-    const result = calcResult || calculateNumbers();
-    const resolvedCustomer =
-      customerCompany.trim() ||
-      (selectedLead ? getLeadProjectName(selectedLead, selectedLead.customerId) : "") ||
-      "Lead Project";
-
-    // Save lead details and brand to store
-    setPembLeadData({
-      leadId: selectedLeadId,
-      leadName: resolvedCustomer,
-      street: location.trim(),
-      cityStateZip: location.trim(),
-      buildingSize: buildingSize.trim(),
-    });
-    setCompanyBrand(company);
-
-    navigate("/quotation/quote-preview/view", {
-      state: {
-        quotationForm: {
-          leadId: selectedLeadId,
-          leadName: resolvedCustomer,
-          cityStateZip: location.trim(),
-          buildingSize: buildingSize.trim(),
-          quoteDate: new Date().toLocaleDateString("en-US", {
-            month: "long",
-            day: "numeric",
-            year: "numeric",
-          }),
-          quoteValidDays: quoteValidDays || "15",
-          companyBrand: company,
-          company,
-          ...(savedQuoteId ? { customQuoteId: savedQuoteId } : {}),
-        },
-        buildingSize: buildingSize.trim(),
-        companyBrand: company,
-        company,
-        customPricing: {
-          materialCost: mat,
-          freightCost: freight,
-          laborCost: labor,
-          targetMargin: marginPct,
-          fixedSellPrice: fixedSell || 0,
-          totalCost: result.totalCost,
-          totalSell: result.totalSell,
-          profit: result.profit,
-          scope,
-          company,
-          includedItems: includedScope.split("\n").filter(Boolean),
-          excludedItems: excludedScope.split("\n").filter(Boolean),
-        },
-      },
-    });
   };
 
   const handleGenerateQuote = async () => {
@@ -764,20 +683,7 @@ export default function CustomQuote() {
             </button>
             <button
               type="button"
-              disabled={isPreviewing || isSaving}
-              onClick={handlePreviewQuote}
-              className="px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-lg border border-slate-300 shadow-xs transition-colors cursor-pointer flex items-center gap-2 disabled:opacity-50"
-            >
-              {isPreviewing ? (
-                <Loader2 className="h-4 w-4 animate-spin text-slate-600" />
-              ) : (
-                <Eye className="h-4 w-4 text-slate-600" />
-              )}
-              {isPreviewing ? "Opening Preview..." : "Preview"}
-            </button>
-            <button
-              type="button"
-              disabled={isSaving || isPreviewing}
+              disabled={isSaving}
               onClick={handleGenerateQuote}
               className="px-6 py-2.5 bg-[#0e3a8c] hover:bg-[#0b2f73] text-white text-sm font-semibold rounded-lg shadow-xs transition-colors cursor-pointer flex items-center gap-2 disabled:opacity-50"
             >
