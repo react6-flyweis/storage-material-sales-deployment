@@ -116,6 +116,11 @@ export function QuotePreviewListPage() {
         }
         navigate("/quotation/storage-preview", {
           state: {
+            estimate,
+            approvalStatus:
+              estimate.approval?.status || estimate.conversion?.approvalStatus,
+            workflowStatus:
+              estimate.workflowStatus || estimate.conversion?.workflowStatus,
             storageData: estimate.storageData,
             storagePricing: estimate.storagePricingResult,
             estimateId: targetEstimateId,

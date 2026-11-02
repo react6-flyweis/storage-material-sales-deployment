@@ -26,6 +26,7 @@ export interface CreateChangeOrderRequest {
   estimateId?: string;
   parentQuoteRef?: string;
   customer: string;
+  coDate?: string;
   origDate?: string;
   origVal?: number;
   amount: number;
@@ -144,6 +145,43 @@ export async function deleteChangeOrderProvider(
     deleted?: boolean;
   }>(`/api/sales/change-orders/${encodeURIComponent(coId)}`);
   return { deleted: response.data?.data?.deleted ?? response.data?.deleted ?? true };
+}
+
+export interface ChangeOrderDocumentData {
+  html?: string;
+  fileBase64?: string;
+  fileName?: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  [key: string]: unknown;
+}
+
+export interface ChangeOrderDocumentResponse {
+  success?: boolean;
+  message?: string;
+  data?: ChangeOrderDocumentData;
+  html?: string;
+  fileBase64?: string;
+  fileName?: string;
+}
+
+export async function getChangeOrderDocumentProvider(
+  coId: string,
+  options?: { format?: "html" | "pdf" }
+): Promise<ChangeOrderDocumentData> {
+  const query = options?.format ? `?format=${encodeURIComponent(options.format)}` : "";
+  const response = await apiClient.get<ChangeOrderDocumentResponse>(
+    `/api/sales/change-orders/${encodeURIComponent(coId)}/document${query}`
+  );
+  const data = response.data?.data;
+  if (data && typeof data === "object") {
+    return data;
+  }
+  return {
+    html: response.data?.html,
+    fileBase64: response.data?.fileBase64,
+    fileName: response.data?.fileName,
+  };
 }
 
 export async function downloadChangeOrderPdfProvider(

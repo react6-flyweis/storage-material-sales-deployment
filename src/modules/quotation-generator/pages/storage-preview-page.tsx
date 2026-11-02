@@ -23,6 +23,8 @@ import { useQuotationStore } from "@/modules/quotation-generator/quotation.store
 import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
 import { ServerDocumentPreview } from "../components/server-document-preview";
 import { hydrateEstimateIntoStore } from "../hooks/use-load-estimate-to-editor";
+import { normalizeWorkflowStatus } from "@/modules/quotations/quotations.utils";
+import { QuotationWorkflowBadge } from "@/modules/quotations/components/quotation-workflow-badge";
 import type {
   StorageData,
   StoragePricing,
@@ -60,6 +62,9 @@ export function StoragePreviewPage() {
   } = useQuotationStore();
 
   const navState = (location.state || {}) as {
+    estimate?: SaveEstimatePayload;
+    approvalStatus?: string;
+    workflowStatus?: string;
     storageData?: StorageData;
     storagePricing?: StoragePricing;
     estimateId?: string;
@@ -123,11 +128,15 @@ export function StoragePreviewPage() {
   const storagePricing =
     (storeStoragePricing as StoragePricing | null) || navState.storagePricing;
   const [estimateId, setEstimateId] = useState<string | null>(
-    navState.estimateId || storeStorageEstimateId || null,
+    navState.estimateId || navState.estimate?._id || storeStorageEstimateId || null,
+  );
+  const [estimate, setEstimate] = useState<SaveEstimatePayload | null>(
+    navState.estimate || null,
   );
 
   useEffect(() => {
-    const eid = navState.estimateId || storeStorageEstimateId;
+    const eid =
+      navState.estimateId || navState.estimate?._id || storeStorageEstimateId;
     if (eid) {
       setEstimateId(eid);
       setStorageEstimateId(eid);
@@ -144,6 +153,7 @@ export function StoragePreviewPage() {
               estData.storageData ||
               estData.parsedCategories)
           ) {
+            setEstimate(estData);
             hydrateEstimateIntoStore(estData, eid);
           }
         })
@@ -151,7 +161,45 @@ export function StoragePreviewPage() {
           console.warn("Failed to load storage estimate for preview:", err);
         });
     }
-  }, [navState.estimateId, storeStorageEstimateId, setStorageEstimateId]);
+  }, [navState.estimateId, navState.estimate?._id, storeStorageEstimateId, setStorageEstimateId]);
+
+  const isApproved = useMemo(() => {
+    const navApproval = navState.approvalStatus;
+    const navWorkflow = navState.workflowStatus;
+    if (navApproval?.toLowerCase() === "approved") return true;
+    if (
+      navWorkflow &&
+      ["approved", "sent", "accepted"].includes(normalizeWorkflowStatus(navWorkflow))
+    ) {
+      return true;
+    }
+
+    if (!estimate) return false;
+
+    const approvalStatus =
+      estimate.approval?.status ||
+      estimate.conversion?.approvalStatus ||
+      (estimate as { approvalStatus?: string }).approvalStatus;
+
+    if (
+      typeof approvalStatus === "string" &&
+      approvalStatus.toLowerCase() === "approved"
+    ) {
+      return true;
+    }
+
+    const rawWorkflow =
+      estimate.workflowStatus ||
+      estimate.conversion?.workflowStatus ||
+      (estimate as { status?: string }).status;
+
+    const normalized = normalizeWorkflowStatus(rawWorkflow);
+    return (
+      normalized === "approved" ||
+      normalized === "sent" ||
+      normalized === "accepted"
+    );
+  }, [estimate, navState.approvalStatus, navState.workflowStatus]);
 
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [isSavingEstimate, setIsSavingEstimate] = useState(false);
@@ -199,13 +247,6 @@ export function StoragePreviewPage() {
   );
   const totalSellFormatted = fmt(grandTotal);
 
-  const handleScrollToPreview = () => {
-    previewSectionRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
-  };
-
   const handlePrint = () => {
     const originalTitle = document.title;
     const safeCustomer = (customerLeadName || "Storage_Quote").replace(/[^a-zA-Z0-9_-]/g, "_");
@@ -215,6 +256,10 @@ export function StoragePreviewPage() {
   };
 
   const handleDownloadPdf = async () => {
+    if (!isApproved) {
+      toast.error("Quotation must be approved before generating or printing PDF.");
+      return;
+    }
     setIsDownloadingPdf(true);
     try {
       const activeDrawings = storageDrawings.filter((d) => d.includeInPackage !== false);
@@ -358,7 +403,11 @@ export function StoragePreviewPage() {
       if (res && (res as { success?: boolean }).success === false) {
         throw new Error(res.message || "Failed to save storage estimate");
       }
-      const savedId = data?.estimate?._id || data?._id || activeEstId;
+      const savedEstimate = (data?.estimate || data) as SaveEstimatePayload;
+      if (savedEstimate && typeof savedEstimate === "object") {
+        setEstimate(savedEstimate);
+      }
+      const savedId = savedEstimate?._id || activeEstId;
       toast.success("Storage estimate saved successfully");
       if (savedId) {
         setEstimateId(savedId);
@@ -554,10 +603,6 @@ export function StoragePreviewPage() {
     }
   };
 
-  const handleClearAll = () => {
-    setStorageDrawings([]);
-  };
-
   return (
     <div className="space-y-6 p-6">
       {/* Top Action Header Bar */}
@@ -572,9 +617,24 @@ export function StoragePreviewPage() {
             Back
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 leading-tight">
-              Storage Quote Preview
-            </h1>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-2xl font-bold text-slate-900 leading-tight">
+                Storage Quote Preview
+              </h1>
+              {estimate && (
+                <QuotationWorkflowBadge
+                  status={
+                    isApproved
+                      ? "approved"
+                      : normalizeWorkflowStatus(
+                          estimate.workflowStatus ||
+                            estimate.conversion?.workflowStatus ||
+                            "draft",
+                        )
+                  }
+                />
+              )}
+            </div>
             <p className="text-xs text-slate-500 mt-0.5 font-medium">
               Mini Storage Assembled Package — Quote · SOW · Contract · Layout
               Plans
@@ -610,19 +670,21 @@ export function StoragePreviewPage() {
             </div>
           </div>
 
-          <Button
-            type="button"
-            onClick={handleDownloadPdf}
-            disabled={isDownloadingPdf}
-            className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
-          >
-            {isDownloadingPdf ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Printer className="h-4 w-4" />
-            )}
-            {isDownloadingPdf ? "Generating PDF..." : "Generate & Print PDF"}
-          </Button>
+          {isApproved && (
+            <Button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={isDownloadingPdf}
+              className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
+            >
+              {isDownloadingPdf ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Printer className="h-4 w-4" />
+              )}
+              {isDownloadingPdf ? "Generating PDF..." : "Generate & Print PDF"}
+            </Button>
+          )}
           <Button
             type="button"
             onClick={handleSaveToHistory}
@@ -647,34 +709,14 @@ export function StoragePreviewPage() {
       <div className="space-y-6 w-full max-w-5xl print:max-w-none print:w-full">
         {/* Building drawings & plans Card */}
         <Card className="p-6 bg-white border border-slate-200 shadow-xs rounded-xl no-print">
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">
-                Building drawings & layout plans
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Upload layout plans or elevations — they will be included in the
-                server preview & final PDF.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleClearAll}
-                className="border-slate-300 text-slate-700 hover:bg-slate-50 px-4 py-2 text-xs font-semibold rounded-lg cursor-pointer bg-white"
-              >
-                Clear All ({storageDrawings.length})
-              </Button>
-              <Button
-                type="button"
-                onClick={handleScrollToPreview}
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2 text-xs font-semibold rounded-lg cursor-pointer shadow-xs flex items-center gap-1.5"
-              >
-                Preview assembled PDF ↓
-              </Button>
-            </div>
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-slate-900">
+              Building drawings & layout plans
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Upload layout plans or elevations — they will be included in the
+              server preview & final PDF.
+            </p>
           </div>
 
           {/* PDF / Image Dropzone Box */}
