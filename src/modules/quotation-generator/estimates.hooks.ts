@@ -4,11 +4,15 @@ import {
   getEstimatesListProvider,
   getHistorySummaryProvider,
   deleteEstimateProvider,
+  getEstimateMilestonesPreviewProvider,
+  saveEstimateMilestonesProvider,
   type SaveEstimatePayload,
   type GetEstimatesParams,
   type EstimatesListResponse,
   type HistorySummaryResponse,
   type CompanyBrand,
+  type MilestonesPreviewData,
+  type MilestoneRowPayload,
 } from "./estimates.api";
 import {
   getCustomQuoteByIdProvider,
@@ -108,7 +112,7 @@ export async function fetchEstimateOrCustomQuote(
           totalSell: customQuote.sell,
           profit: customQuote.profit,
           marginPercent: customQuote.profPct,
-          scope: (customQuote.scope as any) || "Both",
+          scope: (customQuote.scope as unknown as SaveEstimatePayload["scope"]) || "Both",
           companyBrand: (customQuote.company === "SBD" ? "SBD" : "SM") as CompanyBrand,
           workflowStatus: customQuote.workflowStatus || "draft",
           conversion: customQuote.quotationId
@@ -198,6 +202,51 @@ export function useDeleteEstimateMutation() {
     mutationFn: (id: string) => deleteEstimateProvider(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["sales", "estimates"] });
+    },
+  });
+}
+
+/**
+ * Hook to fetch milestone preview/history for an estimate using React Query.
+ */
+export function useEstimateMilestonesQuery(estimateId?: string, enabled = true) {
+  return useQuery<MilestonesPreviewData>({
+    queryKey: ["sales", "estimate-milestones", estimateId],
+    queryFn: () => {
+      if (!estimateId) throw new Error("Estimate ID is required");
+      return getEstimateMilestonesPreviewProvider(estimateId);
+    },
+    enabled: Boolean(estimateId) && enabled,
+    staleTime: 0,
+  });
+}
+
+/**
+ * Mutation hook to save estimate milestones using React Query.
+ */
+export function useSaveEstimateMilestonesMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      estimateId,
+      payload,
+    }: {
+      estimateId: string;
+      payload: {
+        rows?: MilestoneRowPayload[];
+        milestones?: MilestoneRowPayload[];
+        note?: string;
+        grand?: number;
+      };
+    }) => saveEstimateMilestonesProvider(estimateId, payload),
+    onSuccess: (_, { estimateId }) => {
+      void queryClient.invalidateQueries({
+        queryKey: ["sales", "estimate-detail", estimateId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["sales", "estimate-milestones", estimateId],
+      });
     },
   });
 }

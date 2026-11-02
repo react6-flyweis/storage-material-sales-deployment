@@ -374,8 +374,7 @@ export function hydrateEstimateIntoStore(
     estimate.materialSellOverride ??
     estimate.matSellOverride ??
     (estimate.quoteControls as Record<string, unknown> | undefined)?.materialSellOverride ??
-    (estimate.cogsOverride as Record<string, unknown> | undefined)?.materialSellOverride ??
-    (pricingRes?.materialSellExFreight as number | undefined);
+    (estimate.cogsOverride as Record<string, unknown> | undefined)?.materialSellOverride;
 
   if (restoredMatOverride !== undefined && restoredMatOverride !== null) {
     store.setMaterialSellOverride(String(restoredMatOverride));

@@ -1490,6 +1490,7 @@ export interface MilestonesPreviewData {
   fullyScheduled: boolean;
   milestoneNote?: string;
   milestones?: Array<MilestoneRowPayload & { type: string }>;
+  milestoneSchedule?: Array<MilestoneRowPayload & { type: string }>;
   depositTerms?: unknown;
   [key: string]: unknown;
 }
@@ -1500,12 +1501,36 @@ export interface MilestonesPreviewResponse {
   data?: MilestonesPreviewData;
 }
 
+export async function getEstimateMilestonesPreviewProvider(
+  estimateId: string
+): Promise<MilestonesPreviewData> {
+  try {
+    const response = await apiClient.get<MilestonesPreviewResponse>(
+      `/api/sales/estimates/${encodeURIComponent(estimateId)}/milestones/preview`
+    );
+    return (response.data?.data || response.data) as MilestonesPreviewData;
+  } catch (err: unknown) {
+    const status = (err as { response?: { status?: number } })?.response?.status;
+    if (status === 404 || status === 405) {
+      const fallback = await apiClient.post<MilestonesPreviewResponse>(
+        `/api/sales/estimates/${encodeURIComponent(estimateId)}/milestones/preview`,
+        { estimateId }
+      );
+      return (fallback.data?.data || fallback.data) as MilestonesPreviewData;
+    }
+    throw err;
+  }
+}
+
 export async function previewMilestonesProvider(
   payload: MilestonesPreviewRequest
 ): Promise<MilestonesPreviewData> {
-  const url = payload.estimateId
-    ? `/api/sales/estimates/${encodeURIComponent(payload.estimateId)}/milestones/preview`
-    : "/api/sales/estimates/milestones/preview";
+  const url =
+    payload.rows && payload.rows.length > 0
+      ? "/api/sales/estimates/milestones/preview"
+      : payload.estimateId
+        ? `/api/sales/estimates/${encodeURIComponent(payload.estimateId)}/milestones/preview`
+        : "/api/sales/estimates/milestones/preview";
   const response = await apiClient.post<MilestonesPreviewResponse>(
     url,
     payload
