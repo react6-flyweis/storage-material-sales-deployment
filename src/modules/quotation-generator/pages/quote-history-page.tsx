@@ -631,6 +631,11 @@ export function QuoteHistoryPage() {
               //   (pricingRes?.blendPct as number | undefined) ??
               //   50;
 
+              const lifecycle = resolveQuotationLifecycle(quote);
+              const canChangeOrder =
+                quote.conversion?.quotationStatus === "accepted" ||
+                (quote as Record<string, unknown>)?.quotationStatus === "accepted";
+
               return (
                 <div
                   key={quote._id || String(quote.jobNumber || Math.random())}
@@ -706,7 +711,7 @@ export function QuoteHistoryPage() {
                           </span>
                         )}
                         <QuotationWorkflowBadge
-                          status={resolveQuotationLifecycle(quote).lifecycleStatus}
+                          status={lifecycle.lifecycleStatus}
                           showIcon
                         />
                         {/* <span className="text-xs font-semibold text-slate-500">
@@ -749,14 +754,16 @@ export function QuoteHistoryPage() {
                       <span>Load & Edit</span>
                     </Button>
 
-                    <Button
-                      type="button"
-                      onClick={() => setActiveChangeOrderQuote(quote)}
-                      className="bg-[#1e3a8a] hover:bg-[#172554] text-white h-8 px-3 text-xs font-medium rounded-md cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                    >
-                      <RefreshCw className="h-3.5 w-3.5" />
-                      <span>Change Order</span>
-                    </Button>
+                    {canChangeOrder && (
+                      <Button
+                        type="button"
+                        onClick={() => setActiveChangeOrderQuote(quote)}
+                        className="bg-[#1e3a8a] hover:bg-[#172554] text-white h-8 px-3 text-xs font-medium rounded-md cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        <span>Change Order</span>
+                      </Button>
+                    )}
 
                     {!isCustom && (
                       <>
