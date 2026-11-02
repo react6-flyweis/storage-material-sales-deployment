@@ -380,10 +380,9 @@ function MilestonePaymentsContent({
 
   const isOverScheduled =
     totalContractValue > 0 &&
-    !isFullyScheduled &&
     (isPercentOver100 ||
-      Math.abs(unscheduledBalance) > 1 ||
-      totalScheduled > totalContractValue + 1);
+      totalScheduled > totalContractValue + 1 ||
+      unscheduledBalance < -1);
 
   const isOverPercentage =
     !isFullyScheduled && (percentScheduled > 100.01 || isPercentOver100);
@@ -552,7 +551,7 @@ function MilestonePaymentsContent({
         <tr>
           <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-weight: 600;">#${idx + 1} - ${item.name}</td>
           <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: center;">${item.type === "%" ? `${item.value}%` : "Flat $"}</td>
-          <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 700; color: #7c3aed;">$${item.amount.toLocaleString()}</td>
+          <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 700; color: #7c3aed;">$${item.amount.toLocaleString("en-US")}</td>
         </tr>
       `,
         )
@@ -601,7 +600,7 @@ function MilestonePaymentsContent({
 
           <div class="total-box">
             <div class="total-label">Total Contract Value</div>
-            <div class="total-val">$${totalContractValue.toLocaleString()}</div>
+            <div class="total-val">$${totalContractValue.toLocaleString("en-US")}</div>
           </div>
 
           <table>
@@ -620,11 +619,11 @@ function MilestonePaymentsContent({
           <div class="summary-box">
             <div class="sum-row">
               <span style="font-weight: 600; color: #475569;">Total Scheduled:</span>
-              <span style="font-weight: 800; color: #0f172a;">$${totalScheduled.toLocaleString()}</span>
+              <span style="font-weight: 800; color: #0f172a;">$${totalScheduled.toLocaleString("en-US")}</span>
             </div>
             <div class="sum-row">
               <span style="font-weight: 600; color: #475569;">Unscheduled Balance:</span>
-              <span style="font-weight: 800; color: #ea580c;">$${unscheduledBalance.toLocaleString()}</span>
+              <span style="font-weight: 800; color: #ea580c;">$${unscheduledBalance.toLocaleString("en-US")}</span>
             </div>
           </div>
 
@@ -690,7 +689,7 @@ function MilestonePaymentsContent({
     }
     if (!isFullyScheduled && (isOverScheduled || isOverPercentage)) {
       toast.error(
-        `Total scheduled payments (${percentScheduled.toFixed(1)}%) exceed 100% of the contract value by $${overScheduledAmount.toLocaleString()}`,
+        `Total scheduled payments (${percentScheduled.toFixed(1)}%) exceed 100% of the contract value by $${overScheduledAmount.toLocaleString("en-US")}`,
       );
       return false;
     }
@@ -846,7 +845,7 @@ function MilestonePaymentsContent({
               TOTAL CONTRACT VALUE
             </div>
             <div className="text-3xl font-black text-[#7c3aed]">
-              ${totalContractValue.toLocaleString()}
+              ${totalContractValue.toLocaleString("en-US")}
             </div>
           </div>
 
@@ -860,10 +859,10 @@ function MilestonePaymentsContent({
                 </div>
                 <p className="text-[11px] leading-relaxed text-rose-700">
                   Scheduled payments ({percentScheduled.toFixed(1)}% / $
-                  {totalScheduled.toLocaleString()}) exceed the total contract
+                  {totalScheduled.toLocaleString("en-US")}) exceed the total contract
                   value by{" "}
                   <span className="font-bold text-rose-900">
-                    ${overScheduledAmount.toLocaleString()}
+                    ${overScheduledAmount.toLocaleString("en-US")}
                   </span>{" "}
                   ({overScheduledPct.toFixed(1)}%). Please reduce milestone
                   amounts.
@@ -925,7 +924,7 @@ function MilestonePaymentsContent({
                       hasRowError ? "text-rose-600" : "text-slate-900"
                     }`}
                   >
-                    ${item.amount.toLocaleString()}
+                    ${item.amount.toLocaleString("en-US")}
                   </div>
 
                   <button
@@ -959,7 +958,7 @@ function MilestonePaymentsContent({
               onClick={handleAddPercentMilestone}
               className="border-dashed border-[#a855f7] text-[#7c3aed] bg-[#faf5ff] hover:bg-[#f3e8ff] h-10 text-xs font-bold rounded-xl cursor-pointer flex items-center justify-center gap-1.5"
             >
-              <Plus className="h-3.5 w-3.5" />+ Add % Milestone
+              <Plus className="h-3.5 w-3.5" /> Add % Milestone
             </Button>
             <Button
               type="button"
@@ -967,7 +966,7 @@ function MilestonePaymentsContent({
               onClick={handleAddDollarMilestone}
               className="border-dashed border-[#22c55e] text-[#16a34a] bg-[#f0fdf4] hover:bg-[#dcfce7] h-10 text-xs font-bold rounded-xl cursor-pointer flex items-center justify-center gap-1.5"
             >
-              <Plus className="h-3.5 w-3.5" />+ Add $ Milestone
+              <Plus className="h-3.5 w-3.5" /> Add $ Milestone
             </Button>
           </div>
 
@@ -1000,7 +999,7 @@ function MilestonePaymentsContent({
                     isOverScheduled ? "text-rose-600" : "text-slate-900"
                   }`}
                 >
-                  ${totalScheduled.toLocaleString()}
+                  ${totalScheduled.toLocaleString("en-US")}
                 </span>
               </div>
             </div>
@@ -1034,10 +1033,10 @@ function MilestonePaymentsContent({
                 }`}
               >
                 {isOverScheduled
-                  ? `+$${overScheduledAmount.toLocaleString()} (+${overScheduledPct.toFixed(1)}%)`
+                  ? `+$${overScheduledAmount.toLocaleString("en-US")} (+${overScheduledPct.toFixed(1)}%)`
                   : isFullyScheduled
                     ? `$0 (0.0%)`
-                    : `$${Math.max(0, unscheduledBalance).toLocaleString()} (${Math.max(0, 100 - percentScheduled).toFixed(1)}%)`}
+                    : `$${Math.max(0, unscheduledBalance).toLocaleString("en-US")} (${Math.max(0, 100 - percentScheduled).toFixed(1)}%)`}
               </span>
             </div>
           </div>
