@@ -21,6 +21,7 @@ import {
   downloadPdfProvider,
   type SaveEstimatePayload,
   type PreviewDocumentRequest,
+  type MilestoneRowPayload,
 } from "../estimates.api";
 import { downloadCustomQuotePdfProvider } from "../custom-quotes.api";
 import { downloadPdfFromBase64 } from "../utils/pdf-download";
@@ -648,6 +649,9 @@ export function EstimateDetailPage() {
             : ({ _id: id } as SaveEstimatePayload)
         }
         onSuccess={(saveRes) => {
+          const updatedSchedule = (saveRes?.milestoneSchedule ||
+            saveRes?.milestones ||
+            saveRes?.rows) as MilestoneRowPayload[] | undefined;
           if (
             saveRes?.quotationSync?.requiresSubmitForApproval ||
             saveRes?.quotationSync?.workflowStatus === "draft" ||
@@ -655,7 +659,10 @@ export function EstimateDetailPage() {
           ) {
             setEstimate((prev) => {
               if (!prev) return prev;
-              return updateEstimateConversion(prev, {
+              const nextEstimate = updatedSchedule
+                ? { ...prev, milestoneSchedule: updatedSchedule }
+                : prev;
+              return updateEstimateConversion(nextEstimate, {
                 approvalStatus: "not_submitted",
                 workflowStatus: "draft",
                 quotationId: saveRes.quotationSync?.quotationId,
@@ -663,6 +670,10 @@ export function EstimateDetailPage() {
             });
             toast.info(
               "Payment schedule updated. Click 'Send for Approval' to submit for Admin review.",
+            );
+          } else if (updatedSchedule) {
+            setEstimate((prev) =>
+              prev ? { ...prev, milestoneSchedule: updatedSchedule } : prev
             );
           }
           void queryClient.invalidateQueries({
