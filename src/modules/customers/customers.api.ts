@@ -349,3 +349,44 @@ export async function uploadCustomerDocumentToS3(
 
   return { fileUrl, key: key || "" };
 }
+
+export interface CreateBasicCustomerRequest {
+  firstName: string;
+  email: string;
+  phone: string;
+  countryCode?: string;
+}
+
+export interface CreateBasicCustomerResponse {
+  success: boolean;
+  message: string;
+  data: {
+    customer: {
+      _id: string;
+      customerId: string;
+      customerName: string;
+      firstName?: string;
+      lastName?: string;
+      email: string;
+      phone: {
+        number: string;
+        countryCode: string;
+      };
+      status: string;
+      totalProjects: number;
+      createdAt?: string;
+      updatedAt?: string;
+    };
+  };
+}
+
+export async function createBasicCustomerProvider(
+  payload: CreateBasicCustomerRequest,
+) {
+  const response = await apiClient.post<CreateBasicCustomerResponse>(
+    "/api/sales/customers/basic",
+    payload,
+  );
+  return response.data;
+}
+
