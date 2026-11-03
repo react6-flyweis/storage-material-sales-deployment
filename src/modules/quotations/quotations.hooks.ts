@@ -6,8 +6,10 @@ import {
 import {
   createQuotationProvider,
   convertEstimateToQuotationProvider,
+  convertCustomQuoteToQuotationProvider,
   getQuotationByIdProvider,
   getQuotationsProvider,
+  getPendingApprovalsProvider,
   getQuotationStatsProvider,
   sendQuotationProvider,
   markQuotationSentProvider,
@@ -32,6 +34,23 @@ export function useQuotationsQuery(
   return useQuery({
     queryKey,
     queryFn: () => getQuotationsProvider(pageOrParams, limit),
+  });
+}
+
+export function usePendingApprovalsQuery(
+  pageOrParams: number | GetQuotationsParams = 1,
+  limit = 20,
+  options?: { enabled?: boolean }
+) {
+  const queryKey =
+    typeof pageOrParams === "object"
+      ? ["sales", "quotations", "approval-pending", pageOrParams]
+      : ["sales", "quotations", "approval-pending", pageOrParams, limit];
+
+  return useQuery({
+    queryKey,
+    queryFn: () => getPendingApprovalsProvider(pageOrParams, limit),
+    enabled: options?.enabled ?? true,
   });
 }
 
@@ -65,6 +84,29 @@ export function useConvertEstimateToQuotationMutation() {
       if (estimateId) {
         void queryClient.invalidateQueries({
           queryKey: ["sales", "estimate", estimateId],
+        });
+      }
+    },
+  });
+}
+
+export function useConvertCustomQuoteToQuotationMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      customQuoteId,
+      leadId,
+    }: {
+      customQuoteId: string;
+      leadId?: string;
+    }) => convertCustomQuoteToQuotationProvider(customQuoteId, { leadId }),
+    onSuccess: (_, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ["sales", "custom-quotes"] });
+      void queryClient.invalidateQueries({ queryKey: ["sales", "quotations"] });
+      if (variables.customQuoteId) {
+        void queryClient.invalidateQueries({
+          queryKey: ["sales", "custom-quote", variables.customQuoteId],
         });
       }
     },

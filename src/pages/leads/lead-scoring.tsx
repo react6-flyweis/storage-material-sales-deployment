@@ -35,6 +35,7 @@ import { toast } from "sonner";
 import AutoFollowUpConfigDialog from "@/components/leads/auto-followup-config-dialog";
 import LeadFollowUpDetailDialog from "@/components/leads/lead-followup-detail-dialog";
 import { getApiErrorMessage } from "@/lib/api-error";
+import { formatInstallAddress } from "@/lib/address";
 
 interface LeadRow {
   id: string;
@@ -213,7 +214,7 @@ export default function LeadScoring() {
         customerName: lead.customerName || lead.projectName || "N/A",
         leadId: lead.jobId || (lead._id ? `${lead._id.slice(0, 8)}...` : "N/A"),
         projectName: lead.projectName,
-        location: lead.location || "N/A",
+        location: formatInstallAddress(lead.installAddress, lead.location),
         progress: temp === "hot" ? 4 : temp === "warm" ? 3 : 2,
         lifecycleStatus: lead.lifecycleStatus || "initial_contact",
         quoteValue: lead.quoteValue ?? 0,

@@ -1,31 +1,40 @@
-import { useState, useRef, useMemo, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router";
-import { ArrowLeft, FolderUp, Loader2, FileSearch } from "lucide-react";
+import { ArrowLeft, FolderUp, Loader2, FileSearch, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getApiErrorMessage } from "@/lib/api-error";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 import {
-  // downloadPdfProvider,
+  downloadPdfProvider,
   saveEstimateProvider,
+  getEstimateByIdProvider,
   type ExtractDrawingResponseData,
   type ExtractShipperResponseData,
-  type PreviewDocumentRequest,
+  type SaveEstimatePayload,
 } from "../estimates.api";
-import { useQuotationPricing } from "../hooks/use-quotation-pricing";
+import { downloadCustomQuotePdfProvider } from "../custom-quotes.api";
+import { downloadPdfFromBase64 } from "../utils/pdf-download";
 import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
+import { usePembDocumentPayload } from "../hooks/use-pemb-document-payload";
 import { ServerDocumentPreview } from "../components/server-document-preview";
+import { hydrateEstimateIntoStore } from "../hooks/use-load-estimate-to-editor";
+import { normalizeWorkflowStatus } from "@/modules/quotations/quotations.utils";
+import { QuotationWorkflowBadge } from "@/modules/quotations/components/quotation-workflow-badge";
 
 export function QuotePreviewPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const previewSectionRef = useRef<HTMLDivElement>(null);
 
-  // const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [isSavingEstimate, setIsSavingEstimate] = useState(false);
 
   const navState = (location.state || {}) as {
+    estimate?: SaveEstimatePayload;
+    approvalStatus?: string;
+    workflowStatus?: string;
     quotationForm?: Record<string, string>;
     extractedDrawing?: ExtractDrawingResponseData;
     extractedShipper?: ExtractShipperResponseData;
@@ -34,10 +43,37 @@ export function QuotePreviewPage() {
     additionalNotes?: string;
     pdfFileName?: string;
     estimateId?: string;
+    customQuoteId?: string;
+    quoteKind?: string;
+    jobType?: string;
+    isCustom?: boolean;
+    customPricing?: {
+      matCost: number;
+      freight: number;
+      laborCost: number;
+      marginPct: number;
+      sell: number;
+      profit: number;
+      profPct: number;
+      totalCost: number;
+      sellOverride?: number | null;
+    };
+    taxRate?: number;
+    includeTax?: boolean;
+    taxZip?: string;
+    salesTax?: {
+      rate?: number;
+      taxRate?: number;
+      include?: boolean;
+      includeTax?: boolean;
+      zip?: string;
+      taxZip?: string;
+    };
   };
 
   const {
     jobType,
+    companyBrand,
     scope,
     roofType,
     installCost,
@@ -69,44 +105,154 @@ export function QuotePreviewPage() {
     marginLaborOverride,
     marginTargetMargin,
     marginFixedSellOverride,
+    steelFinish,
+    freightOverride,
+    materialSellOverride,
+    engineeringDrawings,
     pembEstimateId,
     setPembEstimateId,
     pembExtractedShipper,
   } = useQuotationStore();
 
   const [estimateId, setEstimateId] = useState<string | null>(
-    navState.estimateId || pembEstimateId || null,
+    navState.estimateId || navState.estimate?._id || pembEstimateId || null,
+  );
+  const [estimate, setEstimate] = useState<SaveEstimatePayload | null>(
+    navState.estimate || null,
   );
 
   useEffect(() => {
-    const eid = navState.estimateId || pembEstimateId;
+    const eid =
+      navState.estimateId ||
+      navState.estimate?._id ||
+      navState.customQuoteId ||
+      pembEstimateId;
     if (eid) {
       setEstimateId(eid);
       setPembEstimateId(eid);
+      getEstimateByIdProvider(eid)
+        .then((res) => {
+          const estData = (res?.data?.estimate ||
+            res?.estimate ||
+            res?.data ||
+            res) as SaveEstimatePayload | undefined;
+          if (estData) {
+            setEstimate(estData);
+            if (
+              estData._id ||
+              estData.jobType ||
+              estData.parsedCategories ||
+              estData.storageData
+            ) {
+              hydrateEstimateIntoStore(estData, eid);
+            }
+          }
+        })
+        .catch((err) => {
+          console.warn("Failed to load estimate for preview:", err);
+        });
     }
-  }, [navState.estimateId, pembEstimateId, setPembEstimateId]);
+  }, [
+    navState.estimateId,
+    navState.estimate?._id,
+    navState.customQuoteId,
+    pembEstimateId,
+    setPembEstimateId,
+  ]);
 
-  const pricingData = useQuotationPricing({
-    extractedShipper: navState.extractedShipper,
-    sqFt: navState.sqFt,
-    buildingSize: navState.buildingSize,
-    quotationForm: navState.quotationForm,
-    extractedDrawing: navState.extractedDrawing,
-  });
+  const isApproved = useMemo(() => {
+    const navApproval = navState.approvalStatus;
+    const navWorkflow = navState.workflowStatus;
+    if (navApproval?.toLowerCase() === "approved") return true;
+    if (
+      navWorkflow &&
+      ["approved", "sent", "accepted"].includes(normalizeWorkflowStatus(navWorkflow))
+    ) {
+      return true;
+    }
 
-  const {
-    customerLeadName,
-    customerAddress,
-    customerEmail,
-    quoteDate,
-    displayBuildingSize,
-    effectiveSqFt,
-    grandTotalFormatted: totalSellFormatted,
-  } = pricingData;
+    if (!estimate) return false;
 
-  const isEditing = Boolean(
-    estimateId || pembEstimateId || navState.estimateId,
-  );
+    const approvalStatus =
+      estimate.approval?.status ||
+      estimate.conversion?.approvalStatus ||
+      (estimate as { approvalStatus?: string }).approvalStatus;
+
+    if (
+      typeof approvalStatus === "string" &&
+      approvalStatus.toLowerCase() === "approved"
+    ) {
+      return true;
+    }
+
+    const rawWorkflow =
+      estimate.workflowStatus ||
+      estimate.conversion?.workflowStatus ||
+      (estimate as { status?: string }).status;
+
+    const normalized = normalizeWorkflowStatus(rawWorkflow);
+    return (
+      normalized === "approved" ||
+      normalized === "sent" ||
+      normalized === "accepted"
+    );
+  }, [estimate, navState.approvalStatus, navState.workflowStatus]);
+
+  useEffect(() => {
+    const rawTax =
+      navState.salesTax ||
+      (navState.extractedShipper?.fullQuote as Record<string, unknown> | undefined)?.salesTax ||
+      (navState.extractedShipper?.fullQuote as Record<string, unknown> | undefined)?.sales_tax ||
+      (navState.extractedShipper?.pricing as Record<string, unknown> | undefined)?.salesTax ||
+      (navState.extractedShipper?.pricing as Record<string, unknown> | undefined)?.sales_tax;
+
+    const qStore = useQuotationStore.getState();
+    const taxObj =
+      rawTax && typeof rawTax === "object"
+        ? (rawTax as Record<string, unknown>)
+        : null;
+
+    const zip =
+      taxObj?.zip ||
+      taxObj?.taxZip ||
+      taxObj?.postalCode ||
+      taxObj?.zipCode ||
+      navState.taxZip ||
+      navState.quotationForm?.cityStateZip?.match(/\b(\d{5})(?:-\d{4})?\b/)?.[1] ||
+      navState.quotationForm?.street?.match(/\b(\d{5})(?:-\d{4})?\b/)?.[1];
+    const rate =
+      taxObj?.rate ??
+      taxObj?.taxRate ??
+      taxObj?.tax_rate ??
+      navState.taxRate;
+    const inc =
+      taxObj?.include ??
+      taxObj?.includeTax ??
+      taxObj?.isTaxIncluded ??
+      navState.includeTax;
+
+    if (zip && qStore.taxZip !== String(zip)) {
+      qStore.setTaxZip(String(zip));
+    }
+    if (
+      rate !== undefined &&
+      rate !== null &&
+      !isNaN(Number(rate)) &&
+      qStore.taxRate !== Number(rate)
+    ) {
+      qStore.setTaxRate(Number(rate));
+    }
+    if (inc !== undefined && inc !== null && qStore.includeTax !== Boolean(inc)) {
+      qStore.setIncludeTax(Boolean(inc));
+    }
+  }, [
+    navState.salesTax,
+    navState.taxZip,
+    navState.taxRate,
+    navState.includeTax,
+    navState.extractedShipper,
+    navState.quotationForm,
+  ]);
 
   const initialPdfName =
     navState.pdfFileName ||
@@ -121,69 +267,61 @@ export function QuotePreviewPage() {
     name: initialPdfName,
   });
 
-  // Server document preview payload
-  const activeEstimateId =
-    estimateId || pembEstimateId || navState.estimateId || undefined;
+  const {
+    payload: previewPayload,
+    buildPayload,
+    pricingData,
+    effectiveEstimateId,
+    hasData,
+  } = usePembDocumentPayload({
+    estimateId: navState.estimateId || estimateId,
+    extractedShipper: navState.extractedShipper,
+    extractedDrawing: navState.extractedDrawing,
+    quotationForm: navState.quotationForm,
+    sqFt: navState.sqFt,
+    buildingSize: navState.buildingSize,
+    pdfFileName: selectedPdf?.name,
+    sections: selectedPdf
+      ? ["quote", "sow", "contract", "drawings"]
+      : ["quote", "sow", "contract"],
+    drawingAttachments: selectedPdf
+      ? [{ name: selectedPdf.name, includeInQuote: true }]
+      : [],
+  });
 
-  const previewPayload: PreviewDocumentRequest = useMemo(
-    () => ({
-      estimateId: activeEstimateId,
-      jobType: "PEMB",
-      leadCompanyName: customerLeadName,
-      customerEmail,
-      streetAddress: customerAddress,
-      cityStateZip: customerAddress,
-      buildingSize: displayBuildingSize,
-      squareFootage: effectiveSqFt,
-      jobNumber:
-        navState.quotationForm?.jobNumber ||
-        navState.extractedDrawing?.extracted?.jobnumber ||
-        "",
-      pricingResult: navState.extractedShipper?.pricing,
-      fullQuote:
-        navState.extractedShipper?.fullQuote ||
-        (navState.extractedShipper?.pricing as
-          | Record<string, unknown>
-          | undefined),
-      extractedDrawingFields: navState.extractedDrawing?.extracted,
-      contract: {
-        customer: customerLeadName,
-        address: customerAddress,
-        city: customerAddress,
-        email: customerEmail,
-        date: quoteDate,
-        deposit: "forty-percent (40%)",
-        type:
-          scope?.toLowerCase() === "both"
-            ? "both"
-            : scope?.toLowerCase() === "install"
-              ? "install"
-              : "supply",
-        value: totalSellFormatted,
-      },
-      drawingAttachments: selectedPdf
-        ? [{ name: selectedPdf.name, includeInQuote: true }]
-        : [],
-      sections: selectedPdf
-        ? ["quote", "sow", "contract", "drawings"]
-        : ["quote", "sow", "contract"],
-    }),
-    [
-      activeEstimateId,
-      customerLeadName,
-      customerEmail,
-      customerAddress,
-      displayBuildingSize,
-      effectiveSqFt,
-      navState.quotationForm?.jobNumber,
-      navState.extractedDrawing?.extracted,
-      navState.extractedShipper?.pricing,
-      navState.extractedShipper?.fullQuote,
-      quoteDate,
-      scope,
-      totalSellFormatted,
-      selectedPdf,
-    ],
+  const {
+    customerLeadName,
+    customerAddress,
+    customerEmail,
+    displayBuildingSize,
+    effectiveSqFt,
+  } = pricingData;
+
+  const isCustomQuote = Boolean(
+    navState.isCustom ||
+      navState.quoteKind === "custom" ||
+      navState.jobType === "Custom" ||
+      Boolean(navState.customQuoteId) ||
+      jobType === "Custom"
+  );
+  const customQuoteId =
+    navState.customQuoteId || navState.estimateId || estimateId || undefined;
+
+  const effectivePreviewPayload = useMemo(() => {
+    if (isCustomQuote) {
+      return {
+        ...previewPayload,
+        quoteKind: "custom" as const,
+        jobType: "Custom" as const,
+        customQuoteId,
+        companyBrand: (companyBrand || "SM") as "SM" | "SBD",
+      };
+    }
+    return previewPayload;
+  }, [isCustomQuote, previewPayload, customQuoteId, companyBrand]);
+
+  const isEditing = Boolean(
+    estimateId || pembEstimateId || navState.estimateId,
   );
 
   const {
@@ -192,99 +330,79 @@ export function QuotePreviewPage() {
     error: previewError,
     refetch: refetchPreview,
   } = useServerDocumentPreview({
-    payload: previewPayload,
+    payload: effectivePreviewPayload,
   });
 
-  const handleScrollToPreview = () => {
-    previewSectionRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
+  const handlePrint = () => {
+    const originalTitle = document.title;
+    const safeCustomer = (customerLeadName || "Quote").replace(
+      /[^a-zA-Z0-9_-]/g,
+      "_"
+    );
+    document.title = `Quote_Package_${safeCustomer}`;
+    window.print();
+    document.title = originalTitle;
   };
 
-  // const handlePrint = () => {
-  //   const originalTitle = document.title;
-  //   const safeCustomer = (customerLeadName || "Quote").replace(
-  //     /[^a-zA-Z0-9_-]/g,
-  //     "_"
-  //   );
-  //   document.title = `Quote_Package_${safeCustomer}`;
-  //   window.print();
-  //   document.title = originalTitle;
-  // };
-
-  // const handleDownloadPdf = async () => {
-  //   setIsDownloadingPdf(true);
-  //   try {
-  //     const activeEstId =
-  //       estimateId || pembEstimateId || navState.estimateId || undefined;
-  //     const payload: PreviewDocumentRequest = {
-  //       estimateId: activeEstId,
-  //       jobType: "PEMB",
-  //       leadCompanyName: customerLeadName,
-  //       customerEmail,
-  //       streetAddress: customerAddress,
-  //       cityStateZip: customerAddress,
-  //       buildingSize: displayBuildingSize,
-  //       squareFootage: effectiveSqFt,
-  //       jobNumber:
-  //         navState.quotationForm?.jobNumber ||
-  //         navState.extractedDrawing?.extracted?.jobnumber ||
-  //         "",
-  //       pricingResult: navState.extractedShipper?.pricing,
-  //       fullQuote:
-  //         navState.extractedShipper?.fullQuote ||
-  //         (navState.extractedShipper?.pricing as
-  //           | Record<string, unknown>
-  //           | undefined),
-  //       contract: {
-  //         customer: customerLeadName,
-  //         address: customerAddress,
-  //         city: customerAddress,
-  //         email: customerEmail,
-  //         date: quoteDate,
-  //         deposit: "forty-percent (40%)",
-  //         type:
-  //           scope?.toLowerCase() === "both"
-  //             ? "both"
-  //             : scope?.toLowerCase() === "install"
-  //             ? "install"
-  //             : "supply",
-  //         value: totalSellFormatted,
-  //       },
-  //       extractedDrawingFields: navState.extractedDrawing?.extracted,
-  //       drawingAttachments: selectedPdf
-  //         ? [{ name: selectedPdf.name, includeInQuote: true }]
-  //         : [],
-  //       sections: selectedPdf
-  //         ? ["quote", "sow", "contract", "drawings"]
-  //         : ["quote", "sow", "contract"],
-  //     };
-  //     const res = await downloadPdfProvider(payload, activeEstId);
-  //     const pdfData = res.data || res;
-  //     if (pdfData?.fileBase64) {
-  //       const a = document.createElement("a");
-  //       a.href = `data:${pdfData.mimeType || "application/pdf"};base64,${pdfData.fileBase64}`;
-  //       a.download =
-  //         pdfData.fileName ||
-  //         `Quote_${(customerLeadName || "Package").replace(/\s+/g, "_")}.pdf`;
-  //       a.click();
-  //     } else {
-  //       handlePrint();
-  //     }
-  //   } catch (err) {
-  //     console.error("Failed to download PDF via API, opening print dialog:", err);
-  //     handlePrint();
-  //   } finally {
-  //     setIsDownloadingPdf(false);
-  //   }
-  // };
+  const handleDownloadPdf = async () => {
+    if (!isApproved) {
+      toast.error("Quotation must be approved before generating or printing PDF.");
+      return;
+    }
+    setIsDownloadingPdf(true);
+    try {
+      if (isCustomQuote && customQuoteId) {
+        const brand = (companyBrand === "SBD" ? "SBD" : "SM") as "SM" | "SBD";
+        const pdfData = await downloadCustomQuotePdfProvider(customQuoteId, { company: brand });
+        if (pdfData?.fileBase64) {
+          downloadPdfFromBase64(
+            pdfData.fileBase64,
+            pdfData.fileName || `Custom_Quote_${(customerLeadName || "Package").replace(/\s+/g, "_")}.pdf`,
+            pdfData.mimeType || "application/pdf"
+          );
+          toast.success("PDF downloaded successfully");
+          return;
+        }
+      }
+      const payload = buildPayload();
+      const res = await downloadPdfProvider(payload, effectiveEstimateId);
+      const pdfData = res?.data || res;
+      if (pdfData?.fileBase64) {
+        downloadPdfFromBase64(
+          pdfData.fileBase64,
+          pdfData.fileName || `Quote_${(customerLeadName || "Package").replace(/\s+/g, "_")}.pdf`,
+          pdfData.mimeType || "application/pdf"
+        );
+        toast.success("PDF downloaded successfully");
+      } else {
+        handlePrint();
+      }
+    } catch (err) {
+      console.error("Failed to download PDF via API, opening print dialog:", err);
+      handlePrint();
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
 
   const handleSaveToHistory = async () => {
+    if (isCustomQuote) {
+      toast.success("Custom quote saved");
+      if (customQuoteId) {
+        navigate(`/quotation/history/${customQuoteId}`);
+      } else {
+        navigate("/quotation/history");
+      }
+      return;
+    }
     setIsSavingEstimate(true);
     try {
       const activeEstId =
         estimateId || pembEstimateId || navState.estimateId || undefined;
+      const matSellOverrideVal = materialSellOverride
+        ? parseFloat(materialSellOverride)
+        : null;
+      const pembDrawingsVal = parseFloat(engineeringDrawings) || 0;
       const cogsCostVal = parseFloat(cogsCostInput) || undefined;
       const cogsSellVal = parseFloat(cogsFixedSellPrice) || undefined;
       const marginLaborVal = parseFloat(marginLaborOverride) || undefined;
@@ -295,6 +413,7 @@ export function QuotePreviewPage() {
         {
           _id: activeEstId,
           jobType,
+          companyBrand,
           scope:
             (scope || "Both").toLowerCase() === "supply"
               ? "Supply"
@@ -313,6 +432,13 @@ export function QuotePreviewPage() {
           installLevel: installDifficulty || "easy",
           installCostPerSf: installCost,
           sellPerSf: installSell,
+          steelFinish: steelFinish || "red-iron",
+          freightOverride: parseFloat(freightOverride) || undefined,
+          materialSellOverride:
+            matSellOverrideVal ?? (materialSellOverride === "" ? null : undefined),
+          matSellOverride:
+            matSellOverrideVal ?? (materialSellOverride === "" ? null : undefined),
+          pembDrawings: pembDrawingsVal,
           jobNumber:
             navState.quotationForm?.jobNumber ||
             navState.extractedDrawing?.extracted?.jobnumber ||
@@ -322,26 +448,6 @@ export function QuotePreviewPage() {
             navState.extractedShipper?.fileName ||
             pembExtractedShipper?.fileName ||
             "",
-          parsedCategories:
-            navState.extractedShipper?.parsedCategories ||
-            pembExtractedShipper?.parsedCategories,
-          tabSummary:
-            navState.extractedShipper?.tabSummary ||
-            pembExtractedShipper?.tabSummary,
-          breakdownRows:
-            navState.extractedShipper?.pricing?.rows ||
-            pembExtractedShipper?.pricing?.rows,
-          pricingResult:
-            navState.extractedShipper?.pricing || pembExtractedShipper?.pricing,
-          fullQuoteResult:
-            navState.extractedShipper?.fullQuote ||
-            pembExtractedShipper?.fullQuote ||
-            (navState.extractedShipper?.pricing as
-              | Record<string, unknown>
-              | undefined) ||
-            (pembExtractedShipper?.pricing as
-              | Record<string, unknown>
-              | undefined),
           extractedDrawingFields: navState.extractedDrawing?.extracted,
           concreteAddon: {
             include: concreteInclude,
@@ -367,8 +473,11 @@ export function QuotePreviewPage() {
           },
           salesTax: {
             rate: taxRate,
+            taxRate,
             include: includeTax,
+            includeTax,
             zip: taxZip,
+            taxZip,
           },
           cogsOverride: cogsOverrideApplied
             ? {
@@ -378,9 +487,11 @@ export function QuotePreviewPage() {
                 sellDollar: cogsSellVal ?? null,
                 costPctAdj: cogsCostAdjustPercent,
               }
-            : {
-                applied: false,
-              },
+            : matSellOverrideVal != null
+              ? undefined
+              : {
+                  applied: false,
+                },
           marginOverride: marginOverrideApplied
             ? {
                 applied: true,
@@ -438,18 +549,6 @@ export function QuotePreviewPage() {
     }
   };
 
-  const handleClearAll = () => {
-    setSelectedPdf(null);
-  };
-
-  const hasData = Boolean(
-    navState.extractedShipper ||
-    navState.quotationForm ||
-    navState.extractedDrawing ||
-    navState.sqFt ||
-    navState.buildingSize,
-  );
-
   return (
     <div className="space-y-6 p-6">
       {/* Top Action Header Bar */}
@@ -464,9 +563,24 @@ export function QuotePreviewPage() {
             Back
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 leading-tight">
-              Quote Preview
-            </h1>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-2xl font-bold text-slate-900 leading-tight">
+                Quote Preview
+              </h1>
+              {estimate && (
+                <QuotationWorkflowBadge
+                  status={
+                    isApproved
+                      ? "approved"
+                      : normalizeWorkflowStatus(
+                          estimate.workflowStatus ||
+                            estimate.conversion?.workflowStatus ||
+                            "draft",
+                        )
+                  }
+                />
+              )}
+            </div>
             <p className="text-xs text-slate-500 mt-0.5 font-medium">
               Full assembled package — Quote · SOW · Contract · Building
               Drawings · Print or Save as PDF
@@ -475,19 +589,21 @@ export function QuotePreviewPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* <Button
-            type="button"
-            onClick={handleDownloadPdf}
-            disabled={isDownloadingPdf}
-            className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
-          >
-            {isDownloadingPdf ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Printer className="h-4 w-4" />
-            )}
-            {isDownloadingPdf ? "Generating PDF..." : "Generate & Print PDF"}
-          </Button> */}
+          {isApproved && (
+            <Button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={isDownloadingPdf}
+              className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
+            >
+              {isDownloadingPdf ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Printer className="h-4 w-4" />
+              )}
+              {isDownloadingPdf ? "Generating PDF..." : "Generate & Print PDF"}
+            </Button>
+          )}
           <Button
             type="button"
             onClick={handleSaveToHistory}
@@ -508,7 +624,7 @@ export function QuotePreviewPage() {
         </div>
       </div>
 
-      {!hasData && (
+      {!hasData && !isCustomQuote && (
         <Card className="p-8 text-center bg-blue-50/50 border border-blue-200 rounded-xl mb-4">
           <div className="flex flex-col items-center justify-center gap-3">
             <FileSearch className="h-8 w-8 text-blue-600" />
@@ -536,33 +652,13 @@ export function QuotePreviewPage() {
       <div className="space-y-6 w-full max-w-5xl print:max-w-none print:w-full">
         {/* Building drawings & plans Card */}
         <Card className="p-6 bg-white border border-slate-200 shadow-xs rounded-xl no-print">
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">
-                Building drawings & plans
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Drag images here — they appear after the SOW in the final PDF...
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleClearAll}
-                className="border-slate-300 text-slate-700 hover:bg-slate-50 px-4 py-2 text-xs font-semibold rounded-lg cursor-pointer bg-white"
-              >
-                Clear All
-              </Button>
-              <Button
-                type="button"
-                onClick={handleScrollToPreview}
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2 text-xs font-semibold rounded-lg cursor-pointer shadow-xs flex items-center gap-1.5"
-              >
-                Preview assembled PDF ↓
-              </Button>
-            </div>
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-slate-900">
+              Building drawings & plans
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Drag images here — they appear after the SOW in the final PDF...
+            </p>
           </div>
 
           {/* PDF Dropzone Box */}

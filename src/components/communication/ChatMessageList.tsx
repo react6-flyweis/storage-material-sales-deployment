@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router";
 import {
   MessageCircle,
   Loader2,
@@ -6,6 +7,7 @@ import {
   CheckCheck,
   FileText,
   Download,
+  ExternalLink,
 } from "lucide-react";
 import type { TeamMessage } from "@/types/communication";
 import { formatMessageTime, formatMessageDateHeader } from "./types";
@@ -15,6 +17,7 @@ interface ChatMessageListProps {
   isLoadingHistory: boolean;
   currentUserId?: string;
   currentUserName?: string;
+  currentUserRole?: string;
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
 }
 
@@ -44,18 +47,33 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
         </div>
       ) : (
         messages.map((msg, index) => {
-          const isMe =
-            msg.senderId === currentUserId ||
+          const isCustomerChat = msg.channelType === "customer";
+          const isCustomerMsg = isCustomerChat && msg.senderType === "customer";
+
+          const isActuallyMe = Boolean(
             msg.isOptimistic ||
-            msg.senderName === currentUserName;
+            (currentUserId && msg.senderId && msg.senderId === currentUserId) ||
+            (currentUserName &&
+              msg.senderName &&
+              msg.senderName.trim().toLowerCase() === currentUserName.trim().toLowerCase())
+          );
+
+          // All employee messages in customer chat come from our side (right side).
+          // In team chat, only messages from current user come from our side.
+          const isFromOurSide = isCustomerChat
+            ? !isCustomerMsg
+            : isActuallyMe;
 
           const prevMsg = messages[index - 1];
           const showDateHeader =
             !prevMsg ||
             formatMessageDateHeader(prevMsg.createdAt) !==
-            formatMessageDateHeader(msg.createdAt);
+              formatMessageDateHeader(msg.createdAt);
 
-          const isRead = (msg.readBy && msg.readBy.length > 0) || false;
+          const isRead =
+            msg.isReadByCustomer ||
+            (msg.readBy && msg.readBy.length > 0) ||
+            false;
 
           return (
             <React.Fragment key={msg._id || index}>
@@ -68,13 +86,28 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
               )}
 
               <div
-                className={`flex flex-col ${isMe ? "items-end" : "items-start"
-                  }`}
+                className={`flex flex-col ${
+                  isFromOurSide ? "items-end" : "items-start"
+                }`}
               >
-                {!isMe && (
+                {/* Small sender indication */}
+                {isFromOurSide ? (
+                  <div className="flex items-center gap-1.5 mb-1 pr-1">
+                    {isActuallyMe ? (
+                      <span className="text-xs text-slate-400 font-medium">You</span>
+                    ) : (
+                      <span className="text-xs text-slate-500 font-medium">
+                        {msg.senderName || "Other Employee"}
+                        <span className="text-[10px] text-slate-400 ml-1">
+                          ({msg.senderRole || (msg.senderType === "admin" ? "Admin" : "Sales")})
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                ) : (
                   <div className="flex items-center gap-2 mb-1 pl-1">
                     <span className="text-xs font-semibold text-slate-700">
-                      {msg.senderName}
+                      {msg.senderName || "Customer"}
                     </span>
                     {msg.senderRole && (
                       <span className="text-[10px] text-slate-400">
@@ -85,10 +118,11 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                 )}
 
                 <div
-                  className={`relative max-w-[85%] sm:max-w-[70%] rounded-2xl px-4 py-2.5 shadow-2xs ${isMe
-                    ? "bg-[#4285F4] text-white rounded-br-xs"
-                    : "bg-white text-slate-800 border border-gray-100 rounded-bl-xs"
-                    }`}
+                  className={`relative max-w-[85%] sm:max-w-[70%] rounded-2xl px-4 py-2.5 shadow-2xs ${
+                    isFromOurSide
+                      ? "bg-[#4285F4] text-white rounded-br-xs"
+                      : "bg-white text-slate-800 border border-gray-100 rounded-bl-xs"
+                  }`}
                 >
                   {/* Text Content */}
                   {msg.content && (
@@ -126,10 +160,11 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                             href={att.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className={`flex items-center gap-2 p-2 rounded-lg text-xs transition-colors ${isMe
-                              ? "bg-blue-600/60 text-white hover:bg-blue-600/80"
-                              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                              }`}
+                            className={`flex items-center gap-2 p-2 rounded-lg text-xs transition-colors ${
+                              isFromOurSide
+                                ? "bg-blue-600/60 text-white hover:bg-blue-600/80"
+                                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                            }`}
                           >
                             <FileText size={16} className="shrink-0" />
                             <span className="truncate flex-1 font-medium">
@@ -142,26 +177,36 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                     </div>
                   )}
 
-                  {/* Message Footer: Timestamp & Read receipts */}
+                  {/* Message Footer: Timestamp, optional lead redirect icon & Read receipts */}
                   <div
-                    className={`flex items-center justify-end gap-1 mt-1 text-[10px] ${isMe ? "text-blue-100" : "text-slate-400"
-                      }`}
+                    className={`flex items-center justify-end gap-1.5 mt-1 text-[10px] ${
+                      isFromOurSide ? "text-blue-100" : "text-slate-400"
+                    }`}
                   >
+                    {(msg.leadId || msg.mirroredFrom) && (
+                      <Link
+                        to={`/leads/${msg.leadId || msg.mirroredFrom}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`inline-flex items-center p-0.5 rounded transition-opacity cursor-pointer ${
+                          isFromOurSide
+                            ? "text-blue-100 hover:text-white"
+                            : "text-slate-400 hover:text-blue-600"
+                        }`}
+                        title="View Lead Chat"
+                      >
+                        <ExternalLink size={11} />
+                      </Link>
+                    )}
                     <span>{formatMessageTime(msg.createdAt)}</span>
-                    {isMe && (
+                    {isFromOurSide && (
                       <span>
                         {msg.status === "pending" ? (
                           <Loader2 size={11} className="animate-spin" />
                         ) : isRead ? (
-                          <CheckCheck
-                            size={13}
-                            className="text-white"
-                          />
+                          <CheckCheck size={13} className="text-white" />
                         ) : (
-                          <Check
-                            size={13}
-                            className="text-blue-200"
-                          />
+                          <Check size={13} className="text-blue-200" />
                         )}
                       </span>
                     )}

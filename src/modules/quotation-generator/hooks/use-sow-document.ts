@@ -57,6 +57,10 @@ export function useSowDocument(params: UseSowDocumentParams = {}) {
     insulationInclusions,
     insulationNotes,
     includeTax,
+    isMultiStory,
+    staircaseCount,
+    staircaseUnitPrice,
+    pembAddOns,
   } = useQuotationStore();
 
   const isSupply = scope.toLowerCase() === "supply" || scope.toLowerCase() === "both";
@@ -75,49 +79,87 @@ export function useSowDocument(params: UseSowDocumentParams = {}) {
     w.category.toLowerCase().includes("sheeting") || w.category.toLowerCase().includes("roof")
   )?.weightLbs;
 
-  const getDefaultState = (): SowDocumentState => ({
-    documentTitle: `Pre-Engineered Metal Building ${scope === "Supply"
-      ? "Supply & Delivery"
-      : scope === "Install"
-        ? "Installation"
-        : "Supply, Delivery & Installation"
-      }`,
-    projectOverviewText: `Storage Materials Will Furnish ${isInstall ? "And Install " : ""
-      }A Complete ${jobType} Pre-Engineered Metal Building Package Based On Preliminary Drawings.`,
-    buildingSummaryItems: [
-      `Approx ${pricingData.effectiveSqFt.toLocaleString()} SF (${pricingData.displayBuildingSize})`,
-      `${jobType} Clear Span Rigid Frame Structure`,
-      `Roof System: 26 GA Galvalume (${roofType} System)`,
-      `Wall System: 26 GA Panel (Color TBD / R-Panel)`,
-      `Total Steel Weight: ${(extractedShipper?.totalWeightLbs || 145000).toLocaleString()} lbs`,
-    ],
-    primaryStructuralItems: [
-      `Rigid Frames (Rafters & Columns)${mainFramesWeight ? ` — ${mainFramesWeight.toLocaleString()} lbs` : ""
-      }`,
-      "Base Plates And Welded Connections",
-      "Anchor Bolt Plans (For Reference Only)",
-    ],
-    secondaryFramingItems: [
-      `Purlins (Roof) & Girts (Walls)${purlinsWeight ? ` — ${purlinsWeight.toLocaleString()} lbs` : ""
-      }`,
-      "Eave Struts",
-      "Bracing (Rod/Cable/Portal As Designed)",
-      "Flange Bracing",
-    ],
+  const getDefaultState = (multiStory = isMultiStory): SowDocumentState => ({
+    documentTitle: multiStory
+      ? `Multi-Story / Decking Pre-Engineered Metal Building ${scope === "Supply"
+        ? "Supply & Delivery"
+        : scope === "Install"
+          ? "Installation"
+          : "Supply, Delivery & Installation"
+        }`
+      : `Pre-Engineered Metal Building ${scope === "Supply"
+        ? "Supply & Delivery"
+        : scope === "Install"
+          ? "Installation"
+          : "Supply, Delivery & Installation"
+        }`,
+    projectOverviewText: multiStory
+      ? `Storage Materials Will Furnish ${isInstall ? "And Install " : ""
+        }A Complete Multi-Story Pre-Engineered Metal Building Package With Decking, Purlins, Partition Panels, And Hallway Systems Based On Preliminary Drawings.`
+      : `Storage Materials Will Furnish ${isInstall ? "And Install " : ""
+        }A Complete ${jobType} Pre-Engineered Metal Building Package Based On Preliminary Drawings.`,
+    buildingSummaryItems: multiStory
+      ? [
+          `Approx ${pricingData.effectiveSqFt.toLocaleString()} SF (${pricingData.displayBuildingSize})`,
+          `Multi-Story Structural Frame with Heavy-Duty Decking & Hallway System`,
+          `Roof System: 26 GA Galvalume (${roofType} System)`,
+          `Wall & Partition System: 26 GA Partition Panels & Corrugated Hallway System`,
+          `Total Steel Weight: ${(extractedShipper?.totalWeightLbs || 145000).toLocaleString()} lbs`,
+        ]
+      : [
+          `Approx ${pricingData.effectiveSqFt.toLocaleString()} SF (${pricingData.displayBuildingSize})`,
+          `${jobType} Clear Span Rigid Frame Structure`,
+          `Roof System: 26 GA Galvalume (${roofType} System)`,
+          `Wall System: 26 GA Panel (Color TBD / R-Panel)`,
+          `Total Steel Weight: ${(extractedShipper?.totalWeightLbs || 145000).toLocaleString()} lbs`,
+        ],
+    primaryStructuralItems: multiStory
+      ? [
+          `Rigid Frames (Rafters & Columns)${mainFramesWeight ? ` — ${mainFramesWeight.toLocaleString()} lbs` : ""}`,
+          "Multi-Story Mezzanine Columns & Main Support Girders",
+          "Base Plates And Welded Connections",
+          "Anchor Bolt Plans (For Reference Only)",
+        ]
+      : [
+          `Rigid Frames (Rafters & Columns)${mainFramesWeight ? ` — ${mainFramesWeight.toLocaleString()} lbs` : ""}`,
+          "Base Plates And Welded Connections",
+          "Anchor Bolt Plans (For Reference Only)",
+        ],
+    secondaryFramingItems: multiStory
+      ? [
+          `Roof Purlins & Wall Girts${purlinsWeight ? ` — ${purlinsWeight.toLocaleString()} lbs` : ""}`,
+          "Mezzanine Floor Decking System (B-Deck / Corrugated Steel Deck)",
+          "Intermediate Floor Joists, Perimeter Deck Angles & Support Channels",
+          "Interior Partition Panel Studs & Hallway System Framing",
+          "Eave Struts, Flange Bracing & Rod/Cable Bracing",
+        ]
+      : [
+          `Purlins (Roof) & Girts (Walls)${purlinsWeight ? ` — ${purlinsWeight.toLocaleString()} lbs` : ""}`,
+          "Eave Struts",
+          "Bracing (Rod/Cable/Portal As Designed)",
+          "Flange Bracing",
+        ],
     roofSystemItems: [
-      `26 GA Galvalume Roof Panels (${roofType} System${sheetingWeight ? ` — ${sheetingWeight.toLocaleString()} lbs` : ""
-      })`,
+      `26 GA Galvalume Roof Panels (${roofType} System${sheetingWeight ? ` — ${sheetingWeight.toLocaleString()} lbs` : ""})`,
       "Ridge Cap",
       "Closure Strips",
       "Fasteners (Self-Drilling Screws)",
       "Sealants (Standard PEMB Package)",
     ],
-    wallSystemItems: [
-      "26 GA Wall Panels",
-      "Base Trim, Corner Trim, J-Trim",
-      "Standard Pedestrian Trims",
-      "Fasteners And Closures",
-    ],
+    wallSystemItems: multiStory
+      ? [
+          "26 GA Exterior Wall Panels",
+          "26 GA Interior Partition Panels (Storage Demising Walls)",
+          "Corrugated Hallway System Panels & Corner Guards",
+          "Base Trim, Corner Trim, J-Trim & Hallway Header Trims",
+          "Fasteners, Closures And Structural Screws",
+        ]
+      : [
+          "26 GA Wall Panels",
+          "Base Trim, Corner Trim, J-Trim",
+          "Standard Pedestrian Trims",
+          "Fasteners And Closures",
+        ],
     trimAccessoriesItems: [
       "Ridge, Eave, Rake, Corner, Base Trim Package",
       "Downspouts And Gutters (If Shown On Plans)",
@@ -136,7 +178,19 @@ export function useSowDocument(params: UseSowDocumentParams = {}) {
     editableConcreteNotes: concreteNotes || "",
     editableInsulationInclusions: insulationInclusions || [],
     editableInsulationNotes: insulationNotes || "",
-    customInclusions: [],
+    customInclusions: [
+      ...(staircaseCount > 0
+        ? [`${staircaseCount} × Steel Staircase System ($${(staircaseCount * staircaseUnitPrice).toLocaleString()} Add-On)`]
+        : []),
+      ...pembAddOns
+        .filter((a) => a.inSow && a.item.trim())
+        .map((a) => {
+          const cost = Number(a.cost) || 0;
+          const markup = Number(a.markupPct) || 0;
+          const sell = Math.round(cost * (1 + markup / 100));
+          return `${a.item}${a.note ? ` (${a.note})` : ""} — $${sell.toLocaleString()}`;
+        }),
+    ],
     exclusionsItems: [
       ...(!isInstall ? ["Building Erection & Labor (Supply Only Contract)"] : []),
       ...(!isSupply ? ["Building Materials & Freight (Installation Only Contract)"] : []),
@@ -280,6 +334,10 @@ export function useSowDocument(params: UseSowDocumentParams = {}) {
     setState(getDefaultState());
   };
 
+  const setMultiStoryBoilerplate = (multiStory: boolean) => {
+    setState(getDefaultState(multiStory));
+  };
+
   return {
     state,
     setState,
@@ -292,6 +350,7 @@ export function useSowDocument(params: UseSowDocumentParams = {}) {
     setFieldValue,
     addCustomInclusion,
     resetToDefaults,
+    setMultiStoryBoilerplate,
   };
 }
 

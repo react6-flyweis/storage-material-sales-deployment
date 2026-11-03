@@ -8,7 +8,9 @@ import {
 } from "react";
 import { useNavigate, useLocation, useSearchParams } from "react-router";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { getApiErrorMessage } from "@/lib/api-error";
+import { formatInstallAddress } from "@/lib/address";
 import {
   ArrowLeft,
   FileSpreadsheet,
@@ -42,13 +44,17 @@ import {
 } from "@/modules/leads/leads.hooks";
 import { getLeadProjectName } from "@/modules/leads/leads.utils";
 import {
-  extractStorageCogProvider,
+  createEstimateFromStorageCogProvider,
   computeStorageProvider,
   saveEstimateProvider,
+  getEstimateByIdProvider,
   taxLookupProvider,
   type SaveEstimatePayload,
   type PreviewDocumentRequest,
+  type ComputeStorageRequest,
+  type CreateEstimateFromStorageCogResponse,
 } from "../estimates.api";
+import { hydrateEstimateIntoStore } from "../hooks/use-load-estimate-to-editor";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
 import { ServerDocumentPreview } from "../components/server-document-preview";
@@ -61,16 +67,19 @@ import {
 } from "../components/storage-preview-document";
 import { QuoteConcreteTab } from "../components/quote-concrete-tab";
 import { QuoteInsulationTab } from "../components/quote-insulation-tab";
+import { QuoteAddOnsTab } from "../components/quote-addons-tab";
+import { usePricingRulesQuery } from "../pricing-rules.hooks";
 
 const tabs = [
   { id: "breakdown", label: "Breakdown" },
   { id: "quote", label: "Quote" },
   { id: "sow", label: "Statement of Work" },
-  { id: "margin", label: "Margin" },
-  { id: "concrete", label: "Concrete" },
-  { id: "insulation", label: "Insulation" },
+  { id: "margin", label: "📊 Margin" },
+  { id: "concrete", label: "🪨 Concrete" },
+  { id: "insulation", label: "🧱 Insulation" },
+  { id: "addons", label: "➕ Add-Ons" },
   { id: "drawings", label: "Drawings" },
-  { id: "contract", label: "Contract" },
+  { id: "contract", label: "📄 Contract" },
 ];
 
 function fileToBase64(file: File): Promise<string> {
@@ -119,6 +128,8 @@ export default function StorageQuotePage() {
   );
 
   const {
+    companyBrand,
+    setCompanyBrand,
     setJobType,
     scope,
     setScope,
@@ -175,6 +186,8 @@ export default function StorageQuotePage() {
     insulationRValueRoof,
 
     insulationRValueWalls,
+    pembAddOns,
+    setPembAddOns,
   } = useQuotationStore();
 
   const storageData =
@@ -183,7 +196,31 @@ export default function StorageQuotePage() {
     navState.storagePricing ||
     (storeStoragePricing as StoragePricing | null) ||
     null;
-  const estimateId = navState.estimateId || storeStorageEstimateId || null;
+  const [searchParams] = useSearchParams();
+  const urlEstimateId =
+    searchParams.get("estimateId") || searchParams.get("id");
+  const initialEstimateId =
+    navState.estimateId || urlEstimateId || storeStorageEstimateId || null;
+  const [estimateId, setEstimateId] = useState<string | null>(initialEstimateId);
+  const estimateIdRef = useRef<string | null>(initialEstimateId);
+
+  useEffect(() => {
+    estimateIdRef.current = estimateId;
+  }, [estimateId]);
+
+  useEffect(() => {
+    const eid = navState.estimateId || urlEstimateId || storeStorageEstimateId;
+    if (eid && eid !== estimateIdRef.current) {
+      estimateIdRef.current = eid;
+      setEstimateId(eid);
+      setStorageEstimateId(eid);
+    }
+  }, [
+    navState.estimateId,
+    urlEstimateId,
+    storeStorageEstimateId,
+    setStorageEstimateId,
+  ]);
   const sourceFileName = navState.sourceFileName || storeStorageFileName || "";
   const globalMarkup = storeGlobalMarkup ?? 0;
   const shippingVal = storeShipping ?? 0;
@@ -205,17 +242,38 @@ export default function StorageQuotePage() {
     storageData?.project?.jobNumber ||
     "";
 
+  // Synchronize storage COG extras into the shared add-ons store when available
+  useEffect(() => {
+    if (storageData?.extras?.length && pembAddOns.length === 0) {
+      setPembAddOns(
+        storageData.extras.map((x, idx) => ({
+          id: `storage-addon-${idx}-${Date.now()}`,
+          item: x.name || x.item || "Extra Item",
+          cost: Number(x.cogs || x.cost || 0),
+          markupPct: Number(x.markup ?? 25),
+          note: x.note || "",
+          inQuote: x.include !== false,
+          inSow: true,
+        })),
+      );
+    }
+  }, [storageData?.extras, pembAddOns.length, setPembAddOns]);
+
+  const { data: pricingRules } = usePricingRulesQuery();
+
   const isInitializedRef = useRef(false);
   useEffect(() => {
     if (!isInitializedRef.current) {
       isInitializedRef.current = true;
       setJobType("Storage");
       setScope("Both");
+      const defaultCost = pricingRules?.install?.storageBasic?.cost || 2.5;
+      const defaultSell = pricingRules?.install?.storageBasic?.sell || 3.25;
       if (installCost === 5.5 || installCost === 5.85) {
-        setInstallCost(2.5);
+        setInstallCost(defaultCost);
       }
       if (installSell === 8.5 || installSell === 9.0) {
-        setInstallSell(3.25);
+        setInstallSell(defaultSell);
       }
     }
   }, [
@@ -225,6 +283,7 @@ export default function StorageQuotePage() {
     installSell,
     setInstallCost,
     setInstallSell,
+    pricingRules,
   ]);
 
   useEffect(() => {
@@ -232,7 +291,13 @@ export default function StorageQuotePage() {
       setStorageData(navState.storageData as Record<string, unknown>);
     if (navState.storagePricing)
       setStoragePricing(navState.storagePricing as Record<string, unknown>);
-    if (navState.estimateId) setStorageEstimateId(navState.estimateId);
+    const resolvedEid =
+      navState.estimateId || urlEstimateId || storeStorageEstimateId;
+    if (resolvedEid) {
+      setStorageEstimateId(resolvedEid);
+      setEstimateId(resolvedEid);
+      estimateIdRef.current = resolvedEid;
+    }
     if (navState.sourceFileName) setStorageFileName(navState.sourceFileName);
     if (navState.customerLeadName)
       setStorageCustomerLeadName(navState.customerLeadName);
@@ -242,6 +307,8 @@ export default function StorageQuotePage() {
     if (navState.jobNumber) setStorageJobNumber(navState.jobNumber);
   }, [
     navState,
+    urlEstimateId,
+    storeStorageEstimateId,
     setStorageData,
     setStoragePricing,
     setStorageEstimateId,
@@ -264,7 +331,6 @@ export default function StorageQuotePage() {
   const setSourceFileName = setStorageFileName;
   const insulationRoofR = insulationRValueRoof || "R-19";
   const insulationWallR = insulationRValueWalls || "R-13";
-  const [searchParams] = useSearchParams();
   const initialLeadId =
     searchParams.get("lead") ||
     searchParams.get("leadId") ||
@@ -368,7 +434,8 @@ export default function StorageQuotePage() {
 
     if (name) setCustomerLeadName(name);
     if (customer?.email) setCustomerEmail(customer.email);
-    if (lead?.location) setCustomerAddress(lead.location);
+    const resolvedAddress = formatInstallAddress(lead?.installAddress, lead?.location);
+    if (resolvedAddress && resolvedAddress !== "—") setCustomerAddress(resolvedAddress);
     if (lead?.jobId) setJobNumber(lead.jobId);
     if (bSize) setBuildingSize(bSize);
     if (sqft > 0) setSquareFootage(sqft);
@@ -384,6 +451,39 @@ export default function StorageQuotePage() {
     setSquareFootage,
   ]);
 
+  const effectiveEstimateId =
+    estimateIdRef.current ||
+    estimateId ||
+    navState.estimateId ||
+    urlEstimateId ||
+    storeStorageEstimateId ||
+    null;
+
+  // Hydrate from GET /api/sales/estimates/:estimateId if estimateId exists but storageData is missing
+  const [isHydratingStorageEstimate, setIsHydratingStorageEstimate] =
+    useState(false);
+  useEffect(() => {
+    if (effectiveEstimateId && !storageData && !isHydratingStorageEstimate) {
+      setIsHydratingStorageEstimate(true);
+      getEstimateByIdProvider(effectiveEstimateId)
+        .then((res) => {
+          const fetchedData = res.data || res;
+          const est =
+            ((fetchedData as Record<string, unknown>)?.estimate ||
+              fetchedData) as SaveEstimatePayload;
+          if (est && typeof est === "object") {
+            hydrateEstimateIntoStore(est, effectiveEstimateId);
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to hydrate storage estimate by ID:", err);
+        })
+        .finally(() => {
+          setIsHydratingStorageEstimate(false);
+        });
+    }
+  }, [effectiveEstimateId, storageData, isHydratingStorageEstimate]);
+
   const [activeTab, setActiveTab] = useState<
     | "breakdown"
     | "quote"
@@ -391,6 +491,7 @@ export default function StorageQuotePage() {
     | "margin"
     | "concrete"
     | "insulation"
+    | "addons"
     | "drawings"
     | "contract"
   >("breakdown");
@@ -409,21 +510,118 @@ export default function StorageQuotePage() {
   // API-driven recalculation
   const triggerApiCompute = useCallback(
     async (currentStorageData: StorageData | null) => {
-      if (!currentStorageData) return;
+      if (
+        !currentStorageData ||
+        !currentStorageData.buildings ||
+        currentStorageData.buildings.length === 0
+      ) {
+        return;
+      }
       setIsComputing(true);
       try {
-        const payload = {
-          storageData: {
-            buildings: currentStorageData.buildings || [],
-            doors: currentStorageData.doors || [],
-            extras: currentStorageData.extras || [],
-            shipping: shippingVal,
-            drawings: drawingsVal,
-            installSellPerSf:
-              scope.toLowerCase() === "supply" ? 0 : installSell,
-            installCostPerSf:
-              scope.toLowerCase() === "supply" ? 0 : installCost,
+        let activeEstId =
+          estimateIdRef.current ||
+          estimateId ||
+          storeStorageEstimateId ||
+          urlEstimateId ||
+          undefined;
+
+        const effectiveInstallSell =
+          scope.toLowerCase() === "supply" ? 0 : installSell;
+        const effectiveInstallCost =
+          scope.toLowerCase() === "supply" ? 0 : installCost;
+
+        const effectiveExtras: StorageExtraItem[] = (pembAddOns || []).map(
+          (addon) => {
+            const cost = Number(addon.cost) || 0;
+            const markup = Number(addon.markupPct) || 0;
+            return {
+              name: addon.item,
+              item: addon.item,
+              cogs: cost,
+              cost,
+              markup,
+              sale: 0,
+              sellPrice: 0,
+              note: addon.note || "",
+              include: addon.inQuote !== false,
+            };
           },
+        );
+
+        const currentStoragePayloadData = {
+          ...currentStorageData,
+          buildings: currentStorageData.buildings || [],
+          doors: currentStorageData.doors || [],
+          extras: effectiveExtras,
+          shipping: shippingVal,
+          drawings: drawingsVal,
+          installSellPerSf: effectiveInstallSell,
+          installCostPerSf: effectiveInstallCost,
+        };
+
+        const saveEstimateBody: SaveEstimatePayload = {
+          _id: activeEstId,
+          leadId: selectedLeadId || activeLeadId || undefined,
+          jobType: "Storage",
+          companyBrand,
+          scope:
+            scope.toLowerCase() === "supply"
+              ? "Supply"
+              : scope.toLowerCase() === "install"
+                ? "Install"
+                : "Both",
+          leadCompanyName:
+            customerLeadName ||
+            currentStorageData.project?.customer ||
+            "Storage Project",
+          customerEmail,
+          streetAddress: customerAddress,
+          cityStateZip: customerAddress,
+          jobNumber:
+            jobNumber || currentStorageData.project?.jobNumber || "",
+          sourceFileName,
+          storageData: currentStoragePayloadData as Record<string, unknown>,
+          status: "draft",
+        };
+
+        // Ensure estimate exists and has storageData.buildings saved before computing
+        if (!activeEstId) {
+          try {
+            const draftRes = await saveEstimateProvider(saveEstimateBody);
+            const draftData = draftRes.data || draftRes;
+            const newId = draftData?.estimate?._id || draftData?._id;
+            if (newId) {
+              activeEstId = newId;
+              estimateIdRef.current = newId;
+              setEstimateId(newId);
+              setStorageEstimateId(newId);
+            }
+          } catch (createErr) {
+            console.warn(
+              "Failed to auto-create draft estimate before computing storage:",
+              createErr,
+            );
+          }
+        } else {
+          // Update server estimate first so storageData.buildings exists on the estimate document
+          try {
+            await saveEstimateProvider(saveEstimateBody, activeEstId);
+          } catch (saveErr) {
+            console.warn("Failed to sync storageData before compute-storage:", saveErr);
+          }
+        }
+
+        const payload: ComputeStorageRequest = {
+          estimateId: activeEstId,
+          storageData: currentStoragePayloadData as Record<string, unknown>,
+          buildings: currentStorageData.buildings || [],
+          doors: currentStorageData.doors || [],
+          extras: effectiveExtras,
+          shipping: shippingVal,
+          drawings: drawingsVal,
+          installSellPerSf: effectiveInstallSell,
+          installCostPerSf: effectiveInstallCost,
           concrete: {
             include: concreteInclude,
             costSF: concreteCostSf,
@@ -441,11 +639,27 @@ export default function StorageQuotePage() {
           },
           salesTax: {
             rate: taxRate,
+            taxRate,
             include: includeTax,
+            includeTax,
+            zip: taxZip,
+            taxZip,
           },
+          taxRate,
+          includeTax,
+          taxZip,
+          zip: taxZip,
+          pembAddOns: (pembAddOns || []).map((addon) => ({
+            item: addon.item,
+            cost: Number(addon.cost) || 0,
+            markupPct: Number(addon.markupPct) || 0,
+            inQuote: Boolean(addon.inQuote),
+            inSow: Boolean(addon.inSow),
+            note: addon.note,
+          })),
         };
 
-        const res = await computeStorageProvider(payload);
+        const res = await computeStorageProvider(payload, activeEstId);
         const data = res.data || res;
         if (data?.storagePricing) {
           setStoragePricing(data.storagePricing as StoragePricing);
@@ -457,6 +671,17 @@ export default function StorageQuotePage() {
       }
     },
     [
+      estimateId,
+      storeStorageEstimateId,
+      urlEstimateId,
+      selectedLeadId,
+      activeLeadId,
+      companyBrand,
+      customerLeadName,
+      customerEmail,
+      customerAddress,
+      jobNumber,
+      sourceFileName,
       shippingVal,
       drawingsVal,
       scope,
@@ -475,7 +700,10 @@ export default function StorageQuotePage() {
       insulationWallR,
       taxRate,
       includeTax,
+      taxZip,
+      pembAddOns,
       setStoragePricing,
+      setStorageEstimateId,
     ],
   );
 
@@ -490,9 +718,9 @@ export default function StorageQuotePage() {
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     };
-  }, [storageData, triggerApiCompute]);
+  }, [storageData, pembAddOns, triggerApiCompute]);
 
-  // Handle File Upload via POST /api/sales/estimates/extract-storage-cog
+  // Handle File Upload via POST /api/sales/estimates/from-storage-cog (EstimateId-first flow)
   const handleFileUpload = async (file: File) => {
     if (!file) return;
     setIsUploading(true);
@@ -503,46 +731,87 @@ export default function StorageQuotePage() {
 
     try {
       const base64 = await fileToBase64(file);
-      const apiRes = await extractStorageCogProvider({
+      const curEstId =
+        estimateIdRef.current ||
+        estimateId ||
+        storeStorageEstimateId ||
+        urlEstimateId ||
+        undefined;
+
+      const apiRes = await createEstimateFromStorageCogProvider({
+        estimateId: curEstId,
+        leadId: selectedLeadId || activeLeadId || undefined,
         fileBase64: base64,
         fileName: file.name,
+        companyBrand,
+        scope,
       });
 
-      const responsePayload = apiRes.data || apiRes;
+      const rawRes = apiRes as unknown as Record<string, unknown>;
+      const responsePayload =
+        (apiRes.data || apiRes) as unknown as CreateEstimateFromStorageCogResponse["data"];
+      const newEstimateId =
+        (rawRes?.estimateId as string) ||
+        responsePayload?.estimateId ||
+        responsePayload?.estimate?._id ||
+        (responsePayload as { _id?: string })?._id ||
+        curEstId;
 
-      const buildingsList: StorageBuildingItem[] = (
-        responsePayload.buildings || []
-      ).map((b: Record<string, unknown>, idx: number) => {
-        const cogs = Number(b.cogs || b.cost || 0);
-        const markup = Number(b.markup ?? 25);
-        const sqft = Number(b.sqft || b.squareFootage || 0);
-        const psf = sqft > 0 ? cogs / sqft : Number(b.psf || 0);
-        return {
-          name: String(b.name || `Building ${idx + 1}`),
-          width: Number(b.width || 0),
-          length: Number(b.length || 0),
-          loEave: Number(b.loEave || b.eaveHeight || 0),
-          hiEave: Number(b.hiEave || b.loEave || b.eaveHeight || 0),
-          eaveHeight: Number(b.loEave || b.eaveHeight || 0),
-          roofPitch: String(b.roofPitch || b.pitch || "0.5:12"),
-          slope: String(b.slope || b.roofPitch || "0.5:12"),
-          sqft,
-          squareFootage: sqft,
-          psf,
-          cogs,
-          cost: cogs,
-          markup,
-          sellPrice:
-            Number(b.sellPrice) || Math.round(cogs * (1 + markup / 100)),
-          roofType: String(b.roofType || "screw-down"),
-          wallPanel: String(b.wallPanel || b.wallColor || "26ga R-Loc"),
-          roofPanel: String(b.roofPanel || "26ga Galvalume"),
-          wallColor: String(b.wallPanel || b.wallColor || "26ga R-Loc"),
-          doors: String(b.doors || ""),
-        };
-      });
+      if (newEstimateId) {
+        estimateIdRef.current = newEstimateId;
+        setEstimateId(newEstimateId);
+        setStorageEstimateId(newEstimateId);
+      }
 
-      const doorsList: StorageDoorItem[] = (responsePayload.doors || []).map(
+      const rawStorageData =
+        (responsePayload.storageData as Record<string, unknown>) ||
+        (responsePayload.estimate?.storageData as Record<string, unknown>) ||
+        {};
+
+      const rawBuildings = (rawStorageData.buildings ||
+        responsePayload.buildings ||
+        []) as Record<string, unknown>[];
+
+      const rawDoors = (rawStorageData.doors ||
+        responsePayload.doors ||
+        []) as Record<string, unknown>[];
+
+      const rawExtras = (rawStorageData.extras ||
+        responsePayload.extras ||
+        []) as Record<string, unknown>[];
+
+      const buildingsList: StorageBuildingItem[] = rawBuildings.map(
+        (b: Record<string, unknown>, idx: number) => {
+          const cogs = Number(b.cogs || b.cost || 0);
+          const markup = Number(b.markup ?? 25);
+          const sqft = Number(b.sqft || b.squareFootage || 0);
+          const psf = sqft > 0 ? cogs / sqft : Number(b.psf || 0);
+          return {
+            name: String(b.name || `Building ${idx + 1}`),
+            width: Number(b.width || 0),
+            length: Number(b.length || 0),
+            loEave: Number(b.loEave || b.eaveHeight || 0),
+            hiEave: Number(b.hiEave || b.loEave || b.eaveHeight || 0),
+            eaveHeight: Number(b.loEave || b.eaveHeight || 0),
+            roofPitch: String(b.roofPitch || b.pitch || "0.5:12"),
+            slope: String(b.slope || b.roofPitch || "0.5:12"),
+            sqft,
+            squareFootage: sqft,
+            psf,
+            cogs,
+            cost: cogs,
+            markup,
+            sellPrice: Number(b.sellPrice || b.sale || b.sell) || 0,
+            roofType: String(b.roofType || "screw-down"),
+            wallPanel: String(b.wallPanel || b.wallColor || "26ga R-Loc"),
+            roofPanel: String(b.roofPanel || "26ga Galvalume"),
+            wallColor: String(b.wallPanel || b.wallColor || "26ga R-Loc"),
+            doors: String(b.doors || ""),
+          };
+        },
+      );
+
+      const doorsList: StorageDoorItem[] = rawDoors.map(
         (d: Record<string, unknown>) => {
           const qty = Number(d.qty || d.quantity || d.count || 0);
           const unitCost = Number(d.unitCost || d.costPerUnit || 0);
@@ -559,21 +828,15 @@ export default function StorageQuotePage() {
             cogs,
             totalCost: cogs,
             markup,
-            sale:
-              Number(d.sale || d.totalSell) ||
-              Math.round(cogs * (1 + markup / 100)),
-            sellPerUnit:
-              Number(d.sellPerUnit) ||
-              Math.round(unitCost * (1 + markup / 100)),
-            totalSell:
-              Number(d.sale || d.totalSell) ||
-              Math.round(cogs * (1 + markup / 100)),
+            sale: Number(d.sale || d.totalSell || d.sell) || 0,
+            sellPerUnit: Number(d.sellPerUnit) || 0,
+            totalSell: Number(d.sale || d.totalSell || d.sell) || 0,
             color: String(d.color || "Standard"),
           };
         },
       );
 
-      const extrasList: StorageExtraItem[] = (responsePayload.extras || []).map(
+      const extrasList: StorageExtraItem[] = rawExtras.map(
         (x: Record<string, unknown>) => {
           const cogs = Number(x.cogs || x.cost || 0);
           const markup = Number(x.markup ?? 25);
@@ -583,12 +846,8 @@ export default function StorageQuotePage() {
             cogs,
             cost: cogs,
             markup,
-            sale:
-              Number(x.sale || x.sellPrice) ||
-              Math.round(cogs * (1 + markup / 100)),
-            sellPrice:
-              Number(x.sale || x.sellPrice) ||
-              Math.round(cogs * (1 + markup / 100)),
+            sale: Number(x.sale || x.sellPrice) || 0,
+            sellPrice: Number(x.sale || x.sellPrice) || 0,
             note: String(x.note || ""),
             include: x.include !== false,
           };
@@ -596,18 +855,42 @@ export default function StorageQuotePage() {
       );
 
       const shipVal =
-        typeof responsePayload.shippingDefault === "number"
+        Number(rawStorageData.shipping) ||
+        (typeof responsePayload.shippingDefault === "number"
           ? responsePayload.shippingDefault
           : Number(
               (responsePayload.shippingDefault as Record<string, unknown>)
                 ?.freightCost,
-            ) || 0;
+            ) || 0);
       setShippingVal(shipVal);
 
-      const proj = responsePayload.project || {};
-      if (proj.customer) setCustomerLeadName(String(proj.customer));
-      if (proj.location) setCustomerAddress(String(proj.location));
-      if (proj.jobNumber) setJobNumber(String(proj.jobNumber));
+      const installSellVal = Number(rawStorageData.installSellPerSf);
+      if (installSellVal > 0) setInstallSell(installSellVal);
+      const installCostVal = Number(rawStorageData.installCostPerSf);
+      if (installCostVal > 0) setInstallCost(installCostVal);
+
+      const proj =
+        responsePayload.project ||
+        (rawStorageData.project as Record<string, unknown>) ||
+        {};
+      const custName =
+        proj.customer ||
+        responsePayload.estimate?.leadCompanyName ||
+        "";
+      if (custName) setCustomerLeadName(String(custName));
+
+      const custAddr =
+        proj.location ||
+        responsePayload.estimate?.cityStateZip ||
+        responsePayload.estimate?.streetAddress ||
+        "";
+      if (custAddr) setCustomerAddress(String(custAddr));
+
+      const jobNum =
+        proj.jobNumber ||
+        responsePayload.estimate?.jobNumber ||
+        "";
+      if (jobNum) setJobNumber(String(jobNum));
 
       const newStorageData: StorageData = {
         buildings: buildingsList,
@@ -619,25 +902,48 @@ export default function StorageQuotePage() {
           trucks: 1,
         },
         project: {
-          customer: String(proj.customer || ""),
-          location: String(proj.location || ""),
-          quoteDate: String(proj.date || ""),
-          jobNumber: String(proj.jobNumber || ""),
+          customer: String(custName || ""),
+          location: String(custAddr || ""),
+          quoteDate: String(
+            proj.date || responsePayload.estimate?.quoteDate || "",
+          ),
+          jobNumber: String(jobNum || ""),
         },
       };
 
       setStorageData(newStorageData);
       setSourceFileName(file.name);
 
-      if (responsePayload.storagePricing) {
-        setStoragePricing(responsePayload.storagePricing as StoragePricing);
+      if (extrasList.length > 0) {
+        setPembAddOns(
+          extrasList.map((x, idx) => ({
+            id: `storage-addon-${Date.now()}-${idx}`,
+            item: x.name || x.item || "Extra Item",
+            cost: Number(x.cogs || x.cost || 0),
+            markupPct: Number(x.markup ?? 25),
+            note: x.note || "",
+            inQuote: x.include !== false,
+            inSow: true,
+          })),
+        );
+      }
+
+      const pricingObj =
+        responsePayload.storagePricing ||
+        responsePayload.estimate?.storagePricingResult ||
+        responsePayload.storagePricingResult;
+
+      if (pricingObj) {
+        setStoragePricing(pricingObj as StoragePricing);
       } else {
         triggerApiCompute(newStorageData);
       }
 
       setFeedbackMsg({
         type: "success",
-        text: `✓ Backend successfully extracted ${buildingsList.length} buildings and ${doorsList.length} door types from ${file.name}!`,
+        text: `✓ Backend successfully extracted and created draft estimate ${
+          newEstimateId ? `(${newEstimateId.slice(-6)})` : ""
+        } from ${file.name}!`,
       });
     } catch (err: unknown) {
       console.error("Storage COG backend extract error:", err);
@@ -692,10 +998,29 @@ export default function StorageQuotePage() {
   const handleSaveDraft = async () => {
     setIsSaving(true);
     try {
+      const effectiveExtras: StorageExtraItem[] = (pembAddOns || []).map(
+        (addon) => {
+          const cost = Number(addon.cost) || 0;
+          const markup = Number(addon.markupPct) || 0;
+          return {
+            name: addon.item,
+            item: addon.item,
+            cogs: cost,
+            cost,
+            markup,
+            sale: 0,
+            sellPrice: 0,
+            note: addon.note || "",
+            include: addon.inQuote !== false,
+          };
+        },
+      );
+
       const payload: SaveEstimatePayload = {
         _id: estimateId || undefined,
         leadId: selectedLeadId || activeLeadId || undefined,
         jobType: "Storage",
+        companyBrand,
         scope:
           scope.toLowerCase() === "supply"
             ? "Supply"
@@ -711,8 +1036,18 @@ export default function StorageQuotePage() {
         cityStateZip: customerAddress,
         jobNumber: jobNumber || storageData?.project?.jobNumber || "",
         sourceFileName,
-        storageData: storageData as Record<string, unknown>,
-        storagePricingResult: storagePricing as Record<string, unknown>,
+        storageData: {
+          ...storageData,
+          extras: effectiveExtras,
+        } as Record<string, unknown>,
+        pembAddOns: (pembAddOns || []).map((addon) => ({
+          item: addon.item,
+          cost: Number(addon.cost) || 0,
+          markupPct: Number(addon.markupPct) || 0,
+          inQuote: Boolean(addon.inQuote),
+          inSow: Boolean(addon.inSow),
+          note: addon.note,
+        })),
         concreteAddon: {
           include: concreteInclude,
           costSF: concreteCostSf,
@@ -771,14 +1106,10 @@ export default function StorageQuotePage() {
   // Apply global markup to all buildings
   const handleApplyGlobalMarkup = () => {
     if (!storageData) return;
-    const updated = (storageData.buildings || []).map((b) => {
-      const cogs = Number(b.cost || b.cogs || 0);
-      return {
-        ...b,
-        markup: globalMarkup,
-        sellPrice: Math.round(cogs * (1 + globalMarkup / 100)),
-      };
-    });
+    const updated = (storageData.buildings || []).map((b) => ({
+      ...b,
+      markup: globalMarkup,
+    }));
     const updatedData = { ...storageData, buildings: updated };
     setStorageData(updatedData);
     triggerApiCompute(updatedData);
@@ -805,16 +1136,6 @@ export default function StorageQuotePage() {
       const sqft = Number(b.sqft || 0);
       b.cogs = psf * sqft;
       b.cost = psf * sqft;
-    }
-    if (
-      field === "markup" ||
-      field === "cost" ||
-      field === "cogs" ||
-      field === "psf"
-    ) {
-      const cogs = Number(b.cost || b.cogs || 0);
-      const mu = Number(b.markup ?? 25);
-      b.sellPrice = Math.round(cogs * (1 + mu / 100));
     }
     updated[index] = b;
     const updatedData = { ...storageData, buildings: updated };
@@ -869,13 +1190,9 @@ export default function StorageQuotePage() {
     const d = { ...updated[index], [field]: value };
     const qty = Number(d.qty || d.quantity || 0);
     const uCost = Number(d.unitCost || d.costPerUnit || 0);
-    const mu = Number(d.markup ?? 25);
     const cogs = qty * uCost;
     d.cogs = cogs;
     d.totalCost = cogs;
-    d.sale = Math.round(cogs * (1 + mu / 100));
-    d.totalSell = Math.round(cogs * (1 + mu / 100));
-    d.sellPerUnit = Math.round(uCost * (1 + mu / 100));
     updated[index] = d;
     const updatedData = { ...storageData, doors: updated };
     setStorageData(updatedData);
@@ -909,50 +1226,6 @@ export default function StorageQuotePage() {
     if (!storageData?.doors) return;
     const updated = storageData.doors.filter((_, i) => i !== index);
     const updatedData = { ...storageData, doors: updated };
-    setStorageData(updatedData);
-  };
-
-  // Extras table inline row helpers
-  const handleUpdateExtra = (
-    index: number,
-    field: keyof StorageExtraItem,
-    value: string | number | boolean,
-  ) => {
-    if (!storageData?.extras) return;
-    const updated = [...storageData.extras];
-    const x = { ...updated[index], [field]: value };
-    const cogs = Number(x.cogs || x.cost || 0);
-    const mu = Number(x.markup ?? 25);
-    x.sale = Math.round(cogs * (1 + mu / 100));
-    x.sellPrice = Math.round(cogs * (1 + mu / 100));
-    updated[index] = x;
-    const updatedData = { ...storageData, extras: updated };
-    setStorageData(updatedData);
-  };
-
-  const handleAddExtra = () => {
-    const newExtra: StorageExtraItem = {
-      name: "",
-      item: "",
-      cogs: 0,
-      cost: 0,
-      markup: globalMarkup,
-      sale: 0,
-      sellPrice: 0,
-      note: "",
-      include: true,
-    };
-    const updatedData = {
-      ...storageData,
-      extras: [...(storageData?.extras || []), newExtra],
-    };
-    setStorageData(updatedData);
-  };
-
-  const handleRemoveExtra = (index: number) => {
-    if (!storageData?.extras) return;
-    const updated = storageData.extras.filter((_, i) => i !== index);
-    const updatedData = { ...storageData, extras: updated };
     setStorageData(updatedData);
   };
 
@@ -993,6 +1266,7 @@ export default function StorageQuotePage() {
           storageData,
           storagePricing,
           estimateId,
+          companyBrand,
           leadId: selectedLeadId || activeLeadId || undefined,
           sourceFileName,
           customerLeadName,
@@ -1016,7 +1290,6 @@ export default function StorageQuotePage() {
 
   const buildings = storageData?.buildings || [];
   const doors = storageData?.doors || [];
-  const extras = storageData?.extras || [];
 
   const totalSqFt =
     Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) ||
@@ -1072,6 +1345,7 @@ export default function StorageQuotePage() {
     () => ({
       jobType: "Storage",
       estimateId: estimateId || undefined,
+      companyBrand,
       scope:
         (scope || "Both").toLowerCase() === "supply"
           ? "Supply"
@@ -1110,7 +1384,33 @@ export default function StorageQuotePage() {
       pricingResult: storagePricing as Record<string, unknown>,
       storagePricingResult: storagePricing as Record<string, unknown>,
       storagePricing: storagePricing as Record<string, unknown>,
-      storageData: storageData as Record<string, unknown>,
+      storageData: {
+        ...storageData,
+        extras: (pembAddOns || []).map((addon) => {
+          const cost = Number(addon.cost) || 0;
+          const markup = Number(addon.markupPct) || 0;
+          const sell = Math.round(cost * (1 + markup / 100));
+          return {
+            name: addon.item,
+            item: addon.item,
+            cogs: cost,
+            cost,
+            markup,
+            sale: sell,
+            sellPrice: sell,
+            note: addon.note || "",
+            include: addon.inQuote !== false,
+          };
+        }),
+      } as Record<string, unknown>,
+      pembAddOns: (pembAddOns || []).map((addon) => ({
+        item: addon.item,
+        cost: Number(addon.cost) || 0,
+        markupPct: Number(addon.markupPct) || 0,
+        inQuote: Boolean(addon.inQuote),
+        inSow: Boolean(addon.inSow),
+        note: addon.note,
+      })),
       concreteAddon: {
         include: concreteInclude,
       },
@@ -1119,8 +1419,16 @@ export default function StorageQuotePage() {
       },
       salesTax: {
         include: includeTax,
+        includeTax,
         rate: taxRate,
+        taxRate,
+        zip: taxZip,
+        taxZip,
       },
+      taxRate,
+      includeTax,
+      taxZip,
+      zip: taxZip,
       contract: {
         customer: customerLeadName || "Customer Legal Entity",
         address: customerAddress || "",
@@ -1141,6 +1449,7 @@ export default function StorageQuotePage() {
     }),
     [
       estimateId,
+      companyBrand,
       scope,
       customerLeadName,
       customerEmail,
@@ -1153,6 +1462,7 @@ export default function StorageQuotePage() {
       includeTax,
       taxRate,
       grandTotal,
+      pembAddOns,
     ],
   );
 
@@ -1378,37 +1688,68 @@ export default function StorageQuotePage() {
       <Card className="border border-slate-200 pt-0">
         {/* Card Header: Select Lead Section */}
         <CardHeader className="border-b bg-slate-50/50 pt-5">
-          <div>
-            <label className="block text-sm font-semibold text-slate-800 mb-2">
-              Select Lead
-            </label>
-            <Select
-              value={selectedLeadId || activeLeadId}
-              onValueChange={handleLeadChange}
-              disabled={isLeadsLoading}
-            >
-              <SelectTrigger className="w-full max-w-md bg-[#F8FAFC] border-slate-200 text-slate-900 text-sm h-11 rounded-lg">
-                <SelectValue
-                  placeholder={
-                    isLeadsLoading ? "Loading leads..." : "Select lead"
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {leads.map((lead) => {
-                  const label = getLeadProjectName(lead, lead.customerId);
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex-1 max-w-md">
+              <label className="block text-sm font-semibold text-slate-800 mb-2">
+                Select Lead
+              </label>
+              <Select
+                value={selectedLeadId || activeLeadId}
+                onValueChange={handleLeadChange}
+                disabled={isLeadsLoading}
+              >
+                <SelectTrigger className="w-full max-w-md bg-[#F8FAFC] border-slate-200 text-slate-900 text-sm h-11 rounded-lg">
+                  <SelectValue
+                    placeholder={
+                      isLeadsLoading ? "Loading leads..." : "Select lead"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {leads.map((lead) => {
+                    const label = getLeadProjectName(lead, lead.customerId);
+                    return (
+                      <SelectItem key={lead._id} value={lead._id}>
+                        {label} (
+                        {lead.customerId?.firstName
+                          ? `${lead.customerId.firstName} ${lead.customerId.lastName ?? ""}`.trim()
+                          : "N/A"}
+                        )
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 uppercase mb-2">
+                LOGO
+              </label>
+              <div className="grid grid-cols-2 gap-1.5 w-64">
+                {[
+                  { label: "Steel Building", value: "SBD" as const },
+                  { label: "Storage Material", value: "SM" as const },
+                ].map((item) => {
+                  const isActive = companyBrand === item.value;
                   return (
-                    <SelectItem key={lead._id} value={lead._id}>
-                      {label} (
-                      {lead.customerId?.firstName
-                        ? `${lead.customerId.firstName} ${lead.customerId.lastName ?? ""}`.trim()
-                        : "N/A"}
-                      )
-                    </SelectItem>
+                    <button
+                      key={item.value}
+                      type="button"
+                      onClick={() => setCompanyBrand(item.value)}
+                      className={cn(
+                        "py-2 px-2.5 rounded-lg font-semibold text-xs transition-colors cursor-pointer text-center",
+                        isActive
+                          ? "bg-blue-600 text-white shadow-xs"
+                          : "bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200",
+                      )}
+                    >
+                      {item.label}
+                    </button>
                   );
                 })}
-              </SelectContent>
-            </Select>
+              </div>
+            </div>
           </div>
         </CardHeader>
 
@@ -1645,6 +1986,7 @@ export default function StorageQuotePage() {
                   | "margin"
                   | "concrete"
                   | "insulation"
+                  | "addons"
                   | "drawings"
                   | "contract",
               )
@@ -2280,138 +2622,6 @@ export default function StorageQuotePage() {
                   </div>
                 </Card>
 
-                {/* Options & Add-ons (Extras) Table */}
-                <Card className="p-5 bg-white border border-slate-200 rounded-xl space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                    <div>
-                      <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                        ⚙️ Options & Add-ons
-                      </h3>
-                      <p className="text-[11px] text-slate-500">
-                        Insulation, concrete, seals, extras — check to include
-                        in total
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleAddExtra}
-                      className="h-8 text-xs font-semibold cursor-pointer"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      Add Line
-                    </Button>
-                  </div>
-
-                  <div className="overflow-x-auto rounded-lg border border-slate-200">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead>
-                        <tr className="bg-slate-100/80 text-slate-700 text-[11px] uppercase font-bold border-b border-slate-200">
-                          <th className="p-2.5">Item</th>
-                          <th className="p-2.5 text-right">COGS $</th>
-                          <th className="p-2.5 text-right">Markup %</th>
-                          <th className="p-2.5 text-right">Sale $</th>
-                          <th className="p-2.5">Note</th>
-                          <th className="p-2.5 text-center">Include</th>
-                          <th className="p-2.5 text-center"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-slate-700">
-                        {extras.map((x, idx) => (
-                          <tr key={idx} className="hover:bg-slate-50/50">
-                            <td className="p-2">
-                              <Input
-                                value={x.name || x.item || ""}
-                                onChange={(e) =>
-                                  handleUpdateExtra(idx, "name", e.target.value)
-                                }
-                                className="h-8 w-44 text-xs font-semibold"
-                              />
-                            </td>
-                            <td className="p-2 text-right">
-                              <Input
-                                type="number"
-                                value={
-                                  x.cogs !== undefined ? x.cogs : x.cost || ""
-                                }
-                                onChange={(e) =>
-                                  handleUpdateExtra(
-                                    idx,
-                                    "cogs",
-                                    parseFloat(e.target.value) || 0,
-                                  )
-                                }
-                                className="h-8 w-24 text-right text-xs"
-                              />
-                            </td>
-                            <td className="p-2 text-right">
-                              <Input
-                                type="number"
-                                value={x.markup !== undefined ? x.markup : 25}
-                                onChange={(e) =>
-                                  handleUpdateExtra(
-                                    idx,
-                                    "markup",
-                                    parseFloat(e.target.value) || 0,
-                                  )
-                                }
-                                className="h-8 w-16 text-right text-xs font-bold"
-                              />
-                            </td>
-                            <td className="p-2 text-right font-bold text-blue-900">
-                              {fmt(Number(x.sale || x.sellPrice || 0))}
-                            </td>
-                            <td className="p-2">
-                              <Input
-                                value={x.note || ""}
-                                onChange={(e) =>
-                                  handleUpdateExtra(idx, "note", e.target.value)
-                                }
-                                placeholder="Note..."
-                                className="h-8 text-xs"
-                              />
-                            </td>
-                            <td className="p-2 text-center">
-                              <input
-                                type="checkbox"
-                                checked={x.include !== false}
-                                onChange={(e) =>
-                                  handleUpdateExtra(
-                                    idx,
-                                    "include",
-                                    e.target.checked,
-                                  )
-                                }
-                                className="h-4 w-4 rounded accent-blue-600 cursor-pointer"
-                              />
-                            </td>
-                            <td className="p-2 text-center">
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveExtra(idx)}
-                                className="text-red-500 hover:text-red-700 cursor-pointer p-1"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr className="bg-slate-50 font-bold border-t-2 border-slate-200">
-                          <td colSpan={3} className="p-2.5">
-                            Options Total (included)
-                          </td>
-                          <td className="p-2.5 text-right text-blue-900">
-                            {fmt(storagePricing?.extrasSubtotal)}
-                          </td>
-                          <td colSpan={3}></td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                </Card>
-
                 {/* Bottom Actions */}
                 <div className="flex items-center gap-5 pt-2">
                   <Button
@@ -2445,6 +2655,38 @@ export default function StorageQuotePage() {
             {/* TAB 2: QUOTE PREVIEW */}
             <TabsContent value="quote" className="m-0 outline-none">
               <div className="space-y-4">
+                {/* Document Options Toolbar */}
+                <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+                      LOGO
+                    </label>
+                    <div className="grid grid-cols-2 gap-1 w-64">
+                      {[
+                        { label: "Steel Building", value: "SBD" as const },
+                        { label: "Storage Material", value: "SM" as const },
+                      ].map((item) => {
+                        const isActive = companyBrand === item.value;
+                        return (
+                          <button
+                            key={item.value}
+                            type="button"
+                            onClick={() => setCompanyBrand(item.value)}
+                            className={cn(
+                              "py-2 px-2.5 rounded-md font-semibold text-xs transition-colors cursor-pointer text-center",
+                              isActive
+                                ? "bg-blue-600 text-white shadow-xs"
+                                : "bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200",
+                            )}
+                          >
+                            {item.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
                 <ServerDocumentPreview
                   html={storageQuotePreviewHtml}
                   isLoading={isStorageQuotePreviewLoading}
@@ -2606,6 +2848,13 @@ export default function StorageQuotePage() {
                       0,
                     ),
                 )}
+                onTriggerCompute={() => triggerApiCompute(storageData)}
+              />
+            </TabsContent>
+
+            {/* TAB: ADD-ONS */}
+            <TabsContent value="addons" className="m-0 outline-none">
+              <QuoteAddOnsTab
                 onTriggerCompute={() => triggerApiCompute(storageData)}
               />
             </TabsContent>

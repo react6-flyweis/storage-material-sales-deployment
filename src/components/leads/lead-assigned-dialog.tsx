@@ -15,6 +15,8 @@ import {
   getLeadLifecycleBadgeDotClassName,
   getLeadLifecycleStatusLabel,
 } from "@/modules/leads/lifecycle-statuses";
+import type { InstallAddress } from "@/types/address.types";
+import { formatInstallAddress } from "@/lib/address";
 
 interface CustomerId {
   _id: string;
@@ -36,6 +38,7 @@ interface LeadDetails {
   leadScoring?: LeadScoring;
   buildingType?: string;
   location?: string;
+  installAddress?: InstallAddress;
   isRaisedToPO?: boolean;
   nextFollowUp?: string | null;
   jobId?: string;
@@ -131,7 +134,7 @@ export default function LeadAssignedDialog({
               <div>
                 <div className="text-xs text-slate-500">Location</div>
                 <div className="font-medium text-slate-800 truncate">
-                  {lead.location || "N/A"}
+                  {formatInstallAddress(lead.installAddress, lead.location)}
                 </div>
               </div>
             </div>

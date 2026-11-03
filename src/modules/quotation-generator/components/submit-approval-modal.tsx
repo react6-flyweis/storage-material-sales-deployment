@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -47,9 +48,10 @@ export function SubmitApprovalModal({
   const [note, setNote] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [isInternalSubmitting, setIsInternalSubmitting] = useState(false);
 
   const submitMutation = useSubmitQuotationForApprovalMutation();
-  const isSubmitting = isLoading || submitMutation.isPending;
+  const isSubmitting = isLoading || submitMutation.isPending || isInternalSubmitting;
 
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
@@ -69,6 +71,7 @@ export function SubmitApprovalModal({
       return;
     }
 
+    setIsInternalSubmitting(true);
     try {
       let result: SubmitApprovalResponse | undefined;
       if (onSubmit) {
@@ -91,6 +94,8 @@ export function SubmitApprovalModal({
       );
       setErrorMessage(msg);
       toast.error(msg);
+    } finally {
+      setIsInternalSubmitting(false);
     }
   };
 
@@ -149,6 +154,7 @@ export function SubmitApprovalModal({
                 placeholder="e.g., Special discount applied as per client discussion. Please review margin."
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
+                disabled={isSubmitting}
                 className="min-h-24"
               />
             </div>
@@ -166,8 +172,16 @@ export function SubmitApprovalModal({
               <Button
                 type="submit"
                 disabled={isSubmitting || (!onSubmit && !quotationId && !estimateId)}
+                className="cursor-pointer min-w-36 flex items-center justify-center gap-2"
               >
-                {isSubmitting ? "Submitting..." : "Submit for Approval"}
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Submitting...</span>
+                  </>
+                ) : (
+                  "Submit for Approval"
+                )}
               </Button>
             </DialogFooter>
           </form>

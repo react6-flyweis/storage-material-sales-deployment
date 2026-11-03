@@ -2,7 +2,16 @@ import { apiClient } from "@/modules/auth/auth.api";
 
 export type PurchaseOrderItem = {
   _id: string;
-  leadId?: { _id: string; projectName?: string; jobId?: string; quoteValue?: number } | null;
+  leadId?: {
+    _id: string;
+    projectName?: string;
+    jobId?: string;
+    quoteValue?: number;
+    businessUnit?: string | null;
+    businessUnitLabel?: string;
+  } | null;
+  businessUnit?: string | null;
+  businessUnitLabel?: string;
   customerId?: { _id: string; firstName?: string; lastName?: string } | null;
   raisedBy?: string;
   assignedTo?: { _id: string; firstName?: string } | null;
@@ -27,10 +36,14 @@ export type PurchaseOrdersListResponse = {
   };
 };
 
-export async function getPurchaseOrdersProvider(page = 1, limit = 20) {
+export async function getPurchaseOrdersProvider(page = 1, limit = 20, businessUnit?: string) {
+  const params: { page: number; limit: number; businessUnit?: string } = { page, limit };
+  if (businessUnit && businessUnit !== "all") {
+    params.businessUnit = businessUnit;
+  }
   const response = await apiClient.get<PurchaseOrdersListResponse>(
     "/api/sales/po-orders",
-    { params: { page, limit } },
+    { params },
   );
 
   return response.data;

@@ -4,6 +4,7 @@ import {
   type PreviewDocumentRequest,
   type PreviewDocumentResponseData,
 } from "../estimates.api";
+import { getCustomQuoteDocumentPreviewProvider } from "../custom-quotes.api";
 
 export interface UseServerDocumentPreviewOptions {
   payload: PreviewDocumentRequest | null;
@@ -33,20 +34,70 @@ export function useServerDocumentPreview({
   const [error, setError] = useState<string | null>(null);
 
   const requestIdRef = useRef(0);
-  const payloadJson = payload ? JSON.stringify(payload) : null;
+  const payloadRef = useRef(payload);
+  payloadRef.current = payload;
 
-  const fetchPreview = useCallback(async () => {
-    if (!enabled || !payload) {
+  const payloadJson = payload ? JSON.stringify(payload) : null;
+  const lastFetchedJsonRef = useRef<string | null>(null);
+
+  const fetchPreview = useCallback(async (forcedPayload?: PreviewDocumentRequest) => {
+    const activePayload = forcedPayload || payloadRef.current;
+    if (!enabled || !activePayload) {
+      return;
+    }
+
+    const isCustom = Boolean(
+      activePayload.quoteKind === "custom" ||
+      activePayload.jobType?.toUpperCase() === "CUSTOM" ||
+      activePayload.customQuoteId
+    );
+    const targetCustomId = activePayload.customQuoteId || activePayload.estimateId;
+
+    if (isCustom && targetCustomId) {
+      const currentReqId = ++requestIdRef.current;
+      setIsLoading(true);
+      setError(null);
+      try {
+        const customRes = await getCustomQuoteDocumentPreviewProvider(
+          targetCustomId,
+          activePayload.companyBrand
+        );
+        if (currentReqId !== requestIdRef.current) return;
+        if (customRes?.html) {
+          lastFetchedJsonRef.current = JSON.stringify(activePayload);
+          setData({
+            assembledHtml: customRes.html,
+            quoteHtml: customRes.html,
+            sowHtml: null,
+            contractHtml: null,
+          });
+        } else {
+          setError("No HTML content returned for custom quote preview.");
+          setData(null);
+        }
+      } catch (err: unknown) {
+        if (currentReqId !== requestIdRef.current) return;
+        const errMsg =
+          err instanceof Error
+            ? err.message
+            : (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+              "Failed to load custom quote preview from server.";
+        setError(errMsg);
+      } finally {
+        if (currentReqId === requestIdRef.current) {
+          setIsLoading(false);
+        }
+      }
       return;
     }
 
     // Must have either estimateId, pricingResult, storagePricingResult, or fullQuote
     const hasPricingContext = Boolean(
-      payload.estimateId ||
-      payload.pricingResult ||
-      payload.storagePricingResult ||
-      payload.storagePricing ||
-      payload.fullQuote
+      activePayload.estimateId ||
+      activePayload.pricingResult ||
+      activePayload.storagePricingResult ||
+      activePayload.storagePricing ||
+      activePayload.fullQuote
     );
 
     if (!hasPricingContext) {
@@ -61,7 +112,7 @@ export function useServerDocumentPreview({
     setError(null);
 
     try {
-      const res = await previewDocumentProvider(payload);
+      const res = await previewDocumentProvider(activePayload);
 
       // Check if this request is still the freshest
       if (currentReqId !== requestIdRef.current) return;
@@ -76,6 +127,7 @@ export function useServerDocumentPreview({
         setError(res.message);
         setData(null);
       } else {
+        lastFetchedJsonRef.current = JSON.stringify(activePayload);
         setData({
           assembledHtml: assembled,
           quoteHtml: quote,
@@ -96,10 +148,15 @@ export function useServerDocumentPreview({
         setIsLoading(false);
       }
     }
-  }, [enabled, payload]);
+  }, [enabled]);
 
   useEffect(() => {
     if (!enabled || !payloadJson) {
+      return;
+    }
+
+    // Avoid refetching identical payload
+    if (payloadJson === lastFetchedJsonRef.current) {
       return;
     }
 
@@ -109,6 +166,11 @@ export function useServerDocumentPreview({
 
     return () => clearTimeout(timer);
   }, [payloadJson, enabled, debounceMs, fetchPreview]);
+
+  const handleRefetch = useCallback(async () => {
+    lastFetchedJsonRef.current = null;
+    await fetchPreview();
+  }, [fetchPreview]);
 
   const assembledHtml = data?.assembledHtml || null;
   const quoteHtml = data?.quoteHtml || null;
@@ -127,7 +189,7 @@ export function useServerDocumentPreview({
     html,
     isLoading,
     error,
-    refetch: fetchPreview,
+    refetch: handleRefetch,
     data,
   };
 }

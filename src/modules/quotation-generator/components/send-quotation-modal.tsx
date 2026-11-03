@@ -18,7 +18,6 @@ import {
 } from "@/components/ui/dialog";
 import SuccessDialog from "@/components/success-dialog";
 import { CcEmailInput } from "@/components/common/cc-email-input";
-import type { ApprovalStatus } from "@/modules/quotations/quotations.api";
 import {
   useSendQuotationMutation,
   useMarkQuotationSentMutation,
@@ -30,9 +29,7 @@ interface SendQuotationModalProps {
   quotationId?: string;
   customerEmail?: string | null;
   customerName?: string | null;
-  approvalStatus?: ApprovalStatus | string | null;
   workflowStatus?: string | null;
-  status?: string | null;
   versionNumber?: number;
   approvedVersionNumber?: number | null;
   onSuccess?: () => void;
@@ -46,9 +43,7 @@ function SendQuotationDialogContent({
   quotationId,
   customerEmail = "",
   customerName = "Valued Customer",
-  approvalStatus = "approved",
   workflowStatus,
-  status,
   versionNumber = 1,
   approvedVersionNumber,
   onSuccess,
@@ -74,10 +69,9 @@ function SendQuotationDialogContent({
 
   const isSending = isLoading || sendMutation.isPending || markSentMutation.isPending;
 
-  const effectiveStatus = (status || workflowStatus || "").toLowerCase();
-  const isSent = effectiveStatus === "sent";
-
-  const isApproved = approvalStatus === "approved" || isSent;
+  const normWorkflow = (workflowStatus || "").toLowerCase();
+  const isSent = normWorkflow === "sent";
+  const isApproved = normWorkflow === "approved" || isSent;
   const isStale =
     isApproved &&
     approvedVersionNumber !== undefined &&

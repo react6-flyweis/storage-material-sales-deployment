@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSocket } from "@/context/useSocket";
 import { getLeadProjectName } from "@/modules/leads/leads.utils";
+import { toast } from "sonner";
 import LeadAssignedDialog from "./lead-assigned-dialog";
 import FollowUpReminderDialog from "./follow-up-reminder-dialog";
 
@@ -121,6 +122,11 @@ export function LeadSocketListener() {
         queryClient.invalidateQueries({ queryKey: ["sales", "leads", "detail", payload.leadId] });
       }
 
+      const trigger = (payload as { trigger?: string })?.trigger || payload.meta?.trigger;
+      if (trigger === "customer_message") {
+        queryClient.invalidateQueries({ queryKey: ["customer-direct-chat"] });
+      }
+
       // If meta action is updated and trigger is assigned, treat it as a new lead assignment
       if (payload.meta?.trigger === "assigned" || payload.meta?.trigger === "admin_create_lead") {
         const projectName = getLeadProjectName(payload.lead);
@@ -193,16 +199,145 @@ export function LeadSocketListener() {
       queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
     };
 
+    const handleNewCustomerMessage = (payload: {
+      leadId?: string;
+      message?: {
+        _id?: string;
+        senderType?: string;
+        content?: string;
+        createdAt?: string;
+        leadId?: string;
+        channel?: string;
+        senderName?: string;
+        customerId?: string;
+      };
+    }) => {
+      console.log("Socket: new_customer_message event received", payload);
+      const msg = payload.message;
+      if (!msg || msg.senderType !== "customer") return;
+
+      const sender = msg.senderName || "Customer";
+      const preview = msg.content
+        ? msg.content.length > 60
+          ? `${msg.content.slice(0, 60)}...`
+          : msg.content
+        : "New message received";
+      const targetLeadId = payload.leadId || msg.leadId;
+
+      if (
+        document.visibilityState !== "visible" &&
+        "Notification" in window &&
+        Notification.permission === "granted"
+      ) {
+        const notification = new Notification(`New message from ${sender}`, {
+          body: preview,
+          icon: "/favicon.ico",
+        });
+        notification.onclick = () => {
+          window.focus();
+          if (targetLeadId) {
+            navigate(`/leads/${targetLeadId}`);
+          } else if (msg.customerId) {
+            navigate(`/communication?customerId=${msg.customerId}`);
+          } else {
+            navigate("/communication");
+          }
+          notification.close();
+        };
+      } else {
+        toast.info(`New customer message from ${sender}`, {
+          description: preview,
+          action: {
+            label: "View Chat",
+            onClick: () => {
+              if (msg.customerId) {
+                navigate(`/communication?customerId=${msg.customerId}`);
+              } else if (targetLeadId) {
+                navigate(`/leads/${targetLeadId}`);
+              } else {
+                navigate("/communication");
+              }
+            },
+          },
+        });
+      }
+    };
+
+    const handleCustomerDirectMessage = (msg: {
+      customerId?: string;
+      senderType?: string;
+      senderName?: string;
+      content?: string;
+    }) => {
+      console.log("Socket: customer_direct_message event received", msg);
+      if (msg.senderType !== "customer") return;
+
+      // Avoid toast if user is already actively viewing this customer thread
+      const currentUrl = window.location.pathname + window.location.search;
+      if (
+        currentUrl.includes("/communication") &&
+        msg.customerId &&
+        currentUrl.includes(msg.customerId)
+      ) {
+        return;
+      }
+
+      const sender = msg.senderName || "Customer";
+      const preview = msg.content
+        ? msg.content.length > 60
+          ? `${msg.content.slice(0, 60)}...`
+          : msg.content
+        : "New direct message received";
+
+      if (
+        document.visibilityState !== "visible" &&
+        "Notification" in window &&
+        Notification.permission === "granted"
+      ) {
+        const notification = new Notification(`New message from ${sender}`, {
+          body: preview,
+          icon: "/favicon.ico",
+        });
+        notification.onclick = () => {
+          window.focus();
+          navigate(
+            msg.customerId
+              ? `/communication?customerId=${msg.customerId}`
+              : "/communication"
+          );
+          notification.close();
+        };
+      } else {
+        toast.info(`New message from ${sender}`, {
+          description: preview,
+          action: {
+            label: "View Chat",
+            onClick: () => {
+              navigate(
+                msg.customerId
+                  ? `/communication?customerId=${msg.customerId}`
+                  : "/communication"
+              );
+            },
+          },
+        });
+      }
+    };
+
     socket.on("lead_list_created", handleLeadCreated);
     socket.on("lead_list_updated", handleLeadUpdated);
     socket.on("followup:reminder", handleFollowUpReminder);
     socket.on("customer_online_status", handleCustomerOnlineStatus);
+    socket.on("new_customer_message", handleNewCustomerMessage);
+    socket.on("customer_direct_message", handleCustomerDirectMessage);
 
     return () => {
       socket.off("lead_list_created", handleLeadCreated);
       socket.off("lead_list_updated", handleLeadUpdated);
       socket.off("followup:reminder", handleFollowUpReminder);
       socket.off("customer_online_status", handleCustomerOnlineStatus);
+      socket.off("new_customer_message", handleNewCustomerMessage);
+      socket.off("customer_direct_message", handleCustomerDirectMessage);
     };
   }, [socket, queryClient, navigate]);
 

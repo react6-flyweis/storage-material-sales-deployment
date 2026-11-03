@@ -1,16 +1,17 @@
-import { useMemo } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router";
-// import { Printer, Loader2 } from "lucide-react";
+import { Printer, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 import {
-  // downloadPdfProvider,
+  downloadPdfProvider,
   type ExtractShipperResponseData,
   type ExtractDrawingResponseData,
-  type PreviewDocumentRequest,
 } from "../estimates.api";
-import { useQuotationPricing } from "../hooks/use-quotation-pricing";
+import { downloadPdfFromBase64 } from "../utils/pdf-download";
+import { usePembDocumentPayload } from "../hooks/use-pemb-document-payload";
 import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
 import { ServerDocumentPreview } from "./server-document-preview";
 
@@ -45,14 +46,16 @@ export function QuoteDetailTab({
   pdfFileName,
   estimateId,
   onQuotePreview,
-  // onSaveDraft,
-  // isSavingDraft,
+  onSaveDraft,
+  isSavingDraft,
   onBackToBreakdown,
 }: QuoteDetailTabProps) {
   const navigate = useNavigate();
   const {
     jobType,
     setJobType,
+    companyBrand,
+    setCompanyBrand,
     scope,
     setScope,
     roofType,
@@ -63,60 +66,22 @@ export function QuoteDetailTab({
     setInstallSell,
   } = useQuotationStore();
 
-  // const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
   const {
-    customerLeadName,
-    customerEmail,
-    customerAddress,
-    displayBuildingSize,
-    effectiveSqFt,
-  } = useQuotationPricing({
+    payload: previewPayload,
+    buildPayload,
+    pricingData,
+  } = usePembDocumentPayload({
+    estimateId,
     extractedShipper,
+    extractedDrawing,
+    quotationForm,
     sqFt,
     buildingSize,
-    quotationForm,
-    extractedDrawing,
+    pdfFileName,
+    sections: ["quote"],
   });
-
-  const previewPayload: PreviewDocumentRequest = useMemo(
-    () => ({
-      estimateId: estimateId || undefined,
-      jobType: "PEMB",
-      leadCompanyName: customerLeadName,
-      customerEmail,
-      streetAddress: customerAddress,
-      cityStateZip: customerAddress,
-      buildingSize: displayBuildingSize,
-      squareFootage: effectiveSqFt,
-      jobNumber:
-        quotationForm?.jobNumber ||
-        extractedDrawing?.extracted?.jobnumber ||
-        "",
-      pricingResult: extractedShipper?.pricing,
-      fullQuote:
-        extractedShipper?.fullQuote ||
-        (extractedShipper?.pricing as Record<string, unknown> | undefined),
-      extractedDrawingFields: extractedDrawing?.extracted,
-      drawingAttachments: pdfFileName
-        ? [{ name: pdfFileName, includeInQuote: true }]
-        : [],
-      sections: ["quote"],
-    }),
-    [
-      estimateId,
-      customerLeadName,
-      customerEmail,
-      customerAddress,
-      displayBuildingSize,
-      effectiveSqFt,
-      quotationForm?.jobNumber,
-      extractedDrawing?.extracted,
-      extractedShipper?.pricing,
-      extractedShipper?.fullQuote,
-      pdfFileName,
-    ],
-  );
 
   const {
     html: serverPreviewHtml,
@@ -127,48 +92,40 @@ export function QuoteDetailTab({
     payload: previewPayload,
   });
 
-  // const handlePrint = () => {
-  //   const originalTitle = document.title;
-  //   const safeCustomer = (customerLeadName || "Quote").replace(/[^a-zA-Z0-9_-]/g, "_");
-  //   document.title = `Quote_Package_${safeCustomer}`;
-  //   window.print();
-  //   document.title = originalTitle;
-  // };
+  const handlePrint = () => {
+    const originalTitle = document.title;
+    const safeCustomer = (pricingData.customerLeadName || "Quote").replace(/[^a-zA-Z0-9_-]/g, "_");
+    document.title = `Quote_Package_${safeCustomer}`;
+    window.print();
+    document.title = originalTitle;
+  };
 
-  // const handleDownloadPdf = async () => {
-  //   setIsDownloadingPdf(true);
-  //   try {
-  //     const payload: PreviewDocumentRequest = {
-  //       leadCompanyName: customerLeadName,
-  //       customerEmail,
-  //       streetAddress: customerAddress,
-  //       cityStateZip: customerAddress,
-  //       buildingSize: displayBuildingSize,
-  //       squareFootage: effectiveSqFt,
-  //       jobNumber: quotationForm?.jobNumber || extractedDrawing?.extracted?.jobnumber || "",
-  //       pricingResult: extractedShipper?.pricing,
-  //       fullQuote: extractedShipper?.fullQuote || (extractedShipper?.pricing as Record<string, unknown> | undefined),
-  //       extractedDrawingFields: extractedDrawing?.extracted,
-  //       drawingAttachments: pdfFileName ? [{ name: pdfFileName, includeInQuote: true }] : [],
-  //       sections: pdfFileName ? ["quote", "sow", "contract", "drawings"] : ["quote", "sow", "contract"],
-  //     };
-  //     const res = await downloadPdfProvider(payload, estimateId || undefined);
-  //     const pdfData = res.data || res;
-  //     if (pdfData?.fileBase64) {
-  //       const a = document.createElement("a");
-  //       a.href = `data:${pdfData.mimeType || "application/pdf"};base64,${pdfData.fileBase64}`;
-  //       a.download = pdfData.fileName || `Quote_${(customerLeadName || "Package").replace(/\s+/g, "_")}.pdf`;
-  //       a.click();
-  //     } else {
-  //       handlePrint();
-  //     }
-  //   } catch (err) {
-  //     console.error("Failed to download PDF via API, opening print dialog:", err);
-  //     handlePrint();
-  //   } finally {
-  //     setIsDownloadingPdf(false);
-  //   }
-  // };
+  const handleDownloadPdf = async () => {
+    setIsDownloadingPdf(true);
+    try {
+      const payload = buildPayload({
+        drawingAttachments: pdfFileName ? [{ name: pdfFileName, includeInQuote: true }] : [],
+        sections: pdfFileName ? ["quote", "sow", "contract", "drawings"] : ["quote", "sow", "contract"],
+      });
+      const res = await downloadPdfProvider(payload, estimateId || undefined);
+      const pdfData = res?.data || res;
+      if (pdfData?.fileBase64) {
+        downloadPdfFromBase64(
+          pdfData.fileBase64,
+          pdfData.fileName || `Quote_${(pricingData.customerLeadName || "Package").replace(/\s+/g, "_")}.pdf`,
+          pdfData.mimeType || "application/pdf"
+        );
+        toast.success("PDF downloaded successfully");
+      } else {
+        handlePrint();
+      }
+    } catch (err) {
+      console.error("Failed to download PDF via API, opening print dialog:", err);
+      handlePrint();
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -178,7 +135,7 @@ export function QuoteDetailTab({
           Live Edit — Changes Update Instantly
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
           {/* JOB TYPE */}
           <div>
             <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
@@ -227,6 +184,36 @@ export function QuoteDetailTab({
                     )}
                   >
                     {item}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* LOGO */}
+          <div>
+            <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+              LOGO
+            </label>
+            <div className="grid grid-cols-2 gap-1">
+              {[
+                { label: "Steel Building", value: "SBD" as const },
+                { label: "Storage Material", value: "SM" as const },
+              ].map((item) => {
+                const isActive = companyBrand === item.value;
+                return (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => setCompanyBrand(item.value)}
+                    className={cn(
+                      "py-2 px-1 rounded-md font-semibold text-xs transition-colors cursor-pointer text-center",
+                      isActive
+                        ? "bg-blue-600 text-white shadow-xs"
+                        : "bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200",
+                    )}
+                  >
+                    {item.label}
                   </button>
                 );
               })}
@@ -335,7 +322,7 @@ export function QuoteDetailTab({
         isLoading={isPreviewLoading}
         error={previewError}
         onRetry={refetchPreview}
-        title={`Quote Document — ${customerLeadName || "Estimate Preview"}`}
+        title={`Quote Document — ${pricingData.customerLeadName || "Estimate Preview"}`}
         minHeight={750}
       />
 
@@ -371,41 +358,57 @@ export function QuoteDetailTab({
         </Button>
         <Button
           type="button"
-          onClick={() =>
-            onQuotePreview
-              ? onQuotePreview()
-              : navigate("/quotation/quote-preview/view", {
-                  state: {
-                    quotationForm,
-                    extractedDrawing,
-                    extractedShipper,
-                    sqFt,
-                    buildingSize,
-                    additionalNotes,
-                    pdfFileName,
-                    estimateId,
-                  },
-                })
-          }
+          onClick={() => {
+            if (onQuotePreview) {
+              onQuotePreview();
+              return;
+            }
+            const qState = useQuotationStore.getState();
+            navigate("/quotation/quote-preview/view", {
+              state: {
+                quotationForm,
+                extractedDrawing,
+                extractedShipper,
+                sqFt,
+                buildingSize,
+                additionalNotes,
+                pdfFileName,
+                estimateId,
+                salesTax: {
+                  include: qState.includeTax,
+                  includeTax: qState.includeTax,
+                  rate: qState.taxRate,
+                  taxRate: qState.taxRate,
+                  zip: qState.taxZip,
+                  taxZip: qState.taxZip,
+                },
+                includeTax: qState.includeTax,
+                taxRate: qState.taxRate,
+                taxZip: qState.taxZip,
+              },
+            });
+          }}
           className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-6 py-2.5 rounded-lg text-xs font-semibold cursor-pointer shadow-xs"
         >
           Quote Preview
         </Button>
-        {/* <Button
-          type="button"
-          onClick={onSaveDraft}
-          disabled={isSavingDraft}
-          className="bg-[#16A34A] hover:bg-[#15803D] text-white px-6 py-2.5 rounded-lg text-xs font-semibold cursor-pointer shadow-xs flex items-center gap-2"
-        >
-          {isSavingDraft && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-          {isSavingDraft
-            ? estimateId
-              ? "Updating Changes..."
-              : "Saving..."
-            : estimateId
-              ? "Update Changes"
-              : "Save to History"}
-        </Button>
+        {onSaveDraft && (
+          <Button
+            type="button"
+            onClick={onSaveDraft}
+            disabled={isSavingDraft}
+            className="bg-[#16A34A] hover:bg-[#15803D] text-white px-6 py-2.5 rounded-lg text-xs font-semibold cursor-pointer shadow-xs flex items-center gap-2"
+          >
+            {isSavingDraft && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {isSavingDraft
+              ? estimateId
+                ? "Updating Changes..."
+                : "Saving..."
+              : estimateId
+                ? "Update Changes"
+                : "Save to History"}
+          </Button>
+        )}
         <Button
           type="button"
           variant="outline"
@@ -419,7 +422,7 @@ export function QuoteDetailTab({
             <Printer className="h-3.5 w-3.5" />
           )}
           {isDownloadingPdf ? "Downloading PDF..." : "Print / Save PDF"}
-        </Button> */}
+        </Button>
       </div>
     </div>
   );

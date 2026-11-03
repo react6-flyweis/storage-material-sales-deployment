@@ -12,6 +12,7 @@ import {
 } from "@/modules/auth/auth.hooks";
 import { AuthLayout } from "@/components/auth-layout";
 import { ArrowLeft, KeyRound, Mail } from "lucide-react";
+import { getApiErrorMessage } from "@/lib/api-error";
 
 const requestOtpSchema = z.object({
   email: z
@@ -69,6 +70,7 @@ export default function ForgotPassword() {
     try {
       const response = await forgotPasswordMutation.mutateAsync({
         email: data.email,
+        role: "sales",
       });
 
       if (!response.success) {
@@ -83,8 +85,10 @@ export default function ForgotPassword() {
       );
       verifyForm.setValue("email", data.email);
       setStep("verify");
-    } catch {
-      setErrorMessage("Unable to process request. Please try again later.");
+    } catch (error) {
+      setErrorMessage(
+        getApiErrorMessage(error, "Unable to process request. Please try again later."),
+      );
     }
   };
 
@@ -113,8 +117,10 @@ export default function ForgotPassword() {
         state: { resetToken, email: data.email },
         replace: true,
       });
-    } catch {
-      setErrorMessage("Invalid OTP or server error. Please try again.");
+    } catch (error) {
+      setErrorMessage(
+        getApiErrorMessage(error, "Invalid OTP or server error. Please try again."),
+      );
     }
   };
 

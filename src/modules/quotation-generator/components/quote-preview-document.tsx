@@ -45,6 +45,12 @@ export const QuotePreviewDocument = React.forwardRef<HTMLDivElement, QuotePrevie
       includeTax,
       taxRateVal,
       salesTaxFormatted,
+      staircaseCount,
+      staircaseUnitPrice,
+      hasStaircase,
+      staircaseFormatted,
+      hasAddOns,
+      addOnsFormatted,
       grandTotalFormatted,
       pricePerSfFormatted,
       weightDisplay,
@@ -190,6 +196,20 @@ export const QuotePreviewDocument = React.forwardRef<HTMLDivElement, QuotePrevie
                     Sales Tax ({taxRateVal}% on materials & insulation)
                   </span>
                   <span className="font-semibold text-slate-900">{salesTaxFormatted}</span>
+                </div>
+              )}
+              {hasStaircase && (
+                <div className="flex justify-between text-slate-600 border-b border-slate-100 pb-1.5">
+                  <span>
+                    Staircases ({staircaseCount} × ${staircaseUnitPrice.toLocaleString()})
+                  </span>
+                  <span className="font-semibold text-slate-900">{staircaseFormatted}</span>
+                </div>
+              )}
+              {hasAddOns && (
+                <div className="flex justify-between text-slate-600 border-b border-slate-100 pb-1.5">
+                  <span>Add-Ons & Extras</span>
+                  <span className="font-semibold text-slate-900">{addOnsFormatted}</span>
                 </div>
               )}
               <div className="flex justify-between text-slate-900 font-extrabold text-sm pt-2 border-t-2 border-slate-900">

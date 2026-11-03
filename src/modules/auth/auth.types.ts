@@ -40,6 +40,7 @@ export interface LogoutResponse {
 
 export interface ForgotPasswordRequest {
   email: string;
+  role?: string;
 }
 
 export interface ForgotPasswordResponse {

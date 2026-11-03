@@ -27,6 +27,8 @@ import {
   type AdminStatus,
   type Quotation,
   type GetQuotationsParams,
+  resolveQuotationLifecycle,
+  QuotationWorkflowBadge,
 } from "@/modules/quotations/quotations.api";
 import { useQuotationsQuery } from "@/modules/quotations/quotations.hooks";
 import type { LeadDetailLead, LeadDetailCustomer } from "@/modules/leads/leads.api";
@@ -43,24 +45,17 @@ const STATUS_LABELS: Record<AdminStatus, string> = {
   pending_approval: "Pending Approval",
   approved: "Approved",
   rejected: "Rejected",
+  admin_rejected: "Admin Rejected",
   sent: "Sent",
   accepted: "Accepted",
+  customer_rejected: "Declined by Customer",
+  customer_accepted: "Accepted by Customer",
 };
 
 const BUILDING_TYPE_OPTIONS = BUILDING_TYPE.map((type) => ({
   value: type,
   label: type,
 }));
-
-const statusColors: Record<string, { bg: string; text: string }> = {
-  Approved: { bg: "bg-green-100", text: "text-green-700" },
-  "Pending Approval": { bg: "bg-amber-100", text: "text-amber-800" },
-  Pending: { bg: "bg-amber-100", text: "text-amber-800" },
-  Rejected: { bg: "bg-rose-100", text: "text-rose-700" },
-  Sent: { bg: "bg-blue-100", text: "text-blue-800" },
-  Accepted: { bg: "bg-emerald-100", text: "text-emerald-800" },
-  Draft: { bg: "bg-slate-100", text: "text-slate-700" },
-};
 
 function formatMoney(value?: number | null) {
   return new Intl.NumberFormat("en-US", {
@@ -86,31 +81,9 @@ function formatDate(value?: string | null) {
   }).format(date);
 }
 
-function normalizeStatus(status?: string | null) {
-  const raw = (status || "draft").trim().toLowerCase();
-
-  switch (raw) {
-    case "sent":
-      return "Sent";
-    case "approved":
-      return "Approved";
-    case "pending_approval":
-      return "Pending Approval";
-    case "pending":
-      return "Pending";
-    case "rejected":
-      return "Rejected";
-    case "accepted":
-      return "Accepted";
-    case "draft":
-      return "Draft";
-    default:
-      return raw.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  }
-}
-
-function getStatusClassName(status: string) {
-  return statusColors[status] ?? { bg: "bg-slate-100", text: "text-slate-700" };
+function getStatusBadge(quotation: Quotation) {
+  const lifecycle = resolveQuotationLifecycle(quotation);
+  return <QuotationWorkflowBadge status={lifecycle.lifecycleStatus} />;
 }
 
 function QuotationTableSkeleton() {
@@ -321,11 +294,6 @@ export default function LeadQuotationsCard({
             ) : (
               <TableBody className="divide-y divide-gray-200">
                 {quotations.map((quotation) => {
-                  const status = normalizeStatus(
-                    quotation.status || quotation.workflowStatus
-                  );
-                  const colors = getStatusClassName(status);
-
                   return (
                     <TableRow key={quotation._id} className="hover:bg-gray-50">
                       <TableCell className="px-6 py-4 text-sm font-medium">
@@ -342,11 +310,7 @@ export default function LeadQuotationsCard({
                       </TableCell>
 
                       <TableCell className="px-6 py-4 text-sm">
-                        <span
-                          className={`px-2.5 py-0.5 whitespace-nowrap rounded-full text-xs font-medium ${colors.bg} ${colors.text}`}
-                        >
-                          {status}
-                        </span>
+                        {getStatusBadge(quotation)}
                       </TableCell>
 
                       <TableCell className="px-6 py-4 text-sm text-gray-900 font-medium">

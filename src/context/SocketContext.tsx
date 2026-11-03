@@ -85,6 +85,40 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       window.dispatchEvent(new CustomEvent("socket_group_members_updated", { detail: data }));
     });
 
+    // 5. Customer Direct Chat Updated Notice
+    sock.on("customer_direct_chat_updated", (data: unknown) => {
+      console.log("[SocketContext] customer_direct_chat_updated", data);
+      queryClient.invalidateQueries({ queryKey: ["customer-direct-chat"] });
+      window.dispatchEvent(
+        new CustomEvent("socket_customer_direct_chat_updated", { detail: data })
+      );
+    });
+
+    // 6. Customer Direct Message
+    sock.on("customer_direct_message", (data: unknown) => {
+      console.log("[SocketContext] customer_direct_message", data);
+      queryClient.invalidateQueries({ queryKey: ["customer-direct-chat"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      window.dispatchEvent(
+        new CustomEvent("socket_customer_direct_message", { detail: data })
+      );
+    });
+
+    // 7. New Customer Message (Mirrored project / widget / lead message)
+    sock.on("new_customer_message", (data: unknown) => {
+      console.log("[SocketContext] new_customer_message", data);
+      queryClient.invalidateQueries({ queryKey: ["customer-direct-chat"] });
+      queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      const leadId = (data as { leadId?: string })?.leadId;
+      if (leadId) {
+        queryClient.invalidateQueries({ queryKey: ["sales", "leads", "detail", leadId] });
+      }
+      window.dispatchEvent(
+        new CustomEvent("socket_new_customer_message", { detail: data })
+      );
+    });
+
     return () => {
       sock.disconnect();
       socketRef.current = null;
@@ -127,6 +161,18 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   }, []);
 
+  const joinCustomerDirect = useCallback((customerId: string) => {
+    if (socketRef.current?.connected && customerId) {
+      socketRef.current.emit("join_customer_direct", { customerId });
+    }
+  }, []);
+
+  const leaveCustomerDirect = useCallback((customerId: string) => {
+    if (socketRef.current?.connected && customerId) {
+      socketRef.current.emit("leave_customer_direct", { customerId });
+    }
+  }, []);
+
   return (
     <SocketContext.Provider
       value={{
@@ -137,6 +183,8 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         sendTypingStart,
         sendTypingStop,
         sendMessage,
+        joinCustomerDirect,
+        leaveCustomerDirect,
       }}
     >
       {children}

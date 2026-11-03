@@ -1,12 +1,14 @@
-import "./instrument.ts";
+import "./instrument";
+import "./lib/vite-preload-error";
+
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
 import * as Sentry from "@sentry/react";
 
-
 import "./index.css";
-import App from "./App.tsx";
+
+import App from "./App";
 import { queryClient } from "./lib/query-client";
 
 // Global event listeners to auto-select value for number inputs on focus/click
@@ -27,7 +29,7 @@ if (typeof window !== "undefined") {
   document.addEventListener("click", handleNumberInputSelection, true);
 }
 
-const container = document.getElementById('root') as HTMLElement;
+const container = document.getElementById("root") as HTMLElement;
 const root = createRoot(container, {
   // Callback called when an error is thrown and not caught by an ErrorBoundary.
   onUncaughtError: Sentry.reactErrorHandler((error, errorInfo) => {
@@ -37,7 +39,7 @@ const root = createRoot(container, {
   onCaughtError: Sentry.reactErrorHandler(),
   // Callback called when React automatically recovers from errors.
   onRecoverableError: Sentry.reactErrorHandler(),
-})
+});
 
 root.render(
   <StrictMode>
@@ -46,4 +48,3 @@ root.render(
     </QueryClientProvider>
   </StrictMode>,
 );
-

@@ -1,5 +1,9 @@
 import logo from "@/assets/steel-building-depot-logo.png";
-import type { InvoiceDocument, PaymentScheduleDocument } from "@/modules/invoices/invoices.api";
+import type {
+  InvoiceDocument,
+  InvoiceAddress,
+  PaymentScheduleDocument,
+} from "@/modules/invoices/invoices.api";
 
 function formatCurrency(value: number) {
   return value.toLocaleString("en-US", {
@@ -36,6 +40,34 @@ function formatStageName(
   return stageName;
 }
 
+const DEFAULT_COMPANY_ADDRESS_LINES = [
+  "1851 Madison Ave Suite 300",
+  "Council Bluffs, IA 51503",
+  "United States",
+  "travis@storagematerials.com",
+  "www.storagematerials.com",
+];
+
+function getAddressLines(address?: InvoiceAddress | null, fallbackLines?: string[]): string[] {
+  if (!address) return fallbackLines ?? [];
+  if (address.lines && address.lines.length > 0) {
+    return address.lines;
+  }
+  const lines: string[] = [];
+  if (address.line1) lines.push(address.line1);
+  if (address.line2) lines.push(address.line2);
+  const cityStateZip = [
+    address.city,
+    [address.state, address.postalCode].filter(Boolean).join(" "),
+  ]
+    .filter(Boolean)
+    .join(", ");
+  if (cityStateZip) lines.push(cityStateZip);
+  if (address.country) lines.push(address.country);
+
+  return lines.length > 0 ? lines : (fallbackLines ?? []);
+}
+
 export type InvoiceTemplateProps = {
   invoice: Omit<InvoiceDocument, "lineItems"> & {
     lineItems?: InvoiceDocument["lineItems"];
@@ -70,6 +102,37 @@ export default function InvoiceTemplate({ invoice, paymentSchedule }: InvoiceTem
   const deposit = invoice?.depositAmount ?? total * 0.25;
   const stages = paymentSchedule?.stages ?? [];
 
+  const sellerAddress = invoice?.billingAddress;
+  const sellerCompanyName = sellerAddress?.companyName || "STEEL BUILDING DEPOT";
+  const sellerLines = getAddressLines(sellerAddress, DEFAULT_COMPANY_ADDRESS_LINES);
+
+  const recipientAddress = invoice?.recipientAddress;
+  const customerObj =
+    typeof invoice?.customerId === "object" && invoice.customerId !== null
+      ? invoice.customerId
+      : null;
+  const customerFullName = customerObj
+    ? `${customerObj.firstName ?? ""} ${customerObj.lastName ?? ""}`.trim()
+    : "";
+  const recipientCompanyName =
+    recipientAddress?.companyName || customerFullName || "Valued Customer";
+  const recipientLines = getAddressLines(recipientAddress);
+  const hasRecipientInfo = Boolean(
+    recipientAddress?.companyName ||
+      recipientLines.length > 0 ||
+      customerFullName ||
+      customerObj?.email,
+  );
+
+  const bank = invoice?.bankDetails;
+  const hasBankInfo = Boolean(
+    bank?.bankName ||
+      bank?.accountNumber ||
+      bank?.routingNumber ||
+      bank?.accountName ||
+      bank?.paymentInstructions,
+  );
+
   return (
     <div className="bg-white rounded-lg p-6 sm:p-14 shadow-sm mx-auto max-w-8xl">
       <h1 className="text-center text-gray-300 font-bold text-md md:text-xl tracking-widest uppercase mb-12">
@@ -77,50 +140,79 @@ export default function InvoiceTemplate({ invoice, paymentSchedule }: InvoiceTem
       </h1>
 
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between gap-12 mb-16 ">
-        <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-12 lg:gap-16 mb-16 items-start">
+        {/* Seller / Billing Address */}
+        <div className="space-y-4">
           <div className="flex items-center gap-2">
             <div className="flex items-center shrink-0">
-              <img src={logo} alt="Logo" className="h-12  object-contain" />
+              <img
+                src={logo}
+                alt="Logo"
+                className="h-10 max-w-56 object-contain object-left"
+              />
             </div>
           </div>
 
-          <div className="text-xs text-gray-500 leading-relaxed">
-            1851 Madison Ave Suite 300
-            <br />
-            Council Bluffs, IA
-            <br />
-            51503
-            <br />
-            United States
-            <br />
-            travis@storagematerials.com
-            <br />
-            www.storagematerials.com
+          <div>
+            <h2 className="text-xs font-bold text-gray-800 uppercase tracking-wide">
+              {sellerCompanyName}
+            </h2>
+            <div className="text-xs text-gray-500 leading-relaxed mt-1">
+              {sellerLines.map((line, idx) => (
+                <div key={idx}>{line}</div>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="min-w-50 space-y-2">
-          <div className="flex justify-between text-sm">
+        {/* Billed To / Recipient Address */}
+        <div className="space-y-2 md:pl-2">
+          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">
+            Billed To
+          </span>
+          {hasRecipientInfo ? (
+            <div className="text-xs text-gray-600 space-y-1">
+              <p className="font-semibold text-gray-900">{recipientCompanyName}</p>
+              {customerObj?.email && recipientCompanyName !== customerObj.email && (
+                <p className="text-gray-500">{customerObj.email}</p>
+              )}
+              {recipientLines.map((line, idx) => (
+                <p key={idx} className="text-gray-500">
+                  {line}
+                </p>
+              ))}
+            </div>
+          ) : (
+            <div className="text-xs text-gray-400 italic">
+              Client details on file
+            </div>
+          )}
+        </div>
+
+        {/* Invoice Meta */}
+        <div className="min-w-50 space-y-2 md:text-right">
+          <div className="flex md:justify-end justify-between gap-4 text-sm">
             <span className="text-gray-500 font-medium">Payment terms</span>
             <span className="text-gray-900">
               {daysToPay === "-" ? "-" : `${daysToPay} days`}
             </span>
           </div>
-          <div className="flex justify-between text-sm">
+          <div className="flex md:justify-end justify-between gap-4 text-sm">
             <span className="text-gray-500 font-medium">Invoice #</span>
-            <span className="text-gray-900">{invoiceNumber}</span>
+            <span className="text-gray-900 font-bold">{invoiceNumber}</span>
           </div>
-          <div className="flex justify-between text-sm">
+          <div className="flex md:justify-end justify-between gap-4 text-sm">
             <span className="text-gray-500 font-medium">Date</span>
             <span className="text-gray-900">{date}</span>
           </div>
-          {/* <div className="flex justify-between text-sm">
-            <span className="text-gray-500 font-medium">
-              Business/Tax #
-            </span>
-            <span className="text-gray-900">99- 4515145</span>
-          </div> */}
+          {invoice?.dueDate && (
+            <div className="flex md:justify-end justify-between gap-4 text-sm">
+              <span className="text-gray-500 font-medium">Due Date</span>
+              <span className="text-gray-900">
+                {formatInvoiceDate(invoice.dueDate)}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -215,7 +307,80 @@ export default function InvoiceTemplate({ invoice, paymentSchedule }: InvoiceTem
       </div>
 
       {/* Summary Section */}
-      <div className="flex justify-end mb-12">
+      <div className="flex flex-col lg:flex-row justify-between items-start gap-10 mb-12">
+        {/* Left: Banking & Wire Info */}
+        {hasBankInfo ? (
+          <div className="w-full max-w-md">
+            <div className="pb-2 border-b border-gray-200">
+              <h3 className="text-sm font-bold text-gray-900">
+                Banking & Wire Info
+              </h3>
+            </div>
+
+            <div className="py-2.5 space-y-2 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500">Bank</span>
+                <span className="font-semibold text-gray-900">
+                  {bank?.bankName || "Example Bank"}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500">Account Name</span>
+                <span className="font-semibold text-gray-900">
+                  {bank?.accountName || "Steel Building Depot LLC"}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500">Account #</span>
+                <span className="font-semibold text-gray-900 font-mono">
+                  {bank?.accountNumber || "****1234"}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500">Routing #</span>
+                <span className="font-semibold text-gray-900 font-mono">
+                  {bank?.routingNumber || "021000021"}
+                </span>
+              </div>
+              {Boolean(bank?.swiftCode) && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">SWIFT</span>
+                  <span className="font-semibold text-gray-900 font-mono">
+                    {bank?.swiftCode}
+                  </span>
+                </div>
+              )}
+              {Boolean(bank?.iban) && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">IBAN</span>
+                  <span className="font-semibold text-gray-900 font-mono">
+                    {bank?.iban}
+                  </span>
+                </div>
+              )}
+              {Boolean(bank?.branchAddress) && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Branch Address</span>
+                  <span className="font-semibold text-gray-900">
+                    {bank?.branchAddress}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-gray-200">
+              <p className="text-xs text-gray-500 italic">
+                Memo:{" "}
+                {bank?.paymentInstructions ||
+                  "Include invoice number in memo."}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div />
+        )}
+
+        {/* Right: Totals */}
         <div className="w-64 space-y-3">
           <div className="flex justify-between text-sm">
             <span className="text-gray-900 font-bold">Subtotal</span>

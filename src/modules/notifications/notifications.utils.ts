@@ -53,7 +53,9 @@ export function getNotificationRoute(notification: NotificationItem): string {
   }
 
   if (model.includes("chat") || model.includes("communication")) {
-    return "/customer-communication";
+    if (customerId) return `/communication?customerId=${customerId}`;
+    if (leadId) return `/leads/${leadId}`;
+    return "/communication";
   }
 
   if (model.includes("task") || model.includes("followup") || model.includes("follow_up")) {
@@ -75,7 +77,11 @@ export function getNotificationRoute(notification: NotificationItem): string {
   if (type === "meeting") return "/meetings";
   if (type === "quotation") return refId ? `/leads/quotation-details/${refId}` : "/leads/quotation-list";
   if (type === "invoice") return refId ? `/invoice/${refId}` : "/invoice/list";
-  if (type === "chat") return "/customer-communication";
+  if (type === "chat") {
+    if (customerId) return `/communication?customerId=${customerId}`;
+    if (leadId) return `/leads/${leadId}`;
+    return "/communication";
+  }
   if (type === "followup" || type === "task") return "/leads/follow-up";
   if (type === "freight_bid") return "/awarded-freight";
   if (type === "escalation") return "/leads/escalated";

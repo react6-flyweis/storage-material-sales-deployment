@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useResetPasswordMutation } from "@/modules/auth/auth.hooks";
 import { AuthLayout } from "@/components/auth-layout";
 import { ArrowLeft, CheckCircle2, Eye, EyeOff, Lock } from "lucide-react";
+import { getApiErrorMessage } from "@/lib/api-error";
 
 interface ResetPasswordState {
   resetToken?: string;
@@ -81,9 +82,12 @@ export default function ResetPassword() {
       }
 
       setIsSuccess(true);
-    } catch {
+    } catch (error) {
       setErrorMessage(
-        "An error occurred while resetting password. Please try again.",
+        getApiErrorMessage(
+          error,
+          "An error occurred while resetting password. Please try again.",
+        ),
       );
     }
   };

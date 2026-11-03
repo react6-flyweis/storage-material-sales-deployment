@@ -4,20 +4,27 @@ import {
   ArrowLeft,
   FolderUp,
   Loader2,
-  //  RefreshCw, Printer
+  Printer,
 } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getApiErrorMessage } from "@/lib/api-error";
 import {
-  // downloadPdfProvider,
+  downloadPdfProvider,
   saveEstimateProvider,
+  getEstimateByIdProvider,
   type PreviewDocumentRequest,
+  type SaveEstimatePayload,
 } from "../estimates.api";
+import { downloadPdfFromBase64 } from "../utils/pdf-download";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
 import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
 import { ServerDocumentPreview } from "../components/server-document-preview";
+import { hydrateEstimateIntoStore } from "../hooks/use-load-estimate-to-editor";
+import { normalizeWorkflowStatus } from "@/modules/quotations/quotations.utils";
+import { QuotationWorkflowBadge } from "@/modules/quotations/components/quotation-workflow-badge";
 import type {
   StorageData,
   StoragePricing,
@@ -34,11 +41,14 @@ export function StoragePreviewPage() {
   const previewSectionRef = useRef<HTMLDivElement>(null);
 
   const {
+    companyBrand: storeCompanyBrand,
+    setCompanyBrand,
     scope: storeScope,
     concreteInclude: storeConcreteInclude,
     insulationInclude: storeInsulationInclude,
     includeTax: storeIncludeTax,
     taxRate: storeTaxRate,
+    taxZip: storeTaxZip,
     storageData: storeStorageData,
     storagePricing: storeStoragePricing,
     storageEstimateId: storeStorageEstimateId,
@@ -52,9 +62,13 @@ export function StoragePreviewPage() {
   } = useQuotationStore();
 
   const navState = (location.state || {}) as {
+    estimate?: SaveEstimatePayload;
+    approvalStatus?: string;
+    workflowStatus?: string;
     storageData?: StorageData;
     storagePricing?: StoragePricing;
     estimateId?: string;
+    companyBrand?: "SBD" | "SM";
     sourceFileName?: string;
     customerLeadName?: string;
     customerAddress?: string;
@@ -65,6 +79,15 @@ export function StoragePreviewPage() {
     insulationInclude?: boolean;
     includeTax?: boolean;
     taxRate?: number;
+    taxZip?: string;
+    salesTax?: {
+      rate?: number;
+      taxRate?: number;
+      include?: boolean;
+      includeTax?: boolean;
+      zip?: string;
+      taxZip?: string;
+    };
     drawingAttachments?: Array<{
       name?: string;
       fileBase64?: string;
@@ -105,19 +128,80 @@ export function StoragePreviewPage() {
   const storagePricing =
     (storeStoragePricing as StoragePricing | null) || navState.storagePricing;
   const [estimateId, setEstimateId] = useState<string | null>(
-    navState.estimateId || storeStorageEstimateId || null,
+    navState.estimateId || navState.estimate?._id || storeStorageEstimateId || null,
+  );
+  const [estimate, setEstimate] = useState<SaveEstimatePayload | null>(
+    navState.estimate || null,
   );
 
   useEffect(() => {
-    const eid = navState.estimateId || storeStorageEstimateId;
+    const eid =
+      navState.estimateId || navState.estimate?._id || storeStorageEstimateId;
     if (eid) {
       setEstimateId(eid);
       setStorageEstimateId(eid);
+      getEstimateByIdProvider(eid)
+        .then((res) => {
+          const estData = (res?.data?.estimate ||
+            res?.estimate ||
+            res?.data ||
+            res) as SaveEstimatePayload | undefined;
+          if (
+            estData &&
+            (estData._id ||
+              estData.jobType ||
+              estData.storageData ||
+              estData.parsedCategories)
+          ) {
+            setEstimate(estData);
+            hydrateEstimateIntoStore(estData, eid);
+          }
+        })
+        .catch((err) => {
+          console.warn("Failed to load storage estimate for preview:", err);
+        });
     }
-  }, [navState.estimateId, storeStorageEstimateId, setStorageEstimateId]);
+  }, [navState.estimateId, navState.estimate?._id, storeStorageEstimateId, setStorageEstimateId]);
 
-  // const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
-  // const [isRefreshing, setIsRefreshing] = useState(false);
+  const isApproved = useMemo(() => {
+    const navApproval = navState.approvalStatus;
+    const navWorkflow = navState.workflowStatus;
+    if (navApproval?.toLowerCase() === "approved") return true;
+    if (
+      navWorkflow &&
+      ["approved", "sent", "accepted"].includes(normalizeWorkflowStatus(navWorkflow))
+    ) {
+      return true;
+    }
+
+    if (!estimate) return false;
+
+    const approvalStatus =
+      estimate.approval?.status ||
+      estimate.conversion?.approvalStatus ||
+      (estimate as { approvalStatus?: string }).approvalStatus;
+
+    if (
+      typeof approvalStatus === "string" &&
+      approvalStatus.toLowerCase() === "approved"
+    ) {
+      return true;
+    }
+
+    const rawWorkflow =
+      estimate.workflowStatus ||
+      estimate.conversion?.workflowStatus ||
+      (estimate as { status?: string }).status;
+
+    const normalized = normalizeWorkflowStatus(rawWorkflow);
+    return (
+      normalized === "approved" ||
+      normalized === "sent" ||
+      normalized === "accepted"
+    );
+  }, [estimate, navState.approvalStatus, navState.workflowStatus]);
+
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [isSavingEstimate, setIsSavingEstimate] = useState(false);
 
   const isEditing = Boolean(
@@ -147,6 +231,7 @@ export function StoragePreviewPage() {
     storeInsulationInclude ?? navState.insulationInclude ?? false;
   const includeTax = storeIncludeTax ?? navState.includeTax ?? true;
   const taxRate = storeTaxRate ?? navState.taxRate ?? 0;
+  const companyBrand = storeCompanyBrand || navState.companyBrand || "SM";
 
   const quoteDate = new Date().toLocaleDateString("en-US", {
     month: "long",
@@ -162,146 +247,118 @@ export function StoragePreviewPage() {
   );
   const totalSellFormatted = fmt(grandTotal);
 
-  const handleScrollToPreview = () => {
-    previewSectionRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
+  const handlePrint = () => {
+    const originalTitle = document.title;
+    const safeCustomer = (customerLeadName || "Storage_Quote").replace(/[^a-zA-Z0-9_-]/g, "_");
+    document.title = `Storage_Quote_${safeCustomer}`;
+    window.print();
+    document.title = originalTitle;
   };
 
-  // const handlePrint = () => {
-  //   const originalTitle = document.title;
-  //   const safeCustomer = (customerLeadName || "Storage_Quote").replace(/[^a-zA-Z0-9_-]/g, "_");
-  //   document.title = `Storage_Quote_${safeCustomer}`;
-  //   window.print();
-  //   document.title = originalTitle;
-  // };
+  const handleDownloadPdf = async () => {
+    if (!isApproved) {
+      toast.error("Quotation must be approved before generating or printing PDF.");
+      return;
+    }
+    setIsDownloadingPdf(true);
+    try {
+      const activeDrawings = storageDrawings.filter((d) => d.includeInPackage !== false);
+      const drawingAttachments = activeDrawings.map((d) => ({
+        name: d.name,
+        fileBase64: d.data?.includes(",") ? d.data.split(",")[1] : d.data,
+        includeInQuote: true,
+      }));
 
-  // const handleDownloadPdf = async () => {
-  //   setIsDownloadingPdf(true);
-  //   try {
-  //     const activeDrawings = storageDrawings.filter((d) => d.includeInPackage !== false);
-  //     const drawingAttachments = activeDrawings.map((d) => ({
-  //       name: d.name,
-  //       fileBase64: d.data?.includes(",") ? d.data.split(",")[1] : d.data,
-  //       includeInQuote: true,
-  //     }));
+      const activeEstId =
+        estimateId || storeStorageEstimateId || navState.estimateId || undefined;
 
-  //     const payload = {
-  //       jobType: "Storage",
-  //       estimateId: estimateId || undefined,
-  //       scope:
-  //         (scope || "Both").toLowerCase() === "supply"
-  //           ? "Supply"
-  //           : (scope || "Both").toLowerCase() === "install"
-  //           ? "Install"
-  //           : "Both",
-  //       leadCompanyName: customerLeadName || "Customer",
-  //       customerEmail,
-  //       streetAddress: customerAddress,
-  //       cityStateZip: customerAddress,
-  //       jobNumber: jobNumber || "8098",
-  //       buildingSize:
-  //         storageData?.buildings?.map((b) => `${b.width}x${b.length}`).join(", ") ||
-  //         "Storage Complex",
-  //       squareFootage:
-  //         Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) ||
-  //         storageData?.buildings?.reduce(
-  //           (acc, b) =>
-  //             acc +
-  //             (Number(b.sqft || b.squareFootage) ||
-  //               Number(b.width || 0) * Number(b.length || 0)),
-  //           0
-  //         ) ||
-  //         0,
-  //       sf:
-  //         Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) ||
-  //         storageData?.buildings?.reduce(
-  //           (acc, b) =>
-  //             acc +
-  //             (Number(b.sqft || b.squareFootage) ||
-  //               Number(b.width || 0) * Number(b.length || 0)),
-  //           0
-  //         ) ||
-  //         0,
-  //       pricingResult: storagePricing as Record<string, unknown>,
-  //       storagePricingResult: storagePricing as Record<string, unknown>,
-  //       storagePricing: storagePricing as Record<string, unknown>,
-  //       storageData: storageData as Record<string, unknown>,
-  //       concreteAddon: {
-  //         include: navState.concreteInclude,
-  //       },
-  //       insulationAddon: {
-  //         include: navState.insulationInclude,
-  //       },
-  //       salesTax: {
-  //         include: navState.includeTax,
-  //         rate: navState.taxRate,
-  //       },
-  //       drawingAttachments,
-  //       sections: drawingAttachments.length > 0
-  //         ? ["quote", "sow", "contract", "drawings"]
-  //         : ["quote", "sow", "contract"],
-  //       format: "pdf",
-  //     };
+      const payload: PreviewDocumentRequest = {
+        jobType: "Storage",
+        companyBrand,
+        estimateId: activeEstId,
+        scope:
+          (scope || "Both").toLowerCase() === "supply"
+            ? "Supply"
+            : (scope || "Both").toLowerCase() === "install"
+            ? "Install"
+            : "Both",
+        leadCompanyName: customerLeadName || "Customer",
+        customerEmail,
+        streetAddress: customerAddress,
+        cityStateZip: customerAddress,
+        jobNumber: jobNumber || "8098",
+        buildingSize:
+          storageData?.buildings?.map((b) => `${b.width}x${b.length}`).join(", ") ||
+          "Storage Complex",
+        squareFootage:
+          Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) ||
+          storageData?.buildings?.reduce(
+            (acc, b) =>
+              acc +
+              (Number(b.sqft || b.squareFootage) ||
+                Number(b.width || 0) * Number(b.length || 0)),
+            0
+          ) ||
+          0,
+        sf:
+          Number(storagePricing?.totalSqFt || storagePricing?.squareFootage) ||
+          storageData?.buildings?.reduce(
+            (acc, b) =>
+              acc +
+              (Number(b.sqft || b.squareFootage) ||
+                Number(b.width || 0) * Number(b.length || 0)),
+            0
+          ) ||
+          0,
+        pricingResult: storagePricing as Record<string, unknown>,
+        storagePricingResult: storagePricing as Record<string, unknown>,
+        storagePricing: storagePricing as Record<string, unknown>,
+        storageData: storageData as Record<string, unknown>,
+        concreteAddon: {
+          include: navState.concreteInclude ?? storeConcreteInclude,
+        },
+        insulationAddon: {
+          include: navState.insulationInclude ?? storeInsulationInclude,
+        },
+        salesTax: {
+          include: navState.includeTax ?? storeIncludeTax,
+          includeTax: navState.includeTax ?? storeIncludeTax,
+          rate: navState.taxRate ?? storeTaxRate,
+          taxRate: navState.taxRate ?? storeTaxRate,
+          zip: navState.taxZip ?? storeTaxZip,
+          taxZip: navState.taxZip ?? storeTaxZip,
+        },
+        taxRate: navState.taxRate ?? storeTaxRate,
+        includeTax: navState.includeTax ?? storeIncludeTax,
+        taxZip: navState.taxZip ?? storeTaxZip,
+        zip: navState.taxZip ?? storeTaxZip,
+        drawingAttachments,
+        sections: drawingAttachments.length > 0
+          ? ["quote", "sow", "contract", "drawings"]
+          : ["quote", "sow", "contract"],
+        format: "pdf",
+      };
 
-  //     const activeEstId =
-  //       estimateId || storeStorageEstimateId || navState.estimateId || undefined;
-  //     const res = await downloadPdfProvider(payload, activeEstId);
-  //     const pdfData = res.data || res;
+      const res = await downloadPdfProvider(payload, activeEstId);
+      const pdfData = res?.data || res;
 
-  //     const fileName =
-  //       pdfData?.fileName ||
-  //       `Storage_Quote_${(customerLeadName || "Customer").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
-
-  //     // 1. Check for base64 string
-  //     const base64 =
-  //       typeof pdfData === "string"
-  //         ? pdfData
-  //         : pdfData?.fileBase64 ||
-  //           (pdfData as { base64?: string })?.base64 ||
-  //           (pdfData as { pdfBase64?: string })?.pdfBase64;
-
-  //     if (base64) {
-  //       const cleanBase64 = base64.includes(",") ? base64.split(",")[1] : base64;
-  //       const byteCharacters = atob(cleanBase64);
-  //       const byteNumbers = new Array(byteCharacters.length);
-  //       for (let i = 0; i < byteCharacters.length; i++) {
-  //         byteNumbers[i] = byteCharacters.charCodeAt(i);
-  //       }
-  //       const byteArray = new Uint8Array(byteNumbers);
-  //       const blob = new Blob([byteArray], { type: pdfData?.mimeType || "application/pdf" });
-  //       const blobUrl = URL.createObjectURL(blob);
-
-  //       const a = document.createElement("a");
-  //       a.href = blobUrl;
-  //       a.download = fileName;
-  //       document.body.appendChild(a);
-  //       a.click();
-  //       document.body.removeChild(a);
-  //       URL.revokeObjectURL(blobUrl);
-  //       return;
-  //     }
-
-  //     // 2. Check for URL redirect
-  //     const downloadUrl =
-  //       (pdfData as { url?: string; downloadUrl?: string })?.url ||
-  //       (pdfData as { url?: string; downloadUrl?: string })?.downloadUrl;
-  //     if (downloadUrl) {
-  //       window.open(downloadUrl, "_blank");
-  //       return;
-  //     }
-
-  //     // 3. Fallback to print dialog if stream was empty
-  //     console.warn("Backend did not return base64 PDF stream, falling back to print dialog.");
-  //     handlePrint();
-  //   } catch (err) {
-  //     console.error("Failed to generate PDF via server API:", err);
-  //     handlePrint();
-  //   } finally {
-  //     setIsDownloadingPdf(false);
-  //   }
-  // };
+      if (pdfData?.fileBase64) {
+        downloadPdfFromBase64(
+          pdfData.fileBase64,
+          pdfData.fileName || `Storage_Quote_${(customerLeadName || "Customer").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`,
+          pdfData.mimeType || "application/pdf"
+        );
+        toast.success("PDF downloaded successfully");
+      } else {
+        handlePrint();
+      }
+    } catch (err) {
+      console.error("Failed to generate PDF via server API:", err);
+      handlePrint();
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
 
   const handleSaveToHistory = async () => {
     setIsSavingEstimate(true);
@@ -318,6 +375,7 @@ export function StoragePreviewPage() {
         {
           _id: activeEstId,
           jobType: "Storage",
+          companyBrand,
           scope:
             (scope || "Both").toLowerCase() === "supply"
               ? "Supply"
@@ -331,7 +389,6 @@ export function StoragePreviewPage() {
           jobNumber,
           sourceFileName: navState.sourceFileName || "Storage_COG.xlsx",
           storageData: storageData as Record<string, unknown>,
-          storagePricingResult: storagePricing as Record<string, unknown>,
           drawingAttachments: activeDrawings.map((d) => ({
             name: d.name,
             fileBase64: d.data,
@@ -346,7 +403,11 @@ export function StoragePreviewPage() {
       if (res && (res as { success?: boolean }).success === false) {
         throw new Error(res.message || "Failed to save storage estimate");
       }
-      const savedId = data?.estimate?._id || data?._id || activeEstId;
+      const savedEstimate = (data?.estimate || data) as SaveEstimatePayload;
+      if (savedEstimate && typeof savedEstimate === "object") {
+        setEstimate(savedEstimate);
+      }
+      const savedId = savedEstimate?._id || activeEstId;
       toast.success("Storage estimate saved successfully");
       if (savedId) {
         setEstimateId(savedId);
@@ -375,6 +436,7 @@ export function StoragePreviewPage() {
   const previewPayload: PreviewDocumentRequest = useMemo(
     () => ({
       jobType: "Storage",
+      companyBrand,
       estimateId:
         estimateId ||
         storeStorageEstimateId ||
@@ -427,8 +489,16 @@ export function StoragePreviewPage() {
       },
       salesTax: {
         include: includeTax,
+        includeTax,
         rate: taxRate,
+        taxRate,
+        zip: storeTaxZip,
+        taxZip: storeTaxZip,
       },
+      taxRate,
+      includeTax,
+      taxZip: storeTaxZip,
+      zip: storeTaxZip,
       contract: {
         customer: customerLeadName,
         address: customerAddress,
@@ -456,6 +526,7 @@ export function StoragePreviewPage() {
     }),
     [
       estimateId,
+      companyBrand,
       navState.estimateId,
       storeStorageEstimateId,
       scope,
@@ -532,10 +603,6 @@ export function StoragePreviewPage() {
     }
   };
 
-  const handleClearAll = () => {
-    setStorageDrawings([]);
-  };
-
   return (
     <div className="space-y-6 p-6">
       {/* Top Action Header Bar */}
@@ -550,9 +617,24 @@ export function StoragePreviewPage() {
             Back
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 leading-tight">
-              Storage Quote Preview
-            </h1>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-2xl font-bold text-slate-900 leading-tight">
+                Storage Quote Preview
+              </h1>
+              {estimate && (
+                <QuotationWorkflowBadge
+                  status={
+                    isApproved
+                      ? "approved"
+                      : normalizeWorkflowStatus(
+                          estimate.workflowStatus ||
+                            estimate.conversion?.workflowStatus ||
+                            "draft",
+                        )
+                  }
+                />
+              )}
+            </div>
             <p className="text-xs text-slate-500 mt-0.5 font-medium">
               Mini Storage Assembled Package — Quote · SOW · Contract · Layout
               Plans
@@ -560,30 +642,49 @@ export function StoragePreviewPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* <Button
-            type="button"
-            variant="outline"
-            onClick={handleRefreshPreview}
-            disabled={isRefreshing || isPreviewLoading}
-            className="border-slate-300 text-slate-700 hover:bg-slate-50 px-3.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer bg-white"
-          >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing || isPreviewLoading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-          <Button
-            type="button"
-            onClick={handleDownloadPdf}
-            disabled={isDownloadingPdf}
-            className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
-          >
-            {isDownloadingPdf ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Printer className="h-4 w-4" />
-            )}
-            {isDownloadingPdf ? "Generating PDF..." : "Generate & Print PDF"}
-          </Button> */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1.5 mr-1">
+            <span className="text-[11px] font-bold text-slate-600 uppercase">Logo:</span>
+            <div className="grid grid-cols-2 gap-1 w-52">
+              {[
+                { label: "Steel Building", value: "SBD" as const },
+                { label: "Storage Material", value: "SM" as const },
+              ].map((item) => {
+                const isActive = companyBrand === item.value;
+                return (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => setCompanyBrand(item.value)}
+                    className={cn(
+                      "py-1.5 px-2 rounded-md font-semibold text-xs transition-colors cursor-pointer text-center",
+                      isActive
+                        ? "bg-blue-600 text-white shadow-xs"
+                        : "bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200",
+                    )}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {isApproved && (
+            <Button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={isDownloadingPdf}
+              className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
+            >
+              {isDownloadingPdf ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Printer className="h-4 w-4" />
+              )}
+              {isDownloadingPdf ? "Generating PDF..." : "Generate & Print PDF"}
+            </Button>
+          )}
           <Button
             type="button"
             onClick={handleSaveToHistory}
@@ -608,34 +709,14 @@ export function StoragePreviewPage() {
       <div className="space-y-6 w-full max-w-5xl print:max-w-none print:w-full">
         {/* Building drawings & plans Card */}
         <Card className="p-6 bg-white border border-slate-200 shadow-xs rounded-xl no-print">
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">
-                Building drawings & layout plans
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Upload layout plans or elevations — they will be included in the
-                server preview & final PDF.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleClearAll}
-                className="border-slate-300 text-slate-700 hover:bg-slate-50 px-4 py-2 text-xs font-semibold rounded-lg cursor-pointer bg-white"
-              >
-                Clear All ({storageDrawings.length})
-              </Button>
-              <Button
-                type="button"
-                onClick={handleScrollToPreview}
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2 text-xs font-semibold rounded-lg cursor-pointer shadow-xs flex items-center gap-1.5"
-              >
-                Preview assembled PDF ↓
-              </Button>
-            </div>
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-slate-900">
+              Building drawings & layout plans
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Upload layout plans or elevations — they will be included in the
+              server preview & final PDF.
+            </p>
           </div>
 
           {/* PDF / Image Dropzone Box */}

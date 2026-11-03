@@ -194,11 +194,46 @@ export function useQuotationPricing({
   const wallsRValueDisplay =
     fullQuote?.insulation?.rWall || insulationRValueWalls || "";
 
-  // Sales Tax from API fullQuote (no local fallback calculation)
-  const taxableBase = fullQuote?.salesTax?.taxableBase;
-  const taxRateVal = fullQuote?.salesTax?.rate ?? taxRate ?? 0;
-  const salesTaxVal = fullQuote?.salesTax?.amount ?? 0;
+  // Sales Tax from API fullQuote / pricing (no local fallback calculation)
+  const rawSalesTax =
+    fullQuote?.salesTax ||
+    (extractedShipper?.fullQuote as Record<string, unknown> | undefined)?.salesTax ||
+    (extractedShipper?.pricing as Record<string, unknown> | undefined)?.salesTax ||
+    (pricing as Record<string, unknown> | undefined)?.salesTax ||
+    (extractedShipper as Record<string, unknown> | undefined)?.salesTax;
+
+  const taxableBase = (rawSalesTax as Record<string, unknown> | undefined)?.taxableBase as number | undefined;
+  const taxRateVal =
+    ((rawSalesTax as Record<string, unknown> | undefined)?.rate as number | undefined) ??
+    ((rawSalesTax as Record<string, unknown> | undefined)?.taxRate as number | undefined) ??
+    taxRate ??
+    0;
+  const salesTaxVal =
+    ((rawSalesTax as Record<string, unknown> | undefined)?.amount as number | undefined) ?? 0;
   const salesTaxFormatted = formatCurrency2(salesTaxVal, "$0.00");
+
+  // Staircase from API fullQuote or store
+  const storeState = useQuotationStore.getState();
+  const staircaseCount =
+    fullQuote?.staircase?.count ??
+    storeState.staircaseCount ??
+    0;
+  const staircaseUnitPrice =
+    fullQuote?.staircase?.unitCost ??
+    storeState.staircaseUnitPrice ??
+    35000;
+  const isInstallOnly = scope.toLowerCase() === "install";
+  const staircaseSell = isInstallOnly
+    ? 0
+    : (fullQuote?.staircase?.staircaseSell ??
+        (staircaseCount > 0 ? staircaseCount * staircaseUnitPrice : 0));
+  const hasStaircase = staircaseCount > 0 && staircaseSell > 0;
+  const staircaseFormatted = formatCurrency2(staircaseSell);
+
+  // Add-Ons from API fullQuote
+  const addOnsSell = fullQuote?.pembAddOnTotals?.sell ?? 0;
+  const hasAddOns = addOnsSell > 0;
+  const addOnsFormatted = formatCurrency2(addOnsSell);
 
   // Grand Total from API fullQuote (no local fallback calculation)
   const grandTotalVal = fullQuote?.grandTotal ?? buildingSubtotalVal ?? pricing?.totSell;
@@ -224,7 +259,10 @@ export function useQuotationPricing({
   const buildingSfPriceFormatted =
     buildingSfPrice != null ? formatSfPrice2(buildingSfPrice) : "-";
 
-  const totalWeight = pricing?.totWt ?? extractedShipper?.totalWeightLbs;
+  const totalWeight =
+    extractedShipper?.detectedWeightLbs ??
+    pricing?.totWt ??
+    extractedShipper?.totalWeightLbs;
   const weightDisplay =
     totalWeight != null
       ? typeof totalWeight === "number"
@@ -362,6 +400,14 @@ export function useQuotationPricing({
     salesTaxVal,
     salesTaxFormatted,
     includeTax,
+    staircaseCount,
+    staircaseUnitPrice,
+    staircaseSell,
+    hasStaircase,
+    staircaseFormatted,
+    addOnsSell,
+    hasAddOns,
+    addOnsFormatted,
     grandTotalVal,
     grandTotalFormatted,
     totalProfitVal,
