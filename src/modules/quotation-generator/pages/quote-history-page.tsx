@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ConfirmModal from "@/components/common/confirm-modal";
+import SuccessDialog from "@/components/success-dialog";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/lib/api-error";
 import {
@@ -168,6 +169,8 @@ export function QuoteHistoryPage() {
   };
 
   const [activeChangeOrderQuote, setActiveChangeOrderQuote] =
+    useState<SaveEstimatePayload | null>(null);
+  const [unacceptedQuoteForChangeOrder, setUnacceptedQuoteForChangeOrder] =
     useState<SaveEstimatePayload | null>(null);
   const [activeDepositQuote, setActiveDepositQuote] =
     useState<SaveEstimatePayload | null>(null);
@@ -634,7 +637,9 @@ export function QuoteHistoryPage() {
               const lifecycle = resolveQuotationLifecycle(quote);
               const canChangeOrder =
                 quote.conversion?.quotationStatus === "accepted" ||
-                (quote as Record<string, unknown>)?.quotationStatus === "accepted";
+                (quote as Record<string, unknown>)?.quotationStatus === "accepted" ||
+                lifecycle.isAccepted ||
+                lifecycle.isCustomerAccepted;
 
               return (
                 <div
@@ -754,16 +759,20 @@ export function QuoteHistoryPage() {
                       <span>Load & Edit</span>
                     </Button>
 
-                    {canChangeOrder && (
-                      <Button
-                        type="button"
-                        onClick={() => setActiveChangeOrderQuote(quote)}
-                        className="bg-[#1e3a8a] hover:bg-[#172554] text-white h-8 px-3 text-xs font-medium rounded-md cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                      >
-                        <RefreshCw className="h-3.5 w-3.5" />
-                        <span>Change Order</span>
-                      </Button>
-                    )}
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        if (canChangeOrder) {
+                          setActiveChangeOrderQuote(quote);
+                        } else {
+                          setUnacceptedQuoteForChangeOrder(quote);
+                        }
+                      }}
+                      className="bg-[#1e3a8a] hover:bg-[#172554] text-white h-8 px-3 text-xs font-medium rounded-md cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      <span>Change Order</span>
+                    </Button>
 
                     {!isCustom && (
                       <>
@@ -840,6 +849,15 @@ export function QuoteHistoryPage() {
         onOpenChange={(open) => !open && setActiveChangeOrderQuote(null)}
         quote={activeChangeOrderQuote}
         onSuccess={() => fetchHistory()}
+      />
+
+      {/* Unaccepted Quotation Notice Modal for Change Order */}
+      <SuccessDialog
+        open={Boolean(unacceptedQuoteForChangeOrder)}
+        onClose={() => setUnacceptedQuoteForChangeOrder(null)}
+        title="Quotation Not Accepted"
+        description="Change order can only be created once the quotation is accepted."
+        okLabel="Ok"
       />
 
       <RequestDepositModal
