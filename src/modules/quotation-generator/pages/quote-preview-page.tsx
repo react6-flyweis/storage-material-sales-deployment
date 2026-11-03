@@ -20,6 +20,8 @@ import { useServerDocumentPreview } from "../hooks/use-server-document-preview";
 import { usePembDocumentPayload } from "../hooks/use-pemb-document-payload";
 import { ServerDocumentPreview } from "../components/server-document-preview";
 import { hydrateEstimateIntoStore } from "../hooks/use-load-estimate-to-editor";
+import { normalizeWorkflowStatus } from "@/modules/quotations/quotations.utils";
+import { QuotationWorkflowBadge } from "@/modules/quotations/components/quotation-workflow-badge";
 
 export function QuotePreviewPage() {
   const navigate = useNavigate();
@@ -30,6 +32,9 @@ export function QuotePreviewPage() {
   const [isSavingEstimate, setIsSavingEstimate] = useState(false);
 
   const navState = (location.state || {}) as {
+    estimate?: SaveEstimatePayload;
+    approvalStatus?: string;
+    workflowStatus?: string;
     quotationForm?: Record<string, string>;
     extractedDrawing?: ExtractDrawingResponseData;
     extractedShipper?: ExtractShipperResponseData;
@@ -110,11 +115,18 @@ export function QuotePreviewPage() {
   } = useQuotationStore();
 
   const [estimateId, setEstimateId] = useState<string | null>(
-    navState.estimateId || pembEstimateId || null,
+    navState.estimateId || navState.estimate?._id || pembEstimateId || null,
+  );
+  const [estimate, setEstimate] = useState<SaveEstimatePayload | null>(
+    navState.estimate || null,
   );
 
   useEffect(() => {
-    const eid = navState.estimateId || pembEstimateId;
+    const eid =
+      navState.estimateId ||
+      navState.estimate?._id ||
+      navState.customQuoteId ||
+      pembEstimateId;
     if (eid) {
       setEstimateId(eid);
       setPembEstimateId(eid);
@@ -124,21 +136,67 @@ export function QuotePreviewPage() {
             res?.estimate ||
             res?.data ||
             res) as SaveEstimatePayload | undefined;
-          if (
-            estData &&
-            (estData._id ||
+          if (estData) {
+            setEstimate(estData);
+            if (
+              estData._id ||
               estData.jobType ||
               estData.parsedCategories ||
-              estData.storageData)
-          ) {
-            hydrateEstimateIntoStore(estData, eid);
+              estData.storageData
+            ) {
+              hydrateEstimateIntoStore(estData, eid);
+            }
           }
         })
         .catch((err) => {
           console.warn("Failed to load estimate for preview:", err);
         });
     }
-  }, [navState.estimateId, pembEstimateId, setPembEstimateId]);
+  }, [
+    navState.estimateId,
+    navState.estimate?._id,
+    navState.customQuoteId,
+    pembEstimateId,
+    setPembEstimateId,
+  ]);
+
+  const isApproved = useMemo(() => {
+    const navApproval = navState.approvalStatus;
+    const navWorkflow = navState.workflowStatus;
+    if (navApproval?.toLowerCase() === "approved") return true;
+    if (
+      navWorkflow &&
+      ["approved", "sent", "accepted"].includes(normalizeWorkflowStatus(navWorkflow))
+    ) {
+      return true;
+    }
+
+    if (!estimate) return false;
+
+    const approvalStatus =
+      estimate.approval?.status ||
+      estimate.conversion?.approvalStatus ||
+      (estimate as { approvalStatus?: string }).approvalStatus;
+
+    if (
+      typeof approvalStatus === "string" &&
+      approvalStatus.toLowerCase() === "approved"
+    ) {
+      return true;
+    }
+
+    const rawWorkflow =
+      estimate.workflowStatus ||
+      estimate.conversion?.workflowStatus ||
+      (estimate as { status?: string }).status;
+
+    const normalized = normalizeWorkflowStatus(rawWorkflow);
+    return (
+      normalized === "approved" ||
+      normalized === "sent" ||
+      normalized === "accepted"
+    );
+  }, [estimate, navState.approvalStatus, navState.workflowStatus]);
 
   useEffect(() => {
     const rawTax =
@@ -275,13 +333,6 @@ export function QuotePreviewPage() {
     payload: effectivePreviewPayload,
   });
 
-  const handleScrollToPreview = () => {
-    previewSectionRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
-  };
-
   const handlePrint = () => {
     const originalTitle = document.title;
     const safeCustomer = (customerLeadName || "Quote").replace(
@@ -294,6 +345,10 @@ export function QuotePreviewPage() {
   };
 
   const handleDownloadPdf = async () => {
+    if (!isApproved) {
+      toast.error("Quotation must be approved before generating or printing PDF.");
+      return;
+    }
     setIsDownloadingPdf(true);
     try {
       if (isCustomQuote && customQuoteId) {
@@ -494,10 +549,6 @@ export function QuotePreviewPage() {
     }
   };
 
-  const handleClearAll = () => {
-    setSelectedPdf(null);
-  };
-
   return (
     <div className="space-y-6 p-6">
       {/* Top Action Header Bar */}
@@ -512,9 +563,24 @@ export function QuotePreviewPage() {
             Back
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 leading-tight">
-              Quote Preview
-            </h1>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-2xl font-bold text-slate-900 leading-tight">
+                Quote Preview
+              </h1>
+              {estimate && (
+                <QuotationWorkflowBadge
+                  status={
+                    isApproved
+                      ? "approved"
+                      : normalizeWorkflowStatus(
+                          estimate.workflowStatus ||
+                            estimate.conversion?.workflowStatus ||
+                            "draft",
+                        )
+                  }
+                />
+              )}
+            </div>
             <p className="text-xs text-slate-500 mt-0.5 font-medium">
               Full assembled package — Quote · SOW · Contract · Building
               Drawings · Print or Save as PDF
@@ -523,19 +589,21 @@ export function QuotePreviewPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Button
-            type="button"
-            onClick={handleDownloadPdf}
-            disabled={isDownloadingPdf}
-            className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
-          >
-            {isDownloadingPdf ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Printer className="h-4 w-4" />
-            )}
-            {isDownloadingPdf ? "Generating PDF..." : "Generate & Print PDF"}
-          </Button>
+          {isApproved && (
+            <Button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={isDownloadingPdf}
+              className="bg-[#2B6CB0] hover:bg-[#2C5282] text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"
+            >
+              {isDownloadingPdf ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Printer className="h-4 w-4" />
+              )}
+              {isDownloadingPdf ? "Generating PDF..." : "Generate & Print PDF"}
+            </Button>
+          )}
           <Button
             type="button"
             onClick={handleSaveToHistory}
@@ -584,33 +652,13 @@ export function QuotePreviewPage() {
       <div className="space-y-6 w-full max-w-5xl print:max-w-none print:w-full">
         {/* Building drawings & plans Card */}
         <Card className="p-6 bg-white border border-slate-200 shadow-xs rounded-xl no-print">
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">
-                Building drawings & plans
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Drag images here — they appear after the SOW in the final PDF...
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleClearAll}
-                className="border-slate-300 text-slate-700 hover:bg-slate-50 px-4 py-2 text-xs font-semibold rounded-lg cursor-pointer bg-white"
-              >
-                Clear All
-              </Button>
-              <Button
-                type="button"
-                onClick={handleScrollToPreview}
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2 text-xs font-semibold rounded-lg cursor-pointer shadow-xs flex items-center gap-1.5"
-              >
-                Preview assembled PDF ↓
-              </Button>
-            </div>
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-slate-900">
+              Building drawings & plans
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Drag images here — they appear after the SOW in the final PDF...
+            </p>
           </div>
 
           {/* PDF Dropzone Box */}

@@ -90,6 +90,11 @@ export function QuotePreviewListPage() {
       if (isCustom) {
         navigate("/quotation/quote-preview/view", {
           state: {
+            estimate,
+            approvalStatus:
+              estimate.approval?.status || estimate.conversion?.approvalStatus,
+            workflowStatus:
+              estimate.workflowStatus || estimate.conversion?.workflowStatus,
             estimateId: targetEstimateId,
             customQuoteId: targetEstimateId,
             quoteKind: "custom",
@@ -221,6 +226,11 @@ export function QuotePreviewListPage() {
 
       navigate("/quotation/quote-preview/view", {
         state: {
+          estimate,
+          approvalStatus:
+            estimate.approval?.status || estimate.conversion?.approvalStatus,
+          workflowStatus:
+            estimate.workflowStatus || estimate.conversion?.workflowStatus,
           extractedShipper: {
             fileName: estimate.sourceFileName || "Shipper.xlsx",
             sheetCount: estimate.tabSummary?.length || 1,
