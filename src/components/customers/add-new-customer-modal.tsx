@@ -82,6 +82,7 @@ export default function AddNewCustomerModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setInternalError(null);
 
     const newErrors: {
