@@ -13,8 +13,10 @@ import {
   getCustomerDocumentsProvider,
   createCustomerDocumentProvider,
   deleteCustomerDocumentProvider,
+  createBasicCustomerProvider,
   type CreateCustomerDocumentPayload,
   type CreateSalesCustomerProjectPayload,
+  type CreateBasicCustomerRequest,
 } from "./customers.api";
 
 export function useCustomersQuery(page = 1, limit = 20) {
@@ -121,4 +123,23 @@ export function useDeleteCustomerDocumentMutation(customerId: string) {
     },
   });
 }
+
+export function useCreateBasicCustomerMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: CreateBasicCustomerRequest) =>
+      createBasicCustomerProvider(payload),
+    onSuccess: (response) => {
+      if (!response.success) {
+        return;
+      }
+
+      void queryClient.invalidateQueries({
+        queryKey: ["customers"],
+      });
+    },
+  });
+}
+
 

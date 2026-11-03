@@ -207,10 +207,22 @@ export default function AddNewLead() {
     );
   }
 
+  const onInvalid = (fieldErrors: typeof errors) => {
+    console.warn("Form validation blocked submission:", fieldErrors);
+    const firstErrorMessage = Object.values(fieldErrors).find(
+      (err) => err && typeof err === "object" && "message" in err && err.message
+    );
+    if (firstErrorMessage && "message" in firstErrorMessage) {
+      setError("root", {
+        message: `Please resolve form errors: ${firstErrorMessage.message}`,
+      });
+    }
+  };
+
   const submitting = isSubmitting || createLeadMutation.isPending || updateLeadMutation.isPending;
 
   return (
-    <form className="p-6 w-full min-h-0" onSubmit={handleSubmit(onSubmit)}>
+    <form className="p-6 w-full min-h-0" onSubmit={handleSubmit(onSubmit, onInvalid)}>
       <div className="mb-6 flex items-start justify-between">
         <div className="flex items-start gap-4">
           <Button type="button" onClick={() => navigate(-1)} aria-label="Back">
@@ -242,8 +254,10 @@ export default function AddNewLead() {
       ) : null}
 
       <FieldGroup className="rounded-lg bg-white p-5 shadow">
-        <Field className="md:w-1/2">
-          <FieldLabel htmlFor="customerId">Select Customer</FieldLabel>
+        <Field className="md:w-1/2" data-invalid={Boolean(errors.customerId)}>
+          <FieldLabel htmlFor="customerId">
+            Select Customer <span className="text-red-500">*</span>
+          </FieldLabel>
           <Controller
             control={control}
             name="customerId"
@@ -255,18 +269,26 @@ export default function AddNewLead() {
               />
             )}
           />
+          {errors.customerId?.message ? (
+            <FieldError errors={[errors.customerId]} />
+          ) : null}
         </Field>
 
         <div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field className="md:col-span-2">
-              <FieldLabel htmlFor="projectName">Project Name</FieldLabel>
+            <Field className="md:col-span-2" data-invalid={Boolean(errors.projectName)}>
+              <FieldLabel htmlFor="projectName">
+                Project Name <span className="text-red-500">*</span>
+              </FieldLabel>
               <Input
                 id="projectName"
                 type="text"
                 placeholder="Enter project name"
                 {...register("projectName")}
               />
+              {errors.projectName?.message ? (
+                <FieldError errors={[errors.projectName]} />
+              ) : null}
             </Field>
             <Field>
               <FieldLabel htmlFor="businessUnit">Business Unit</FieldLabel>
@@ -418,7 +440,9 @@ export default function AddNewLead() {
                 />
               </Field>
               <Field data-invalid={Boolean(errors.buildingType)}>
-                <FieldLabel htmlFor="buildingType">Building Type</FieldLabel>
+                <FieldLabel htmlFor="buildingType">
+                  Building Type <span className="text-red-500">*</span>
+                </FieldLabel>
                 <Controller
                   control={control}
                   name="buildingType"
