@@ -44,8 +44,8 @@ const DEFAULT_COMPANY_ADDRESS_LINES = [
   "1851 Madison Ave Suite 300",
   "Council Bluffs, IA 51503",
   "United States",
-  "travis@storagematerials.com",
-  "www.storagematerials.com",
+  "info@steelbuildingdepot.com",
+  "www.steelbuildingdepot.com",
 ];
 
 function getAddressLines(address?: InvoiceAddress | null, fallbackLines?: string[]): string[] {

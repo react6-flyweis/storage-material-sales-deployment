@@ -408,7 +408,7 @@ export const StoragePreviewDocument = React.forwardRef<HTMLDivElement, StoragePr
             <p className="text-[10px] text-slate-500 mt-1 font-medium leading-tight">
               METAL AND DOORS · 1851 Madison Ave Suite 300, Council Bluffs, IA 51503
               <br />
-              (888) 968-1222 · travis@storagematerials.com · www.storagematerials.com
+              (888) 968-1222 · info@steelbuildingdepot.com · www.steelbuildingdepot.com
             </p>
           </div>
 
@@ -754,7 +754,7 @@ export const StoragePreviewDocument = React.forwardRef<HTMLDivElement, StoragePr
 
         {/* Footer Notice */}
         <p className="text-center text-[10px] text-slate-400 pt-2">
-          Thanks for your Business! Reach out with any questions · (888) 968-1222 · travis@storagematerials.com
+          Thanks for your Business! Reach out with any questions · (888) 968-1222 · info@steelbuildingdepot.com
         </p>
       </div>
     );
