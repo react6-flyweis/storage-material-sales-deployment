@@ -1412,8 +1412,8 @@ export default function InvoiceForm({
               ) : (
                 <div>United States</div>
               )}
-              <div>travis@storagematerials.com</div>
-              <div>www.storagematerials.com</div>
+              <div>info@steelbuildingdepot.com</div>
+              <div>www.steelbuildingdepot.com</div>
             </div>
 
             {!isSummaryReadOnly && (

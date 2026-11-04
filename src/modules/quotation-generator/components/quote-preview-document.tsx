@@ -79,7 +79,7 @@ export const QuotePreviewDocument = React.forwardRef<HTMLDivElement, QuotePrevie
               METAL AND DOORS · 1851 Madison Ave Suite 300, Council Bluffs, IA 51503
             </p>
             <p className="text-[10px] text-slate-600 font-medium">
-              (888) 968-1222 · travis@storagematerials.com · www.storagematerials.com
+              (888) 968-1222 · info@steelbuildingdepot.com · www.steelbuildingdepot.com
             </p>
           </div>
 
@@ -274,7 +274,7 @@ export const QuotePreviewDocument = React.forwardRef<HTMLDivElement, QuotePrevie
 
         {/* Footer Notice */}
         <p className="text-center text-[10px] text-slate-400 pt-2">
-          Thanks For Your Business! Reach Out With Any Questions · (888) 968-1222 · travis@storagematerials.com
+          Thanks For Your Business! Reach Out With Any Questions · (888) 968-1222 · info@steelbuildingdepot.com
         </p>
       </div>
     );
