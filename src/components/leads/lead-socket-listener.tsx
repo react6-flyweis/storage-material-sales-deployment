@@ -324,12 +324,91 @@ export function LeadSocketListener() {
       }
     };
 
+    const handleCallStarted = (payload: {
+      callSessionId: string;
+      leadId?: string;
+      customerId?: string;
+      fromNumber: string;
+    }) => {
+      console.log("Socket: call_started event received", payload);
+      if (payload.leadId) {
+        queryClient.invalidateQueries({
+          queryKey: ["sales", "leads", "transcripts", payload.leadId],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["sales", "leads", "calls", payload.leadId],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["sales", "leads", "detail", payload.leadId],
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
+
+      const from = payload.fromNumber || "Customer";
+      const preview = `Incoming voice call from ${from}`;
+
+      if (
+        document.visibilityState !== "visible" &&
+        "Notification" in window &&
+        Notification.permission === "granted"
+      ) {
+        const notification = new Notification("Incoming Voice Call", {
+          body: preview,
+          icon: "/favicon.ico",
+        });
+        notification.onclick = () => {
+          window.focus();
+          if (payload.leadId) {
+            navigate(`/leads/${payload.leadId}?tab=chat`);
+          }
+          notification.close();
+        };
+      } else {
+        toast.info("Incoming Voice Call", {
+          description: preview,
+          action: payload.leadId
+            ? {
+                label: "View Lead",
+                onClick: () => navigate(`/leads/${payload.leadId}?tab=chat`),
+              }
+            : undefined,
+        });
+      }
+    };
+
+    const handleCallEnded = (payload: {
+      callSessionId: string;
+      leadId?: string;
+      durationSeconds: number;
+      status: string;
+    }) => {
+      console.log("Socket: call_ended event received", payload);
+      if (payload.leadId) {
+        queryClient.invalidateQueries({
+          queryKey: ["sales", "leads", "transcripts", payload.leadId],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["sales", "leads", "calls", payload.leadId],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["sales", "leads", "detail", payload.leadId],
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
+
+      toast.success("Voice Call Ended", {
+        description: `Call duration: ${payload.durationSeconds}s (${payload.status})`,
+      });
+    };
+
     socket.on("lead_list_created", handleLeadCreated);
     socket.on("lead_list_updated", handleLeadUpdated);
     socket.on("followup:reminder", handleFollowUpReminder);
     socket.on("customer_online_status", handleCustomerOnlineStatus);
     socket.on("new_customer_message", handleNewCustomerMessage);
     socket.on("customer_direct_message", handleCustomerDirectMessage);
+    socket.on("call_started", handleCallStarted);
+    socket.on("call_ended", handleCallEnded);
 
     return () => {
       socket.off("lead_list_created", handleLeadCreated);
@@ -338,6 +417,8 @@ export function LeadSocketListener() {
       socket.off("customer_online_status", handleCustomerOnlineStatus);
       socket.off("new_customer_message", handleNewCustomerMessage);
       socket.off("customer_direct_message", handleCustomerDirectMessage);
+      socket.off("call_started", handleCallStarted);
+      socket.off("call_ended", handleCallEnded);
     };
   }, [socket, queryClient, navigate]);
 

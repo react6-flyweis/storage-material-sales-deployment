@@ -7,7 +7,7 @@ export function getSocketBaseUrl() {
 
 export function createAdminSocket(
   accessToken: string | null | undefined,
-  transports: string[] = ["polling"],
+  transports: string[] = ["polling", "websocket"],
   namespace = "/admin",
 ): Socket | null {
   if (!accessToken) return null;
