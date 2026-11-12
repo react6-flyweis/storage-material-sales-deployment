@@ -119,6 +119,45 @@ export const SocketProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       );
     });
 
+    // 8. Voice Call Started
+    sock.on("call_started", (data: { callSessionId: string; leadId?: string; customerId?: string; fromNumber: string }) => {
+      console.log("[SocketContext] call_started", data);
+      if (data?.leadId) {
+        queryClient.invalidateQueries({ queryKey: ["sales", "leads", "transcripts", data.leadId] });
+        queryClient.invalidateQueries({ queryKey: ["sales", "leads", "calls", data.leadId] });
+        queryClient.invalidateQueries({ queryKey: ["sales", "leads", "detail", data.leadId] });
+      }
+      queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
+      window.dispatchEvent(new CustomEvent("socket_call_started", { detail: data }));
+    });
+
+    // 9. Voice Call Turn
+    sock.on("call_turn", (data: { callSessionId: string; leadId?: string; role: string; transcript: string; createdAt: string }) => {
+      console.log("[SocketContext] call_turn", data);
+      if (data?.leadId) {
+        queryClient.invalidateQueries({ queryKey: ["sales", "leads", "transcripts", data.leadId] });
+      }
+      if (data?.callSessionId) {
+        queryClient.invalidateQueries({ queryKey: ["sales", "calls", data.callSessionId] });
+      }
+      window.dispatchEvent(new CustomEvent("socket_call_turn", { detail: data }));
+    });
+
+    // 10. Voice Call Ended
+    sock.on("call_ended", (data: { callSessionId: string; leadId?: string; durationSeconds: number; status: string }) => {
+      console.log("[SocketContext] call_ended", data);
+      if (data?.leadId) {
+        queryClient.invalidateQueries({ queryKey: ["sales", "leads", "transcripts", data.leadId] });
+        queryClient.invalidateQueries({ queryKey: ["sales", "leads", "calls", data.leadId] });
+        queryClient.invalidateQueries({ queryKey: ["sales", "leads", "detail", data.leadId] });
+      }
+      if (data?.callSessionId) {
+        queryClient.invalidateQueries({ queryKey: ["sales", "calls", data.callSessionId] });
+      }
+      queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
+      window.dispatchEvent(new CustomEvent("socket_call_ended", { detail: data }));
+    });
+
     return () => {
       sock.disconnect();
       socketRef.current = null;

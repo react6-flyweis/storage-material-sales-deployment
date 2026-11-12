@@ -58,9 +58,27 @@ type Props = {
 };
 
 type PublicChatHistoryResponse = {
-  success: boolean;
-  data: {
-    messages: LeadDetailMessage[];
+  success?: boolean;
+  messages?: LeadDetailMessage[];
+  chat?: {
+    messageCount?: number;
+    messages?: LeadDetailMessage[];
+  };
+  call?: {
+    sessionCount?: number;
+    turnCount?: number;
+    sessions?: unknown[];
+  };
+  summary?: {
+    text?: string;
+    updatedAt?: string;
+  };
+  data?: {
+    messages?: LeadDetailMessage[];
+    chat?: {
+      messageCount?: number;
+      messages?: LeadDetailMessage[];
+    };
   };
 };
 
@@ -73,6 +91,9 @@ type LeadChatMessagePayload = {
   content?: string;
   text?: string;
   createdAt?: string;
+  origin?: "chat" | "call";
+  callSessionId?: string | null;
+  channel?: string | null;
 };
 
 function formatMessageTime(value?: string) {
@@ -86,6 +107,11 @@ function formatMessageTime(value?: string) {
 function toChatMessage(
   message: LeadDetailMessage | LeadChatMessagePayload,
 ): ChatMessage | null {
+  // Exclude voice call transcript turns from the widget chat feed
+  if (message.origin === "call" || message.channel === "call" || message.callSessionId) {
+    return null;
+  }
+
   const content = message.content ?? message.text ?? "";
 
   if (!content.trim()) {
@@ -218,7 +244,15 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
           `/api/public/chat/history/${lead._id}`,
         );
 
-        const historyMessages = response.data.data.messages
+        const resData = response.data;
+        const rawList =
+          resData?.messages ??
+          resData?.data?.messages ??
+          resData?.chat?.messages ??
+          resData?.data?.chat?.messages ??
+          [];
+
+        const historyMessages = rawList
           .map(toChatMessage)
           .filter((message): message is ChatMessage => message !== null);
 
@@ -227,7 +261,8 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
         }
 
         setMessages((current) => mergeMessages(current, historyMessages));
-      } catch {
+      } catch (err) {
+        console.error("Failed to load chat history:", err);
         if (!isActive) {
           return;
         }
@@ -398,6 +433,10 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
       setIsConnected(false);
     });
 
+    if (socket.connected) {
+      handleConnect();
+    }
+
     return () => {
       stopTyping();
       socket.off("connect", handleConnect);
@@ -454,26 +493,21 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
 
   return (
     <div className="flex-1 flex flex-col p-0 rounded-lg bg-white shadow">
-      <div className="px-6 pt-6 pb-4 border-b">
-        <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="px-6 py-4 border-b">
+        <div className="mb-3 flex items-center justify-between gap-3">
           <div className="text-sm text-gray-500">
             {/* Lead ID- */}
             <span className="font-semibold">{lead.jobId}</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-500">
-            {messages.length === 0 ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 px-3 py-1 text-gray-500">
-
-                Not connected
-              </span>
-            ) : isConnected ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">
-
+            {isConnected ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700 font-medium">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                 Connected
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-amber-700">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-amber-700 font-medium">
+                <Loader2 className="h-3 w-3 animate-spin" />
                 Connecting
               </span>
             )}
