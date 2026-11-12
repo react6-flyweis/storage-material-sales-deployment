@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { AlertCircle, Loader2, Paperclip, Phone, Send } from "lucide-react";
+import { AlertCircle, Loader2, Paperclip, Send } from "lucide-react";
 import { type Socket } from "socket.io-client";
 import { apiClient } from "@/modules/auth/auth.api";
 import { createAdminSocket } from "@/lib/socket";
@@ -41,8 +41,6 @@ type ChatMessage = {
   senderName?: string | null;
   content: string;
   createdAt: string;
-  origin?: "chat" | "call";
-  callSessionId?: string | null;
 };
 
 // type Lead = {
@@ -60,9 +58,27 @@ type Props = {
 };
 
 type PublicChatHistoryResponse = {
-  success: boolean;
-  data: {
-    messages: LeadDetailMessage[];
+  success?: boolean;
+  messages?: LeadDetailMessage[];
+  chat?: {
+    messageCount?: number;
+    messages?: LeadDetailMessage[];
+  };
+  call?: {
+    sessionCount?: number;
+    turnCount?: number;
+    sessions?: unknown[];
+  };
+  summary?: {
+    text?: string;
+    updatedAt?: string;
+  };
+  data?: {
+    messages?: LeadDetailMessage[];
+    chat?: {
+      messageCount?: number;
+      messages?: LeadDetailMessage[];
+    };
   };
 };
 
@@ -90,14 +106,16 @@ function formatMessageTime(value?: string) {
 function toChatMessage(
   message: LeadDetailMessage | LeadChatMessagePayload,
 ): ChatMessage | null {
+  // Exclude voice call transcript turns from the widget chat feed
+  if (message.origin === "call" || message.channel === "call" || message.callSessionId) {
+    return null;
+  }
+
   const content = message.content ?? message.text ?? "";
 
   if (!content.trim()) {
     return null;
   }
-
-  const origin = message.origin === "call" ? "call" : "chat";
-  const callSessionId = message.callSessionId ?? null;
 
   return {
     id: message._id ?? `${message.createdAt ?? Date.now()}-${content}`,
@@ -108,8 +126,6 @@ function toChatMessage(
         ? (message.senderName ?? message.sender ?? null)
         : (message.sender ?? null),
     content,
-    origin,
-    callSessionId,
     createdAt: message.createdAt ?? new Date().toISOString(),
   } satisfies ChatMessage;
 }
@@ -227,7 +243,15 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
           `/api/public/chat/history/${lead._id}`,
         );
 
-        const historyMessages = response.data.data.messages
+        const resData = response.data;
+        const rawList =
+          resData?.messages ??
+          resData?.data?.messages ??
+          resData?.chat?.messages ??
+          resData?.data?.chat?.messages ??
+          [];
+
+        const historyMessages = rawList
           .map(toChatMessage)
           .filter((message): message is ChatMessage => message !== null);
 
@@ -236,7 +260,8 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
         }
 
         setMessages((current) => mergeMessages(current, historyMessages));
-      } catch {
+      } catch (err) {
+        console.error("Failed to load chat history:", err);
         if (!isActive) {
           return;
         }
@@ -602,16 +627,10 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
 
                   <div className="flex max-w-[70%] flex-col gap-1">
                     <div
-                      className={`text-sm font-medium text-gray-700 flex items-center gap-1.5 ${isSalesMessage ? "justify-end" : "justify-start"
+                      className={`text-sm font-medium text-gray-700 ${isSalesMessage ? "text-right" : "text-left"
                         }`}
                     >
-                      <span>{senderLabel}</span>
-                      {message.origin === "call" && (
-                        <span className="inline-flex items-center gap-1 rounded bg-amber-100/90 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
-                          <Phone className="h-2.5 w-2.5" />
-                          Voice Call
-                        </span>
-                      )}
+                      {senderLabel}
                     </div>
                     <div
                       className={`whitespace-pre-wrap rounded-lg p-3 text-sm ${isSalesMessage

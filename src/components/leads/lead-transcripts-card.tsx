@@ -33,7 +33,14 @@ export default function LeadTranscriptsCard({
 
   const activeTab: SubTab = selectedTab ?? defaultTab;
 
-  const chatCount = transcripts?.chat?.messageCount ?? 0;
+  const isWidgetChatMessage = (m: LeadDetailMessage) =>
+    m.origin !== "call" && m.channel !== "call" && !m.callSessionId;
+
+  const chatCount =
+    transcripts?.messages?.filter(isWidgetChatMessage)?.length ??
+    transcripts?.chat?.messages?.filter(isWidgetChatMessage)?.length ??
+    transcripts?.chat?.messageCount ??
+    0;
   const callCount = transcripts?.call?.sessionCount ?? 0;
 
   return (
@@ -116,7 +123,7 @@ export default function LeadTranscriptsCard({
           <ChatCard
             lead={lead}
             customer={customer}
-            recentMessages={recentMessages}
+            recentMessages={transcripts?.messages ?? recentMessages}
           />
         )}
 
