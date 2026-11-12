@@ -6,7 +6,7 @@ import ArchiveLeadDialog from "@/components/leads/archive-lead-dialog";
 import RestoreLeadDialog from "@/components/leads/restore-lead-dialog";
 import BasicDetails from "@/components/leads/basic-details";
 import LeadQuotationsCard from "@/components/leads/lead-quotations-card";
-import ChatCard from "@/components/leads/chat-card";
+import LeadTranscriptsCard from "@/components/leads/lead-transcripts-card";
 import TimelineCard from "@/components/leads/timeline-card";
 import FollowUpsCard from "@/components/leads/follow-ups-card";
 import PaymentsCard from "@/components/leads/payments-card";
@@ -281,7 +281,7 @@ export default function LeadDetails() {
               />
             </TabsContent>
             <TabsContent value="chat" className="mt-6">
-              <ChatCard
+              <LeadTranscriptsCard
                 lead={detail.lead}
                 customer={detail.customer}
                 recentMessages={detail.recentMessages}
