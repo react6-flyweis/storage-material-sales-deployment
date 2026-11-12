@@ -657,9 +657,11 @@ export type LeadDetailPayments = {
 
 export type LeadDetailMessage = {
   _id?: string;
+  messageId?: string;
   text?: string;
   content?: string;
   sender?: string | null;
+  senderName?: string | null;
   senderType?:
   | "customer"
   | "ai"
@@ -670,6 +672,9 @@ export type LeadDetailMessage = {
   | null;
   senderId?: string | null;
   isRead?: boolean;
+  origin?: "chat" | "call";
+  callSessionId?: string | null;
+  channel?: string | null;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -1092,4 +1097,136 @@ export async function getLeadMediaProvider(
 
   return response.data;
 }
+
+// -------------------------------------------------------------
+// Voice Call & Transcript APIs
+// -------------------------------------------------------------
+
+export type TranscriptChannel = "all" | "chat" | "call" | "summary";
+
+export type TranscriptTabStatus = {
+  hasChat: boolean;
+  hasCall: boolean;
+  hasSummary: boolean;
+};
+
+export type TranscriptSummary = {
+  text: string;
+  updatedAt: string;
+};
+
+export type CallTurn = {
+  turnId: string;
+  role: "ai" | "customer";
+  transcript: string;
+  createdAt: string;
+  messageId?: string;
+};
+
+export type CallSession = {
+  callSessionId: string;
+  twilioCallSid: string;
+  status: string;
+  fromNumber: string;
+  toNumber?: string;
+  startedAt: string;
+  endedAt?: string | null;
+  durationSeconds: number;
+  isHandedToSales: boolean;
+  turnCount: number;
+  turns: CallTurn[];
+};
+
+export type LeadTranscriptsData = {
+  leadId: string;
+  customerId: string;
+  projectName: string;
+  jobId: string;
+  tabs: TranscriptTabStatus;
+  summary?: TranscriptSummary;
+  chat?: {
+    messageCount: number;
+    messages: LeadDetailMessage[];
+  };
+  call?: {
+    sessionCount: number;
+    turnCount: number;
+    sessions: CallSession[];
+  };
+};
+
+export type LeadTranscriptsResponse = {
+  success: boolean;
+  data: LeadTranscriptsData;
+};
+
+export type LeadCallItem = {
+  callSessionId: string;
+  twilioCallSid: string;
+  status: string;
+  fromNumber: string;
+  toNumber?: string;
+  startedAt: string;
+  endedAt?: string | null;
+  durationSeconds: number;
+  isHandedToSales: boolean;
+};
+
+export type LeadCallsResponse = {
+  success: boolean;
+  data: {
+    calls: LeadCallItem[];
+    total: number;
+    page: number;
+    limit: number;
+  };
+};
+
+export type CallDetailResponse = {
+  success: boolean;
+  data: {
+    call: LeadCallItem & { leadId: string };
+    turns: CallTurn[];
+  };
+};
+
+export async function getLeadTranscriptsProvider(
+  leadId: string,
+  channel: TranscriptChannel = "all",
+): Promise<LeadTranscriptsResponse> {
+  const response = await apiClient.get<LeadTranscriptsResponse>(
+    `/api/sales/leads/${leadId}/transcripts`,
+    {
+      params: { channel },
+    },
+  );
+
+  return response.data;
+}
+
+export async function getLeadCallsProvider(
+  leadId: string,
+  page = 1,
+  limit = 20,
+): Promise<LeadCallsResponse> {
+  const response = await apiClient.get<LeadCallsResponse>(
+    `/api/sales/leads/${leadId}/calls`,
+    {
+      params: { page, limit },
+    },
+  );
+
+  return response.data;
+}
+
+export async function getCallDetailProvider(
+  callSessionId: string,
+): Promise<CallDetailResponse> {
+  const response = await apiClient.get<CallDetailResponse>(
+    `/api/sales/calls/${callSessionId}`,
+  );
+
+  return response.data;
+}
+
 
