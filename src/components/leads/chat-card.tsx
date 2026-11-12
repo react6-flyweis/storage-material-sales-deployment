@@ -93,6 +93,7 @@ type LeadChatMessagePayload = {
   createdAt?: string;
   origin?: "chat" | "call";
   callSessionId?: string | null;
+  channel?: string | null;
 };
 
 function formatMessageTime(value?: string) {
