@@ -1144,6 +1144,7 @@ export type LeadTranscriptsData = {
   jobId: string;
   tabs: TranscriptTabStatus;
   summary?: TranscriptSummary;
+  messages?: LeadDetailMessage[];
   chat?: {
     messageCount: number;
     messages: LeadDetailMessage[];
