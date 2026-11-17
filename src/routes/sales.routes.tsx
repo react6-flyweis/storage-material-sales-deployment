@@ -67,6 +67,9 @@ const ContractDetail = lazy(() => import("@/pages/customers/contract-detail"));
 
 const Meetings = lazy(() => import("@/pages/meetings/meetings"));
 const ScheduleMeeting = lazy(() => import("@/pages/meetings/schedule-meeting"));
+const ZoomMeetingRoom = lazy(
+  () => import("@/pages/meetings/zoom-meeting-room"),
+);
 
 // leads section
 const Leads = lazy(() => import("@/pages/leads/leads"));
@@ -213,6 +216,10 @@ export const salesRoutes: RouteObject[] = [
               {
                 path: "reschedule/:id",
                 element: <ScheduleMeeting />,
+              },
+              {
+                path: "room/:id",
+                element: <ZoomMeetingRoom />,
               },
             ],
           },
