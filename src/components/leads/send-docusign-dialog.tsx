@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Send, FileSignature, CheckCircle2, ShieldCheck, Mail, User } from "lucide-react";
+import { Send, FileSignature, ShieldCheck, Mail, User } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
