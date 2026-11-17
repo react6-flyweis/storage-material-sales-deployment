@@ -5,7 +5,6 @@ import {
   FileSignature,
   FileText,
   Mail,
-  Send,
   CheckCircle2,
   Clock,
   Eye,
@@ -19,7 +18,7 @@ import { useNavigate, useParams } from "react-router";
 import { useLeadAgreementQuery, useLeadDetailQuery } from "@/modules/leads/leads.hooks";
 import UploadAgreementDialog from "@/components/leads/upload-agreement-dialog";
 import SendDocuSignDialog, {
-  DocuSignSendPayload,
+  type DocuSignSendPayload,
 } from "@/components/leads/send-docusign-dialog";
 import VoidDocuSignDialog from "@/components/leads/void-docusign-dialog";
 import { toast } from "sonner";
