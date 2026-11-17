@@ -18,6 +18,7 @@ import {
   Clock,
   PlusIcon,
   Check,
+  Video,
 } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
 import { useCompleteFollowUpMutation } from "@/modules/followups/followups.hooks";
@@ -333,23 +334,14 @@ export default function FollowUpsCard({
                     </div>
                     <div>
                       {m.action === "call" ? (
-                        m.meetingLink ? (
-                          <a href={m.meetingLink} target="_blank" rel="noopener noreferrer">
-                            <Button
-                              variant="ghost"
-                              className="bg-green-50 text-green-700"
-                            >
-                              <Phone className="h-4 w-4 mr-2" /> Join
-                            </Button>
-                          </a>
-                        ) : (
+                        <Link to={`/meetings/room/${m.id}`}>
                           <Button
                             variant="ghost"
-                            className="bg-green-50 text-green-700"
+                            className="bg-blue-50 text-blue-700 hover:bg-blue-100 flex items-center"
                           >
-                            <Phone className="h-4 w-4 mr-2" /> Call
+                            <Video className="h-4 w-4 mr-1.5 text-blue-600" /> Join Zoom
                           </Button>
-                        )
+                        </Link>
                       ) : (
                         <Button
                           variant="ghost"
