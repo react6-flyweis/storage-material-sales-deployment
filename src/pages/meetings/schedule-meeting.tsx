@@ -114,6 +114,14 @@ export default function ScheduleMeeting() {
     return "";
   });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [platform, setPlatform] = useState<"zoom" | "custom">(() => {
+    if (isEditMode && passedMeeting?.rawMeeting?.meetingLink) {
+      return passedMeeting.rawMeeting.meetingLink.includes("/meetings/room/")
+        ? "zoom"
+        : "custom";
+    }
+    return "zoom";
+  });
 
   const createMeetingMutation = useCreateMeetingMutation();
   const updateMeetingMutation = useUpdateMeetingMutation();
@@ -155,9 +163,9 @@ export default function ScheduleMeeting() {
       title: "",
       date: "",
       time: "",
-      duration: "",
+      duration: "45",
       reminderMinutes: "30",
-      link: "",
+      link: `${window.location.origin}/meetings/room/meet_${Date.now().toString(36)}`,
       notes: "",
       client: leadIdParam,
     };
@@ -414,34 +422,63 @@ export default function ScheduleMeeting() {
             {/* Meeting mode */}
             <div className="space-y-2 sm:col-span-2">
               <Label>Meeting mode</Label>
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pt-2">
+              <div className="flex flex-wrap items-center gap-4 pt-1">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="radio"
-                    value="online"
-                    {...register("mode")}
+                    value="zoom"
+                    checked={mode === "online" && platform === "zoom"}
+                    onChange={() => {
+                      setValue("mode", "online", { shouldValidate: true });
+                      setPlatform("zoom");
+                      const roomUrl = `${window.location.origin}/meetings/room/meet_${Date.now().toString(36)}`;
+                      setValue("link", roomUrl, { shouldValidate: true });
+                    }}
                     className="w-4 h-4 text-blue-600"
                   />
-                  <span className="text-sm text-gray-700">Online</span>
+                  <span className="text-sm text-gray-700">Zoom In-App Meeting</span>
                 </label>
+
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    value="custom_online"
+                    checked={mode === "online" && platform === "custom"}
+                    onChange={() => {
+                      setValue("mode", "online", { shouldValidate: true });
+                      setPlatform("custom");
+                      setValue("link", "", { shouldValidate: true });
+                    }}
+                    className="w-4 h-4 text-blue-600"
+                  />
+                  <span className="text-sm text-gray-700">Online Link (Google Meet / Other)</span>
+                </label>
+
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="radio"
                     value="in-person"
-                    {...register("mode")}
+                    checked={mode === "in-person"}
+                    onChange={() => {
+                      setValue("mode", "in-person", { shouldValidate: true });
+                      setValue("link", "");
+                    }}
                     className="w-4 h-4 text-blue-600"
                   />
                   <span className="text-sm text-gray-700">In Person</span>
                 </label>
               </div>
-              {errors.mode && (
-                <p className="text-sm text-red-500">{errors.mode.message}</p>
+
+              {mode === "online" && platform === "zoom" && (
+                <p className="text-xs text-blue-600 pt-0.5">
+                  Zoom room is configured and will start at the scheduled time directly inside the panel.
+                </p>
               )}
             </div>
           </div>
 
-          {/* Meeting Link */}
-          {mode === "online" && (
+          {/* Custom Link if external online mode */}
+          {mode === "online" && platform === "custom" && (
             <div className="space-y-2">
               <Label htmlFor="link">
                 Meeting Link <span className="text-red-500">*</span>

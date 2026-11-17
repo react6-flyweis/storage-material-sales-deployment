@@ -181,12 +181,23 @@ export default function Meetings() {
           </Select>
         </div>
 
-        <Button
-          className="bg-blue-600 hover:bg-blue-700 mt-3 sm:mt-0 w-full sm:w-auto"
-          onClick={() => navigate("/meetings/schedule")}
-        >
-          Schedule meeting
-        </Button>
+        <div className="flex flex-col sm:flex-row items-center gap-2 mt-3 sm:mt-0 w-full sm:w-auto">
+          <Button
+            variant="outline"
+            className="border-blue-500 text-blue-600 hover:bg-blue-50 flex items-center gap-1.5 w-full sm:w-auto"
+            onClick={() => navigate("/meetings/room/demo")}
+          >
+            <Video className="h-4 w-4 text-blue-600" />
+            <span>Launch Demo Zoom Room</span>
+          </Button>
+
+          <Button
+            className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
+            onClick={() => navigate("/meetings/schedule")}
+          >
+            Schedule meeting
+          </Button>
+        </div>
       </div>
 
       {/* {isError ? (
@@ -214,71 +225,134 @@ export default function Meetings() {
               <div className="h-8 w-full rounded bg-gray-200 animate-pulse mt-2" />
             </Card>
           ))
-          : filteredMeetings.map((meeting) => (
-            <Card
-              key={meeting.id}
-              className="p-4 gap-2  bg-[#F9FAFB] shadow border-0 ring-0"
-            >
-              {/* Header with title and status */}
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-semibold text-gray-900">
-                    {meeting.title}
-                  </h3>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {meeting.organizer}
-                  </p>
-                </div>
-                <Badge className={getStatusColor(meeting.status)}>
-                  {meeting.status}
-                </Badge>
-              </div>
+          : filteredMeetings.map((meeting) => {
+            const meetingDate = meeting.rawMeeting?.meetingTime
+              ? new Date(meeting.rawMeeting.meetingTime)
+              : null;
+            const diffMinutes = meetingDate
+              ? Math.round((meetingDate.getTime() - Date.now()) / (1000 * 60))
+              : 0;
+            const duration = meeting.rawMeeting?.duration || 45;
+            const isLiveNow = diffMinutes <= 0 && diffMinutes >= -duration;
+            const isStartingSoon = diffMinutes > 0 && diffMinutes <= 60;
 
-              {/* Meeting Details */}
-              <div className="flex items-center gap-2 space-y-1">
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Calendar className="h-4 w-4" />
-                  <span>{meeting.date}</span>
+            return (
+              <Card
+                key={meeting.id}
+                className="p-4 gap-2 bg-[#F9FAFB] shadow border-0 ring-0"
+              >
+                {/* Header with title and status */}
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-semibold text-gray-900">
+                      {meeting.title}
+                    </h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {meeting.organizer}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <Badge className={getStatusColor(meeting.status)}>
+                      {meeting.status}
+                    </Badge>
+                    {isLiveNow && (
+                      <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1 bg-emerald-50 px-1.5 py-0.5 rounded">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                        Live Now
+                      </span>
+                    )}
+                    {isStartingSoon && (
+                      <span className="text-[10px] text-blue-600 font-medium bg-blue-50 px-1.5 py-0.5 rounded">
+                        Starts in {diffMinutes}m
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Clock className="h-4 w-4" />
-                  <span>{meeting.time}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Video className="h-4 w-4" />
-                  <span>{meeting.type}</span>
-                </div>
-              </div>
 
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-2 mt-2">
-                {meeting.status !== "Completed" && (
-                  <Button
-                    size="sm"
-                    className="w-full sm:flex-1 bg-blue-200 text-blue-600 hover:bg-blue-100 hover:text-blue-700"
-                    onClick={() =>
-                      navigate(`/meetings/reschedule/${meeting.id}`, {
-                        state: { meeting },
-                      })
-                    }
-                  >
-                    Edit
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  className="w-full sm:flex-1 bg-orange-200 text-orange-600 hover:bg-orange-100 hover:text-orange-700"
-                  onClick={() =>
-                    navigate(`/meetings/reschedule/${meeting.id}`, {
-                      state: { meeting },
-                    })
-                  }
-                >
-                  Reschedule meeting
-                </Button>
-              </div>
-            </Card>
-          ))}
+                {/* Meeting Details */}
+                <div className="flex items-center gap-2 space-y-1">
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Calendar className="h-4 w-4" />
+                    <span>{meeting.date}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Clock className="h-4 w-4" />
+                    <span>{meeting.time}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Video className="h-4 w-4" />
+                    <span>{meeting.type}</span>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col gap-2 mt-3 pt-3 border-t border-gray-100">
+                  {meeting.status !== "Completed" && (
+                    <Button
+                      size="sm"
+                      className={`w-full flex items-center justify-center gap-1.5 shadow-sm font-medium ${
+                        isLiveNow
+                          ? "bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse"
+                          : "bg-blue-600 hover:bg-blue-700 text-white"
+                      }`}
+                      onClick={() =>
+                        navigate(`/meetings/room/${meeting.id}`, {
+                          state: {
+                            meeting: {
+                              ...meeting.rawMeeting,
+                              title: meeting.title,
+                              organizer: meeting.organizer,
+                              meetingTime: meeting.rawMeeting?.meetingTime,
+                              duration,
+                              notes: meeting.rawMeeting?.notes,
+                            },
+                          },
+                        })
+                      }
+                    >
+                      <Video className="h-4 w-4" />
+                      <span>
+                        {isLiveNow
+                          ? "Join Live Meeting Now"
+                          : isStartingSoon
+                            ? `Start Meeting (In ${diffMinutes}m)`
+                            : `Enter Room (Scheduled ${meeting.time})`}
+                      </span>
+                    </Button>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    {meeting.status !== "Completed" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                        onClick={() =>
+                          navigate(`/meetings/reschedule/${meeting.id}`, {
+                            state: { meeting },
+                          })
+                        }
+                      >
+                        Edit
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 bg-white border-orange-200 text-orange-600 hover:bg-orange-50"
+                      onClick={() =>
+                        navigate(`/meetings/reschedule/${meeting.id}`, {
+                          state: { meeting },
+                        })
+                      }
+                    >
+                      Reschedule
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
       </div>
 
       {/* Empty State */}
