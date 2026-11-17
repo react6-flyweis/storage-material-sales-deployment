@@ -1,6 +1,8 @@
+import * as React from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
-import { ArrowLeft, Archive, RotateCcw } from "lucide-react";
+import { ArrowLeft, Archive, RotateCcw, Send, FileSignature } from "lucide-react";
 import UploadAgreementDialog from "@/components/leads/upload-agreement-dialog";
+import SendDocuSignDialog from "@/components/leads/send-docusign-dialog";
 import MoveToOrdersDialog from "@/components/leads/move-to-orders-dialog";
 import ArchiveLeadDialog from "@/components/leads/archive-lead-dialog";
 import RestoreLeadDialog from "@/components/leads/restore-lead-dialog";
@@ -93,6 +95,14 @@ export default function LeadDetails() {
   const { leadId } = useParams<{ leadId: string }>();
   const { data: response, isLoading } = useLeadDetailQuery(leadId);
 
+  const [activeEnvelope, setActiveEnvelope] = React.useState<{
+    id?: string;
+    status: string;
+    signerName?: string;
+    signerEmail?: string;
+    sentAt?: string;
+  } | null>(null);
+
   const detail = response?.success ? response.data : undefined;
   const canMoveToOrders =
     !detail?.lead.isRaisedToPO &&
@@ -130,6 +140,15 @@ export default function LeadDetails() {
       "type" in doc &&
       (doc as { type: unknown }).type === "contract"
   );
+
+  const isEnvelopeActive =
+    activeEnvelope && (activeEnvelope.status === "sent" || activeEnvelope.status === "viewed");
+
+  const customerName = detail?.customer
+    ? `${detail.customer.firstName || ""} ${detail.customer.lastName || ""}`.trim()
+    : "";
+  const customerEmail = detail?.customer?.email || "";
+  const projectName = detail?.lead?.projectName || "Project";
 
   return (
     <div className="p-5">
@@ -201,8 +220,53 @@ export default function LeadDetails() {
               >
                 <span>View Agreement</span>
               </Button>
+            ) : isEnvelopeActive ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-sm border-blue-300 bg-blue-50/70 text-blue-700 hover:bg-blue-100 shadow-sm gap-2"
+                onClick={() => {
+                  if (!leadId) return;
+                  navigate(`/leads/${leadId}/agreement`);
+                }}
+              >
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600"></span>
+                </span>
+                <span>DocuSign: Awaiting Signature</span>
+              </Button>
             ) : (
-              <UploadAgreementDialog leadId={leadId} />
+              <div className="flex items-center gap-2">
+                <SendDocuSignDialog
+                  leadId={leadId}
+                  projectName={projectName}
+                  defaultSignerName={customerName}
+                  defaultSignerEmail={customerEmail}
+                  onSuccess={(payload) => {
+                    setActiveEnvelope({
+                      id: `env_${Date.now()}`,
+                      status: "sent",
+                      signerName: payload.signerName,
+                      signerEmail: payload.signerEmail,
+                      sentAt: new Date().toISOString(),
+                    });
+                    if (leadId) {
+                      navigate(`/leads/${leadId}/agreement`);
+                    }
+                  }}
+                  trigger={
+                    <Button
+                      size="sm"
+                      className="rounded-sm shadow-md bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                      <span>Send Contract</span>
+                    </Button>
+                  }
+                />
+                <UploadAgreementDialog leadId={leadId} />
+              </div>
             )}
           </div>
         </div>
@@ -253,6 +317,42 @@ export default function LeadDetails() {
                 </Button>
               }
             />
+          </div>
+        )}
+
+        {isEnvelopeActive && !hasContract && (
+          <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-3 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
+                <FileSignature className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-slate-900">
+                    Agreement Sent via DocuSign
+                  </span>
+                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-800">
+                    {activeEnvelope.status === "viewed" ? "Opened by Customer" : "Awaiting Signature"}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-xs text-slate-600">
+                  Fabrication &amp; Supply Agreement sent to{" "}
+                  <strong className="font-medium text-slate-700">{activeEnvelope.signerEmail}</strong>.
+                </p>
+              </div>
+            </div>
+
+            <Button
+              size="sm"
+              variant="outline"
+              className="bg-white border-blue-200 text-blue-700 hover:bg-blue-50 shadow-xs text-xs self-start sm:self-center"
+              onClick={() => {
+                if (!leadId) return;
+                navigate(`/leads/${leadId}/agreement`);
+              }}
+            >
+              Track Agreement &rarr;
+            </Button>
           </div>
         )}
 

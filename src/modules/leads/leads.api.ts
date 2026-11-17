@@ -409,6 +409,7 @@ export type LeadDetailCustomer = {
   _id: string;
   customerId: string;
   firstName: string;
+  lastName?: string;
   email: string;
   phone?: {
     number: string;
