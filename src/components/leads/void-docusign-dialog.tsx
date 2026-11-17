@@ -93,7 +93,7 @@ export default function VoidDocuSignDialog({
               </DialogTitle>
             </div>
             <DialogDescription className="text-xs text-slate-500">
-              This will cancel the active DocuSign signing session. This action cannot be undone.
+              This will cancel the active DocuSign signing session{envelopeId ? ` (${envelopeId})` : ""}. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
 
