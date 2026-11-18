@@ -2,7 +2,7 @@ import CommunicationView from "@/components/communication/CommunicationView";
 
 export default function Communication() {
   return (
-    <div className="p-5 h-[calc(100vh-80px)]">
+    <div className="p-5 h-[calc(100vh-80px)]" data-tour="communication-view">
       <CommunicationView />
     </div>
   );
