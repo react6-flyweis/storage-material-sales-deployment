@@ -500,7 +500,7 @@ export function QuoteHistoryPage() {
       </div>
 
       {/* Quotation History Section */}
-      <div className="space-y-4 pt-2">
+      <div className="space-y-4 pt-2" data-tour="quote-history-table">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-slate-600 tracking-wide">
             Quotation History ({totalItems})

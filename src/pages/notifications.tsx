@@ -43,30 +43,40 @@ export type FilterOption = {
   type: string;
 };
 
-const iconMap: Record<
-  string,
-  { icon: LucideIcon; bg: string; text: string }
-> = {
-  new: { icon: UserPlus, bg: "bg-[#DBEAFE]", text: "text-[#1D51A4]" },
-  lead: { icon: UserPlus, bg: "bg-[#DBEAFE]", text: "text-[#1D51A4]" },
-  update: { icon: RefreshCw, bg: "bg-blue-100", text: "text-blue-600" },
-  task: { icon: CheckSquare, bg: "bg-purple-100", text: "text-purple-600" },
-  reminder: { icon: Clock, bg: "bg-yellow-100", text: "text-yellow-600" },
-  followup: { icon: Clock, bg: "bg-yellow-100", text: "text-yellow-600" },
-  alert: { icon: AlertTriangle, bg: "bg-red-100", text: "text-red-600" },
-  escalation: { icon: AlertTriangle, bg: "bg-red-100", text: "text-red-600" },
-  schedule: { icon: Calendar, bg: "bg-cyan-100", text: "text-cyan-600" },
-  meeting: { icon: Calendar, bg: "bg-cyan-100", text: "text-cyan-600" },
-  payment: { icon: DollarSign, bg: "bg-green-100", text: "text-green-600" },
-  drawing: { icon: FileSpreadsheet, bg: "bg-indigo-100", text: "text-indigo-600" },
-  delivery: { icon: Truck, bg: "bg-amber-100", text: "text-amber-600" },
-  material_request: { icon: Package, bg: "bg-teal-100", text: "text-teal-600" },
-  quotation: { icon: FileText, bg: "bg-emerald-100", text: "text-emerald-600" },
-  invoice: { icon: FileText, bg: "bg-blue-100", text: "text-blue-700" },
-  freight_bid: { icon: Truck, bg: "bg-orange-100", text: "text-orange-600" },
-  chat: { icon: MessageSquare, bg: "bg-sky-100", text: "text-sky-600" },
-  system: { icon: AlertCircle, bg: "bg-gray-100", text: "text-gray-600" },
-};
+const iconMap: Record<string, { icon: LucideIcon; bg: string; text: string }> =
+  {
+    new: { icon: UserPlus, bg: "bg-[#DBEAFE]", text: "text-[#1D51A4]" },
+    lead: { icon: UserPlus, bg: "bg-[#DBEAFE]", text: "text-[#1D51A4]" },
+    update: { icon: RefreshCw, bg: "bg-blue-100", text: "text-blue-600" },
+    task: { icon: CheckSquare, bg: "bg-purple-100", text: "text-purple-600" },
+    reminder: { icon: Clock, bg: "bg-yellow-100", text: "text-yellow-600" },
+    followup: { icon: Clock, bg: "bg-yellow-100", text: "text-yellow-600" },
+    alert: { icon: AlertTriangle, bg: "bg-red-100", text: "text-red-600" },
+    escalation: { icon: AlertTriangle, bg: "bg-red-100", text: "text-red-600" },
+    schedule: { icon: Calendar, bg: "bg-cyan-100", text: "text-cyan-600" },
+    meeting: { icon: Calendar, bg: "bg-cyan-100", text: "text-cyan-600" },
+    payment: { icon: DollarSign, bg: "bg-green-100", text: "text-green-600" },
+    drawing: {
+      icon: FileSpreadsheet,
+      bg: "bg-indigo-100",
+      text: "text-indigo-600",
+    },
+    delivery: { icon: Truck, bg: "bg-amber-100", text: "text-amber-600" },
+    material_request: {
+      icon: Package,
+      bg: "bg-teal-100",
+      text: "text-teal-600",
+    },
+    quotation: {
+      icon: FileText,
+      bg: "bg-emerald-100",
+      text: "text-emerald-600",
+    },
+    invoice: { icon: FileText, bg: "bg-blue-100", text: "text-blue-700" },
+    freight_bid: { icon: Truck, bg: "bg-orange-100", text: "text-orange-600" },
+    chat: { icon: MessageSquare, bg: "bg-sky-100", text: "text-sky-600" },
+    system: { icon: AlertCircle, bg: "bg-gray-100", text: "text-gray-600" },
+  };
 
 export default function Notifications() {
   const navigate = useNavigate();
@@ -190,7 +200,10 @@ export default function Notifications() {
   };
 
   return (
-    <div className="xl:px-5 px-2 md:pt-5 pb-10 space-y-6">
+    <div
+      className="xl:px-5 px-2 md:pt-5 pb-10 space-y-6"
+      data-tour="notifications-hub"
+    >
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 mt-2">
         <div className="flex items-start gap-1 flex-col">
@@ -245,7 +258,7 @@ export default function Notifications() {
                   {
                     "bg-[#1D51A4] text-white hover:bg-[#153f82]": isActive,
                     "bg-gray-100 text-gray-600 hover:bg-gray-200": !isActive,
-                  }
+                  },
                 )}
               >
                 {filter.label}
@@ -270,7 +283,7 @@ export default function Notifications() {
                 onClick={() => handleNotificationClick(notification)}
                 className={cn(
                   "p-6 flex flex-col md:flex-row items-start justify-between gap-4 hover:bg-gray-50 transition-colors cursor-pointer group",
-                  !notification.isRead ? "bg-blue-50/30" : ""
+                  !notification.isRead ? "bg-blue-50/30" : "",
                 )}
               >
                 <div className="flex items-start gap-4 flex-1">
@@ -290,7 +303,7 @@ export default function Notifications() {
                         <span
                           className={cn(
                             "text-[10px] font-semibold px-2 py-0.5 rounded border capitalize",
-                            getPriorityBadgeClass(notification.priority)
+                            getPriorityBadgeClass(notification.priority),
                           )}
                         >
                           {notification.priority} priority
@@ -336,7 +349,8 @@ export default function Notifications() {
         {totalPages > 1 && (
           <div className="p-4 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3">
             <span className="text-xs text-gray-500">
-              Showing page {page} of {totalPages} ({totalItems} total notifications)
+              Showing page {page} of {totalPages} ({totalItems} total
+              notifications)
             </span>
 
             <div className="flex items-center gap-2">
@@ -354,7 +368,9 @@ export default function Notifications() {
                 size="sm"
                 variant="outline"
                 disabled={page >= totalPages}
-                onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
+                onClick={() =>
+                  setPage((prev) => Math.min(prev + 1, totalPages))
+                }
                 className="text-xs flex items-center gap-1 cursor-pointer"
               >
                 Next

@@ -447,7 +447,7 @@ export default function BasicDetails({
       </Card>
 
       {/* Notes Section */}
-      <Card className="p-6 gap-0">
+      <Card className="p-6 gap-0" data-tour="lead-notes-card">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-[16px] font-bold text-slate-800">Notes</h3>
           <AddNotesDialog leadId={leadData?._id} />
@@ -676,7 +676,7 @@ export default function BasicDetails({
       </div>
 
       {/* Project Lifecycle */}
-      <Card className="">
+      <Card className="" data-tour="lead-lifecycle-status">
         <CardHeader>
           <CardTitle>Project Lifecycle</CardTitle>
         </CardHeader>

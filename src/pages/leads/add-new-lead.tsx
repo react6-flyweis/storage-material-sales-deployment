@@ -222,7 +222,11 @@ export default function AddNewLead() {
   const submitting = isSubmitting || createLeadMutation.isPending || updateLeadMutation.isPending;
 
   return (
-    <form className="p-6 w-full min-h-0" onSubmit={handleSubmit(onSubmit, onInvalid)}>
+    <form
+      className="p-6 w-full min-h-0"
+      data-tour="add-lead-form"
+      onSubmit={handleSubmit(onSubmit, onInvalid)}
+    >
       <div className="mb-6 flex items-start justify-between">
         <div className="flex items-start gap-4">
           <Button type="button" onClick={() => navigate(-1)} aria-label="Back">

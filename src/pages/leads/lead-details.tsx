@@ -30,7 +30,7 @@ const TAB_VALUES = new Set<LeadTab>(TABS.map((tab) => tab.value));
 
 function LeadDetailsSkeleton() {
   return (
-    <div className="p-5">
+    <div className="p-5" data-tour="lead-details-content">
       <div className="animate-pulse space-y-6">
         <div className="flex items-start gap-4">
           <div className="h-10 w-24 rounded-lg bg-slate-200" />
@@ -132,7 +132,7 @@ export default function LeadDetails() {
   );
 
   return (
-    <div className="p-5">
+    <div className="p-5" data-tour="lead-details-content">
       <div className=" rounded-b-lg">
         <div className="flex items-start justify-between">
           <div className="flex items-start gap-4">

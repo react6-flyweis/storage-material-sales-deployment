@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { HeaderSearch } from "@/components/header-search";
 import { NotificationMenu } from "@/components/notification-menu";
 import { UserMenu } from "@/components/user-menu";
+import { TourHubMenu } from "@/modules/tour/components/tour-hub-menu";
 import steelLogo from "@/assets/steel-building-depot-logo.png";
 
 interface HeaderProps {
@@ -25,13 +26,17 @@ export function Header({ onMenuClick }: HeaderProps) {
         </Button>
 
         {/* Search Bar */}
-        <div className="hidden md:block">
+        <div className="hidden md:block" data-tour="header-search">
           <HeaderSearch />
         </div>
 
         {/* Right Side - Notifications and Logo */}
         <div className="flex items-center gap-3 md:gap-6">
-          <NotificationMenu />
+          <div data-tour="notifications-menu">
+            <NotificationMenu />
+          </div>
+
+          <TourHubMenu />
 
           <UserMenu>
             <Button variant="ghost" size="icon" className="rounded-full">
