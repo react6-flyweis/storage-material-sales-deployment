@@ -348,7 +348,7 @@ export default function LeadsPage() {
           <div className="flex flex-wrap gap-3">
             {!isArchived && (
               <>
-                <Link to="/leads/add" className="inline-block">
+                <Link to="/leads/add" className="inline-block" data-tour="add-lead-btn">
                   <Button className="bg-blue-600 hover:bg-blue-700">
                     <UserPlus className="" />
                     Add Lead
@@ -460,7 +460,7 @@ export default function LeadsPage() {
         </div>
 
         {/* Table */}
-        <Card className="p-0">
+        <Card className="p-0" data-tour="leads-table">
           <CardContent className="p-0">
             <Table>
               <TableHeader className="bg-gray-50">
