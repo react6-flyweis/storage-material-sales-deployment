@@ -1,4 +1,11 @@
-export type TourId = "sales-pipeline" | "quotation-deep-dive";
+export type TourId = "sales-pipeline" | "leads-deep-dive" | "quotation-deep-dive";
+
+export interface TourStepBranchConfig {
+  tourId: TourId;
+  label: string;
+  description?: string;
+  resumeStepIndex?: number;
+}
 
 export interface TourStepConfig {
   id: string;
@@ -9,6 +16,7 @@ export interface TourStepConfig {
   speechText?: string;
   side?: "top" | "right" | "bottom" | "left";
   align?: "start" | "center" | "end";
+  branch?: TourStepBranchConfig;
 }
 
 export interface TourDefinition {
