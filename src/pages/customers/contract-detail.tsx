@@ -38,7 +38,7 @@ export default function ContractDetail() {
   }
 
   return (
-    <div className="p-5 flex flex-col h-[calc(100vh-4rem)]">
+    <div data-tour="contract-detail-view" className="p-5 flex flex-col h-[calc(100vh-4rem)]">
       {/* Header */}
       <div className="mb-4 flex items-center justify-between shrink-0">
         <Button
