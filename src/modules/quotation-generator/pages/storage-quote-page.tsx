@@ -1521,7 +1521,7 @@ export default function StorageQuotePage() {
   });
 
   return (
-    <div className="p-5 space-y-6">
+    <div className="p-5 space-y-6" data-tour="storage-cog-workspace">
       {/* Top Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
