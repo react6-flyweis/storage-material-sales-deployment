@@ -44,7 +44,7 @@ export default function LeadTranscriptsCard({
   const callCount = transcripts?.call?.sessionCount ?? 0;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div data-tour="lead-chat-card" className="flex flex-col gap-3">
       {/* Sub-tab Navigation Switcher */}
       <div className="flex flex-wrap items-center justify-between gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200/80 shadow-2xs">
         <div className="flex items-center gap-1 p-0.5 bg-slate-100/90 rounded-lg">
