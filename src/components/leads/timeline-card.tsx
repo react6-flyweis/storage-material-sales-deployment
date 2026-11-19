@@ -12,7 +12,7 @@ const progressSteps = LEAD_LIFECYCLE_STEPS;
 export default function TimelineCard({ lead }: { lead: LeadDetailLead }) {
   const progress = getLeadLifecycleStepId(lead.lifecycleStatus ?? "");
   return (
-    <Card className="flex flex-col gap-6 p-6">
+    <Card data-tour="lead-timeline-card" className="flex flex-col gap-6 p-6">
       <div>
         <div className="text-sm text-gray-500">
           {/* Lead ID- */}
