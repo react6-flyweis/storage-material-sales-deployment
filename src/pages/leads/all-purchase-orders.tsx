@@ -97,7 +97,10 @@ export default function AllPurchaseOrdersPage() {
         subtitle="Assign and view leads"
       />
 
-      <Card className=" border-slate-100 shadow-sm py-0">
+      <Card
+        className=" border-slate-100 shadow-sm py-0"
+        data-tour="purchase-orders-table"
+      >
         <CardContent className="px-0">
           <Table>
             <TableHeader>
