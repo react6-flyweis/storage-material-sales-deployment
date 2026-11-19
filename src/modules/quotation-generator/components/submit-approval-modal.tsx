@@ -102,7 +102,10 @@ export function SubmitApprovalModal({
   return (
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent
+          className="sm:max-w-lg max-h-[90vh] overflow-y-auto"
+          data-tour="submit-approval-modal"
+        >
           <form onSubmit={handleSubmit} className="space-y-5">
             <DialogHeader>
               <DialogTitle className="text-xl font-semibold">
