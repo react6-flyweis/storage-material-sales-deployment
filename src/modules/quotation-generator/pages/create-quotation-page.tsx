@@ -247,7 +247,7 @@ export default function CreateQuotationPage() {
   };
 
   return (
-    <div className="p-5">
+    <div className="p-5" data-tour="pemb-create-workspace">
       {/* Page Header */}
       <div className="flex items-center gap-4 mb-6">
         <Button
