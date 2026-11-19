@@ -161,7 +161,10 @@ export default function AddFollowUpDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleDialogOpenChange}>
-      <DialogContent className="p-0 gap-0 max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        data-tour="add-followup-modal"
+        className="p-0 gap-0 max-h-[90vh] overflow-y-auto"
+      >
         <DialogHeader className="border-b p-5">
           <DialogTitle className="text-lg">Add Follow-up</DialogTitle>
         </DialogHeader>

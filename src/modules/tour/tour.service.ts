@@ -5,11 +5,41 @@ import { toast } from "sonner";
 import type { NavigateFunction } from "react-router";
 import { queryClient } from "@/lib/query-client";
 import { getLeadsProvider, type LeadsListResponse } from "@/modules/leads/leads.api";
+import {
+  getSalesCustomersProvider,
+  getSalesCustomerProjectsProvider,
+  type GetSalesCustomersResponse,
+  type GetSalesCustomerProjectsResponse,
+} from "@/modules/customers/customers.api";
+import {
+  getEstimatesListProvider,
+  type EstimatesListResponse,
+} from "@/modules/quotation-generator/estimates.api";
 import { tourSpeech, type SpeechState } from "./tour-speech.service";
 import { useTourStore } from "./tour.store";
-import type { TourDefinition, TourStepConfig } from "./tour.types";
+import type { TourDefinition, TourStepConfig, TourId } from "./tour.types";
+import { salesPipelineTour } from "./tours/sales-pipeline.tour";
+import { leadsDeepDiveTour } from "./tours/leads-deep-dive.tour";
+import { quotationDeepDiveTour } from "./tours/quotation-deep-dive.tour";
 
-const isLeadDetailsStep = (id: string) => id.startsWith("step-lead-detail");
+export const TOURS_REGISTRY: Record<TourId, TourDefinition> = {
+  "sales-pipeline": salesPipelineTour,
+  "leads-deep-dive": leadsDeepDiveTour,
+  "quotation-deep-dive": quotationDeepDiveTour,
+};
+
+interface ResumeTourContext {
+  tourId: TourId;
+  stepIndex: number;
+}
+
+const isLeadDetailsStep = (id: string) =>
+  id.startsWith("step-lead-detail") ||
+  id.startsWith("step-lead-tab") ||
+  id.startsWith("step-lead-subpage");
+
+const isEstimateDetailsStep = (id: string) =>
+  id.startsWith("step-estimate-") || id.startsWith("step-submit-approval");
 const DESKTOP_TOUR_WIDTH = 1024;
 
 function isTourTargetVisible(element: Element): boolean {
@@ -22,10 +52,10 @@ function isTourTargetVisible(element: Element): boolean {
   return true;
 }
 
-function pathsMatch(currentPath: string, targetRoute: string): boolean {
+function pathsMatch(currentPathWithSearch: string, targetRoute: string): boolean {
   const normalize = (path: string) =>
     path.length > 1 && path.endsWith("/") ? path.slice(0, -1) : path;
-  const current = normalize(currentPath);
+  const current = normalize(currentPathWithSearch);
   const target = normalize(targetRoute);
   if (target === "/" || target === "/dashboard") {
     return current === "/" || current === "/dashboard";
@@ -64,6 +94,98 @@ async function resolveFirstLeadId(): Promise<string | null> {
   }
 }
 
+function readCachedCustomerId(): string | null {
+  const entries = queryClient.getQueriesData<GetSalesCustomersResponse>({
+    queryKey: ["customers", "list"],
+  });
+
+  for (const [, data] of entries) {
+    const customerId = data?.data?.customers?.[0]?._id;
+    if (customerId) return customerId;
+  }
+
+  return null;
+}
+
+async function resolveFirstCustomerId(): Promise<string | null> {
+  const cached = readCachedCustomerId();
+  if (cached) return cached;
+
+  try {
+    const fresh = await queryClient.fetchQuery({
+      queryKey: ["customers", "list", 1, 1, "tour"],
+      queryFn: () => getSalesCustomersProvider(1, 1),
+    });
+    return fresh.data?.customers?.[0]?._id ?? null;
+  } catch (error) {
+    console.warn("[Tour] Unable to resolve a customer ID.", error);
+    return null;
+  }
+}
+
+function readCachedProjectId(customerId?: string): string | null {
+  const entries = queryClient.getQueriesData<GetSalesCustomerProjectsResponse>({
+    queryKey: customerId
+      ? ["customers", "sales-projects", customerId]
+      : ["customers", "sales-projects"],
+  });
+
+  for (const [, data] of entries) {
+    const projectId = data?.data?.projects?.[0]?._id;
+    if (projectId) return projectId;
+  }
+
+  return null;
+}
+
+async function resolveFirstProjectId(customerId?: string): Promise<string | null> {
+  const targetCustId = customerId || (await resolveFirstCustomerId());
+  if (!targetCustId) return null;
+
+  const cached = readCachedProjectId(targetCustId);
+  if (cached) return cached;
+
+  try {
+    const fresh = await queryClient.fetchQuery({
+      queryKey: ["customers", "sales-projects", targetCustId, 1, 1, "tour"],
+      queryFn: () => getSalesCustomerProjectsProvider(targetCustId, 1, 1),
+    });
+    return fresh.data?.projects?.[0]?._id ?? null;
+  } catch (error) {
+    console.warn("[Tour] Unable to resolve a customer project ID.", error);
+    return null;
+  }
+}
+
+function readCachedEstimateId(): string | null {
+  const entries = queryClient.getQueriesData<EstimatesListResponse>({
+    queryKey: ["sales", "estimates"],
+  });
+
+  for (const [, data] of entries) {
+    const estimateId = data?.data?.estimates?.[0]?._id;
+    if (estimateId) return estimateId;
+  }
+
+  return null;
+}
+
+async function resolveFirstEstimateId(): Promise<string | null> {
+  const cached = readCachedEstimateId();
+  if (cached) return cached;
+
+  try {
+    const fresh = await queryClient.fetchQuery({
+      queryKey: ["sales", "estimates", 1, 1, "", "tour"],
+      queryFn: () => getEstimatesListProvider({ page: 1, limit: 1 }),
+    });
+    return fresh.data?.estimates?.[0]?._id ?? null;
+  } catch (error) {
+    console.warn("[Tour] Unable to resolve an estimate ID.", error);
+    return null;
+  }
+}
+
 export class TourCoordinator {
   private driverObj: Driver | null = null;
   private navigate: NavigateFunction | null = null;
@@ -71,6 +193,7 @@ export class TourCoordinator {
   private stepToken = 0;
   private unsubscribe: (() => void) | null = null;
   private currentSpeechUnsub: (() => void) | null = null;
+  private resumeContext: ResumeTourContext | null = null;
 
   private cleanupSpeechSubscription() {
     if (this.currentSpeechUnsub) {
@@ -96,6 +219,9 @@ export class TourCoordinator {
         document.querySelector(step.element) === null &&
         isLeadDetailsStep(step.id)
           ? "There are no leads yet. The deal workspace will appear here after the first inquiry is captured."
+          : document.querySelector(step.element) === null &&
+            isEstimateDetailsStep(step.id)
+          ? "No saved estimates are available yet in the history. Save an estimate draft first to review formal estimate packages and submit them for approval."
           : step.speechText || step.description;
       tourSpeech.speak(textToSpeak, false);
     });
@@ -129,8 +255,15 @@ export class TourCoordinator {
     });
   }
 
-  public async startTour(tour: TourDefinition, startIndex = 0) {
-    this.stopTour();
+  public async startTour(
+    tour: TourDefinition,
+    startIndex = 0,
+    resumeContext?: ResumeTourContext | null,
+  ) {
+    this.stopTour(false);
+    if (resumeContext !== undefined) {
+      this.resumeContext = resumeContext;
+    }
     tourSpeech.prime();
     this.currentTour = tour;
     useTourStore.getState().setActiveTour(tour.id);
@@ -168,7 +301,10 @@ export class TourCoordinator {
     await this.goToStep(startIndex);
   }
 
-  public async goToStep(index: number) {
+  public async goToStep(
+    index: number,
+    direction: "forward" | "backward" = "forward",
+  ) {
     if (!this.currentTour || !this.driverObj) return;
     const token = ++this.stepToken;
     const step = this.currentTour.steps[index];
@@ -182,12 +318,25 @@ export class TourCoordinator {
     const targetRoute = await this.resolveStepRoute(step);
     if (token !== this.stepToken) return;
 
-    if (!targetRoute && isLeadDetailsStep(step.id)) {
-      this.presentStep(step, index, null);
+    const isSpecialStep = isLeadDetailsStep(step.id) || isEstimateDetailsStep(step.id);
+
+    if (!targetRoute) {
+      if (isSpecialStep) {
+        this.presentStep(step, index, null);
+        return;
+      }
+
+      console.info(`[Tour] Route not available for step: ${step.id}. Skipping.`);
+      const nextIndex = direction === "forward" ? index + 1 : index - 1;
+      if (nextIndex >= 0 && nextIndex < this.currentTour.steps.length) {
+        await this.goToStep(nextIndex, direction);
+      } else {
+        this.completeTour();
+      }
       return;
     }
 
-    const currentPath = window.location.pathname;
+    const currentPath = window.location.pathname + window.location.search;
     if (
       targetRoute &&
       this.navigate &&
@@ -196,19 +345,20 @@ export class TourCoordinator {
       this.navigate(targetRoute);
     }
 
-    const timeoutMs = isLeadDetailsStep(step.id) ? 8000 : 4000;
+    const timeoutMs = isSpecialStep ? 8000 : 4000;
     const element = await this.waitForElement(step.element, timeoutMs);
     if (token !== this.stepToken || !this.currentTour || !this.driverObj) return;
 
     if (!element) {
-      if (isLeadDetailsStep(step.id)) {
+      if (isSpecialStep) {
         this.presentStep(step, index, null);
         return;
       }
 
       console.warn(`[Tour] Element not found: ${step.element}. Skipping to next step.`);
-      if (index + 1 < this.currentTour.steps.length) {
-        await this.goToStep(index + 1);
+      const nextIndex = direction === "forward" ? index + 1 : index - 1;
+      if (nextIndex >= 0 && nextIndex < this.currentTour.steps.length) {
+        await this.goToStep(nextIndex, direction);
       } else {
         this.completeTour();
       }
@@ -219,6 +369,22 @@ export class TourCoordinator {
   }
 
   private async resolveStepRoute(step: TourStepConfig): Promise<string | null> {
+    if (step.route.includes(":projectId")) {
+      const projectId = await resolveFirstProjectId();
+      return projectId ? step.route.replace(":projectId", projectId) : null;
+    }
+    if (step.route.includes(":customerId")) {
+      const customerId = await resolveFirstCustomerId();
+      return customerId ? step.route.replace(":customerId", customerId) : null;
+    }
+    if (step.route.includes(":leadId")) {
+      const leadId = await resolveFirstLeadId();
+      return leadId ? step.route.replace(":leadId", leadId) : null;
+    }
+    if (step.route.includes(":estimateId")) {
+      const estimateId = await resolveFirstEstimateId();
+      return estimateId ? step.route.replace(":estimateId", estimateId) : "/quotation/history";
+    }
     if (!isLeadDetailsStep(step.id)) return step.route;
     const leadId = await resolveFirstLeadId();
     return leadId ? `/leads/${leadId}` : null;
@@ -241,15 +407,36 @@ export class TourCoordinator {
     const total = this.currentTour.steps.length;
     const isFirst = index === 0;
     const isLast = index === total - 1;
-    const description =
+    let description =
       element === null && isLeadDetailsStep(step.id)
         ? "No active leads are available yet. Once a lead exists, this workspace tracks communication history, call notes, reminders, and linked quotes."
+        : element === null && isEstimateDetailsStep(step.id)
+        ? "No saved estimates are available yet in the history. Save an estimate draft first to review formal estimate packages and submit them for approval."
         : step.description;
+
+    let speech =
+      element === null && isLeadDetailsStep(step.id)
+        ? "There are no leads yet. The deal workspace will appear here after the first inquiry is captured."
+        : element === null && isEstimateDetailsStep(step.id)
+        ? "No saved estimates are available yet. Save an estimate draft first to review formal packages and submit for approval."
+        : step.speechText || step.description;
+
+    if (isLast && this.resumeContext) {
+      const tourName = this.currentTour.name || "deep dive";
+      description =
+        `You've completed the ${tourName} walkthrough! Click 'Continue Sales Tour' below to return to the core tour.`;
+      speech =
+        `You've completed the ${tourName} walkthrough! Click Continue Sales Tour to resume the core sales tour.`;
+    }
+
+    const nextBtnText = isLast
+      ? (this.resumeContext ? "Continue Sales Tour →" : "Finish Tour ✓")
+      : "Next →";
 
     this.driverObj.highlight({
       ...(element ? { element } : {}),
       popover: {
-        title: step.title,
+        title: isLast && this.resumeContext ? `${this.currentTour.name} Complete!` : step.title,
         description,
         side: step.side || "bottom",
         align: step.align || "start",
@@ -257,7 +444,7 @@ export class TourCoordinator {
         disableButtons: isFirst ? ["previous"] : [],
         showProgress: true,
         progressText: `${index + 1} of ${total}`,
-        nextBtnText: isLast ? "Finish ✓" : "Next →",
+        nextBtnText,
         prevBtnText: "← Back",
         onPopoverRender: (popoverDOM) => {
           this.cleanupSpeechSubscription();
@@ -306,7 +493,11 @@ export class TourCoordinator {
               const textToSpeak =
                 element === null && isLeadDetailsStep(step.id)
                   ? "There are no leads yet. The deal workspace will appear here after the first inquiry is captured."
-                  : step.speechText || step.description;
+                  : element === null && isEstimateDetailsStep(step.id)
+                  ? "No saved estimates are available yet in the history. Save an estimate draft first to review formal estimate packages and submit them for approval."
+                  : isLast && this.resumeContext
+                    ? `You've completed the ${this.currentTour?.name || "walkthrough"}! Click Continue Sales Tour to resume the core sales tour.`
+                    : step.speechText || step.description;
               tourSpeech.speak(textToSpeak, false);
               return;
             }
@@ -317,30 +508,86 @@ export class TourCoordinator {
           this.currentSpeechUnsub = tourSpeech.onStateChange((state) => {
             updateBadge(state);
           });
+
+          // Handle Branching Button
+          const existingBranchBox = popoverDOM.wrapper.querySelector(
+            ".tour-branch-container",
+          );
+          if (step.branch) {
+            if (!existingBranchBox) {
+              const branchBox = document.createElement("div");
+              branchBox.className = "tour-branch-container";
+
+              const promptEl = document.createElement("div");
+              promptEl.className = "tour-branch-prompt";
+              promptEl.textContent =
+                step.branch.description ||
+                "Want to explore this section in depth?";
+
+              const btn = document.createElement("button");
+              btn.type = "button";
+              btn.className = "tour-branch-btn";
+              btn.innerHTML = `
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <span>${step.branch.label}</span>
+              `;
+
+              btn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const targetTour = TOURS_REGISTRY[step.branch!.tourId];
+                if (!targetTour) return;
+
+                const resumeStepIndex =
+                  step.branch!.resumeStepIndex ?? index + 1;
+                const resumeCtx: ResumeTourContext = {
+                  tourId: this.currentTour!.id,
+                  stepIndex: resumeStepIndex,
+                };
+
+                toast.info(`Launching ${targetTour.name}...`);
+                void this.startTour(targetTour, 0, resumeCtx);
+              };
+
+              branchBox.appendChild(promptEl);
+              branchBox.appendChild(btn);
+
+              if (popoverDOM.description && popoverDOM.description.parentNode) {
+                popoverDOM.description.parentNode.insertBefore(
+                  branchBox,
+                  popoverDOM.description.nextSibling,
+                );
+              } else if (popoverDOM.footer) {
+                popoverDOM.wrapper.insertBefore(branchBox, popoverDOM.footer);
+              } else {
+                popoverDOM.wrapper.appendChild(branchBox);
+              }
+            }
+          } else if (existingBranchBox) {
+            existingBranchBox.remove();
+          }
         },
         onNextClick: () => {
           this.cleanupSpeechSubscription();
           tourSpeech.stop();
-          void this.goToStep(index + 1);
+          void this.goToStep(index + 1, "forward");
         },
         onPrevClick: () => {
           this.cleanupSpeechSubscription();
           tourSpeech.stop();
-          void this.goToStep(Math.max(0, index - 1));
+          void this.goToStep(Math.max(0, index - 1), "backward");
         },
         onCloseClick: () => {
           this.cleanupSpeechSubscription();
-          this.stopTour();
+          this.stopTour(true);
         },
       },
     });
 
     const isMuted = useTourStore.getState().isAudioMuted;
-    const speech =
-      element === null && isLeadDetailsStep(step.id)
-        ? "There are no leads yet. The deal workspace will appear here after the first inquiry is captured."
-        : step.speechText || step.description;
-
     tourSpeech.speak(speech, isMuted);
   }
 
@@ -348,13 +595,37 @@ export class TourCoordinator {
     if (this.currentTour) {
       useTourStore.getState().markTourCompleted(this.currentTour.id);
     }
-    this.stopTour();
+
+    if (this.resumeContext) {
+      const { tourId, stepIndex } = this.resumeContext;
+      const completedTourName = this.currentTour?.name || "Walkthrough";
+      this.resumeContext = null;
+      const targetTour = TOURS_REGISTRY[tourId];
+      if (targetTour) {
+        toast.success(
+          `${completedTourName} complete! Resuming Sales Tour...`,
+          {
+            action: {
+              label: "Exit Tour",
+              onClick: () => this.stopTour(true),
+            },
+          },
+        );
+        void this.startTour(targetTour, stepIndex, null);
+        return;
+      }
+    }
+
+    this.stopTour(true);
   }
 
-  public stopTour() {
+  public stopTour(clearResume = true) {
     this.cleanupSpeechSubscription();
     tourSpeech.stop();
     this.stepToken += 1;
+    if (clearResume) {
+      this.resumeContext = null;
+    }
     if (this.driverObj) {
       const activeDriver = this.driverObj;
       this.driverObj = null;

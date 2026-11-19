@@ -268,7 +268,10 @@ export default function QuotationListPage() {
         </div>
       ) : null}
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div
+        data-tour="quotations-list-table"
+        className="bg-white rounded-lg shadow overflow-hidden"
+      >
         <div className="overflow-x-auto">
           <Table>
             <TableHeader className="bg-gray-50 border-b border-gray-200">

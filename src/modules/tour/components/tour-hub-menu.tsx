@@ -13,6 +13,8 @@ import { tourCoordinator } from "../tour.service";
 import { useTourStore } from "../tour.store";
 import type { TourDefinition } from "../tour.types";
 import { salesPipelineTour } from "../tours/sales-pipeline.tour";
+import { leadsDeepDiveTour } from "../tours/leads-deep-dive.tour";
+import { quotationDeepDiveTour } from "../tours/quotation-deep-dive.tour";
 
 export function TourHubMenu() {
   const navigate = useNavigate();
@@ -96,8 +98,30 @@ export function TourHubMenu() {
         >
           <PlayCircle className="size-4 text-[#1D51A4]" />
           <div>
-            <div className="font-medium">Full Sales Tour</div>
-            <div className="text-xs text-slate-500">2 min overview of pipeline</div>
+            <div className="font-medium">Global Platform Tour</div>
+            <div className="text-xs text-slate-500">Walkthrough in sidebar order</div>
+          </div>
+        </DropdownMenuItem>
+
+        <DropdownMenuItem
+          onClick={() => handleLaunchTour(leadsDeepDiveTour)}
+          className="flex items-center gap-2 cursor-pointer py-2 text-sm text-slate-700 hover:bg-slate-50"
+        >
+          <PlayCircle className="size-4 text-emerald-600" />
+          <div>
+            <div className="font-medium">Leads & Pipeline Deep Dive</div>
+            <div className="text-xs text-slate-500">4 min deep dive into leads & details</div>
+          </div>
+        </DropdownMenuItem>
+
+        <DropdownMenuItem
+          onClick={() => handleLaunchTour(quotationDeepDiveTour)}
+          className="flex items-center gap-2 cursor-pointer py-2 text-sm text-slate-700 hover:bg-slate-50"
+        >
+          <PlayCircle className="size-4 text-purple-600" />
+          <div>
+            <div className="font-medium">Quoting & Approval Flow</div>
+            <div className="text-xs text-slate-500">4 min deep dive into PEMB specs & approval</div>
           </div>
         </DropdownMenuItem>
       </DropdownMenuContent>

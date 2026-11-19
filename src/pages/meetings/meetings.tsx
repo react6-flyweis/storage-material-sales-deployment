@@ -149,7 +149,7 @@ export default function Meetings() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6" data-tour="meetings-workspace">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-900">Upcoming Meetings</h1>

@@ -149,7 +149,7 @@ export default function LeadDetails() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div data-tour="lead-details-header-actions" className="flex items-center gap-3">
             {!detail?.lead.isArchived && (
               <ArchiveLeadDialog
                 leadId={leadId}
@@ -168,6 +168,7 @@ export default function LeadDetails() {
             )}
 
             <Button
+              data-tour="lead-action-edit-btn"
               size="sm"
               variant="outline"
               className="rounded-sm shadow-md border-slate-200"
@@ -190,20 +191,22 @@ export default function LeadDetails() {
               />
             )}
 
-            {hasContract ? (
-              <Button
-                size="sm"
-                className="rounded-sm shadow-md"
-                onClick={() => {
-                  if (!leadId) return;
-                  navigate(`/leads/${leadId}/agreement`);
-                }}
-              >
-                <span>View Agreement</span>
-              </Button>
-            ) : (
-              <UploadAgreementDialog leadId={leadId} />
-            )}
+            <div data-tour="lead-action-agreement-btn">
+              {hasContract ? (
+                <Button
+                  size="sm"
+                  className="rounded-sm shadow-md"
+                  onClick={() => {
+                    if (!leadId) return;
+                    navigate(`/leads/${leadId}/agreement`);
+                  }}
+                >
+                  <span>View Agreement</span>
+                </Button>
+              ) : (
+                <UploadAgreementDialog leadId={leadId} />
+              )}
+            </div>
           </div>
         </div>
 
@@ -262,9 +265,13 @@ export default function LeadDetails() {
             onValueChange={handleTabChange}
             className="w-full"
           >
-            <TabsList variant="line" className="w-full justify-start ">
+            <TabsList data-tour="lead-details-tabs-nav" variant="line" className="w-full justify-start ">
               {TABS.map((tab) => (
-                <TabsTrigger key={tab.value} value={tab.value}>
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  data-tour={`lead-tab-trigger-${tab.value}`}
+                >
                   {tab.label}
                 </TabsTrigger>
               ))}
