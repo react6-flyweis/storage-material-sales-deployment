@@ -270,7 +270,10 @@ export default function AiScriptGeneratorPage() {
       </div>
 
       <div className="p-6">
-        <Card className="bg-white shadow-sm mb-4 py-0">
+        <Card
+          className="bg-white shadow-sm mb-4 py-0"
+          data-tour="ai-script-generator"
+        >
           <div className="flex items-center justify-between px-4 py-3 border-b">
             <div className="flex items-center gap-2">
               <DropdownMenu>
