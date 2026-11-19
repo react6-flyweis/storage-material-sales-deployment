@@ -290,7 +290,10 @@ export function QuoteHistoryPage() {
       </div>
 
       {/* Top Analytics KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4.5 items-stretch">
+      <div
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4.5 items-stretch"
+        data-tour="quote-history-kpis"
+      >
         {/* THIS MONTH Card */}
         <Card className="p-4 bg-white border-2 border-blue-500 rounded-xl shadow-xs flex flex-col justify-between h-44">
           <div>
