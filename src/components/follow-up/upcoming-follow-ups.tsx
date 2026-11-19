@@ -263,7 +263,7 @@ export default function UpcomingFollowUps({ onScheduleFollowUp }: Props) {
                     }
 
                     setSelectedDay(day);
-                    setViewMode("list");
+                    handleSetViewMode("list");
                   }}
                   aria-disabled={isPast}
                   className={cn(

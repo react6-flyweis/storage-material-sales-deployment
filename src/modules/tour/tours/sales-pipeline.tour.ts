@@ -221,7 +221,6 @@ export const salesPipelineTour: TourDefinition = {
         label: "Quoting & Approval Flow (4 min)",
         description:
           "Explore the complete quoting journey from creating PEMB building specs to sending estimate packages for approval.",
-        buttonText: "Launch Quoting Deep Dive",
         resumeStepIndex: 18,
       },
     },
