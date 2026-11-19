@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,7 +18,6 @@ import {
   useCompleteFollowUpMutation,
 } from "@/modules/followups/followups.hooks";
 import SuccessDialog from "@/components/success-dialog";
-import { useEffect } from "react";
 import type { UpcomingFollowUpItem } from "@/modules/followups/followups.api";
 import { getLeadProjectName } from "@/modules/leads/leads.utils";
 
@@ -51,13 +51,34 @@ const formatDateForInput = (day: number) => {
 };
 
 export default function UpcomingFollowUps({ onScheduleFollowUp }: Props) {
-  const [viewMode, setViewMode] = useState<ViewMode>("calendar");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlView = searchParams.get("view");
+  const [internalViewMode, setInternalViewMode] =
+    useState<ViewMode>("calendar");
+  const viewMode =
+    urlView === "list" || urlView === "calendar" ? urlView : internalViewMode;
+
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const { data: response, isLoading } = useUpcomingFollowUpsQuery();
   const apiFollowUps = response?.success ? response.data.followups : [];
 
   const completeFollowUp = useCompleteFollowUpMutation();
   const [showSuccess, setShowSuccess] = useState(false);
+
+  const handleSetViewMode = (mode: ViewMode) => {
+    setInternalViewMode(mode);
+    setSelectedDay(null);
+    if (urlView) {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set("view", mode);
+          return next;
+        },
+        { replace: true },
+      );
+    }
+  };
 
   useEffect(() => {
     if (completeFollowUp.isSuccess) {
@@ -76,7 +97,10 @@ export default function UpcomingFollowUps({ onScheduleFollowUp }: Props) {
       hour: "2-digit",
       minute: "2-digit",
     });
-    const name = getLeadProjectName(f.leadId as Record<string, unknown>, f.customerId as Record<string, unknown>);
+    const name = getLeadProjectName(
+      f.leadId as Record<string, unknown>,
+      f.customerId as Record<string, unknown>,
+    );
     const customer = f.customerId?.firstName || "";
     const type =
       f.modeOfContact === "call"
@@ -135,7 +159,7 @@ export default function UpcomingFollowUps({ onScheduleFollowUp }: Props) {
     : filteredFollowUps.slice(0, 4);
 
   return (
-    <Card className="p-6">
+    <Card className="p-6" data-tour="upcoming-followups-card">
       <div className="flex flex-col   justify-between mb-4 gap-5">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
           <div className="flex gap-2">
@@ -151,14 +175,14 @@ export default function UpcomingFollowUps({ onScheduleFollowUp }: Props) {
             Schedule
           </Button>
         </div>
-        <div className="flex gap-1 bg-gray-100 rounded-md p-1">
+        <div
+          className="flex gap-1 bg-gray-100 rounded-md p-1"
+          data-tour="followup-view-tabs"
+        >
           <Button
             size="sm"
             variant={viewMode === "calendar" ? "default" : "ghost"}
-            onClick={() => {
-              setViewMode("calendar");
-              setSelectedDay(null);
-            }}
+            onClick={() => handleSetViewMode("calendar")}
             className={cn(
               "flex-1 px-3 h-8 text-xs",
               viewMode === "calendar"
@@ -172,10 +196,7 @@ export default function UpcomingFollowUps({ onScheduleFollowUp }: Props) {
           <Button
             size="sm"
             variant={viewMode === "list" ? "default" : "ghost"}
-            onClick={() => {
-              setViewMode("list");
-              setSelectedDay(null);
-            }}
+            onClick={() => handleSetViewMode("list")}
             className={cn(
               "flex-1 px-3 h-8 text-xs",
               viewMode === "list"
@@ -200,7 +221,7 @@ export default function UpcomingFollowUps({ onScheduleFollowUp }: Props) {
       )}
 
       {viewMode === "calendar" && (
-        <div className="space-y-4">
+        <div className="space-y-4" data-tour="upcoming-followups-calendar">
           {/* Day names */}
           <div className="grid grid-cols-7 gap-2">
             {dayNames.map((day) => (
@@ -275,7 +296,7 @@ export default function UpcomingFollowUps({ onScheduleFollowUp }: Props) {
       )}
 
       {viewMode === "list" && (
-        <div className="space-y-2">
+        <div className="space-y-2" data-tour="upcoming-followups-list">
           {selectedDay && (
             <p className="text-sm text-gray-600">
               Showing follow-ups for {selectedDay}
@@ -326,12 +347,8 @@ export default function UpcomingFollowUps({ onScheduleFollowUp }: Props) {
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-md bg-white/70">{Icon}</div>
                     <div>
-                      <p className="font-semibold text-sm">
-                        {followUp.name}
-                      </p>
-                      <p className="text-sm">
-                        {followUp.customer}
-                      </p>
+                      <p className="font-semibold text-sm">{followUp.name}</p>
+                      <p className="text-sm">{followUp.customer}</p>
                       <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
                         <span className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" /> {formattedDate}
