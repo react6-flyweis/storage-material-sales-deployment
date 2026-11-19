@@ -30,7 +30,7 @@ export default function ProjectDetailsPage() {
   const activeLeadId = detail.lead._id || leadId;
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-6" data-tour="project-details-workspace">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <Button
@@ -80,7 +80,7 @@ export default function ProjectDetailsPage() {
 
 function ProjectDetailsSkeleton() {
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-6" data-tour="project-details-workspace">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="h-10 w-28 rounded-lg bg-slate-200 animate-pulse" />
