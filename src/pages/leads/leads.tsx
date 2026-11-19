@@ -247,15 +247,17 @@ export default function LeadsPage() {
 
   return (
     <div>
-      <FilterTabs
-        initialPeriod={period}
-        onPeriodChange={(newPeriod, range) => {
-          setPeriod(newPeriod);
-          setStartDate(range.startDate?.toISOString());
-          setEndDate(range.endDate?.toISOString());
-          setCurrentPage(1);
-        }}
-      />
+      <div data-tour="leads-period-filters">
+        <FilterTabs
+          initialPeriod={period}
+          onPeriodChange={(newPeriod, range) => {
+            setPeriod(newPeriod);
+            setStartDate(range.startDate?.toISOString());
+            setEndDate(range.endDate?.toISOString());
+            setCurrentPage(1);
+          }}
+        />
+      </div>
       <div className="p-4 sm:p-6 space-y-6">
         {/* Header with Top Tab List */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -270,7 +272,10 @@ export default function LeadsPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-lg w-fit self-start sm:self-auto">
+          <div
+            data-tour="leads-pipeline-toggle"
+            className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-lg w-fit self-start sm:self-auto"
+          >
             <button
               type="button"
               onClick={() => handleTabChange("active")}
@@ -312,7 +317,7 @@ export default function LeadsPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div data-tour="leads-stats-cards" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             title="Leads in Pipeline"
             value={metrics?.totalLeads ?? 0}
@@ -345,7 +350,7 @@ export default function LeadsPage() {
 
         {/* Action Buttons and Filters */}
         <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-          <div className="flex flex-wrap gap-3">
+          <div data-tour="leads-action-bar" className="flex flex-wrap gap-3">
             {!isArchived && (
               <>
                 <Link to="/leads/add" className="inline-block" data-tour="add-lead-btn">
@@ -370,7 +375,7 @@ export default function LeadsPage() {
             )}
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div data-tour="leads-filters" className="flex flex-wrap gap-3">
             <div className="relative w-full lg:w-54">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
@@ -608,8 +613,8 @@ export default function LeadsPage() {
                       </TableCell>
 
                       <TableCell className="">
-                        <div className="flex items-center gap-1">
-                          <Link to={`/leads/${lead._id}`}>
+                        <div data-tour="leads-row-actions" className="flex items-center gap-1">
+                          <Link to={`/leads/${lead._id}`} data-tour="lead-row-view-btn">
                             <Button variant="ghost" size="icon" title="View Lead">
                               <Eye className="text-purple-600 stroke-2" />
                             </Button>
