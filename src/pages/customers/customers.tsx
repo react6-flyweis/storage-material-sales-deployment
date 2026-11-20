@@ -267,8 +267,8 @@ export default function CustomersPage() {
                   >
                     <TableCell className="">{customer.customerId}</TableCell>
                     <TableCell className="">{`${customer.firstName ?? ""} ${customer.lastName ?? ""}`.trim()}</TableCell>
-                    <TableCell className="">{(customer.phone?.countryCode || "") + (customer.phone?.number || "N/A")}</TableCell>
-                    <TableCell className="">{customer.email}</TableCell>
+                    <TableCell className="">{customer.phone?.number ? `${customer.phone.countryCode || ""} ${customer.phone.number}`.trim() : "—"}</TableCell>
+                    <TableCell className="">{customer.email || "—"}</TableCell>
                     <TableCell className="">{customer.inquiryFor}</TableCell>
                     <TableCell className="">
                       <Badge
