@@ -399,7 +399,7 @@ export default function InvoiceListPage() {
         </CardContent>
       </Card>
 
-      <Card className="p-0">
+      <Card className="p-0" data-tour="invoices-table">
         <CardContent className="p-0">
           <div className="p-4 flex items-center justify-between">
             <h3 className="text-lg font-medium">Invoice List</h3>

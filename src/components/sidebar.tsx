@@ -473,6 +473,7 @@ export function Sidebar({
       )}
 
       <div
+        data-tour="sidebar-nav"
         className={`flex fixed inset-y-0 left-0 lg:left-0 lg:top-0 z-50 transition-transform duration-300 lg:translate-x-0 h-screen ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}

@@ -92,7 +92,7 @@ export default function PaymentsCard({ leadId, leadDbId, paymentsData }: Props) 
 
   return (
     <>
-      <Card className=" p-6">
+      <Card data-tour="lead-payments-card" className=" p-6">
         <div>
           <div className="text-sm text-gray-500">
             <span className="font-semibold">{leadId}</span>

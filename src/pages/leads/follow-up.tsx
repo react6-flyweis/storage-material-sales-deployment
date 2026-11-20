@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router";
 import StatCard from "@/components/ui/stat-card";
 import { useFollowUpStatsQuery } from "@/lib/metrics";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,12 @@ import LeadScoring from "@/components/follow-up/lead-scoring";
 // import FollowUpKpis from "@/components/follow-up/follow-up-kpis";
 
 export default function FollowUpPage() {
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isAddFromQuery =
+    searchParams.get("action") === "add" || searchParams.get("dialog") === "add";
+  const [manualAddOpen, setManualAddOpen] = useState(false);
+  const isAddDialogOpen = isAddFromQuery || manualAddOpen;
+
   const [initialFollowUpDate, setInitialFollowUpDate] = useState<string | null>(
     null,
   );
@@ -26,19 +32,33 @@ export default function FollowUpPage() {
 
   const openAddFollowUpDialog = (date: string | null = null) => {
     setInitialFollowUpDate(date);
-    setIsAddDialogOpen(true);
+    setManualAddOpen(true);
   };
 
   const handleAddDialogOpenChange = (open: boolean) => {
-    setIsAddDialogOpen(open);
+    setManualAddOpen(open);
 
     if (!open) {
       setInitialFollowUpDate(null);
+      if (isAddFromQuery) {
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete("action");
+            next.delete("dialog");
+            return next;
+          },
+          { replace: true },
+        );
+      }
     }
   };
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-5">
+    <div
+      className="p-4 sm:p-6 max-w-7xl mx-auto space-y-5"
+      data-tour="followups-overview"
+    >
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
@@ -51,6 +71,7 @@ export default function FollowUpPage() {
         </div>
         <Button
           onClick={() => openAddFollowUpDialog()}
+          data-tour="add-followup-btn"
           className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto mt-3 sm:mt-0"
         >
           <Plus className="w-4 h-4 mr-2" />

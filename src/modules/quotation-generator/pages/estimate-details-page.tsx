@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { useParams, useNavigate } from "react-router";
+import { useParams, useNavigate, useSearchParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -44,6 +44,7 @@ import { SendQuotationModal } from "../components/send-quotation-modal";
 export function EstimateDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const previewSectionRef = useRef<HTMLDivElement>(null);
 
@@ -87,8 +88,15 @@ export function EstimateDetailPage() {
   const [isConverting, setIsConverting] = useState(false);
   const [isMilestoneModalOpen, setIsMilestoneModalOpen] = useState(false);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
+  const isSubmitFromQuery = searchParams.get("action") === "submit-approval";
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (isSubmitFromQuery) {
+      setIsSubmitModalOpen(true);
+    }
+  }, [isSubmitFromQuery]);
 
   const { loadAndEdit, isLoading: isEditing } = useLoadEstimateToEditor();
   const convertMutation = useConvertEstimateToQuotationMutation();
@@ -408,7 +416,7 @@ export function EstimateDetailPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-6" data-tour="estimate-detail-view">
       {/* Top Action Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 no-print">
         <div className="flex items-center gap-3">
@@ -454,9 +462,10 @@ export function EstimateDetailPage() {
 
         <div className="flex flex-wrap items-center gap-3">
           {/* 1. Draft / not_submitted: Send for Approval CTA */}
-          {effectiveStatus === "draft" && (
+          {(effectiveStatus === "draft" || isSubmitFromQuery || searchParams.get("tour") === "true") && (
             <Button
               type="button"
+              data-tour="estimate-send-approval-btn"
               onClick={() => setIsSubmitModalOpen(true)}
               disabled={isConverting}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer shadow-xs"

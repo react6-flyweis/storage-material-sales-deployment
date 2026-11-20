@@ -1075,7 +1075,10 @@ export function QuoteBreakdownPricingSection({
   };
 
   return (
-    <Card className="p-6 md:p-8 bg-white border border-slate-200 shadow-xs rounded-xl space-y-6">
+    <Card
+      className="p-6 md:p-8 bg-white border border-slate-200 shadow-xs rounded-xl space-y-6"
+      data-tour="pemb-pricing-section"
+    >
       {/* Step 2 Header */}
       <CardHeader className="p-0 pb-2">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
