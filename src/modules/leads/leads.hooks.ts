@@ -58,7 +58,7 @@ type EscalatedLeadResponse = {
   customerId: {
     _id: string;
     firstName: string;
-    email: string;
+    email?: string;
   };
   escalation: {
     _id: string;
@@ -597,6 +597,8 @@ export function useUpdateLeadMutation() {
       void queryClient.invalidateQueries({
         queryKey: ["sales", "leads", "detail", variables.leadId],
       });
+      // Lead edit may also save the customer's email/phone.
+      void queryClient.invalidateQueries({ queryKey: ["customers"] });
     },
   });
 }
