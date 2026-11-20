@@ -10,7 +10,7 @@ export type ImportLeadsPayload = {
 export type LeadCustomerSummary = {
   _id: string;
   firstName: string;
-  email: string;
+  email?: string;
   isOnline?: boolean;
 };
 
@@ -106,7 +106,6 @@ export type LeadImportJobStatus = "queued" | "processing" | "completed" | "faile
 export type LeadImportErrorItem = {
   row: number;
   reason: string;
-  leadId?: string;
 };
 
 export type LeadImportJobData = {
@@ -316,6 +315,10 @@ export type CreateLeadPayload = {
   insulation: number;
   leadStatus: string;
   notes?: string;
+  /** Optional customer contact. Blank ("") leaves the saved value unchanged. */
+  email?: string;
+  phone?: string;
+  countryCode?: string;
 };
 
 export type CreateLeadResponse = {
@@ -358,7 +361,7 @@ export type LeadLookupItem = {
     customerId: string;
     firstName: string;
     lastName: string;
-    email: string;
+    email?: string;
     phone?: {
       number: string;
       countryCode: string;
@@ -409,7 +412,8 @@ export type LeadDetailCustomer = {
   _id: string;
   customerId: string;
   firstName: string;
-  email: string;
+  /** Absent when the customer has no email. */
+  email?: string;
   phone?: {
     number: string;
     countryCode: string;

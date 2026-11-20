@@ -343,11 +343,6 @@ export default function ImportLeadsDialog() {
                           <td className="px-3 py-1.5 text-gray-500">#{err.row}</td>
                           <td className="px-3 py-1.5 text-gray-700">
                             {err.reason}
-                            {err.leadId && (
-                              <span className="ml-1 text-gray-400 text-[10px]">
-                                ({err.leadId})
-                              </span>
-                            )}
                           </td>
                         </tr>
                       ))}
