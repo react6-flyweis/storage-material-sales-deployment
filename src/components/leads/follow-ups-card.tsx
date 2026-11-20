@@ -199,7 +199,7 @@ export default function FollowUpsCard({
 
   return (
     <>
-      <div className="space-y-6">
+      <div data-tour="lead-followups-card" className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card className="rounded-md">
             <CardHeader className="flex items-start justify-between border-b">

@@ -1,4 +1,4 @@
-import { Outlet, useLocation } from "react-router";
+import { Outlet, useLocation, useNavigate } from "react-router";
 import { Sidebar } from "@/components/sidebar";
 import { Header } from "@/components/header";
 import { useState, useEffect, useRef } from "react";
@@ -6,12 +6,19 @@ import { cn } from "@/lib/utils";
 import { LeadSocketListener } from "@/components/leads/lead-socket-listener";
 import { PageTracker } from "@/components/page-tracker";
 import { SocketProvider } from "@/context/SocketContext";
+import { WelcomeTourDialog } from "@/modules/tour/components/welcome-tour-dialog";
+import { tourCoordinator } from "@/modules/tour/tour.service";
 
 export function AdminLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMainCollapsed, setIsMainCollapsed] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    tourCoordinator.init(navigate);
+  }, [navigate]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -36,6 +43,7 @@ export function AdminLayout() {
       <div className="flex h-screen overflow-hidden">
         <PageTracker />
         <LeadSocketListener />
+        <WelcomeTourDialog />
         <Sidebar
           isOpen={isSidebarOpen}
           onClose={closeSidebar}

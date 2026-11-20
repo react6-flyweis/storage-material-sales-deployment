@@ -221,7 +221,11 @@ export function ExtractedQuoteFormSection({
 
   return (
     <>
-      <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6">
+      <form
+        onSubmit={handleSubmit(onFormSubmit)}
+        className="space-y-6"
+        data-tour="pemb-drawing-section"
+      >
         {/* Step 1 Card: Upload Prelim Drawing (PDF) */}
         <Card>
           <CardHeader>

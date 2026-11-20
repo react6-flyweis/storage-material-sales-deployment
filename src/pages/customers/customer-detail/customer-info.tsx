@@ -134,7 +134,10 @@ export default function CustomerDetailLayout() {
   ];
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 min-h-screen">
+    <div
+      className="p-4 sm:p-6 space-y-6 min-h-screen"
+      data-tour="customer-detail-workspace"
+    >
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3">

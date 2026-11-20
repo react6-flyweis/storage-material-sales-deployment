@@ -13,6 +13,7 @@ import { mapExtractedDrawingToFormData } from "../utils/extracted-drawing-mapper
 import { QuoteBreakdownPricingSection } from "../components/quote-breakdown-pricing-section";
 import { QuotationStickerTool } from "../components/quotation-sticker-tool";
 import { useQuotationStore } from "@/modules/quotation-generator/quotation.store";
+import { useTourStore } from "@/modules/tour/tour.store";
 import { usePricingRulesQuery } from "../pricing-rules.hooks";
 import { hydrateEstimateIntoStore } from "../hooks/use-load-estimate-to-editor";
 import {
@@ -79,6 +80,11 @@ export default function PembQuotePage() {
     estimateId?: string;
   };
 
+  const [searchParams] = useSearchParams();
+  const isTourActive =
+    searchParams.get("tour") === "true" ||
+    Boolean(useTourStore.getState().activeTourId);
+
   // Preserve state from store if already present, or use from location.state
   const quotationForm = useMemo(() => {
     if (
@@ -103,6 +109,19 @@ export default function PembQuotePage() {
         quoteDate: pembQuoteDate,
       };
     }
+    if (isTourActive) {
+      return {
+        leadId: "tour-demo-lead",
+        leadName: "Apex Logistics - Industrial Warehouse",
+        email: "procurement@apexlogistics.com",
+        street: "450 Industrial Parkway",
+        cityStateZip: "Dallas, TX 75001",
+        jobNumber: "JOB-2026-088",
+        buildingSize: "60 x 100 x 18",
+        squareFootage: "6,000",
+        quoteDate: new Date().toLocaleDateString("en-US"),
+      };
+    }
     return navState.quotationForm;
   }, [
     navState.quotationForm,
@@ -115,15 +134,16 @@ export default function PembQuotePage() {
     pembBuildingSize,
     pembSquareFootage,
     pembQuoteDate,
+    isTourActive,
   ]);
 
-  const [searchParams] = useSearchParams();
   const urlEstimateId = searchParams.get("estimateId") || searchParams.get("id");
   const activeEstimateId =
     navState.estimateId || urlEstimateId || pembEstimateId || undefined;
 
   // Check if lead data or loaded estimate data is available in state or store. If not, redirect to /quotation/pemb/create
   const hasLeadData = Boolean(
+    isTourActive ||
     (quotationForm &&
       (quotationForm.leadName ||
         quotationForm.leadId ||
@@ -359,7 +379,7 @@ export default function PembQuotePage() {
       {/* Sticky Header / Tool Section */}
       <QuotationStickerTool />
 
-      <div className="p-5 pt-0 space-y-6">
+      <div className="p-5 pt-0 space-y-6" data-tour="pemb-quote-workspace">
         {/* Top Header Banner */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">

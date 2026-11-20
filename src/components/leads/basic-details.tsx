@@ -255,7 +255,7 @@ export default function BasicDetails({
   return (
     <div className="space-y-6">
       {/* Basic Info Card */}
-      <Card className="">
+      <Card data-tour="lead-basic-info-card" className="">
         <CardHeader className="border-b  flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#EEF2FC]">
@@ -447,7 +447,7 @@ export default function BasicDetails({
       </Card>
 
       {/* Notes Section */}
-      <Card className="p-6 gap-0">
+      <Card className="p-6 gap-0" data-tour="lead-notes-card">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-[16px] font-bold text-slate-800">Notes</h3>
           <AddNotesDialog leadId={leadData?._id} />
@@ -590,7 +590,7 @@ export default function BasicDetails({
       </Dialog>
 
       {/* Project Specifications Card */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+      <div data-tour="lead-specs-card" className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
         <div className="flex items-center gap-2.5 mb-6">
           <div className="w-7 h-7 rounded-md bg-[#e8f5e9] flex items-center justify-center text-[#2e7d32]">
             <Flag className="w-4 h-4" />
@@ -676,7 +676,7 @@ export default function BasicDetails({
       </div>
 
       {/* Project Lifecycle */}
-      <Card className="">
+      <Card className="" data-tour="lead-lifecycle-status">
         <CardHeader>
           <CardTitle>Project Lifecycle</CardTitle>
         </CardHeader>
@@ -961,7 +961,7 @@ export default function BasicDetails({
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 lg:w-3/4 gap-4">
+      <div data-tour="lead-scoring-card" className="grid grid-cols-1 lg:grid-cols-3 lg:w-3/4 gap-4">
         <div className="p-4 rounded-lg border bg-white">
           <div className="text-xs tracking-wider text-gray-500 font-semibold">
             LEAD SCORING

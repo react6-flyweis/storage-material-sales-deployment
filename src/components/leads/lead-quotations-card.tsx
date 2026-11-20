@@ -169,7 +169,7 @@ export default function LeadQuotationsCard({
   const createQuotationUrl = `/quotation/pemb/create?leadId=${encodeURIComponent(leadId)}`;
 
   return (
-    <Card className="p-6 space-y-6">
+    <Card data-tour="lead-quotations-card" className="p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

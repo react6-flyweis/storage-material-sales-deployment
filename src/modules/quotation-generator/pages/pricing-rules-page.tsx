@@ -390,6 +390,7 @@ export function PricingRulesPage() {
     <form
       onSubmit={handleSubmit(onSubmit)}
       className="space-y-6 p-5"
+      data-tour="pricing-rules-workspace"
     >
       {/* Top Header Row */}
       <div className="flex items-center justify-between">

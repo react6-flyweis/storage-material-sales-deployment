@@ -207,7 +207,7 @@ export default function CustomersPage() {
           </div>
         </div>
 
-        <div className="overflow-hidden rounded bg-white">
+        <div data-tour="customers-table" className="overflow-hidden rounded bg-white">
           <Table className="table-fixed">
             <TableHeader>
               <TableRow className="border-0 bg-[#fbfbfd] hover:bg-[#fbfbfd]">

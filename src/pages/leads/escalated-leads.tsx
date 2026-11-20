@@ -92,10 +92,13 @@ export default function EscalatedLeadsPage() {
             )}
           </div>
         }
-        subtitle="Assign and view leads"
+        subtitle="View and track your escalated leads"
       />
 
-      <div className="rounded-xl bg-white border border-slate-100 shadow-sm overflow-hidden">
+      <div
+        className="rounded-xl bg-white border border-slate-100 shadow-sm overflow-hidden"
+        data-tour="escalated-leads-table"
+      >
         {isError ? (
           <div className="px-6 py-10 text-center space-y-3">
             <p className="text-sm text-slate-600">
