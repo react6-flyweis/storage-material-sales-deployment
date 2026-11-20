@@ -24,7 +24,7 @@ import { useCreateLeadMutation, useLeadDetailQuery, useUpdateLeadMutation } from
 import BusinessUnitSelector from "@/components/business-unit-selector";
 import BuildingTypeSelector from "@/components/building-type-selector";
 import InstallAddressFields from "@/components/common/install-address-fields";
-import { buildLocationString, parseLocationFallback } from "@/lib/address";
+import { buildLocationString, normalizeStateCode, parseLocationFallback } from "@/lib/address";
 
 const requiredNumber = (message: string) => z.number().min(0, message);
 
@@ -49,6 +49,13 @@ const addNewLeadSchema = z.object({
   windows: requiredNumber("Windows are required"),
   insulation: requiredNumber("Insulation is required"),
   notes: z.string().trim(),
+  // Customer contact (edit mode only). Optional; validated only when filled in.
+  email: z
+    .string()
+    .trim()
+    .refine((v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), "Please enter a valid email"),
+  countryCode: z.string().trim(),
+  phone: z.string().trim(),
 });
 
 type AddNewLeadFormValues = z.infer<typeof addNewLeadSchema>;
@@ -72,6 +79,9 @@ const defaultValues: AddNewLeadFormValues = {
   windows: 0,
   insulation: 0,
   notes: "",
+  email: "",
+  countryCode: "+1",
+  phone: "",
 };
 
 export default function AddNewLead() {
@@ -105,7 +115,10 @@ export default function AddNewLead() {
       const fallbackParsed = parseLocationFallback(lead?.location);
       const line1 = lead?.installAddress?.line1 || fallbackParsed.line1;
       const city = lead?.installAddress?.city || lead?.city || fallbackParsed.city;
-      const state = lead?.installAddress?.state || lead?.state || fallbackParsed.state;
+      const state =
+        normalizeStateCode(lead?.installAddress?.state) ||
+        normalizeStateCode(lead?.state) ||
+        normalizeStateCode(fallbackParsed.state);
       const postalCode = lead?.installAddress?.postalCode || lead?.pincode || fallbackParsed.postalCode;
 
       reset({
@@ -127,6 +140,9 @@ export default function AddNewLead() {
         windows: lead.numWindows || 0,
         insulation: lead.numInsulation || 0,
         notes: lead.notes || "",
+        email: detail.customer?.email || "",
+        countryCode: detail.customer?.phone?.countryCode || "+1",
+        phone: detail.customer?.phone?.number || "",
       });
     }
   }, [isEditMode, detail, reset]);
@@ -171,6 +187,10 @@ export default function AddNewLead() {
       insulation: values.insulation,
       notes: values.notes.trim() || undefined,
       leadStatus: detail?.lead.lifecycleStatus || "initial_contact",
+      // Contact is only editable on edit; blank values leave the saved contact unchanged.
+      ...(isEditMode
+        ? { email: values.email, phone: values.phone, countryCode: values.countryCode }
+        : {}),
     };
 
     try {
@@ -277,6 +297,40 @@ export default function AddNewLead() {
             <FieldError errors={[errors.customerId]} />
           ) : null}
         </Field>
+
+        {isEditMode ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field data-invalid={Boolean(errors.email)}>
+              <FieldLabel htmlFor="email">Customer Email</FieldLabel>
+              <Input id="email" type="email" placeholder="No email" {...register("email")} />
+              {errors.email?.message ? <FieldError errors={[errors.email]} /> : null}
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="phone">Customer Phone</FieldLabel>
+              <div className="flex gap-2">
+                <Controller
+                  control={control}
+                  name="countryCode"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger className="w-[100px] shrink-0">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="+1">+1</SelectItem>
+                        <SelectItem value="+44">+44</SelectItem>
+                        <SelectItem value="+91">+91</SelectItem>
+                        <SelectItem value="+61">+61</SelectItem>
+                        <SelectItem value="+86">+86</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                <Input id="phone" type="tel" placeholder="No phone" className="flex-1" {...register("phone")} />
+              </div>
+            </Field>
+          </div>
+        ) : null}
 
         <div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
