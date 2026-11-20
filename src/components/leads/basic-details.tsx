@@ -135,15 +135,15 @@ export default function BasicDetails({
   const createdOn = formatLeadDate(leadData?.createdAt);
   const location = formatInstallAddress(leadData?.installAddress, leadData?.location);
   const contactName = customer?.firstName?.trim() || "-";
-  const contactPhone = formatPhone(
-    typeof customer?.phone === "string"
-      ? customer.phone
-      : customer?.phone?.number,
-    typeof customer?.phone === "object"
-      ? customer?.phone?.countryCode
-      : null,
-  );
-  const contactEmail = customer?.email || "—";
+  const rawPhone =
+    typeof customer?.phone === "string" ? customer.phone : customer?.phone?.number;
+  const contactPhone = rawPhone
+    ? formatPhone(
+        rawPhone,
+        typeof customer?.phone === "object" ? customer?.phone?.countryCode : null,
+      )
+    : "No phone";
+  const contactEmail = customer?.email || "";
   const contactAddress = formatInstallAddress(leadData?.installAddress, leadData?.location);
   // const assignedToName =
   //   getAssignedEmployeeName(lead?.auditLog ?? []) ||
@@ -376,16 +376,16 @@ export default function BasicDetails({
                     <Mail className="h-4 w-4 text-slate-400 shrink-0 mt-0.5" />
                     <div className="flex text-[13px]">
                       <span className="text-slate-500 w-16">Email</span>
-                      <a
-                        href={
-                          contactEmail === "—"
-                            ? undefined
-                            : `mailto:${contactEmail}`
-                        }
-                        className="font-medium text-[#1D51A4] hover:underline"
-                      >
-                        {contactEmail}
-                      </a>
+                      {contactEmail ? (
+                        <a
+                          href={`mailto:${contactEmail}`}
+                          className="font-medium text-[#1D51A4] hover:underline"
+                        >
+                          {contactEmail}
+                        </a>
+                      ) : (
+                        <span className="font-medium text-slate-400">No email</span>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
