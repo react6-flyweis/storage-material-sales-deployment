@@ -192,6 +192,32 @@ export async function getSalesCustomerDetailProvider(customerId: string) {
   return response.data;
 }
 
+export type UpdateSalesCustomerRequest = {
+  firstName?: string;
+  /** Blank ("") leaves the saved email unchanged. */
+  email?: string;
+  /** Blank ("") leaves the saved phone unchanged. */
+  phone?: string;
+  countryCode?: string;
+};
+
+export type UpdateSalesCustomerResponse = {
+  success: boolean;
+  message: string;
+  data: { customer: SalesCustomer };
+};
+
+export async function updateSalesCustomerProvider(
+  customerId: string,
+  payload: UpdateSalesCustomerRequest,
+) {
+  const response = await apiClient.put<UpdateSalesCustomerResponse>(
+    `/api/sales/customers/${customerId}`,
+    payload,
+  );
+  return response.data;
+}
+
 export type SalesCustomerProject = {
   _id: string;
   projectId?: string;
@@ -367,8 +393,8 @@ export interface CreateBasicCustomerResponse {
       customerName: string;
       firstName?: string;
       lastName?: string;
-      email: string;
-      phone: {
+      email?: string;
+      phone?: {
         number: string;
         countryCode: string;
       };

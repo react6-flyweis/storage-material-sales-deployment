@@ -95,14 +95,9 @@ export default function AddNewCustomerModal({
       newErrors.customerName = "Customer name is required";
     }
 
-    if (!email.trim()) {
-      newErrors.email = "Email is required";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    // Email and phone are optional; only validate format when filled in.
+    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       newErrors.email = "Please enter a valid email address";
-    }
-
-    if (!phoneNumber.trim()) {
-      newErrors.phoneNumber = "Phone number is required";
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -198,7 +193,7 @@ export default function AddNewCustomerModal({
               htmlFor="modal-customer-email"
               className="text-sm font-medium text-gray-800"
             >
-              Email <span className="text-red-500">*</span>
+              Email
             </label>
             <Input
               id="modal-customer-email"
@@ -226,7 +221,7 @@ export default function AddNewCustomerModal({
                 htmlFor="modal-customer-country-code"
                 className="text-sm font-medium text-gray-800"
               >
-                Country Code <span className="text-red-500">*</span>
+                Country Code
               </label>
               <Select
                 value={countryCode}
@@ -254,7 +249,7 @@ export default function AddNewCustomerModal({
                 htmlFor="modal-customer-phone"
                 className="text-sm font-medium text-gray-800"
               >
-                Phone Number <span className="text-red-500">*</span>
+                Phone Number
               </label>
               <Input
                 id="modal-customer-phone"
