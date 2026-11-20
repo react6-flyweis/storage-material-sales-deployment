@@ -60,6 +60,17 @@ export const US_STATES: StateOption[] = [
 ];
 
 /**
+ * Normalizes a state value ("ca", " CA ", "California") to its US_STATES code.
+ * Returns "" when it can't be matched, so the state Select never gets a value with no option.
+ */
+export function normalizeStateCode(value?: string | null): string {
+  const v = value?.trim().toLowerCase();
+  if (!v) return "";
+  const match = US_STATES.find((s) => s.code.toLowerCase() === v || s.name.toLowerCase() === v);
+  return match?.code ?? "";
+}
+
+/**
  * Compiles a readable legacy `location` string from structured address parts.
  */
 export function buildLocationString(address: {

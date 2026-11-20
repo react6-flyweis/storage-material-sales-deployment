@@ -83,7 +83,10 @@ export default function InstallAddressFields({
           </Label>
           <Select
             value={values.state}
-            onValueChange={(val) => onChange("state", val)}
+            // Radix Select can emit "" when its value is set programmatically (e.g. form reset); ignore it.
+            onValueChange={(val) => {
+              if (val) onChange("state", val);
+            }}
             disabled={disabled}
           >
             <SelectTrigger

@@ -14,6 +14,8 @@ import {
   createCustomerDocumentProvider,
   deleteCustomerDocumentProvider,
   createBasicCustomerProvider,
+  updateSalesCustomerProvider,
+  type UpdateSalesCustomerRequest,
   type CreateCustomerDocumentPayload,
   type CreateSalesCustomerProjectPayload,
   type CreateBasicCustomerRequest,
@@ -143,3 +145,21 @@ export function useCreateBasicCustomerMutation() {
 }
 
 
+
+export function useUpdateSalesCustomerMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      customerId,
+      payload,
+    }: {
+      customerId: string;
+      payload: UpdateSalesCustomerRequest;
+    }) => updateSalesCustomerProvider(customerId, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["customers"] });
+      void queryClient.invalidateQueries({ queryKey: ["sales", "leads"] });
+    },
+  });
+}
