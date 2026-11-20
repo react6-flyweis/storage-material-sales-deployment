@@ -1,5 +1,7 @@
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
-import { ArrowLeft, Clock3, DollarSign, FileText, FolderKanban, MessageSquare } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, Clock3, DollarSign, FileText, FolderKanban, MessageSquare, Pencil } from "lucide-react";
+import EditCustomerContactDialog from "@/components/customers/edit-customer-contact-dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +41,7 @@ export default function CustomerDetailLayout() {
   const params = useParams();
   const id = params.id ?? "unknown";
   const [searchParams, setSearchParams] = useSearchParams();
+  const [editContactOpen, setEditContactOpen] = useState(false);
 
   const {
     data: customerDetailResponse,
@@ -80,14 +83,16 @@ export default function CustomerDetailLayout() {
   const phone =
     phoneCountryCode && phoneNumber
       ? `${phoneCountryCode} ${phoneNumber}`
-      : phoneNumber || "-";
+      : phoneNumber || "No phone";
+  // The first saved phone becomes the customer's portal password; until then they cannot log in.
+  const hasPortalLogin = Boolean(phoneNumber);
 
   const joinedDate = formatJoinedDate(customerData?.createdAt);
 
   const customer = {
     id: customerData?.customerId ?? customerData?._id ?? id,
     customerName,
-    email: customerData?.email ?? "-",
+    email: customerData?.email || "No email",
     phone,
     inquiryFor:
       customerData?.source?.trim() || customerData?.inquiryFor?.trim() || "-",
@@ -153,14 +158,34 @@ export default function CustomerDetailLayout() {
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           <Button
-            asChild
-            className="w-full sm:w-auto bg-[#4285F4] hover:bg-blue-600 text-white shadow-xs"
+            variant="outline"
+            className="w-full sm:w-auto"
+            disabled={!customerMongoId}
+            onClick={() => setEditContactOpen(true)}
           >
-            <Link to={`/communication?customerId=${customerData?._id || id}`}>
+            <Pencil className="h-4 w-4 mr-1.5" />
+            Edit Contact
+          </Button>
+          {hasPortalLogin ? (
+            <Button
+              asChild
+              className="w-full sm:w-auto bg-[#4285F4] hover:bg-blue-600 text-white shadow-xs"
+            >
+              <Link to={`/communication?customerId=${customerData?._id || id}`}>
+                <MessageSquare className="h-4 w-4 mr-1.5" />
+                Message Customer
+              </Link>
+            </Button>
+          ) : (
+            <Button
+              disabled
+              title="Add a phone number first — the customer has no portal login yet"
+              className="w-full sm:w-auto bg-[#4285F4] text-white shadow-xs"
+            >
               <MessageSquare className="h-4 w-4 mr-1.5" />
               Message Customer
-            </Link>
-          </Button>
+            </Button>
+          )}
           <Link to={`/customers/${id}/projects/new`}>
             <Button className="w-full sm:w-auto bg-[#1F86D5] hover:bg-[#1769A7]">
               Create new Project
@@ -241,6 +266,14 @@ export default function CustomerDetailLayout() {
           />
         </TabsContent>
       </Tabs>
+
+      <EditCustomerContactDialog
+        open={editContactOpen}
+        onOpenChange={setEditContactOpen}
+        customerId={customerMongoId}
+        email={customerData?.email}
+        phone={customerData?.phone}
+      />
     </div>
   );
 }
