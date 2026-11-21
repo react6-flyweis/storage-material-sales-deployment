@@ -7,6 +7,13 @@ export interface TourStepBranchConfig {
   resumeStepIndex?: number;
 }
 
+/** Shown instead of skipping the step when its target element is not rendered. */
+export interface TourStepFallbackConfig {
+  element: string;
+  description: string;
+  speechText?: string;
+}
+
 export interface TourStepConfig {
   id: string;
   route: string;
@@ -17,6 +24,7 @@ export interface TourStepConfig {
   side?: "top" | "right" | "bottom" | "left";
   align?: "start" | "center" | "end";
   branch?: TourStepBranchConfig;
+  fallback?: TourStepFallbackConfig;
 }
 
 export interface TourDefinition {
