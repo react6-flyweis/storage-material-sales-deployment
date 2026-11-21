@@ -305,6 +305,24 @@ export const leadsDeepDiveTour: TourDefinition = {
       side: "bottom",
     },
     {
+      id: "step-lead-convert-to-po",
+      route: "/leads/:leadId",
+      element: '[data-tour="lead-action-convert-po-btn"]',
+      title: "Create Purchase Order",
+      description:
+        "Once the deal is confirmed, click 'Convert to PO' to raise a purchase order for this lead. The request goes to an admin for approval, and after it is approved the lead moves to Purchase Orders.",
+      speechText:
+        "Click Convert to PO to raise a purchase order. After admin approval, the lead moves to Purchase Orders.",
+      side: "bottom",
+      fallback: {
+        element: '[data-tour="lead-details-header-actions"]',
+        description:
+          "The 'Convert to PO' button appears here once a lead moves past the Initial Contact and Requirements Gathered stages, and stays hidden after a PO has already been raised. Clicking it sends a purchase order request to an admin for approval. After approval, the lead moves to Purchase Orders.",
+        speechText:
+          "Convert to PO appears here once the lead moves past Requirements Gathered. Clicking it sends a purchase order request for admin approval, and after approval the lead moves to Purchase Orders.",
+      },
+    },
+    {
       id: "step-leads-tour-finish",
       route: "/leads",
       element: '[data-tour="tour-hub-btn"]',
