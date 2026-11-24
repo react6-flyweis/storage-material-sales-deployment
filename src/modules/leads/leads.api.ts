@@ -41,6 +41,8 @@ export type LeadListItem = {
   installAddress?: InstallAddress;
   nextFollowUp: LeadFollowUpSummary | null;
   isRaisedToPO?: boolean;
+  /** e.g. "chat", "messenger", "manual" — present when the list API returns it. */
+  source?: string;
   isOnline?: boolean;
   lastSeenAt?: string | null;
   isArchived?: boolean;
@@ -412,6 +414,7 @@ export type LeadDetailCustomer = {
   _id: string;
   customerId: string;
   firstName: string;
+  lastName?: string;
   /** Absent when the customer has no email. */
   email?: string;
   phone?: {
@@ -676,7 +679,13 @@ export type LeadDetailMessage = {
   | null;
   senderId?: string | null;
   isRead?: boolean;
-  origin?: "chat" | "call";
+  /** Storage enum: website widget, Facebook Messenger or phone call. */
+  origin?: "chat" | "messenger" | "call";
+  /** UI channel id. */
+  source?: "website" | "facebook" | "phone";
+  /** Human label for the bubble: "Website" | "Facebook" | "Phone". */
+  sourceLabel?: "Website" | "Facebook" | "Phone" | string;
+  leadId?: string;
   callSessionId?: string | null;
   channel?: string | null;
   createdAt?: string;
@@ -730,6 +739,8 @@ export type ChatStatusData = {
   canCustomerSend: boolean;
   canStaffSend: boolean;
   isCustomerOnline: boolean;
+  /** Thread channel: "website" widget or "facebook" Messenger. */
+  channel?: "website" | "facebook";
   leadOnlineAt: string | null;
   leadLastSeenAt: string | null;
   customerOnline: {
@@ -1106,7 +1117,7 @@ export async function getLeadMediaProvider(
 // Voice Call & Transcript APIs
 // -------------------------------------------------------------
 
-export type TranscriptChannel = "all" | "chat" | "call" | "summary";
+export type TranscriptChannel = "all" | "chat" | "messenger" | "call" | "summary";
 
 export type TranscriptTabStatus = {
   hasChat: boolean;
@@ -1151,6 +1162,10 @@ export type LeadTranscriptsData = {
   messages?: LeadDetailMessage[];
   chat?: {
     messageCount: number;
+    messages: LeadDetailMessage[];
+  };
+  messenger?: {
+    messageCount?: number;
     messages: LeadDetailMessage[];
   };
   call?: {
