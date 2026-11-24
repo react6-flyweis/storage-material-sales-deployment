@@ -15,6 +15,26 @@ import type {
 } from "@/modules/leads/leads.api";
 import { getLeadProjectName } from "@/modules/leads/leads.utils";
 import ChatDropOffDialog from "@/components/leads/chat-drop-off-dialog";
+import ChannelBadge from "@/components/leads/channel-badge";
+import { toast } from "sonner";
+import {
+  getMessageSource,
+  getMessageSourceLabel,
+  resolveChatChannel,
+  type ChatChannel,
+  type MessageSource,
+} from "@/lib/chat-source";
+
+function getInitials(value?: string | null, fallback = "?") {
+  const initials = (value ?? "")
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  return initials || fallback;
+}
 
 function formatLastSeen(timestamp?: string | null) {
   if (!timestamp) return "";
@@ -41,6 +61,8 @@ type ChatMessage = {
   senderName?: string | null;
   content: string;
   createdAt: string;
+  source: MessageSource;
+  sourceLabel: string;
 };
 
 // type Lead = {
@@ -91,9 +113,24 @@ type LeadChatMessagePayload = {
   content?: string;
   text?: string;
   createdAt?: string;
-  origin?: "chat" | "call";
+  origin?: "chat" | "messenger" | "call";
+  source?: "website" | "facebook" | "phone";
+  sourceLabel?: string | null;
+  leadId?: string;
   callSessionId?: string | null;
   channel?: string | null;
+};
+
+type ChatStatusSocketPayload = {
+  leadId?: string;
+  isCustomerOnline: boolean;
+  canStaffSend?: boolean;
+  channel?: "website" | "facebook";
+  leadLastSeenAt?: string | null;
+  customerOnline?: {
+    isOnline: boolean;
+    lastSeenAt?: string | null;
+  } | null;
 };
 
 function formatMessageTime(value?: string) {
@@ -128,6 +165,8 @@ function toChatMessage(
         : (message.sender ?? null),
     content,
     createdAt: message.createdAt ?? new Date().toISOString(),
+    source: getMessageSource(message),
+    sourceLabel: getMessageSourceLabel(message),
   } satisfies ChatMessage;
 }
 
@@ -171,6 +210,11 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
   const [lastSeenAt, setLastSeenAt] = useState<string | null>(
     lead.lastSeenAt ?? customer.lastSeenAt ?? null
   );
+  const [statusChannel, setStatusChannel] = useState<string | null>(null);
+  const [canStaffSend, setCanStaffSend] = useState<boolean | null>(null);
+
+  const channel: ChatChannel = resolveChatChannel(statusChannel, lead);
+  const isFacebook = channel === "facebook";
 
   const socketRef = useRef<Socket | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
@@ -194,6 +238,10 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
             setCustomerOnline(status.customerOnline.isOnline);
           }
           setLastSeenAt(status.leadLastSeenAt ?? status.customerOnline?.lastSeenAt ?? null);
+          setStatusChannel(status.channel ?? null);
+          setCanStaffSend(
+            typeof status.canStaffSend === "boolean" ? status.canStaffSend : null,
+          );
         }
       } catch (err) {
         console.error("Failed to fetch chat status", err);
@@ -376,17 +424,20 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
     };
 
     const handleError = (payload: { message?: string }) => {
-      setStatusMessage(payload.message ?? "An unexpected chat error occurred.");
+      // e.g. "Saved in the CRM, but Facebook did not accept the reply"
+      toast.error(payload.message ?? "An unexpected chat error occurred.");
     };
 
-    const handleChatStatus = (payload: {
-      isCustomerOnline: boolean;
-      leadLastSeenAt?: string | null;
-      customerOnline?: {
-        isOnline: boolean;
-        lastSeenAt?: string | null;
-      } | null;
-    }) => {
+    const handleChatStatus = (payload: ChatStatusSocketPayload) => {
+      if (payload.leadId && payload.leadId !== lead._id) {
+        return;
+      }
+      if (payload.channel) {
+        setStatusChannel(payload.channel);
+      }
+      if (typeof payload.canStaffSend === "boolean") {
+        setCanStaffSend(payload.canStaffSend);
+      }
       setLeadOnline(payload.isCustomerOnline);
       if (payload.customerOnline) {
         setCustomerOnline(payload.customerOnline.isOnline);
@@ -487,8 +538,20 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
     stopTyping();
   };
 
+  // Website: the composer closes when the customer leaves the site.
+  // Facebook: Messenger delivers replies while the customer is away, so only
+  // lock when the backend says staff cannot send (e.g. chat ended).
+  const isComposerLocked =
+    messages.length > 0 &&
+    (isFacebook ? canStaffSend === false : !customerOnline);
+  const lockedMessage = isFacebook
+    ? "Replies are disabled for this chat."
+    : "Customer is offline. Chat is closed.";
+  const showFacebookAwayHint =
+    isFacebook && messages.length > 0 && !isComposerLocked && !leadOnline;
+
   const canSend = Boolean(
-    isHydrated && lead._id && lead.customerId && input.trim(),
+    isHydrated && lead._id && lead.customerId && input.trim() && !isComposerLocked,
   );
 
   return (
@@ -521,28 +584,34 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
             <div className="relative">
               <Avatar className="h-10 w-10 bg-gray-100">
                 <AvatarFallback className="text-sm text-gray-600 font-medium">
-                  {customer.firstName
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")}
+                  {getInitials(customer.firstName)}
                 </AvatarFallback>
               </Avatar>
               {leadOnline ? (
                 <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white animate-pulse" />
-              ) : customerOnline ? (
+              ) : customerOnline && !isFacebook ? (
                 <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-white" />
               ) : null}
             </div>
             <div>
-              <div className="text-base font-semibold">
-                Chat with {customer.firstName}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-base font-semibold">
+                  Chat with {customer.firstName || "Customer"}
+                </span>
+                <ChannelBadge
+                  source={channel}
+                  label={isFacebook ? "Facebook Messenger" : "Website chat"}
+                  size="sm"
+                />
               </div>
               <div className="flex items-center gap-1.5 text-xs text-gray-500">
                 <span>{getLeadProjectName(lead as Record<string, unknown>, customer)}</span>
                 <span>•</span>
                 {leadOnline ? (
-                  <span className="text-emerald-600 font-medium">Active now</span>
-                ) : customerOnline ? (
+                  <span className="text-emerald-600 font-medium">
+                    {isFacebook ? "Active on Facebook" : "Active now"}
+                  </span>
+                ) : customerOnline && !isFacebook ? (
                   <span className="text-emerald-500 font-medium">Online on site</span>
                 ) : lastSeenAt ? (
                   <span>Last seen {formatLastSeen(lastSeenAt)}</span>
@@ -586,16 +655,19 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
         ) : (
           <div className="space-y-4">
             {messages.map((message) => {
-              const isSalesMessage = message.senderType === "sales";
+              // Staff replies (sales or admin) render on the right.
+              const isSalesMessage =
+                message.senderType === "sales" || message.senderType === "admin";
               const isAiMessage = message.senderType === "ai";
               const senderLabel = isAiMessage
-                ? "Assistant"
+                ? (message.senderName ?? "Assistant")
                 : isSalesMessage
                   ? message.senderId === currentUser?._id
                     ? "You"
-                    : (message.senderName ?? "Another Sales")
+                    : (message.senderName ??
+                      (message.senderType === "admin" ? "Admin" : "Another Sales"))
                   : message.senderType === "customer"
-                    ? customer.firstName
+                    ? (message.senderName ?? customer.firstName)
                     : "";
               // : lead.projectName;
 
@@ -614,14 +686,11 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
                         {isAiMessage
                           ? "AI"
                           : message.senderType === "customer"
-                            ? customer.firstName
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")
-                            : (getLeadProjectName(lead as Record<string, unknown>, customer) || "")
-                              .split(" ")
-                              .map((value) => value[0])
-                              .join("")}
+                            ? getInitials(customer.firstName)
+                            : getInitials(
+                              getLeadProjectName(lead as Record<string, unknown>, customer),
+                              "",
+                            )}
                       </AvatarFallback>
                     </Avatar>
                   ) : null}
@@ -644,17 +713,18 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
                       {message.content}
                     </div>
                     <div
-                      className={`text-xs text-gray-400 ${isSalesMessage ? "text-right" : "text-left"
+                      className={`flex items-center gap-1.5 text-xs text-gray-400 ${isSalesMessage ? "justify-end" : "justify-start"
                         }`}
                     >
-                      {formatMessageTime(message.createdAt)}
+                      <ChannelBadge source={message.source} label={message.sourceLabel} />
+                      <span>{formatMessageTime(message.createdAt)}</span>
                     </div>
                   </div>
 
                   {isSalesMessage ? (
                     <Avatar className="h-8 w-8 shrink-0 bg-blue-100">
                       <AvatarFallback className="text-xs text-blue-600">
-                        SL
+                        {message.senderType === "admin" ? "AD" : "SL"}
                       </AvatarFallback>
                     </Avatar>
                   ) : null}
@@ -675,7 +745,7 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
       {/* Input Area */}
       <div className="relative px-6 py-4 border-t bg-gray-50">
         <div
-          className={`flex items-center gap-2 transition-all duration-200 ${messages.length > 0 && !customerOnline
+          className={`flex items-center gap-2 transition-all duration-200 ${isComposerLocked
             ? "blur-[1.5px] pointer-events-none select-none opacity-50"
             : ""
             }`}
@@ -719,10 +789,16 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
           </Button>
         </div>
 
-        {messages.length > 0 && !customerOnline && (
+        {showFacebookAwayHint ? (
+          <div className="mt-2 text-xs text-gray-500">
+            Customer is away on Facebook — they&apos;ll see your reply in Messenger.
+          </div>
+        ) : null}
+
+        {isComposerLocked && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-50/20">
             <span className="text-sm font-medium text-gray-500 bg-white/90 px-4 py-2 rounded-full shadow-sm border border-gray-100">
-              Customer is offline. Chat is closed.
+              {lockedMessage}
             </span>
           </div>
         )}

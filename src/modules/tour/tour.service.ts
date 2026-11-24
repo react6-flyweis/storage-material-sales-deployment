@@ -222,6 +222,8 @@ export class TourCoordinator {
           : document.querySelector(step.element) === null &&
             isEstimateDetailsStep(step.id)
           ? "No saved estimates are available yet in the history. Save an estimate draft first to review formal estimate packages and submit them for approval."
+          : document.querySelector(step.element) === null && step.fallback
+          ? step.fallback.speechText || step.fallback.description
           : step.speechText || step.description;
       tourSpeech.speak(textToSpeak, false);
     });
@@ -353,6 +355,24 @@ export class TourCoordinator {
       if (isSpecialStep) {
         this.presentStep(step, index, null);
         return;
+      }
+
+      if (step.fallback) {
+        const fallbackEl = await this.waitForElement(step.fallback.element, 2000);
+        if (token !== this.stepToken || !this.currentTour || !this.driverObj) return;
+        if (fallbackEl) {
+          this.presentStep(
+            {
+              ...step,
+              element: step.fallback.element,
+              description: step.fallback.description,
+              speechText: step.fallback.speechText,
+            },
+            index,
+            step.fallback.element,
+          );
+          return;
+        }
       }
 
       console.warn(`[Tour] Element not found: ${step.element}. Skipping to next step.`);

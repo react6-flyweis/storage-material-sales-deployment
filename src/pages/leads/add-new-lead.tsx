@@ -25,6 +25,7 @@ import BusinessUnitSelector from "@/components/business-unit-selector";
 import BuildingTypeSelector from "@/components/building-type-selector";
 import InstallAddressFields from "@/components/common/install-address-fields";
 import { buildLocationString, normalizeStateCode, parseLocationFallback } from "@/lib/address";
+import { getCleanEmail, getCleanPhone } from "@/lib/chat-source";
 
 const requiredNumber = (message: string) => z.number().min(0, message);
 
@@ -140,9 +141,10 @@ export default function AddNewLead() {
         windows: lead.numWindows || 0,
         insulation: lead.numInsulation || 0,
         notes: lead.notes || "",
-        email: detail.customer?.email || "",
-        countryCode: detail.customer?.phone?.countryCode || "+1",
-        phone: detail.customer?.phone?.number || "",
+        // Never prefill legacy Messenger placeholder contact values.
+        email: getCleanEmail(detail.customer?.email),
+        countryCode: getCleanPhone(detail.customer?.phone)?.countryCode || "+1",
+        phone: getCleanPhone(detail.customer?.phone)?.number || "",
       });
     }
   }, [isEditMode, detail, reset]);
