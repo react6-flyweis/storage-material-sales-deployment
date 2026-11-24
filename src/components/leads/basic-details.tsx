@@ -36,6 +36,8 @@ import {
   // getAssignedEmployeeName,
 } from "@/modules/leads/leads.utils";
 import { formatPhone } from "@/lib/utils";
+import { getCleanEmail, getCleanPhone, isMessengerLead } from "@/lib/chat-source";
+import ChannelBadge from "@/components/leads/channel-badge";
 import {
   useUpdateLeadLifecycleMutation,
   useDeleteLeadNoteMutation,
@@ -134,16 +136,20 @@ export default function BasicDetails({
   );
   const createdOn = formatLeadDate(leadData?.createdAt);
   const location = formatInstallAddress(leadData?.installAddress, leadData?.location);
-  const contactName = customer?.firstName?.trim() || "-";
-  const rawPhone =
-    typeof customer?.phone === "string" ? customer.phone : customer?.phone?.number;
-  const contactPhone = rawPhone
-    ? formatPhone(
-        rawPhone,
-        typeof customer?.phone === "object" ? customer?.phone?.countryCode : null,
-      )
-    : "No phone";
-  const contactEmail = customer?.email || "";
+  const isMessenger = isMessengerLead(leadData);
+  const missingContactLabel = isMessenger ? "Not provided" : null;
+  const contactName =
+    [customer?.firstName, customer?.lastName]
+      .map((part) => part?.trim())
+      .filter(Boolean)
+      .join(" ") || "-";
+  // Hides legacy Messenger placeholders (fb-…@pending.messenger.local, "+0 <PSID>").
+  const cleanPhone = getCleanPhone(customer?.phone);
+  const contactPhone = cleanPhone
+    ? formatPhone(cleanPhone.number, cleanPhone.countryCode)
+    : (missingContactLabel ?? "No phone");
+  const hasContactPhone = Boolean(cleanPhone);
+  const contactEmail = getCleanEmail(customer?.email);
   const contactAddress = formatInstallAddress(leadData?.installAddress, leadData?.location);
   // const assignedToName =
   //   getAssignedEmployeeName(lead?.auditLog ?? []) ||
@@ -362,12 +368,19 @@ export default function BasicDetails({
               </h3>
               <div className="bg-[#F8FAFC] rounded-xl p-4 flex gap-4">
                 <div className="flex-1 space-y-2">
-                  <p className=" mb-1">{contactName}</p>
+                  <div className="mb-1 flex flex-wrap items-center gap-2">
+                    <p>{contactName}</p>
+                    {isMessenger ? (
+                      <ChannelBadge source="facebook" label="Facebook Messenger" size="sm" />
+                    ) : null}
+                  </div>
                   <div className="flex items-start gap-2">
                     <Phone className="h-4 w-4 text-slate-400 shrink-0 mt-0.5" />
                     <div className="flex text-[13px]">
                       <span className="text-slate-500 w-16">Phone</span>
-                      <span className="font-medium text-slate-800">
+                      <span
+                        className={`font-medium ${hasContactPhone ? "text-slate-800" : "text-slate-400"}`}
+                      >
                         {contactPhone}
                       </span>
                     </div>
@@ -384,7 +397,9 @@ export default function BasicDetails({
                           {contactEmail}
                         </a>
                       ) : (
-                        <span className="font-medium text-slate-400">No email</span>
+                        <span className="font-medium text-slate-400">
+                          {missingContactLabel ?? "No email"}
+                        </span>
                       )}
                     </div>
                   </div>
