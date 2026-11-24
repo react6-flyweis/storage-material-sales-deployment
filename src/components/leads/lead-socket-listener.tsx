@@ -4,7 +4,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useSocket } from "@/context/useSocket";
 import { getLeadProjectName } from "@/modules/leads/leads.utils";
 import { toast } from "sonner";
-import { getMessageSource } from "@/lib/chat-source";
 import LeadAssignedDialog from "./lead-assigned-dialog";
 import FollowUpReminderDialog from "./follow-up-reminder-dialog";
 
@@ -209,9 +208,6 @@ export function LeadSocketListener() {
         createdAt?: string;
         leadId?: string;
         channel?: string;
-        origin?: string;
-        source?: string;
-        sourceLabel?: string;
         senderName?: string;
         customerId?: string;
       };
@@ -220,13 +216,7 @@ export function LeadSocketListener() {
       const msg = payload.message;
       if (!msg || msg.senderType !== "customer") return;
 
-      const viaFacebook =
-        getMessageSource({
-          origin: msg.origin,
-          source: msg.source,
-          sourceLabel: msg.sourceLabel,
-        }) === "facebook";
-      const sender = `${msg.senderName || "Customer"}${viaFacebook ? " (Facebook)" : ""}`;
+      const sender = msg.senderName || "Customer";
       const preview = msg.content
         ? msg.content.length > 60
           ? `${msg.content.slice(0, 60)}...`
