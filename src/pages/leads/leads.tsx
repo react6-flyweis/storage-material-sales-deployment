@@ -63,8 +63,6 @@ import {
 import FilterTabs, { type Period } from "@/components/FilterTabs";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { isMessengerLead } from "@/lib/chat-source";
-import ChannelBadge from "@/components/leads/channel-badge";
 
 const PAGE_SIZE = 10;
 
@@ -595,7 +593,6 @@ export default function LeadsPage() {
                       </TableCell>
 
                       <TableCell className="">
-                        <div className="flex items-center gap-1.5">
                         <Link to={`/leads/${lead._id}?tab=chat`}>
                           <button className="relative flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
                             <MessageSquare className="h-4 w-4" />
@@ -613,10 +610,6 @@ export default function LeadsPage() {
                             ) : null}
                           </button>
                         </Link>
-                        {isMessengerLead(lead) ? (
-                          <ChannelBadge source="facebook" label="Messenger" />
-                        ) : null}
-                        </div>
                       </TableCell>
 
                       <TableCell className="">

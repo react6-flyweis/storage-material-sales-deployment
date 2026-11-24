@@ -37,7 +37,6 @@ import {
 } from "@/modules/leads/leads.utils";
 import { formatPhone } from "@/lib/utils";
 import { getCleanEmail, getCleanPhone, isMessengerLead } from "@/lib/chat-source";
-import ChannelBadge from "@/components/leads/channel-badge";
 import {
   useUpdateLeadLifecycleMutation,
   useDeleteLeadNoteMutation,
@@ -368,12 +367,7 @@ export default function BasicDetails({
               </h3>
               <div className="bg-[#F8FAFC] rounded-xl p-4 flex gap-4">
                 <div className="flex-1 space-y-2">
-                  <div className="mb-1 flex flex-wrap items-center gap-2">
-                    <p>{contactName}</p>
-                    {isMessenger ? (
-                      <ChannelBadge source="facebook" label="Facebook Messenger" size="sm" />
-                    ) : null}
-                  </div>
+                  <p className=" mb-1">{contactName}</p>
                   <div className="flex items-start gap-2">
                     <Phone className="h-4 w-4 text-slate-400 shrink-0 mt-0.5" />
                     <div className="flex text-[13px]">
