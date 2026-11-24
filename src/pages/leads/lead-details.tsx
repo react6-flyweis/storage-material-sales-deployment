@@ -184,7 +184,7 @@ export default function LeadDetails() {
               <MoveToOrdersDialog
                 leadId={leadId}
                 trigger={
-                  <Button className="rounded-sm shadow-md" size="sm">
+                  <Button data-tour="lead-action-convert-po-btn" className="rounded-sm shadow-md" size="sm">
                     <span>Convert to PO</span>
                   </Button>
                 }
