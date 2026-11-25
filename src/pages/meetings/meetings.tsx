@@ -237,7 +237,7 @@ export default function Meetings() {
       </div>
 
       {/* Meetings Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4">
         {isLoading
           ? Array.from({ length: 6 }).map((_, index) => (
             <Card
@@ -256,7 +256,7 @@ export default function Meetings() {
               className="p-4 gap-2  bg-[#F9FAFB] shadow border-0 ring-0"
             >
               {/* Header with title and status */}
-              <div className="flex items-start justify-between">
+              <div className="flex items-start justify-between gap-2">
                 <div>
                   <h3 className="font-semibold text-gray-900">
                     {meeting.title}
@@ -265,22 +265,22 @@ export default function Meetings() {
                     {meeting.organizer}
                   </p>
                 </div>
-                <Badge className={getStatusColor(meeting.status)}>
+                <Badge className={`shrink-0 ${getStatusColor(meeting.status)}`}>
                   {meeting.status}
                 </Badge>
               </div>
 
               {/* Meeting Details */}
-              <div className="flex items-center gap-2 space-y-1">
-                <div className="flex items-center gap-2 text-sm text-gray-600">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <div className="flex items-center gap-1.5 whitespace-nowrap text-sm text-gray-600">
                   <Calendar className="h-4 w-4" />
                   <span>{meeting.date}</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-gray-600">
+                <div className="flex items-center gap-1.5 whitespace-nowrap text-sm text-gray-600">
                   <Clock className="h-4 w-4" />
                   <span>{meeting.time}</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-gray-600">
+                <div className="flex items-center gap-1.5 whitespace-nowrap text-sm text-gray-600">
                   <Video className="h-4 w-4" />
                   <span>{meeting.type}</span>
                 </div>
@@ -298,10 +298,10 @@ export default function Meetings() {
 
               {/* Action Buttons */}
               {meeting.status !== "Completed" && meeting.status !== "Cancelled" ? (
-                <div className="flex flex-col sm:flex-row gap-2 mt-2">
+                <div className="mt-auto flex flex-wrap gap-2 pt-2">
                   <Button
                     size="sm"
-                    className="w-full sm:flex-1 bg-blue-200 text-blue-600 hover:bg-blue-100 hover:text-blue-700"
+                    className="flex-auto px-2 text-xs bg-blue-200 text-blue-600 hover:bg-blue-100 hover:text-blue-700"
                     onClick={() =>
                       navigate(`/meetings/reschedule/${meeting.id}`, {
                         state: { meeting },
@@ -312,7 +312,7 @@ export default function Meetings() {
                   </Button>
                   <Button
                     size="sm"
-                    className="w-full sm:flex-1 bg-green-100 text-green-700 hover:bg-green-50"
+                    className="flex-auto px-2 text-xs bg-green-100 text-green-700 hover:bg-green-50"
                     disabled={completeMeeting.isPending}
                     onClick={() => handleComplete(meeting)}
                   >
@@ -320,7 +320,7 @@ export default function Meetings() {
                   </Button>
                   <Button
                     size="sm"
-                    className="w-full sm:flex-1 bg-red-100 text-red-600 hover:bg-red-50"
+                    className="flex-auto px-2 text-xs bg-red-100 text-red-600 hover:bg-red-50"
                     onClick={() => setCancelTarget(meeting)}
                   >
                     Cancel
