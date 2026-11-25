@@ -57,7 +57,7 @@ export default function SuccessDialog({
           />
         </div>
 
-        <DialogFooter className={`mt-3 ${hasSecondary ? "flex flex-col-reverse sm:flex-row gap-3 sm:justify-center" : "sm:justify-center"}`}>
+        <DialogFooter className={`mt-3 min-w-0 ${hasSecondary ? "flex flex-col-reverse sm:flex-row gap-3 sm:justify-center" : "sm:justify-center"}`}>
           {hasSecondary && (
             <Button
               type="button"

@@ -10,7 +10,7 @@ type Props = {
   className?: string;
   /** Show the join URL as text above the buttons. */
   showLink?: boolean;
-  /** Center the link and buttons (e.g. inside a centered dialog). */
+  /** Boxed link with full-width, secondary buttons (e.g. inside a dialog). */
   centered?: boolean;
   /** Keep the buttons side by side on one row (e.g. in a narrow card). */
   singleRow?: boolean;
@@ -39,8 +39,12 @@ export default function MeetingLinkActions({
 }: Props) {
   if (!meetingLink && !zoomStartUrl) return null;
 
-  const buttonClass = singleRow ? "min-w-0 flex-auto shrink px-2 text-xs" : "";
-  const iconClass = singleRow ? "size-3.5" : "h-4 w-4 mr-1.5";
+  const buttonClass = singleRow
+    ? "min-w-0 flex-auto shrink px-2 text-xs"
+    : centered
+      ? "h-9 flex-auto"
+      : "";
+  const iconClass = singleRow ? "size-3.5" : "size-4";
 
   return (
     // min-w-0: lets the link truncate instead of stretching a grid/flex parent.
@@ -50,7 +54,10 @@ export default function MeetingLinkActions({
           href={meetingLink}
           target="_blank"
           rel="noopener noreferrer"
-          className="block truncate text-sm text-blue-600 hover:underline"
+          className={cn(
+            "block truncate text-sm text-blue-600 hover:underline",
+            centered && "rounded-md border bg-slate-50 px-3 py-2",
+          )}
           title={meetingLink}
         >
           {meetingLink}
@@ -60,16 +67,16 @@ export default function MeetingLinkActions({
         className={cn(
           "flex gap-2",
           !singleRow && "flex-wrap",
-          centered && "justify-center",
         )}
       >
         {zoomStartUrl ? (
           <Button
             type="button"
             size="sm"
+            variant={centered ? "outline" : "default"}
             title="Start meeting (host)"
             className={cn(
-              "bg-blue-600 text-white hover:bg-blue-700",
+              !centered && "bg-blue-600 text-white hover:bg-blue-700",
               buttonClass,
             )}
             onClick={() =>

@@ -632,7 +632,7 @@ export default function ScheduleMeeting() {
             : undefined
         }
       >
-        <div className="flex w-full flex-col items-center gap-4">
+        <div className="flex w-full min-w-0 flex-col items-center gap-3">
           {savedMeeting && isOnlineMeeting(savedMeeting.mode) ? (
             <MeetingLinkActions
               meetingLink={savedMeeting.meetingLink}
@@ -648,7 +648,7 @@ export default function ScheduleMeeting() {
               setSuccessOpen(false);
               navigate("/meetings");
             }}
-            className="w-52 bg-[#2563EB] hover:bg-[#1D4ED8]"
+            className="w-full bg-[#2563EB] hover:bg-[#1D4ED8]"
           >
             Go to meetings
           </Button>
