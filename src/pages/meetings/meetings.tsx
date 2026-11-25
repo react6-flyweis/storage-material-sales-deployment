@@ -291,6 +291,7 @@ export default function Meetings() {
                 <MeetingLinkActions
                   meetingLink={meeting.rawMeeting.meetingLink}
                   zoomStartUrl={meeting.rawMeeting.zoomStartUrl}
+                  singleRow
                   className="mt-1"
                 />
               ) : null}

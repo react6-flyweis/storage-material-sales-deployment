@@ -32,6 +32,48 @@ export function toMeetingTimeIso(date: string, time: string) {
   return new Date(`${date}T${time}:00`).toISOString();
 }
 
+/**
+ * Earliest slot that is still in the future, in the user's local timezone:
+ * the start of the next minute. At 23:59 that is 00:00 tomorrow.
+ */
+function getEarliestMeetingSlot() {
+  const slot = new Date();
+  slot.setMinutes(slot.getMinutes() + 1, 0, 0);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return {
+    date: `${slot.getFullYear()}-${pad(slot.getMonth() + 1)}-${pad(slot.getDate())}`,
+    time: `${pad(slot.getHours())}:${pad(slot.getMinutes())}`,
+  };
+}
+
+/**
+ * Minimum date (yyyy-mm-dd) for the date field, and minimum time (HH:mm) for
+ * the time field when the picked date still has past times on it.
+ */
+export function getMeetingMinimums(date: string) {
+  const earliest = getEarliestMeetingSlot();
+  return {
+    minDate: earliest.date,
+    minTime: date === earliest.date ? earliest.time : undefined,
+  };
+}
+
+/** Which field puts the meeting in the past, or undefined if it's fine. */
+export function getPastMeetingError(
+  date: string,
+  time: string,
+): { field: "date" | "time"; message: string } | undefined {
+  if (!date || !time) return undefined;
+  const earliest = getEarliestMeetingSlot();
+  if (date < earliest.date) {
+    return { field: "date", message: "Meeting date can't be in the past" };
+  }
+  if (date === earliest.date && time < earliest.time) {
+    return { field: "time", message: "Meeting time can't be in the past" };
+  }
+  return undefined;
+}
+
 export function normalizeUrl(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return "";

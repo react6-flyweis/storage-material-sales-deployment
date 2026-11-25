@@ -10,6 +10,10 @@ type Props = {
   className?: string;
   /** Show the join URL as text above the buttons. */
   showLink?: boolean;
+  /** Center the link and buttons (e.g. inside a centered dialog). */
+  centered?: boolean;
+  /** Keep the buttons side by side on one row (e.g. in a narrow card). */
+  singleRow?: boolean;
 };
 
 async function copyToClipboard(value: string) {
@@ -30,11 +34,17 @@ export default function MeetingLinkActions({
   zoomStartUrl,
   className,
   showLink = false,
+  centered = false,
+  singleRow = false,
 }: Props) {
   if (!meetingLink && !zoomStartUrl) return null;
 
+  const buttonClass = singleRow ? "min-w-0 flex-auto shrink px-2 text-xs" : "";
+  const iconClass = singleRow ? "size-3.5" : "h-4 w-4 mr-1.5";
+
   return (
-    <div className={cn("space-y-2", className)}>
+    // min-w-0: lets the link truncate instead of stretching a grid/flex parent.
+    <div className={cn("min-w-0 space-y-2", className)}>
       {showLink && meetingLink ? (
         <a
           href={meetingLink}
@@ -46,18 +56,28 @@ export default function MeetingLinkActions({
           {meetingLink}
         </a>
       ) : null}
-      <div className="flex flex-wrap gap-2">
+      <div
+        className={cn(
+          "flex gap-2",
+          !singleRow && "flex-wrap",
+          centered && "justify-center",
+        )}
+      >
         {zoomStartUrl ? (
           <Button
             type="button"
             size="sm"
-            className="bg-blue-600 text-white hover:bg-blue-700"
+            title="Start meeting (host)"
+            className={cn(
+              "bg-blue-600 text-white hover:bg-blue-700",
+              buttonClass,
+            )}
             onClick={() =>
               window.open(zoomStartUrl, "_blank", "noopener,noreferrer")
             }
           >
-            <Play className="h-4 w-4 mr-1.5" />
-            Start meeting (host)
+            <Play className={iconClass} />
+            <span className="truncate">Start meeting (host)</span>
           </Button>
         ) : null}
         {meetingLink ? (
@@ -66,22 +86,26 @@ export default function MeetingLinkActions({
               type="button"
               size="sm"
               variant="outline"
+              title="Copy join link"
+              className={buttonClass}
               onClick={() => void copyToClipboard(meetingLink)}
             >
-              <Copy className="h-4 w-4 mr-1.5" />
-              Copy join link
+              <Copy className={iconClass} />
+              <span className="truncate">Copy join link</span>
             </Button>
             {!zoomStartUrl ? (
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
+                title="Open link"
+                className={buttonClass}
                 onClick={() =>
                   window.open(meetingLink, "_blank", "noopener,noreferrer")
                 }
               >
-                <ExternalLink className="h-4 w-4 mr-1.5" />
-                Open link
+                <ExternalLink className={iconClass} />
+                <span className="truncate">Open link</span>
               </Button>
             ) : null}
           </>

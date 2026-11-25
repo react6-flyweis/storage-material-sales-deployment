@@ -29,6 +29,8 @@ import type {
   UpdateMeetingPayload,
 } from "@/modules/meetings/meetings.api";
 import {
+  getMeetingMinimums,
+  getPastMeetingError,
   hasZoomLink,
   isOnlineMeeting,
   isValidUrl,
@@ -50,7 +52,8 @@ const meetingSchema = z
     duration: z
       .string()
       .min(1, "Duration is required")
-      .regex(/^[0-9]+$/, "Duration must be a number of minutes"),
+      .regex(/^[0-9]+$/, "Duration must be a number of minutes")
+      .refine((v) => Number(v) >= 1, "Duration must be at least 1 minute"),
     reminderMinutes: z.string().optional(),
     mode: z.enum(["online", "in-person"]),
     /** Online only: skip Zoom auto-create and use a pasted link. */
@@ -188,6 +191,7 @@ export default function ScheduleMeeting() {
     handleSubmit,
     formState: { errors },
     setValue,
+    setError,
     reset,
     control,
   } = useForm<MeetingFormData>({
@@ -207,12 +211,29 @@ export default function ScheduleMeeting() {
     defaultValue: false,
   });
 
+  const selectedDate = useWatch({ control, name: "date" });
+  const { minDate, minTime } = getMeetingMinimums(selectedDate);
+
   useEffect(() => {
     reset(defaultValues);
   }, [defaultValues, reset]);
 
   const onSubmit = async (data: MeetingFormData) => {
     setErrorMessage(null);
+
+    // Block past slots. A meeting that has already passed can still have its
+    // other fields edited, so on edit only check when the date/time changed.
+    const timeChanged =
+      !isEditMode ||
+      data.date !== defaultValues.date ||
+      data.time !== defaultValues.time;
+    const pastError = timeChanged
+      ? getPastMeetingError(data.date, data.time)
+      : undefined;
+    if (pastError) {
+      setError(pastError.field, { type: "custom", message: pastError.message });
+      return;
+    }
 
     const meetingTime = toMeetingTimeIso(data.date, data.time);
     const duration = Number.parseInt(data.duration, 10);
@@ -319,7 +340,7 @@ export default function ScheduleMeeting() {
         </h1>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-6">
         {errorMessage ? (
           <p className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-600">
             {errorMessage}
@@ -388,7 +409,7 @@ export default function ScheduleMeeting() {
                 id="date"
                 type="date"
                 placeholder="dd-mm-yyyy"
-                min={new Date().toLocaleDateString("en-CA")}
+                min={minDate}
                 {...register("date")}
               />
               {errors.date && (
@@ -402,7 +423,7 @@ export default function ScheduleMeeting() {
               <Input
                 id="time"
                 type="time"
-                placeholder="dd-mm-yyyy"
+                min={minTime}
                 {...register("time")}
               />
               {errors.time && (
@@ -617,7 +638,8 @@ export default function ScheduleMeeting() {
               meetingLink={savedMeeting.meetingLink}
               zoomStartUrl={savedMeeting.zoomStartUrl}
               showLink
-              className="w-full text-left"
+              centered
+              className="w-full text-center"
             />
           ) : null}
           <Button
