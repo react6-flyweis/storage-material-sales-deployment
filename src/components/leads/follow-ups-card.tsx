@@ -22,6 +22,10 @@ import {
 import { useMemo, useState, useEffect } from "react";
 import { useCompleteFollowUpMutation } from "@/modules/followups/followups.hooks";
 import { useMeetingsQuery } from "@/modules/meetings/meetings.hooks";
+import {
+  isMeetingJoinable,
+  isOnlineMeeting,
+} from "@/modules/meetings/meetings.utils";
 import SuccessDialog from "@/components/success-dialog";
 import { useParams, Link } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -51,7 +55,10 @@ type Meeting = {
   company?: string;
   duration: string;
   action: "call" | "email";
+  /** Join link, only set while the meeting is joinable (online + scheduled). */
   meetingLink?: string;
+  /** Host start URL — staff only. */
+  zoomStartUrl?: string;
 };
 
 function mapLeadFollowUpsToDisplay(items?: LeadDetailFollowUp[]): FollowUp[] {
@@ -169,8 +176,9 @@ export default function FollowUpsCard({
         title: m.title,
         company,
         duration: `${m.duration} mins`,
-        action: m.mode === "online" ? ("call" as const) : ("email" as const),
-        meetingLink: m.meetingLink,
+        action: isOnlineMeeting(m.mode) ? ("call" as const) : ("email" as const),
+        meetingLink: isMeetingJoinable(m) ? m.meetingLink : undefined,
+        zoomStartUrl: isMeetingJoinable(m) ? m.zoomStartUrl : undefined,
       };
     });
   }, [meetingsResponse]);
@@ -333,7 +341,16 @@ export default function FollowUpsCard({
                     </div>
                     <div>
                       {m.action === "call" ? (
-                        m.meetingLink ? (
+                        m.zoomStartUrl ? (
+                          <a href={m.zoomStartUrl} target="_blank" rel="noopener noreferrer">
+                            <Button
+                              variant="ghost"
+                              className="bg-green-50 text-green-700"
+                            >
+                              <Phone className="h-4 w-4 mr-2" /> Start (host)
+                            </Button>
+                          </a>
+                        ) : m.meetingLink ? (
                           <a href={m.meetingLink} target="_blank" rel="noopener noreferrer">
                             <Button
                               variant="ghost"

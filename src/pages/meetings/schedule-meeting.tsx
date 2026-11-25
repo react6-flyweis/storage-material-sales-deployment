@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Video } from "lucide-react";
 import ClientSelector from "@/components/customers/client-selector";
 import { getApiErrorMessage } from "@/lib/api-error";
 import {
@@ -22,6 +22,19 @@ import {
   useUpdateMeetingMutation,
 } from "@/modules/meetings/meetings.hooks";
 import SuccessDialog from "@/components/success-dialog";
+import MeetingLinkActions from "@/components/meetings/meeting-link-actions";
+import { Checkbox } from "@/components/ui/checkbox";
+import type {
+  Meeting,
+  UpdateMeetingPayload,
+} from "@/modules/meetings/meetings.api";
+import {
+  hasZoomLink,
+  isOnlineMeeting,
+  isValidUrl,
+  normalizeUrl,
+  toMeetingTimeIso,
+} from "@/modules/meetings/meetings.utils";
 import {
   InputGroup,
   InputGroupAddon,
@@ -40,45 +53,42 @@ const meetingSchema = z
       .regex(/^[0-9]+$/, "Duration must be a number of minutes"),
     reminderMinutes: z.string().optional(),
     mode: z.enum(["online", "in-person"]),
+    /** Online only: skip Zoom auto-create and use a pasted link. */
+    useOwnLink: z.boolean(),
     link: z.string().optional(),
     notes: z.string().optional(),
   })
   .superRefine((data, ctx) => {
-    const checkUrl = (val: string) => {
-      let urlStr = val.trim();
-      if (!/^https?:\/\//i.test(urlStr)) {
-        urlStr = `https://${urlStr}`;
-      }
-      try {
-        new URL(urlStr);
-        return true;
-      } catch {
-        return false;
-      }
-    };
+    // Zoom accepts 15–1440 minutes.
+    const duration = Number(data.duration);
+    if (
+      data.mode === "online" &&
+      !data.useOwnLink &&
+      Number.isFinite(duration) &&
+      (duration < 15 || duration > 1440)
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Zoom meetings must be between 15 and 1440 minutes",
+        path: ["duration"],
+      });
+    }
 
-    if (data.mode === "online") {
-      if (!data.link || data.link.trim() === "") {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Meeting link is required for online meetings",
-          path: ["link"],
-        });
-      } else if (!checkUrl(data.link)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Please enter a valid meeting URL (e.g., https://zoom.us)",
-          path: ["link"],
-        });
-      }
-    } else if (data.mode === "in-person") {
-      if (data.link && data.link.trim() !== "" && !checkUrl(data.link)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Please enter a valid meeting URL (e.g., https://zoom.us)",
-          path: ["link"],
-        });
-      }
+    const link = data.link?.trim() ?? "";
+    const linkRequired = data.mode === "online" && data.useOwnLink;
+
+    if (linkRequired && !link) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Paste your meeting link, or untick \"Use my own link\"",
+        path: ["link"],
+      });
+    } else if (link && !isValidUrl(link)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Please enter a valid meeting URL (e.g., https://zoom.us/j/...)",
+        path: ["link"],
+      });
     }
   });
 
@@ -90,6 +100,10 @@ export default function ScheduleMeeting() {
   const location = useLocation();
   const isEditMode = !!id;
   const passedMeeting = location.state?.meeting;
+  const rawMeeting: Meeting | undefined = passedMeeting?.rawMeeting;
+  /** Stored link on the meeting being edited, if any. */
+  const existingLink = rawMeeting?.meetingLink?.trim() ?? "";
+  const existingIsZoom = rawMeeting ? hasZoomLink(rawMeeting) : false;
 
   const [selectedClient, setSelectedClient] = useState(() => {
     if (isEditMode && passedMeeting?.rawMeeting) {
@@ -114,6 +128,7 @@ export default function ScheduleMeeting() {
     return "";
   });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [savedMeeting, setSavedMeeting] = useState<Meeting | null>(null);
 
   const createMeetingMutation = useCreateMeetingMutation();
   const updateMeetingMutation = useUpdateMeetingMutation();
@@ -135,7 +150,11 @@ export default function ScheduleMeeting() {
         typeof raw.leadId === "string" ? raw.leadId : raw.leadId?._id || "";
 
       return {
-        mode: (raw.mode || "online") as "online" | "in-person",
+        mode: (isOnlineMeeting(raw.mode) ? "online" : "in-person") as
+          | "online"
+          | "in-person",
+        // A stored link that Zoom didn't create is a manual link.
+        useOwnLink: Boolean(raw.meetingLink?.trim()) && !hasZoomLink(raw),
         title: raw.title || "",
         date: dateStr,
         time: timeStr,
@@ -143,7 +162,7 @@ export default function ScheduleMeeting() {
         reminderMinutes: raw.reminderMinutes
           ? String(raw.reminderMinutes)
           : "30",
-        link: raw.meetingLink || "",
+        link: hasZoomLink(raw) ? "" : raw.meetingLink || "",
         notes: raw.notes || "",
         client: leadIdStr,
       };
@@ -152,10 +171,11 @@ export default function ScheduleMeeting() {
     const leadIdParam = queryParams.get("lead") || "";
     return {
       mode: "online" as const,
+      useOwnLink: false,
       title: "",
       date: "",
       time: "",
-      duration: "",
+      duration: "30",
       reminderMinutes: "30",
       link: "",
       notes: "",
@@ -181,6 +201,11 @@ export default function ScheduleMeeting() {
     name: "mode",
     defaultValue: "online",
   });
+  const useOwnLink = useWatch({
+    control,
+    name: "useOwnLink",
+    defaultValue: false,
+  });
 
   useEffect(() => {
     reset(defaultValues);
@@ -189,35 +214,57 @@ export default function ScheduleMeeting() {
   const onSubmit = async (data: MeetingFormData) => {
     setErrorMessage(null);
 
-    const meetingTime = new Date(
-      `${data.date}T${data.time}:00.000Z`,
-    ).toISOString();
-
-    let meetingLink = data.mode === "online" ? (data.link?.trim() ?? "") : "";
-    if (meetingLink && !/^https?:\/\//i.test(meetingLink)) {
-      meetingLink = `https://${meetingLink}`;
-    }
-
+    const meetingTime = toMeetingTimeIso(data.date, data.time);
+    const duration = Number.parseInt(data.duration, 10);
     const reminderMinutes = data.reminderMinutes
       ? Number(data.reminderMinutes)
       : undefined;
+    const notes = data.notes?.trim() || undefined;
+
+    // Online + Zoom (default): no meetingLink — the backend creates the Zoom
+    // meeting. Online + own link, or in person with an optional link: send it.
+    const typedLink = normalizeUrl(data.link ?? "");
+    const meetingLink =
+      data.mode === "online"
+        ? data.useOwnLink
+          ? typedLink
+          : undefined
+        : typedLink || undefined;
 
     try {
       let response;
       if (isEditMode && id) {
+        // Send only the fields that changed so the Zoom join link stays stable.
+        const initial = defaultValues;
+        const payload: UpdateMeetingPayload = {};
+        if (data.client !== initial.client) payload.leadId = data.client;
+        if (customerId && data.client !== initial.client) {
+          payload.customerId = customerId;
+        }
+        if (data.title !== initial.title) payload.title = data.title;
+        if (data.date !== initial.date || data.time !== initial.time) {
+          payload.meetingTime = meetingTime;
+        }
+        if (data.duration !== initial.duration) payload.duration = duration;
+        if (data.mode !== initial.mode) payload.mode = data.mode;
+        if (data.reminderMinutes !== initial.reminderMinutes) {
+          payload.reminderMinutes = reminderMinutes;
+        }
+        if ((data.notes ?? "") !== (initial.notes ?? "")) {
+          payload.notes = data.notes?.trim() ?? "";
+        }
+        if (meetingLink && meetingLink !== existingLink) {
+          payload.meetingLink = meetingLink;
+        }
+
+        if (Object.keys(payload).length === 0) {
+          navigate("/meetings");
+          return;
+        }
+
         response = await updateMeetingMutation.mutateAsync({
           meetingId: id,
-          payload: {
-            leadId: data.client,
-            customerId: customerId || undefined,
-            title: data.title,
-            meetingTime,
-            duration: Number.parseInt(data.duration, 10),
-            mode: data.mode,
-            meetingLink,
-            reminderMinutes,
-            notes: data.notes?.trim() || undefined,
-          },
+          payload,
         });
       } else {
         response = await createMeetingMutation.mutateAsync({
@@ -225,11 +272,11 @@ export default function ScheduleMeeting() {
           customerId: customerId || undefined,
           title: data.title,
           meetingTime,
-          duration: Number.parseInt(data.duration, 10),
+          duration,
           mode: data.mode,
-          meetingLink,
+          ...(meetingLink ? { meetingLink } : {}),
           reminderMinutes,
-          notes: data.notes?.trim() || undefined,
+          notes,
         });
       }
 
@@ -241,9 +288,10 @@ export default function ScheduleMeeting() {
         return;
       }
 
+      setSavedMeeting(response.data?.meeting ?? null);
       setSuccessOpen(true);
-      setTimeout(() => navigate("/meetings"), 500);
     } catch (error) {
+      // Zoom / config failures come back as 400 with Zoom's message.
       setErrorMessage(
         getApiErrorMessage(
           error,
@@ -441,21 +489,71 @@ export default function ScheduleMeeting() {
           </div>
 
           {/* Meeting Link */}
-          {mode === "online" && (
-            <div className="space-y-2">
-              <Label htmlFor="link">
-                Meeting Link <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="link"
-                placeholder="https://meet.google.com/xyz-abcd-efg"
-                {...register("link")}
-              />
-              {errors.link && (
-                <p className="text-sm text-red-500">{errors.link.message}</p>
-              )}
+          {mode === "online" ? (
+            <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+              {!useOwnLink ? (
+                <div className="flex items-start gap-3">
+                  <Video className="mt-0.5 h-5 w-5 text-blue-600" />
+                  <div className="space-y-1 text-sm">
+                    <p className="font-medium text-gray-900">Zoom meeting</p>
+                    {isEditMode && existingIsZoom && existingLink ? (
+                      <>
+                        <p className="text-gray-600">
+                          The join link stays the same when you reschedule.
+                        </p>
+                        <MeetingLinkActions
+                          meetingLink={existingLink}
+                          zoomStartUrl={rawMeeting?.zoomStartUrl}
+                          showLink
+                          className="pt-1"
+                        />
+                      </>
+                    ) : (
+                      <p className="text-gray-600">
+                        A Zoom link is created automatically when you save and
+                        shared with the customer.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+
+              {/* A saved manual link can't be switched back to Zoom by the API. */}
+              {!(isEditMode && existingLink && !existingIsZoom) ? (
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                  <Controller
+                    control={control}
+                    name="useOwnLink"
+                    render={({ field }) => (
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={(checked) =>
+                          field.onChange(checked === true)
+                        }
+                      />
+                    )}
+                  />
+                  Use my own link instead
+                </label>
+              ) : null}
+
+              {useOwnLink ? (
+                <div className="space-y-2">
+                  <Label htmlFor="link">
+                    Meeting Link <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="link"
+                    placeholder="https://meet.google.com/xyz-abcd-efg"
+                    {...register("link")}
+                  />
+                  {errors.link && (
+                    <p className="text-sm text-red-500">{errors.link.message}</p>
+                  )}
+                </div>
+              ) : null}
             </div>
-          )}
+          ) : null}
 
           {/* Add Notes */}
           <div className="space-y-2">
@@ -507,8 +605,33 @@ export default function ScheduleMeeting() {
           navigate("/meetings");
         }}
         title={isEditMode ? "Meeting updated" : "Meeting scheduled"}
-        okLabel="Go to meetings"
-      />
+        description={
+          savedMeeting && isOnlineMeeting(savedMeeting.mode) && savedMeeting.meetingLink
+            ? "The customer can join with this link."
+            : undefined
+        }
+      >
+        <div className="flex w-full flex-col items-center gap-4">
+          {savedMeeting && isOnlineMeeting(savedMeeting.mode) ? (
+            <MeetingLinkActions
+              meetingLink={savedMeeting.meetingLink}
+              zoomStartUrl={savedMeeting.zoomStartUrl}
+              showLink
+              className="w-full text-left"
+            />
+          ) : null}
+          <Button
+            type="button"
+            onClick={() => {
+              setSuccessOpen(false);
+              navigate("/meetings");
+            }}
+            className="w-52 bg-[#2563EB] hover:bg-[#1D4ED8]"
+          >
+            Go to meetings
+          </Button>
+        </div>
+      </SuccessDialog>
     </div>
   );
 }

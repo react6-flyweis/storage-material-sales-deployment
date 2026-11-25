@@ -5,9 +5,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-// import { getApiErrorMessage } from "@/lib/api-error";
-import { useMeetingsQuery } from "@/modules/meetings/meetings.hooks";
-import type { Meeting as ApiMeeting } from "@/modules/meetings/meetings.api";
+import { toast } from "sonner";
+import { getApiErrorMessage } from "@/lib/api-error";
+import {
+  useCancelMeetingMutation,
+  useCompleteMeetingMutation,
+  useMeetingsQuery,
+} from "@/modules/meetings/meetings.hooks";
+import type {
+  Meeting as ApiMeeting,
+  MeetingStatus,
+} from "@/modules/meetings/meetings.api";
+import {
+  isMeetingJoinable,
+  isOnlineMeeting,
+} from "@/modules/meetings/meetings.utils";
+import MeetingLinkActions from "@/components/meetings/meeting-link-actions";
+import CancelMeetingDialog from "@/components/meetings/cancel-meeting-dialog";
 import {
   Select,
   SelectContent,
@@ -23,8 +37,9 @@ interface Meeting {
   date: string;
   time: string;
   type: "Online" | "In-person";
-  status: "Scheduled" | "Cancelled" | "Completed";
-  rawMeeting?: ApiMeeting;
+  status: "Scheduled" | "Cancelled" | "Completed" | "Rescheduled";
+  joinable: boolean;
+  rawMeeting: ApiMeeting;
 }
 
 function getMeetingUserDisplayName(
@@ -65,6 +80,8 @@ function mapApiMeetingToUI(apiMeeting: ApiMeeting): Meeting {
     formattedStatus = "Completed";
   } else if (status === "cancelled") {
     formattedStatus = "Cancelled";
+  } else if (status === "rescheduled") {
+    formattedStatus = "Rescheduled";
   }
 
   return {
@@ -84,8 +101,9 @@ function mapApiMeetingToUI(apiMeeting: ApiMeeting): Meeting {
         hour12: true,
       })
       : "",
-    type: apiMeeting.mode === "online" ? "Online" : "In-person",
+    type: isOnlineMeeting(apiMeeting.mode) ? "Online" : "In-person",
     status: formattedStatus,
+    joinable: isMeetingJoinable(apiMeeting),
     rawMeeting: apiMeeting,
   };
 }
@@ -94,12 +112,38 @@ export default function Meetings() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [cancelTarget, setCancelTarget] = useState<Meeting | null>(null);
+  // The API hides completed/cancelled meetings unless a status is requested.
   const {
     data: meetingsResponse,
     isLoading,
-    // error,
-    // refetch,
-  } = useMeetingsQuery();
+  } = useMeetingsQuery(
+    statusFilter === "all"
+      ? undefined
+      : { status: statusFilter as MeetingStatus },
+  );
+  const completeMeeting = useCompleteMeetingMutation();
+  const cancelMeeting = useCancelMeetingMutation();
+
+  const handleComplete = (meeting: Meeting) => {
+    completeMeeting.mutate(meeting.id, {
+      onSuccess: () => toast.success("Meeting marked as completed"),
+      onError: (error) =>
+        toast.error(getApiErrorMessage(error, "Unable to complete meeting.")),
+    });
+  };
+
+  const handleCancel = () => {
+    if (!cancelTarget) return;
+    cancelMeeting.mutate(cancelTarget.id, {
+      onSuccess: () => {
+        toast.success("Meeting cancelled");
+        setCancelTarget(null);
+      },
+      onError: (error) =>
+        toast.error(getApiErrorMessage(error, "Unable to cancel meeting.")),
+    });
+  };
 
   const meetings = useMemo(() => {
     const responseData = meetingsResponse?.data;
@@ -141,6 +185,8 @@ export default function Meetings() {
         return "bg-green-100 text-green-700 hover:bg-green-100";
       case "Scheduled":
         return "bg-yellow-100 text-yellow-700 hover:bg-yellow-100";
+      case "Rescheduled":
+        return "bg-blue-100 text-blue-700 hover:bg-blue-100";
       case "Cancelled":
         return "bg-red-100 text-red-700 hover:bg-red-100";
       default:
@@ -175,6 +221,7 @@ export default function Meetings() {
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
               <SelectItem value="scheduled">Scheduled</SelectItem>
+              <SelectItem value="rescheduled">Rescheduled</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
@@ -188,17 +235,6 @@ export default function Meetings() {
           Schedule meeting
         </Button>
       </div>
-
-      {/* {isError ? (
-        <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3">
-          <p className="text-sm text-red-700">
-            {getApiErrorMessage(error, "Unable to load meetings.")}
-          </p>
-          <Button className="mt-3" variant="outline" onClick={() => refetch()}>
-            Try again
-          </Button>
-        </div>
-      ) : null} */}
 
       {/* Meetings Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -250,9 +286,18 @@ export default function Meetings() {
                 </div>
               </div>
 
+              {/* Join / host */}
+              {meeting.joinable ? (
+                <MeetingLinkActions
+                  meetingLink={meeting.rawMeeting.meetingLink}
+                  zoomStartUrl={meeting.rawMeeting.zoomStartUrl}
+                  className="mt-1"
+                />
+              ) : null}
+
               {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-2 mt-2">
-                {meeting.status !== "Completed" && (
+              {meeting.status !== "Completed" && meeting.status !== "Cancelled" ? (
+                <div className="flex flex-col sm:flex-row gap-2 mt-2">
                   <Button
                     size="sm"
                     className="w-full sm:flex-1 bg-blue-200 text-blue-600 hover:bg-blue-100 hover:text-blue-700"
@@ -262,32 +307,43 @@ export default function Meetings() {
                       })
                     }
                   >
-                    Edit
+                    Edit / Reschedule
                   </Button>
-                )}
-                <Button
-                  size="sm"
-                  className="w-full sm:flex-1 bg-orange-200 text-orange-600 hover:bg-orange-100 hover:text-orange-700"
-                  onClick={() =>
-                    navigate(`/meetings/reschedule/${meeting.id}`, {
-                      state: { meeting },
-                    })
-                  }
-                >
-                  Reschedule meeting
-                </Button>
-              </div>
+                  <Button
+                    size="sm"
+                    className="w-full sm:flex-1 bg-green-100 text-green-700 hover:bg-green-50"
+                    disabled={completeMeeting.isPending}
+                    onClick={() => handleComplete(meeting)}
+                  >
+                    Mark complete
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="w-full sm:flex-1 bg-red-100 text-red-600 hover:bg-red-50"
+                    onClick={() => setCancelTarget(meeting)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              ) : null}
             </Card>
           ))}
       </div>
 
       {/* Empty State */}
-      {/* {!isLoading && !isError && filteredMeetings.length === 0 && ( */}
       {!isLoading && filteredMeetings.length === 0 && (
         <div className="text-center py-12">
           <p className="text-gray-500">No meetings found</p>
         </div>
       )}
+
+      <CancelMeetingDialog
+        open={Boolean(cancelTarget)}
+        title={cancelTarget?.title}
+        isPending={cancelMeeting.isPending}
+        onOpenChange={(open) => !open && setCancelTarget(null)}
+        onConfirm={handleCancel}
+      />
     </div>
   );
 }
