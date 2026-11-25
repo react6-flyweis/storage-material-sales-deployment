@@ -23,10 +23,13 @@ export function hasZoomLink(meeting: Pick<Meeting, "zoomMeetingId">) {
 
 /**
  * Build the ISO 8601 `meetingTime` sent to the API from the picked date
- * (yyyy-mm-dd) and time (HH:mm).
+ * (yyyy-mm-dd) and time (HH:mm). The picked values are in the user's local
+ * timezone, so e.g. 15:00 in IST is sent as 09:30Z — matching what the edit
+ * form and lists display (they read meetingTime back in local time) and what
+ * Zoom shows in the invite.
  */
 export function toMeetingTimeIso(date: string, time: string) {
-  return new Date(`${date}T${time}:00.000Z`).toISOString();
+  return new Date(`${date}T${time}:00`).toISOString();
 }
 
 export function normalizeUrl(value: string) {
