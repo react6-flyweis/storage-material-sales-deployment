@@ -36,7 +36,7 @@ import {
   // getAssignedEmployeeName,
 } from "@/modules/leads/leads.utils";
 import { formatPhone } from "@/lib/utils";
-import { getCleanEmail, getCleanPhone, isMessengerLead } from "@/lib/chat-source";
+import { getCleanEmail, getCleanPhone, isOptionalContactLead } from "@/lib/chat-source";
 import {
   useUpdateLeadLifecycleMutation,
   useDeleteLeadNoteMutation,
@@ -135,7 +135,8 @@ export default function BasicDetails({
   );
   const createdOn = formatLeadDate(leadData?.createdAt);
   const location = formatInstallAddress(leadData?.installAddress, leadData?.location);
-  const isMessenger = isMessengerLead(leadData);
+  // Messenger / Meta lead ad leads may legitimately have no email or phone.
+  const isMessenger = isOptionalContactLead(leadData);
   const missingContactLabel = isMessenger ? "Not provided" : null;
   const contactName =
     [customer?.firstName, customer?.lastName]

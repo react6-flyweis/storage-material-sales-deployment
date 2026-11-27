@@ -1,4 +1,4 @@
-import { Globe, MessageCircle, Phone } from "lucide-react";
+import { ClipboardList, Globe, MessageCircle, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { MessageSource } from "@/lib/chat-source";
 
@@ -18,6 +18,11 @@ const STYLES: Record<MessageSource, { label: string; className: string; Icon: ty
     className: "bg-amber-50 text-amber-800 border-amber-200",
     Icon: Phone,
   },
+  facebook_lead_ad: {
+    label: "Meta lead ad",
+    className: "bg-[#EEF0FF] text-[#4F46E5] border-[#D6D9FB]",
+    Icon: ClipboardList,
+  },
 };
 
 type Props = {
@@ -29,7 +34,7 @@ type Props = {
 };
 
 export default function ChannelBadge({ source, label, size = "xs", className }: Props) {
-  const style = STYLES[source];
+  const style = STYLES[source] ?? STYLES.website;
   const Icon = style.Icon;
 
   return (
