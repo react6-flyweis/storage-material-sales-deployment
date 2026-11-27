@@ -7,6 +7,9 @@ import RestoreLeadDialog from "@/components/leads/restore-lead-dialog";
 import BasicDetails from "@/components/leads/basic-details";
 import LeadQuotationsCard from "@/components/leads/lead-quotations-card";
 import LeadTranscriptsCard from "@/components/leads/lead-transcripts-card";
+import LeadDetailsErrorState, {
+  getLeadDetailsErrorKind,
+} from "@/components/leads/lead-details-error-state";
 import TimelineCard from "@/components/leads/timeline-card";
 import FollowUpsCard from "@/components/leads/follow-ups-card";
 import PaymentsCard from "@/components/leads/payments-card";
@@ -91,7 +94,14 @@ export default function LeadDetails() {
   const navigate = useNavigate();
   const location = useLocation();
   const { leadId } = useParams<{ leadId: string }>();
-  const { data: response, isLoading } = useLeadDetailQuery(leadId);
+  const {
+    data: response,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isRefetching,
+  } = useLeadDetailQuery(leadId);
 
   const detail = response?.success ? response.data : undefined;
   const canMoveToOrders =
@@ -118,8 +128,23 @@ export default function LeadDetails() {
     navigate(`/leads/${leadId}?tab=${tab}`);
   };
 
-  if (isLoading || !detail) {
+  if (isLoading) {
     return <LeadDetailsSkeleton />;
+  }
+
+  // No id in the URL, request failed, or the API answered without a lead
+  // (previously this showed the skeleton forever).
+  if (!leadId || isError || !detail?.lead) {
+    return (
+      <LeadDetailsErrorState
+        kind={!leadId || !isError ? "not_found" : getLeadDetailsErrorKind(error)}
+        error={error}
+        leadId={leadId}
+        onBack={() => navigate("/leads")}
+        onRetry={() => refetch()}
+        isRetrying={isRefetching}
+      />
+    );
   }
 
   const documents = detail?.lead?.documents;

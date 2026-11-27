@@ -39,6 +39,8 @@ import BuildingTypeSelector from "@/components/building-type-selector";
 import BusinessUnitSelector from "@/components/business-unit-selector";
 import { formatBusinessUnit } from "@/modules/leads/business-unit";
 import { formatInstallAddress } from "@/lib/address";
+import ChannelBadge from "@/components/leads/channel-badge";
+import { getLeadSourceBadge } from "@/lib/chat-source";
 import SuccessDialog from "@/components/success-dialog";
 import ProgressDots from "@/components/ui/progress-dots";
 import {
@@ -546,6 +548,15 @@ export default function LeadsPage() {
                             >
                               {lead.businessUnitLabel || (lead.businessUnit ? formatBusinessUnit(lead.businessUnit) : "Not set")}
                             </Badge>
+                            {(() => {
+                              const sourceBadge = getLeadSourceBadge(lead.source);
+                              return sourceBadge ? (
+                                <ChannelBadge
+                                  source={sourceBadge.source}
+                                  label={sourceBadge.label}
+                                />
+                              ) : null;
+                            })()}
                             <span className="text-xs text-gray-500">
                               · {lead.buildingType || "-"} · {formatInstallAddress(lead.installAddress, lead.location)}
                             </span>

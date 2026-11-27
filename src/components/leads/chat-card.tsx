@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import {
   getMessageSource,
   getMessageSourceLabel,
+  isMetaLeadAdLead,
   resolveChatChannel,
   type ChatChannel,
   type MessageSource,
@@ -113,8 +114,8 @@ type LeadChatMessagePayload = {
   content?: string;
   text?: string;
   createdAt?: string;
-  origin?: "chat" | "messenger" | "call";
-  source?: "website" | "facebook" | "phone";
+  origin?: "chat" | "messenger" | "call" | "meta_lead";
+  source?: "website" | "facebook" | "phone" | "facebook_lead_ad";
   sourceLabel?: string | null;
   leadId?: string;
   callSessionId?: string | null;
@@ -215,6 +216,8 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
 
   const channel: ChatChannel = resolveChatChannel(statusChannel, lead);
   const isFacebook = channel === "facebook";
+  // Meta instant form lead: no live thread — the first message is the form summary.
+  const isMetaLead = isMetaLeadAdLead(lead);
 
   const socketRef = useRef<Socket | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
@@ -541,14 +544,18 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
   // Website: the composer closes when the customer leaves the site.
   // Facebook: Messenger delivers replies while the customer is away, so only
   // lock when the backend says staff cannot send (e.g. chat ended).
-  const isComposerLocked =
-    messages.length > 0 &&
-    (isFacebook ? canStaffSend === false : !customerOnline);
-  const lockedMessage = isFacebook
-    ? "Replies are disabled for this chat."
-    : "Customer is offline. Chat is closed.";
+  // Meta lead ad: locked unless the backend explicitly allows staff to send.
+  const isComposerLocked = isMetaLead
+    ? canStaffSend !== true
+    : messages.length > 0 &&
+      (isFacebook ? canStaffSend === false : !customerOnline);
+  const lockedMessage = isMetaLead
+    ? "This lead came from a Meta instant form — follow up by phone or email."
+    : isFacebook
+      ? "Replies are disabled for this chat."
+      : "Customer is offline. Chat is closed.";
   const showFacebookAwayHint =
-    isFacebook && messages.length > 0 && !isComposerLocked && !leadOnline;
+    isFacebook && !isMetaLead && messages.length > 0 && !isComposerLocked && !leadOnline;
 
   const canSend = Boolean(
     isHydrated && lead._id && lead.customerId && input.trim() && !isComposerLocked,
@@ -599,15 +606,23 @@ export default function ChatCard({ lead, customer, recentMessages }: Props) {
                   Chat with {customer.firstName || "Customer"}
                 </span>
                 <ChannelBadge
-                  source={channel}
-                  label={isFacebook ? "Facebook Messenger" : "Website chat"}
+                  source={isMetaLead ? "facebook_lead_ad" : channel}
+                  label={
+                    isMetaLead
+                      ? "Meta lead ad"
+                      : isFacebook
+                        ? "Facebook Messenger"
+                        : "Website chat"
+                  }
                   size="sm"
                 />
               </div>
               <div className="flex items-center gap-1.5 text-xs text-gray-500">
                 <span>{getLeadProjectName(lead as Record<string, unknown>, customer)}</span>
                 <span>•</span>
-                {leadOnline ? (
+                {isMetaLead ? (
+                  <span>Instant form lead</span>
+                ) : leadOnline ? (
                   <span className="text-emerald-600 font-medium">
                     {isFacebook ? "Active on Facebook" : "Active now"}
                   </span>
