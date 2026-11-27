@@ -36,7 +36,15 @@ import {
   // getAssignedEmployeeName,
 } from "@/modules/leads/leads.utils";
 import { formatPhone } from "@/lib/utils";
-import { getCleanEmail, getCleanPhone, isOptionalContactLead } from "@/lib/chat-source";
+import {
+  getCleanEmail,
+  getCleanPhone,
+  getLeadSourceBadge,
+  isMetaLeadAdLead,
+  isOptionalContactLead,
+} from "@/lib/chat-source";
+import ChannelBadge from "@/components/leads/channel-badge";
+import MetaLeadFormCard from "@/components/leads/meta-lead-form-card";
 import {
   useUpdateLeadLifecycleMutation,
   useDeleteLeadNoteMutation,
@@ -137,6 +145,8 @@ export default function BasicDetails({
   const location = formatInstallAddress(leadData?.installAddress, leadData?.location);
   // Messenger / Meta lead ad leads may legitimately have no email or phone.
   const isMessenger = isOptionalContactLead(leadData);
+  const isMetaLead = isMetaLeadAdLead(leadData);
+  const sourceBadge = getLeadSourceBadge(leadData?.source);
   const missingContactLabel = isMessenger ? "Not provided" : null;
   const contactName =
     [customer?.firstName, customer?.lastName]
@@ -286,6 +296,13 @@ export default function BasicDetails({
                 >
                   {formatBusinessUnit(leadData?.businessUnit, leadData?.businessUnitLabel)}
                 </Badge>
+                {sourceBadge ? (
+                  <ChannelBadge
+                    source={sourceBadge.source}
+                    label={sourceBadge.label}
+                    size="sm"
+                  />
+                ) : null}
               </div>
               <p className="text-[13px] text-slate-500 mt-1">
                 {projectReference}
@@ -455,6 +472,9 @@ export default function BasicDetails({
           </div>
         </CardFooter>
       </Card>
+
+      {/* Meta lead ad instant form — answers not already mapped to lead / customer */}
+      <MetaLeadFormCard metaLeadAd={lead?.metaLeadAd} isMetaLead={isMetaLead} />
 
       {/* Notes Section */}
       <Card className="p-6 gap-0" data-tour="lead-notes-card">

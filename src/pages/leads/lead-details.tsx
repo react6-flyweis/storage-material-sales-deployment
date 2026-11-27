@@ -7,8 +7,6 @@ import RestoreLeadDialog from "@/components/leads/restore-lead-dialog";
 import BasicDetails from "@/components/leads/basic-details";
 import LeadQuotationsCard from "@/components/leads/lead-quotations-card";
 import LeadTranscriptsCard from "@/components/leads/lead-transcripts-card";
-import MetaLeadFormCard from "@/components/leads/meta-lead-form-card";
-import { isMetaLeadAdLead } from "@/lib/chat-source";
 import LeadDetailsErrorState, {
   getLeadDetailsErrorKind,
 } from "@/components/leads/lead-details-error-state";
@@ -304,13 +302,8 @@ export default function LeadDetails() {
               ))}
             </TabsList>
 
-            <TabsContent value="basic-info" className="mt-6 space-y-6">
+            <TabsContent value="basic-info" className="mt-6">
               <BasicDetails lead={detail} />
-              {/* Meta lead ad instant form — answers not already mapped to lead / customer */}
-              <MetaLeadFormCard
-                metaLeadAd={detail.metaLeadAd}
-                isMetaLead={isMetaLeadAdLead(detail.lead)}
-              />
             </TabsContent>
             <TabsContent value="quotations" className="mt-6">
               <LeadQuotationsCard
